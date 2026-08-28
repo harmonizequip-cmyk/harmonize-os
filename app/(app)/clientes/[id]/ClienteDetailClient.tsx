@@ -168,6 +168,8 @@ export default function ClienteDetailClient({
       {modalOpen && (
         <NovaLocacaoModal
           clientId={client.id}
+          clientName={client.name}
+          clientWhatsapp={client.whatsapp}
           equipments={equipments}
           onClose={() => setModalOpen(false)}
           onCreated={handleCreated}

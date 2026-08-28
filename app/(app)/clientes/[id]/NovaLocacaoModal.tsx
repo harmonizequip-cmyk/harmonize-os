@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calculateRentalValue } from "@/lib/rental-pricing";
+import { buildWhatsAppSummary, buildWhatsAppLink } from "@/lib/rental-summary";
 import { formatCurrency } from "@/lib/format";
 
 const PAYMENT_METHODS = [
@@ -22,11 +23,15 @@ interface EquipmentOption {
 
 export default function NovaLocacaoModal({
   clientId,
+  clientName,
+  clientWhatsapp,
   equipments,
   onClose,
   onCreated,
 }: {
   clientId: string;
+  clientName: string;
+  clientWhatsapp?: string | null;
   equipments: EquipmentOption[];
   onClose: () => void;
   onCreated: () => void;
@@ -34,27 +39,46 @@ export default function NovaLocacaoModal({
   const supabase = createClient();
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [shots, setShots] = useState("");
+  const [initialCount, setInitialCount] = useState("");
+  const [finalCount, setFinalCount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const shotsNumber = Number(shots.replace(/\D/g, ""));
+  const initialNumber = Number(initialCount.replace(/\D/g, ""));
+  const finalNumber = Number(finalCount.replace(/\D/g, ""));
+  const shots = finalCount && initialCount ? finalNumber - initialNumber : 0;
+
   const pricing = useMemo(() => {
-    if (!shotsNumber || shotsNumber <= 0) return null;
+    if (!shots || shots <= 0) return null;
     try {
-      return calculateRentalValue(shotsNumber);
+      return calculateRentalValue(shots);
     } catch {
       return null;
     }
-  }, [shotsNumber]);
+  }, [shots]);
 
   async function handleSave() {
-    if (!equipmentId || !eventDate || !pricing) {
-      setError("Preencha o equipamento, a data e a quantidade de disparos.");
+    if (!equipmentId || !eventDate) {
+      setError("Preencha o equipamento e a data.");
       return;
     }
+    if (!initialCount || !finalCount) {
+      setError("Preencha a contagem inicial e final do equipamento.");
+      return;
+    }
+    if (finalNumber <= initialNumber) {
+      setError("A contagem final precisa ser maior que a inicial.");
+      return;
+    }
+    if (!pricing) {
+      setError("Não foi possível calcular o valor. Confira as contagens.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -62,7 +86,7 @@ export default function NovaLocacaoModal({
       p_client_id: clientId,
       p_equipment_id: equipmentId,
       p_event_date: eventDate,
-      p_shots: shotsNumber,
+      p_shots: shots,
       p_calculated_value: pricing.totalValue,
       p_payment_method: paymentMethod,
       p_notes: notes || null,
@@ -80,7 +104,70 @@ export default function NovaLocacaoModal({
       return;
     }
 
-    onCreated();
+    setSummary(
+      buildWhatsAppSummary({
+        initialCount: initialNumber,
+        finalCount: finalNumber,
+        pricing,
+        eventDate,
+        clientName,
+        paymentMethod,
+      })
+    );
+  }
+
+  async function handleCopy() {
+    if (!summary) return;
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+    }
+  }
+
+  const whatsappLink = summary ? buildWhatsAppLink(clientWhatsapp, summary) : null;
+
+  // Tela de sucesso: locação já salva, mostra o resumo para copiar/enviar
+  if (summary) {
+    return (
+      <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900">Locação salva ✅</h2>
+          <p className="mb-4 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
+
+          <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
+            {summary}
+          </pre>
+
+          <div className="mt-4 flex flex-col gap-2">
+            {whatsappLink && (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl bg-brand-teal py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-teal-dark"
+              >
+                Enviar no WhatsApp
+              </a>
+            )}
+            <button
+              onClick={handleCopy}
+              className="rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
+            >
+              {copied ? "Copiado!" : "Copiar texto"}
+            </button>
+            <button
+              onClick={onCreated}
+              className="rounded-xl bg-neutral-900 py-2.5 text-sm font-medium text-white"
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -117,16 +204,34 @@ export default function NovaLocacaoModal({
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Quantidade de disparos</label>
-            <input
-              inputMode="numeric"
-              value={shots}
-              onChange={(e) => setShots(e.target.value)}
-              placeholder="Ex: 45000"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Contagem inicial</label>
+              <input
+                inputMode="numeric"
+                value={initialCount}
+                onChange={(e) => setInitialCount(e.target.value)}
+                placeholder="Ex: 2907661"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Contagem final</label>
+              <input
+                inputMode="numeric"
+                value={finalCount}
+                onChange={(e) => setFinalCount(e.target.value)}
+                placeholder="Ex: 2942213"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </div>
           </div>
+
+          {shots > 0 && (
+            <p className="text-xs text-neutral-500">
+              Disparos realizados: <span className="font-medium text-neutral-700">{shots.toLocaleString("pt-BR")}</span>
+            </p>
+          )}
 
           {pricing && (
             <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">

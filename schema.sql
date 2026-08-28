@@ -336,7 +336,7 @@ begin
 
   select code into v_equipment_code from equipments where id = p_equipment_id;
   select name into v_client_name from clients where id = p_client_id;
-  select id into v_category_id from categories where name = 'Locação' and type = 'entrada' and is_default = true limit 1;
+  select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
 
   insert into rentals (client_id, equipment_id, event_date, shots, calculated_value, payment_method, notes, created_by)
   values (p_client_id, p_equipment_id, p_event_date, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by)
