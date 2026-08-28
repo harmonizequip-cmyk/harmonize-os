@@ -301,6 +301,65 @@ create policy "limits_rw_pessoal" on expense_limits for all
   with check (scope = 'pessoal');
 
 -- ============================================================
+-- FUNÇÃO: create_rental
+-- Cria a locação, a entrada financeira e o evento de agenda em uma
+-- única operação atômica. Se o equipamento já estiver reservado no
+-- período (constraint no_equipment_double_booking), a função inteira
+-- é revertida e o erro sobe para quem chamou — nada fica gravado
+-- pela metade.
+-- ============================================================
+create or replace function public.create_rental(
+  p_client_id uuid,
+  p_equipment_id uuid,
+  p_event_date date,
+  p_shots integer,
+  p_calculated_value numeric,
+  p_payment_method payment_method_type,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_category_id uuid;
+  v_equipment_code equipment_code_type;
+  v_client_name text;
+  v_created_by uuid := auth.uid();
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para criar locações';
+  end if;
+
+  select code into v_equipment_code from equipments where id = p_equipment_id;
+  select name into v_client_name from clients where id = p_client_id;
+  select id into v_category_id from categories where name = 'Locação' and type = 'entrada' and is_default = true limit 1;
+
+  insert into rentals (client_id, equipment_id, event_date, shots, calculated_value, payment_method, notes, created_by)
+  values (p_client_id, p_equipment_id, p_event_date, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by)
+  returning id into v_rental_id;
+
+  insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, created_by)
+  values ('entrada', v_category_id, 'Locação HIPRO - ' || coalesce(v_client_name, ''), p_calculated_value, p_payment_method, p_event_date, 'harmonize', p_client_id, v_rental_id, v_created_by)
+  returning id into v_transaction_id;
+
+  update rentals set transaction_id = v_transaction_id where id = v_rental_id;
+
+  -- Esta gravação é a que aciona a constraint no_equipment_double_booking.
+  -- Se houver conflito, o Postgres recusa aqui e toda a função é desfeita.
+  insert into calendar_events (event_type, title, client_id, equipment_id, date_start, date_end, status, value, rental_id, created_by)
+  values (v_equipment_code::text::calendar_event_type, 'Locação - ' || coalesce(v_client_name, ''), p_client_id, p_equipment_id, p_event_date, p_event_date, 'confirmada', p_calculated_value, v_rental_id, v_created_by);
+
+  return v_rental_id;
+end;
+$$;
+
+grant execute on function public.create_rental to authenticated;
+
+-- ============================================================
 -- Depois de criar seu usuário em Authentication > Users,
 -- rode isto trocando o e-mail, para virar admin com acesso total:
 -- ============================================================
