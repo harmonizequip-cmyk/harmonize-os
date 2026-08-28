@@ -35,6 +35,10 @@ export default async function DashboardPage({
     .lte("event_date", toStr);
 
   const rows = transactions ?? [];
+  const normalizedRows = rows.map((t: any) => ({
+    ...t,
+    categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
+  }));
   const entradas = rows.filter((t) => t.type === "entrada").reduce((sum, t) => sum + Number(t.amount), 0);
   const saidas = rows.filter((t) => t.type === "saida").reduce((sum, t) => sum + Number(t.amount), 0);
   const resultado = entradas - saidas;
@@ -77,7 +81,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <DashboardCharts transactions={rows as any} />
+      <DashboardCharts transactions={normalizedRows} />
     </div>
   );
 }

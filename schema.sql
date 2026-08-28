@@ -56,6 +56,29 @@ as $$
   );
 $$;
 
+-- Cria automaticamente a linha em profiles sempre que um usuário
+-- novo é criado no Supabase Auth (Authentication > Users ou pela
+-- futura tela de Configurações > Usuários). Sem isso, todo usuário
+-- novo precisaria de um INSERT manual em profiles antes de conseguir
+-- usar o sistema.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, name, email)
+  values (new.id, coalesce(new.raw_user_meta_data->>'name', new.email), new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 -- ------------------------------------------------------------
 -- CLIENTES
 -- ------------------------------------------------------------
