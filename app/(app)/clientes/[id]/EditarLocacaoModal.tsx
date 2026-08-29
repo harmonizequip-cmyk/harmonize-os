@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calculateRentalValue } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
-import ConfirmPinModal from "@/components/ConfirmPinModal";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -59,7 +58,6 @@ export default function EditarLocacaoModal({
   const [status, setStatus] = useState(rental.status);
   const [notes, setNotes] = useState(rental.notes ?? "");
   const [saving, setSaving] = useState(false);
-  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const shotsNumber = Number(shots.replace(/\D/g, ""));
@@ -83,6 +81,7 @@ export default function EditarLocacaoModal({
       setError("Preencha equipamento, data, disparos e valor.");
       return;
     }
+    if (!window.confirm("Salvar essas alterações na locação?")) return;
     setSaving(true);
     setError(null);
 
@@ -229,24 +228,13 @@ export default function EditarLocacaoModal({
             Cancelar
           </button>
           <button
-            onClick={() => setShowPin(true)}
+            onClick={handleSave}
             disabled={saving}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white transition hover:bg-brand-teal-dark disabled:opacity-60"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
-
-        {showPin && (
-          <ConfirmPinModal
-            title="Confirme com a senha para salvar"
-            onConfirm={() => {
-              setShowPin(false);
-              handleSave();
-            }}
-            onCancel={() => setShowPin(false)}
-          />
-        )}
       </div>
     </div>
   );

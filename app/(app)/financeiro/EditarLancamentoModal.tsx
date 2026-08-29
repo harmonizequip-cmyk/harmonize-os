@@ -61,7 +61,7 @@ export default function EditarLancamentoModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pinAction, setPinAction] = useState<"save" | "delete" | null>(null);
+  const [showDeletePin, setShowDeletePin] = useState(false);
 
   const categoriasDoTipo = categories.filter((c) => c.type === type);
 
@@ -71,6 +71,7 @@ export default function EditarLancamentoModal({
       setError("Preencha descrição, valor e data.");
       return;
     }
+    if (!window.confirm("Salvar essas alterações no lançamento?")) return;
     setSaving(true);
     setError(null);
     const { error } = await supabase
@@ -217,13 +218,7 @@ export default function EditarLancamentoModal({
             Cancelar
           </button>
           <button
-            onClick={() => {
-              if (!description.trim()) {
-                setError("Preencha descrição, valor e data.");
-                return;
-              }
-              setPinAction("save");
-            }}
+            onClick={handleSave}
             disabled={saving}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white transition hover:bg-brand-teal-dark disabled:opacity-60"
           >
@@ -232,25 +227,23 @@ export default function EditarLancamentoModal({
         </div>
 
         <button
-          onClick={() => setPinAction("delete")}
+          onClick={() => setShowDeletePin(true)}
           disabled={deleting}
           className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
         >
           {deleting ? "Excluindo..." : "Excluir lançamento"}
         </button>
 
-        {pinAction && (
+        {showDeletePin && (
           <ConfirmPinModal
-            title={pinAction === "delete" ? "Confirme com a senha para excluir" : "Confirme com a senha para salvar"}
-            confirmLabel={pinAction === "delete" ? "Excluir" : "Confirmar"}
-            danger={pinAction === "delete"}
+            title="Confirme com a senha para excluir"
+            confirmLabel="Excluir"
+            danger
             onConfirm={() => {
-              const action = pinAction;
-              setPinAction(null);
-              if (action === "delete") handleDelete();
-              else handleSave();
+              setShowDeletePin(false);
+              handleDelete();
             }}
-            onCancel={() => setPinAction(null)}
+            onCancel={() => setShowDeletePin(false)}
           />
         )}
       </div>
