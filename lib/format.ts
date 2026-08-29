@@ -33,8 +33,14 @@ export function buildWazeLink(address: string | null | undefined): string | null
  */
 export function buildWhatsAppLink(phone: string | null | undefined, text?: string): string | null {
   if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
+  let digits = phone.replace(/\D/g, "");
   if (!digits) return null;
+  // Remove um eventual "0" de discagem nacional antes do DDD
+  // (ex: "083999998888" -> "83999998888"), que senão faria o país
+  // ficar grudado errado: "55083999998888" em vez de "5583999998888".
+  if (!digits.startsWith("55") && digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
   const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
   return text ? `https://wa.me/${withCountryCode}?text=${encodeURIComponent(text)}` : `https://wa.me/${withCountryCode}`;
 }
