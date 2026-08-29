@@ -89,6 +89,7 @@ create table public.clients (
   whatsapp text,
   email text,
   city text,
+  address text,
   notes text,
   -- Funil de vendas: todo cliente carrega uma etapa. Cadastros feitos
   -- direto em "Clientes" entram como 'cliente' (já convertido); leads

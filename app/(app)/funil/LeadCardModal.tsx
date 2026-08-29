@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow } from "./FunilClient";
+import { buildMapsLink } from "@/lib/format";
 
 export default function LeadCardModal({
   lead,
@@ -17,6 +18,7 @@ export default function LeadCardModal({
   const supabase = createClient();
   const [stage, setStage] = useState(lead.stage);
   const [dataEvento, setDataEvento] = useState(lead.data_evento ?? "");
+  const [address, setAddress] = useState(lead.address ?? "");
   const [tagsText, setTagsText] = useState((lead.tags ?? []).join(", "));
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [reservationFeeStatus, setReservationFeeStatus] = useState(lead.reservation_fee_status);
@@ -37,6 +39,7 @@ export default function LeadCardModal({
       .update({
         stage,
         data_evento: dataEvento || null,
+        address: address || null,
         tags,
         notes: notes || null,
         reservation_fee_status: reservationFeeStatus,
@@ -87,6 +90,16 @@ export default function LeadCardModal({
           </div>
 
           <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Rua, número, bairro"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tags (separadas por vírgula)</label>
             <input
               value={tagsText}
@@ -122,15 +135,29 @@ export default function LeadCardModal({
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-        {lead.whatsapp && (
-          <a
-            href={`https://wa.me/${lead.whatsapp.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 block text-center text-sm text-brand-teal underline underline-offset-2"
-          >
-            Abrir WhatsApp
-          </a>
+        {(lead.whatsapp || buildMapsLink(address)) && (
+          <div className="mt-4 flex gap-2">
+            {lead.whatsapp && (
+              <a
+                href={`https://wa.me/${lead.whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center text-sm text-brand-teal underline underline-offset-2"
+              >
+                Abrir WhatsApp
+              </a>
+            )}
+            {buildMapsLink(address) && (
+              <a
+                href={buildMapsLink(address)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center text-sm text-brand-blue underline underline-offset-2"
+              >
+                Abrir no Maps
+              </a>
+            )}
+          </div>
         )}
 
         <Link href={`/clientes/${lead.id}`} className="mt-2 block text-center text-xs text-neutral-400 underline">

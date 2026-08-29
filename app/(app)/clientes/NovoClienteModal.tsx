@@ -16,6 +16,7 @@ export default function NovoClienteModal({
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [chargeReservationFee, setChargeReservationFee] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -34,6 +35,7 @@ export default function NovoClienteModal({
       whatsapp: whatsapp || null,
       email: email || null,
       city: city || null,
+      address: address || null,
       notes: notes || null,
       reservation_fee_status: chargeReservationFee ? "pendente" : "nao_aplica",
     });
@@ -92,6 +94,15 @@ export default function NovoClienteModal({
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Rua, número, bairro"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>

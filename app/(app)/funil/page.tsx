@@ -6,7 +6,7 @@ export default async function FunilPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, city, whatsapp, stage, data_evento, tags, origem, notes, reservation_fee_status")
+    .select("id, name, city, address, whatsapp, stage, data_evento, tags, origem, notes, reservation_fee_status")
     .order("created_at", { ascending: false });
 
   const todayStr = new Date().toISOString().slice(0, 10);

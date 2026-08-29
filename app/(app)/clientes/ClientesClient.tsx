@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, buildMapsLink } from "@/lib/format";
 
 interface ClientRow {
   id: string;
@@ -13,6 +13,7 @@ interface ClientRow {
   clinic_name: string | null;
   whatsapp: string | null;
   city: string | null;
+  address: string | null;
   reservation_fee_status: string;
   data_evento: string | null;
   stats: { count: number; total: number; lastDate: string | null };
@@ -136,16 +137,31 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
               </div>
             )}
 
-            {c.whatsapp && (
-              <a
-                href={`https://wa.me/${c.whatsapp.replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="mt-2 block text-center text-xs text-brand-teal underline underline-offset-2"
-              >
-                Abrir WhatsApp
-              </a>
+            {(c.whatsapp || c.address) && (
+              <div className="mt-2 flex gap-2">
+                {c.whatsapp && (
+                  <a
+                    href={`https://wa.me/${c.whatsapp.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-center text-xs text-brand-teal underline underline-offset-2"
+                  >
+                    WhatsApp
+                  </a>
+                )}
+                {buildMapsLink(c.address) && (
+                  <a
+                    href={buildMapsLink(c.address)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-center text-xs text-brand-blue underline underline-offset-2"
+                  >
+                    Maps
+                  </a>
+                )}
+              </div>
             )}
           </div>
         ))}

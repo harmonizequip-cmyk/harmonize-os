@@ -21,6 +21,7 @@ export interface LeadRow {
   id: string;
   name: string;
   city: string | null;
+  address: string | null;
   whatsapp: string | null;
   stage: StageKey;
   data_evento: string | null;

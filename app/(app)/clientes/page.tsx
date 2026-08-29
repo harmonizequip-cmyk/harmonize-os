@@ -6,7 +6,7 @@ export default async function ClientesPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, clinic_name, whatsapp, city, reservation_fee_status, data_evento")
+    .select("id, name, clinic_name, whatsapp, city, address, reservation_fee_status, data_evento")
     .eq("stage", "cliente")
     .order("name");
 

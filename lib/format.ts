@@ -6,3 +6,12 @@ export function formatDate(date: string | Date): string {
   const d = typeof date === "string" ? new Date(`${date}T00:00:00`) : date;
   return d.toLocaleDateString("pt-BR");
 }
+
+/**
+ * Monta o link que abre o endereço direto no Google Maps (app se instalado,
+ * senão o navegador). Retorna null se o endereço estiver vazio.
+ */
+export function buildMapsLink(address: string | null | undefined): string | null {
+  if (!address || !address.trim()) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.trim())}`;
+}

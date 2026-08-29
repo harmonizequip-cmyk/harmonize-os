@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, buildMapsLink } from "@/lib/format";
 import NovaLocacaoModal from "./NovaLocacaoModal";
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
@@ -24,6 +24,7 @@ interface Client {
   whatsapp: string | null;
   email: string | null;
   city: string | null;
+  address: string | null;
   notes: string | null;
   reservation_fee_status: string;
 }
@@ -117,9 +118,38 @@ export default function ClienteDetailClient({
           <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.city ?? "-"}</p>
         </div>
         <div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Endereço</p>
+          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.address ?? "-"}</p>
+        </div>
+        <div className="col-span-2 sm:col-span-4">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Observação</p>
           <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.notes ?? "-"}</p>
         </div>
+
+        {(client.whatsapp || client.address) && (
+          <div className="col-span-2 flex gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:col-span-4">
+            {client.whatsapp && (
+              <a
+                href={`https://wa.me/${client.whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 rounded-lg bg-brand-teal/10 py-2 text-center text-xs font-medium text-brand-teal"
+              >
+                Abrir WhatsApp
+              </a>
+            )}
+            {buildMapsLink(client.address) && (
+              <a
+                href={buildMapsLink(client.address)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 rounded-lg bg-brand-blue/10 py-2 text-center text-xs font-medium text-brand-blue"
+              >
+                Abrir no Maps
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

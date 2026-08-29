@@ -21,6 +21,7 @@ export default function NovoLeadModal({
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
   const [origem, setOrigem] = useState("indicacao");
   const [notes, setNotes] = useState("");
   const [chargeReservationFee, setChargeReservationFee] = useState(false);
@@ -38,6 +39,7 @@ export default function NovoLeadModal({
       name: name.trim(),
       whatsapp: whatsapp || null,
       city: city || null,
+      address: address || null,
       origem,
       notes: notes || null,
       stage: "lead",
@@ -82,6 +84,15 @@ export default function NovoLeadModal({
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Rua, número, bairro"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>

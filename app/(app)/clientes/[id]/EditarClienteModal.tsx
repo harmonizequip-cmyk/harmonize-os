@@ -10,6 +10,7 @@ interface Client {
   whatsapp: string | null;
   email: string | null;
   city: string | null;
+  address: string | null;
   notes: string | null;
   reservation_fee_status: string;
 }
@@ -29,6 +30,7 @@ export default function EditarClienteModal({
   const [whatsapp, setWhatsapp] = useState(client.whatsapp ?? "");
   const [email, setEmail] = useState(client.email ?? "");
   const [city, setCity] = useState(client.city ?? "");
+  const [address, setAddress] = useState(client.address ?? "");
   const [notes, setNotes] = useState(client.notes ?? "");
   const [reservationFeeStatus, setReservationFeeStatus] = useState(client.reservation_fee_status);
   const [saving, setSaving] = useState(false);
@@ -50,6 +52,7 @@ export default function EditarClienteModal({
         whatsapp: whatsapp || null,
         email: email || null,
         city: city || null,
+        address: address || null,
         notes: notes || null,
         reservation_fee_status: reservationFeeStatus,
       })
@@ -109,6 +112,15 @@ export default function EditarClienteModal({
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Rua, número, bairro"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
