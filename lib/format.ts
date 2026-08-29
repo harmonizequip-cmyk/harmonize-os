@@ -31,6 +31,12 @@ export function buildWazeLink(address: string | null | undefined): string | null
  * sem o qual o wa.me não reconhece o número corretamente. Retorna null se o
  * campo estiver vazio. O parâmetro "text" é opcional (mensagem pré-preenchida).
  */
+/**
+ * Monta o link do WhatsApp a partir de um número em qualquer formato comum
+ * ((83) 90000-0000, 83900000000, etc). Sempre garante o código do país (55),
+ * sem o qual o wa.me não reconhece o número corretamente. Retorna null se o
+ * campo estiver vazio. O parâmetro "text" é opcional (mensagem pré-preenchida).
+ */
 export function buildWhatsAppLink(phone: string | null | undefined, text?: string): string | null {
   if (!phone) return null;
   let digits = phone.replace(/\D/g, "");
@@ -43,4 +49,33 @@ export function buildWhatsAppLink(phone: string | null | undefined, text?: strin
   }
   const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
   return text ? `https://wa.me/${withCountryCode}?text=${encodeURIComponent(text)}` : `https://wa.me/${withCountryCode}`;
+}
+
+// Cidades onde a Harmonize atua — usadas como reforço na detecção de
+// cidade a partir do endereço, quando o padrão "Cidade - UF" não aparece.
+const KNOWN_CITIES = ["João Pessoa", "Recife", "Campina Grande", "Serra Talhada", "Patos", "Maceió"];
+
+/**
+ * Tenta identificar a cidade a partir de um texto de endereço livre.
+ * Primeiro procura o padrão "..., Cidade - UF" ou "..., Cidade/UF" no fim
+ * do texto; se não achar, verifica se alguma cidade de atuação conhecida
+ * aparece mencionada. Retorna null se não conseguir identificar nada.
+ */
+export function extractCityFromAddress(address: string | null | undefined): string | null {
+  if (!address || !address.trim()) return null;
+
+  const match = address.match(/,\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+?)\s*[-/]\s*[A-Za-z]{2}\s*$/);
+  if (match) {
+    const city = match[1].trim();
+    if (city.length >= 3) return city;
+  }
+
+  const normalized = address.toLowerCase();
+  for (const city of KNOWN_CITIES) {
+    if (normalized.includes(city.toLowerCase())) {
+      return city;
+    }
+  }
+
+  return null;
 }

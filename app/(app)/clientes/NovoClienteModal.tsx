@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { extractCityFromAddress } from "@/lib/format";
 
 export default function NovoClienteModal({
   onClose,
@@ -102,6 +103,12 @@ export default function NovoClienteModal({
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              onBlur={() => {
+                if (!city.trim()) {
+                  const detected = extractCityFromAddress(address);
+                  if (detected) setCity(detected);
+                }
+              }}
               placeholder="Rua, número, bairro"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />

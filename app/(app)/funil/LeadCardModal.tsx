@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow } from "./FunilClient";
-import { buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
+import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress } from "@/lib/format";
 
 export default function LeadCardModal({
   lead,
@@ -18,6 +18,7 @@ export default function LeadCardModal({
   const supabase = createClient();
   const [stage, setStage] = useState(lead.stage);
   const [dataEvento, setDataEvento] = useState(lead.data_evento ?? "");
+  const [city, setCity] = useState(lead.city ?? "");
   const [address, setAddress] = useState(lead.address ?? "");
   const [tagsText, setTagsText] = useState((lead.tags ?? []).join(", "));
   const [notes, setNotes] = useState(lead.notes ?? "");
@@ -39,6 +40,7 @@ export default function LeadCardModal({
       .update({
         stage,
         data_evento: dataEvento || null,
+        city: city || null,
         address: address || null,
         tags,
         notes: notes || null,
@@ -60,8 +62,7 @@ export default function LeadCardModal({
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 dark:bg-neutral-900 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{lead.name}</h2>
-        {lead.city && <p className="mb-4 text-sm text-neutral-500">{lead.city}</p>}
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{lead.name}</h2>
 
         <div className="space-y-3">
           <div>
@@ -90,10 +91,25 @@ export default function LeadCardModal({
           </div>
 
           <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cidade</label>
+            <input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              onBlur={() => {
+                if (!city.trim()) {
+                  const detected = extractCityFromAddress(address);
+                  if (detected) setCity(detected);
+                }
+              }}
               placeholder="Rua, número, bairro"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
