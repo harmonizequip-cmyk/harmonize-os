@@ -67,6 +67,7 @@ export default function NovaLocacaoModal({
   const [warning, setWarning] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [previewCopied, setPreviewCopied] = useState(false);
 
   const initialNumber = Number(initialCount.replace(/\D/g, ""));
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
@@ -99,6 +100,36 @@ export default function NovaLocacaoModal({
       paymentMethod,
     });
   }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod]);
+
+  const previewSummary = useMemo(() => {
+    if (!pricing) return null;
+    return buildWhatsAppSummary({
+      initialCount: initialNumber,
+      finalCount: finalNumber,
+      pricing,
+      additionalChargeValue: additionalNumber,
+      additionalChargeDescription: additionalDescription,
+      discountValue: discountNumber,
+      discountDescription,
+      reservationFeeStatus,
+      eventDate,
+      clientName,
+      paymentMethod,
+    });
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod]);
+
+  const previewWhatsappLink = previewSummary ? buildWhatsAppLink(clientWhatsapp, previewSummary) : null;
+
+  async function handleCopyPreview() {
+    if (!previewSummary) return;
+    try {
+      await navigator.clipboard.writeText(previewSummary);
+      setPreviewCopied(true);
+      setTimeout(() => setPreviewCopied(false), 2000);
+    } catch {
+      setError("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+    }
+  }
 
   async function handleSave() {
     if (!equipmentId || !eventDate) {
@@ -395,6 +426,28 @@ export default function NovaLocacaoModal({
                 <span>Total a pagar agora</span>
                 <span className="text-lg font-semibold">{formatCurrency(totals.totalToPayNow)}</span>
               </div>
+            </div>
+          )}
+
+          {previewSummary && (
+            <div className="flex gap-2">
+              {previewWhatsappLink && (
+                <a
+                  href={previewWhatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 rounded-xl border border-brand-teal py-2 text-center text-xs font-medium text-brand-teal"
+                >
+                  Enviar orçamento no WhatsApp
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={handleCopyPreview}
+                className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600"
+              >
+                {previewCopied ? "Copiado!" : "Copiar orçamento"}
+              </button>
             </div>
           )}
 

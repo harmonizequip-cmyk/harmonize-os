@@ -1,12 +1,21 @@
 // ============================================================
 // HARMONIZE OS — Cálculo de valor da locação HIPRO Day
 // ============================================================
-// Modelo progressivo por faixa (marginal), confirmado em conversa:
+// Modelo por faixa única (não progressivo/marginal), confirmado com
+// exemplos numéricos em conversa:
 //   - até 20.000 disparos: pacote fixo de R$ 2.500,00
-//   - de 20.001 a 80.000 disparos: R$ 0,10 por disparo (só a parte
-//     que cai nessa faixa, os primeiros 20.000 já estão no pacote)
-//   - acima de 80.000 disparos: R$ 0,07 por disparo (só a parte
-//     que excede 80.000)
+//   - de 20.001 a 80.000 disparos: TODO o excedente acima de 20.000
+//     é cobrado a R$ 0,10/disparo
+//     Ex: 70.000 disparos -> 2.500 + (50.000 x 0,10) = R$ 7.500,00
+//   - acima de 80.000 disparos: TODO o excedente acima de 20.000
+//     (não só a parte que passou de 80.000) passa a ser cobrado a
+//     R$ 0,07/disparo — a taxa de 0,10 deixa de valer inteiramente
+//     Ex: 90.000 disparos -> 2.500 + (70.000 x 0,07) = R$ 7.400,00
+//
+// Importante: como a faixa acima de 80.000 usa uma taxa mais baixa
+// sobre TODO o excedente (não só o incremento), existe um ponto onde
+// disparar um pouco mais pode custar menos no total. Isso é
+// intencional conforme confirmado, não é bug.
 //
 // Se algum valor mudar, edite só as constantes abaixo.
 // ============================================================
@@ -16,9 +25,9 @@ export const RESERVATION_FEE = 250.0;
 export const PRICING = {
   FLAT_PACKAGE_LIMIT: 20_000,   // disparos incluídos no pacote fixo
   FLAT_PACKAGE_VALUE: 2500.0,   // valor do pacote fixo (R$)
-  TIER_2_LIMIT: 80_000,         // limite da segunda faixa
-  TIER_2_RATE: 0.10,            // R$/disparo entre 20.001 e 80.000
-  TIER_3_RATE: 0.07,            // R$/disparo acima de 80.000
+  TIER_2_LIMIT: 80_000,         // até aqui, o excedente todo é a TIER_2_RATE
+  TIER_2_RATE: 0.10,            // R$/disparo sobre o excedente, faixa 20.001-80.000
+  TIER_3_RATE: 0.07,            // R$/disparo sobre TODO o excedente, acima de 80.000
 
   // Confirmado: não existe mínimo de disparos por sessão.
   // O valor fixo de R$ 2.500 cobre qualquer volume até 20.000.
@@ -28,8 +37,8 @@ export const PRICING = {
 export interface RentalPricingBreakdown {
   shots: number;
   flatPackagePortion: number;   // disparos cobertos pelo pacote fixo
-  tier2Portion: number;         // disparos cobrados a TIER_2_RATE
-  tier3Portion: number;         // disparos cobrados a TIER_3_RATE
+  tier2Portion: number;         // disparos cobrados a TIER_2_RATE (0 se estiver na faixa 3)
+  tier3Portion: number;         // disparos cobrados a TIER_3_RATE (0 se estiver na faixa 1 ou 2)
   flatPackageValue: number;
   tier2Value: number;
   tier3Value: number;
@@ -54,11 +63,18 @@ export function calculateRentalValue(shots: number): RentalPricingBreakdown {
   }
 
   const flatPackagePortion = Math.min(shots, PRICING.FLAT_PACKAGE_LIMIT);
-  const tier2Portion = Math.max(
-    0,
-    Math.min(shots, PRICING.TIER_2_LIMIT) - PRICING.FLAT_PACKAGE_LIMIT
-  );
-  const tier3Portion = Math.max(0, shots - PRICING.TIER_2_LIMIT);
+  const excess = Math.max(0, shots - PRICING.FLAT_PACKAGE_LIMIT);
+
+  let tier2Portion = 0;
+  let tier3Portion = 0;
+
+  if (shots > PRICING.TIER_2_LIMIT) {
+    // Acima de 80.000: todo o excedente (acima de 20.000) vai para a taxa menor.
+    tier3Portion = excess;
+  } else if (shots > PRICING.FLAT_PACKAGE_LIMIT) {
+    // Entre 20.001 e 80.000: todo o excedente vai para a taxa intermediária.
+    tier2Portion = excess;
+  }
 
   const flatPackageValue = PRICING.FLAT_PACKAGE_VALUE;
   const tier2Value = round2(tier2Portion * PRICING.TIER_2_RATE);
@@ -86,7 +102,7 @@ function round2(value: number): number {
 // Casos de verificação (rodar com: npx tsx lib/rental-pricing.ts)
 // ------------------------------------------------------------
 if (require.main === module) {
-  const cases = [15_000, 20_000, 20_001, 50_000, 80_000, 100_000];
+  const cases = [15_000, 20_000, 20_001, 50_000, 70_000, 80_000, 90_000, 100_000];
   for (const shots of cases) {
     const r = calculateRentalValue(shots);
     console.log(
