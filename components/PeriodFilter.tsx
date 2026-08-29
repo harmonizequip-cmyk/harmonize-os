@@ -30,7 +30,7 @@ export default function PeriodFilter() {
           className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
             current === opt.key
               ? "bg-brand-teal text-white"
-              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
           }`}
         >
           {opt.label}

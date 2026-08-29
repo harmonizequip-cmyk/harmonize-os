@@ -240,12 +240,12 @@ export default function NovaLocacaoModal({
   if (summary) {
     return (
       <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
-        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
-          <h2 className="mb-1 text-lg font-semibold text-neutral-900">Locação salva ✅</h2>
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 dark:bg-neutral-900 sm:rounded-2xl">
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Locação salva ✅</h2>
           <p className="mb-2 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
           {warning && <p className="mb-3 text-xs text-amber-600">{warning}</p>}
 
-          <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
+          <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
             {summary}
           </pre>
 
@@ -281,18 +281,18 @@ export default function NovaLocacaoModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 dark:bg-neutral-900 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Nova locação</h2>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nova locação</h2>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Equipamento</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Equipamento</label>
             <select
               value={equipmentId}
               onChange={(e) => setEquipmentId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
               {equipments.map((eq) => (
                 <option key={eq.id} value={eq.id}>
@@ -303,41 +303,41 @@ export default function NovaLocacaoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
             <input
               type="date"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Contagem inicial</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem inicial</label>
               <input
                 inputMode="numeric"
                 value={initialCount}
                 onChange={(e) => setInitialCount(e.target.value)}
                 placeholder="Ex: 2907661"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Contagem final</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem final</label>
               <input
                 inputMode="numeric"
                 value={finalCount}
                 onChange={(e) => setFinalCount(e.target.value)}
                 placeholder="Ex: 2942213"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
               />
             </div>
           </div>
 
           {shots > 0 && (
-            <p className="text-xs text-neutral-500">
-              Disparos realizados: <span className="font-medium text-neutral-700">{shots.toLocaleString("pt-BR")}</span>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Disparos realizados: <span className="font-medium text-neutral-700 dark:text-neutral-300">{shots.toLocaleString("pt-BR")}</span>
             </p>
           )}
 
@@ -366,49 +366,49 @@ export default function NovaLocacaoModal({
           {showExtras && (
             <div className="space-y-3 rounded-xl border border-neutral-200 p-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600">Cobrança adicional</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cobrança adicional</label>
                 <div className="grid grid-cols-3 gap-2">
                   <input
                     value={additionalDescription}
                     onChange={(e) => setAdditionalDescription(e.target.value)}
                     placeholder="Ex: Deslocamento"
-                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                   />
                   <input
                     inputMode="decimal"
                     value={additionalValue}
                     onChange={(e) => setAdditionalValue(e.target.value)}
                     placeholder="R$ 0,00"
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600">Desconto</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Desconto</label>
                 <div className="grid grid-cols-3 gap-2">
                   <input
                     value={discountDescription}
                     onChange={(e) => setDiscountDescription(e.target.value)}
                     placeholder="Ex: Fidelidade"
-                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                   />
                   <input
                     inputMode="decimal"
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
                     placeholder="R$ 0,00"
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600">Taxa de reserva (R$ 250)</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva (R$ 250)</label>
                 <select
                   value={reservationFeeStatus}
                   onChange={(e) => setReservationFeeStatus(e.target.value as ReservationFeeStatus)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 >
                   {RESERVATION_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -452,11 +452,11 @@ export default function NovaLocacaoModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Forma de pagamento</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
               {PAYMENT_METHODS.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -467,17 +467,17 @@ export default function NovaLocacaoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <p className="mt-3 text-xs text-neutral-400">
           Ao salvar, a locação, a entrada financeira e o evento na agenda são criados automaticamente.
@@ -486,7 +486,7 @@ export default function NovaLocacaoModal({
         <div className="mt-4 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
           >
             Cancelar
           </button>

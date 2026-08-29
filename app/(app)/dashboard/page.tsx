@@ -60,24 +60,24 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Dashboard</h1>
+        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
         <PeriodFilter />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <p className="text-xs text-neutral-500">{card.label}</p>
-            <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(card.value)}</p>
+          <div key={card.label} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">{card.label}</p>
+            <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(card.value)}</p>
           </div>
         ))}
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-neutral-500">Locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{rentalsCount ?? 0}</p>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{rentalsCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-neutral-500">Ticket médio</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ticketMedio)}</p>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
         </div>
       </div>
 

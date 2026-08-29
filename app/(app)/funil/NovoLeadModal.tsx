@@ -52,43 +52,43 @@ export default function NovoLeadModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 dark:bg-neutral-900 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Novo lead</h2>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Novo lead</h2>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Nome</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">WhatsApp</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">WhatsApp</label>
             <input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
               placeholder="(83) 90000-0000"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Cidade</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cidade</label>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Origem</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Origem</label>
             <select
               value={origem}
               onChange={(e) => setOrigem(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
               {ORIGENS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -98,22 +98,22 @@ export default function NovoLeadModal({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
           >
             Cancelar
           </button>

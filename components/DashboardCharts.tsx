@@ -33,8 +33,8 @@ export default function DashboardCharts({ transactions }: { transactions: Transa
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <p className="mb-3 text-sm font-medium text-neutral-700">Fluxo financeiro</p>
+      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <p className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">Fluxo financeiro</p>
         {fluxoData.length === 0 ? (
           <EmptyChart />
         ) : (
@@ -50,8 +50,8 @@ export default function DashboardCharts({ transactions }: { transactions: Transa
         )}
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <p className="mb-3 text-sm font-medium text-neutral-700">Receitas por categoria</p>
+      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <p className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">Receitas por categoria</p>
         {categoriaData.length === 0 ? (
           <EmptyChart />
         ) : (
@@ -73,7 +73,7 @@ export default function DashboardCharts({ transactions }: { transactions: Transa
 
 function EmptyChart() {
   return (
-    <div className="flex h-[220px] items-center justify-center text-sm text-neutral-400">
+    <div className="flex h-[220px] items-center justify-center text-sm text-neutral-400 dark:text-neutral-500">
       Sem lançamentos no período
     </div>
   );

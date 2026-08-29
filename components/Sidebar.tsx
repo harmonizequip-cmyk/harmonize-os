@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "🏠", module: "dashboard" },
@@ -37,10 +38,13 @@ export default function Sidebar({
   const items = NAV_ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
 
   return (
-    <aside className="hidden w-60 flex-col border-r border-neutral-200 bg-white p-4 md:flex">
+    <aside className="hidden w-60 flex-col border-r border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:flex">
       <div className="mb-6 px-2">
-        <img src="/harmonize-logo.png" alt="Harmonize" className="h-8 w-auto" />
-        <p className="mt-1 truncate text-xs text-neutral-500">{name}</p>
+        {/* Fundo sempre claro atrás da logo, já que o texto dela é preto */}
+        <div className="w-fit rounded-lg bg-white p-1.5">
+          <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-12 w-auto" />
+        </div>
+        <p className="mt-2 truncate text-xs text-neutral-500 dark:text-neutral-400">{name}</p>
       </div>
 
       <nav className="flex-1 space-y-1">
@@ -52,8 +56,8 @@ export default function Sidebar({
               href={item.href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
                 active
-                  ? "bg-brand-teal/10 font-medium text-brand-teal"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "bg-brand-teal/10 font-medium text-brand-teal dark:bg-brand-teal/20"
+                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
               }`}
             >
               <span>{item.icon}</span>
@@ -63,12 +67,15 @@ export default function Sidebar({
         })}
       </nav>
 
+      <ThemeToggle />
+
       <button
         onClick={handleLogout}
-        className="mt-4 rounded-lg px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-100"
+        className="mt-1 rounded-lg px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
       >
         Sair
       </button>
     </aside>
   );
 }
+

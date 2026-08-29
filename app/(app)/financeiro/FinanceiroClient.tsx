@@ -58,7 +58,7 @@ export default function FinanceiroClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Financeiro</h1>
+        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Financeiro</h1>
         <button
           onClick={() => setModalOpen(true)}
           className="rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-teal-dark"
@@ -73,7 +73,7 @@ export default function FinanceiroClient({
             key={key}
             onClick={() => setTypeFilter(key)}
             className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-              typeFilter === key ? "bg-brand-teal text-white" : "bg-neutral-100 text-neutral-600"
+              typeFilter === key ? "bg-brand-teal text-white" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             }`}
           >
             {key === "todos" ? "Todos" : key === "entrada" ? "Entradas" : "Saídas"}
@@ -90,11 +90,11 @@ export default function FinanceiroClient({
       {/* Celular: lista de cartões empilhados */}
       <div className="space-y-2 sm:hidden">
         {filtered.map((t) => (
-          <div key={t.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+          <div key={t.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-900">{t.description}</p>
-                <p className="mt-0.5 text-xs text-neutral-500">
+                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t.description}</p>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
                 </p>
               </div>
@@ -107,7 +107,7 @@ export default function FinanceiroClient({
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">{PAYMENT_LABELS[t.payment_method] ?? t.payment_method}</span>
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">{PAYMENT_LABELS[t.payment_method] ?? t.payment_method}</span>
               <span
                 className={`font-medium ${t.type === "entrada" ? "text-brand-teal" : "text-brand-pink"}`}
               >
@@ -117,16 +117,16 @@ export default function FinanceiroClient({
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400">
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900">
             Nenhum lançamento encontrado.
           </div>
         )}
       </div>
 
       {/* Tablet e notebook: tabela completa */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
+          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">Tipo</th>
@@ -138,8 +138,8 @@ export default function FinanceiroClient({
           </thead>
           <tbody>
             {filtered.map((t) => (
-              <tr key={t.id} className="border-b border-neutral-100 last:border-0">
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(t.date)}</td>
+              <tr key={t.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatDate(t.date)}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -149,8 +149,8 @@ export default function FinanceiroClient({
                     {t.type === "entrada" ? "Entrada" : "Saída"}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-neutral-600">{t.categories?.name ?? "-"}</td>
-                <td className="px-4 py-3 text-neutral-900">{t.description}</td>
+                <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{t.categories?.name ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{t.description}</td>
                 <td
                   className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
                     t.type === "entrada" ? "text-brand-teal" : "text-brand-pink"
@@ -158,7 +158,7 @@ export default function FinanceiroClient({
                 >
                   {formatCurrency(Number(t.amount))}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
                   {PAYMENT_LABELS[t.payment_method] ?? t.payment_method}
                 </td>
               </tr>

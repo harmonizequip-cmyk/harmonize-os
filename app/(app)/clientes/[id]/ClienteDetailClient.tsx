@@ -74,7 +74,7 @@ export default function ClienteDetailClient({
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">{client.name}</h1>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{client.name}</h1>
           {client.clinic_name && <p className="text-sm text-neutral-500">{client.clinic_name}</p>}
         </div>
         <button
@@ -85,41 +85,41 @@ export default function ClienteDetailClient({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:grid-cols-4">
         <div>
-          <p className="text-xs text-neutral-500">WhatsApp</p>
-          <p className="mt-0.5 text-sm text-neutral-900">{client.whatsapp ?? "-"}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">WhatsApp</p>
+          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.whatsapp ?? "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500">E-mail</p>
-          <p className="mt-0.5 text-sm text-neutral-900">{client.email ?? "-"}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">E-mail</p>
+          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.email ?? "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500">Cidade</p>
-          <p className="mt-0.5 text-sm text-neutral-900">{client.city ?? "-"}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Cidade</p>
+          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.city ?? "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500">Observação</p>
-          <p className="mt-0.5 text-sm text-neutral-900">{client.notes ?? "-"}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Observação</p>
+          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.notes ?? "-"}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-neutral-500">Total de locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{totalLocacoes}</p>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Total de locações</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{totalLocacoes}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-neutral-500">Total faturado</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(totalFaturado)}</p>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Total faturado</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(totalFaturado)}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-neutral-500">Ticket médio</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ticketMedio)}</p>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-neutral-500">Última locação</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Última locação</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
             {ultimaLocacao ? formatDate(ultimaLocacao) : "-"}
           </p>
         </div>
@@ -128,11 +128,11 @@ export default function ClienteDetailClient({
       {/* Celular: cartões empilhados */}
       <div className="space-y-2 sm:hidden">
         {rentals.map((r) => (
-          <div key={r.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+          <div key={r.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-900">{r.equipments?.name ?? "-"}</p>
-                <p className="mt-0.5 text-xs text-neutral-500">
+                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{r.equipments?.name ?? "-"}</p>
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                   {formatDate(r.event_date)} · {r.shots.toLocaleString("pt-BR")} disparos
                 </p>
               </div>
@@ -141,7 +141,7 @@ export default function ClienteDetailClient({
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">
                 {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
               </span>
               <span className="font-medium text-brand-teal">{formatCurrency(Number(r.calculated_value))}</span>
@@ -149,16 +149,16 @@ export default function ClienteDetailClient({
           </div>
         ))}
         {rentals.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400">
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900">
             Nenhuma locação registrada ainda.
           </div>
         )}
       </div>
 
       {/* Tablet e notebook: tabela completa */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
+          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">HIPRO</th>
@@ -170,14 +170,14 @@ export default function ClienteDetailClient({
           </thead>
           <tbody>
             {rentals.map((r) => (
-              <tr key={r.id} className="border-b border-neutral-100 last:border-0">
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(r.event_date)}</td>
-                <td className="px-4 py-3 text-neutral-900">{r.equipments?.name ?? "-"}</td>
-                <td className="px-4 py-3 text-neutral-600">{r.shots.toLocaleString("pt-BR")}</td>
+              <tr key={r.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatDate(r.event_date)}</td>
+                <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{r.equipments?.name ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{r.shots.toLocaleString("pt-BR")}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-brand-teal">
                   {formatCurrency(Number(r.calculated_value))}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
                   {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-600 capitalize">

@@ -64,7 +64,7 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Funil de vendas</h1>
+        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
         <button
           onClick={() => setModalOpen(true)}
           className="rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-teal-dark"
@@ -77,7 +77,7 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
         placeholder="Buscar por nome ou cidade..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal sm:max-w-sm"
+        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
       />
 
       <p className="hidden text-xs text-neutral-400 sm:block">
@@ -103,12 +103,12 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                 setDragOverStage(null);
               }}
               className={`w-64 flex-shrink-0 rounded-2xl p-3 transition ${
-                dragOverStage === stage.key ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100"
+                dragOverStage === stage.key ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100 dark:bg-neutral-800/60"
               }`}
             >
               <div className="mb-3 flex items-center gap-2 px-1">
                 <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
-                <p className="text-sm font-semibold text-neutral-700">{stage.label}</p>
+                <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{stage.label}</p>
                 <span className="ml-auto text-xs text-neutral-400">{leads.length}</span>
               </div>
 
@@ -126,12 +126,12 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                       setDragOverStage(null);
                     }}
                     onClick={() => setSelected(lead)}
-                    className={`cursor-grab rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal active:cursor-grabbing ${
+                    className={`cursor-grab rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal active:cursor-grabbing dark:border-neutral-800 dark:bg-neutral-900 ${
                       draggedId === lead.id ? "opacity-40" : ""
                     }`}
                   >
-                    <p className="text-sm font-medium text-neutral-900">{lead.name}</p>
-                    {lead.city && <p className="mt-0.5 text-xs text-neutral-500">{lead.city}</p>}
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+                    {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
                     {lead.data_evento && (
                       <p className="mt-1 text-xs text-brand-teal">📅 {formatDate(lead.data_evento)}</p>
                     )}
@@ -153,7 +153,7 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                           e.stopPropagation();
                           avancarEtapa(lead);
                         }}
-                        className="mt-2 w-full rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal"
+                        className="mt-2 w-full rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal dark:bg-neutral-800 dark:text-neutral-300"
                       >
                         Avançar →
                       </button>

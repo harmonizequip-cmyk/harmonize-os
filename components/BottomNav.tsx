@@ -23,7 +23,7 @@ export default function BottomNav({
   const items = ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-neutral-200 bg-white py-2 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900 md:hidden">
       {items.map((item) => {
         const active = pathname.startsWith(item.href);
         return (
@@ -31,7 +31,7 @@ export default function BottomNav({
             key={item.href}
             href={item.href}
             className={`flex flex-col items-center px-3 py-1 text-[10px] ${
-              active ? "text-brand-teal" : "text-neutral-500"
+              active ? "text-brand-teal" : "text-neutral-500 dark:text-neutral-400"
             }`}
           >
             <span className="text-lg leading-none">{item.icon}</span>

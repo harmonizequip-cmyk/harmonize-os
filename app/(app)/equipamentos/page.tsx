@@ -32,7 +32,7 @@ export default async function EquipamentosPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900">Equipamentos</h1>
+      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Equipamentos</h1>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {(equipments ?? []).map((eq) => {
@@ -42,20 +42,20 @@ export default async function EquipamentosPage() {
           const nextEvent = normalizedUpcoming.find((e) => e.equipment_id === eq.id);
 
           return (
-            <div key={eq.id} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <div key={eq.id} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
-                <h2 className="text-lg font-semibold text-neutral-900">{eq.name}</h2>
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{eq.name}</h2>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-neutral-500">Status</p>
-                  <p className="mt-0.5 text-sm font-medium capitalize text-neutral-900">{eq.status}</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Status</p>
+                  <p className="mt-0.5 text-sm font-medium capitalize text-neutral-900 dark:text-neutral-100">{eq.status}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500">Próxima reserva</p>
-                  <p className="mt-0.5 text-sm font-medium text-neutral-900">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Próxima reserva</p>
+                  <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">
                     {nextEvent ? (
                       <>
                         {formatDate(nextEvent.date_start)}
@@ -71,11 +71,11 @@ export default async function EquipamentosPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500">Quantidade de locações</p>
-                  <p className="mt-0.5 text-sm font-medium text-neutral-900">{totalLocacoes}</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Quantidade de locações</p>
+                  <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">{totalLocacoes}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500">Receita total</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Receita total</p>
                   <p className="mt-0.5 text-sm font-medium text-brand-teal">{formatCurrency(receitaTotal)}</p>
                 </div>
               </div>
@@ -83,7 +83,7 @@ export default async function EquipamentosPage() {
           );
         })}
         {(!equipments || equipments.length === 0) && (
-          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300 bg-white py-12 text-center text-neutral-400">
+          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300 bg-white py-12 text-center text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900">
             Nenhum equipamento cadastrado.
           </div>
         )}
