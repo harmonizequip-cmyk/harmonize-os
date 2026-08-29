@@ -32,9 +32,9 @@ export default function LoginPage() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
       >
-        <div className="mb-2 text-center">
-          <h1 className="text-xl font-semibold text-brand-teal">Harmonize OS</h1>
-          <p className="text-sm text-neutral-500">Entre para continuar</p>
+        <div className="mb-2 flex flex-col items-center text-center">
+          <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-16 w-auto" />
+          <p className="mt-2 text-sm text-neutral-500">Entre para continuar</p>
         </div>
 
         <div>

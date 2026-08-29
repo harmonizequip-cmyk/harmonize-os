@@ -125,7 +125,38 @@ export default function ClienteDetailClient({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm">
+      {/* Celular: cartões empilhados */}
+      <div className="space-y-2 sm:hidden">
+        {rentals.map((r) => (
+          <div key={r.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-900">{r.equipments?.name ?? "-"}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {formatDate(r.event_date)} · {r.shots.toLocaleString("pt-BR")} disparos
+                </p>
+              </div>
+              <span className="whitespace-nowrap text-xs capitalize text-neutral-500">
+                {r.status.replace("_", " ")}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-neutral-500">
+                {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
+              </span>
+              <span className="font-medium text-brand-teal">{formatCurrency(Number(r.calculated_value))}</span>
+            </div>
+          </div>
+        ))}
+        {rentals.length === 0 && (
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400">
+            Nenhuma locação registrada ainda.
+          </div>
+        )}
+      </div>
+
+      {/* Tablet e notebook: tabela completa */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm sm:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>

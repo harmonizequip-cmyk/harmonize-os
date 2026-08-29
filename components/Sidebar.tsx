@@ -39,8 +39,8 @@ export default function Sidebar({
   return (
     <aside className="hidden w-60 flex-col border-r border-neutral-200 bg-white p-4 md:flex">
       <div className="mb-6 px-2">
-        <p className="text-lg font-semibold text-brand-teal">Harmonize OS</p>
-        <p className="truncate text-xs text-neutral-500">{name}</p>
+        <img src="/harmonize-logo.png" alt="Harmonize" className="h-8 w-auto" />
+        <p className="mt-1 truncate text-xs text-neutral-500">{name}</p>
       </div>
 
       <nav className="flex-1 space-y-1">

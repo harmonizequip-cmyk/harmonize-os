@@ -35,6 +35,8 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [search, setSearch] = useState("");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<StageKey | null>(null);
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
@@ -48,12 +50,15 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
     router.refresh();
   }
 
+  async function moveToStage(leadId: string, newStage: StageKey) {
+    await supabase.from("clients").update({ stage: newStage }).eq("id", leadId);
+    router.refresh();
+  }
+
   async function avancarEtapa(lead: LeadRow) {
     const idx = STAGES.findIndex((s) => s.key === lead.stage);
     if (idx === -1 || idx === STAGES.length - 1) return;
-    const nextStage = STAGES[idx + 1].key;
-    await supabase.from("clients").update({ stage: nextStage }).eq("id", lead.id);
-    router.refresh();
+    moveToStage(lead.id, STAGES[idx + 1].key);
   }
 
   return (
@@ -75,11 +80,32 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
         className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal sm:max-w-sm"
       />
 
+      <p className="hidden text-xs text-neutral-400 sm:block">
+        Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.
+      </p>
+
       <div className="flex gap-3 overflow-x-auto pb-4">
         {STAGES.map((stage) => {
           const leads = filtered.filter((c) => c.stage === stage.key);
           return (
-            <div key={stage.key} className="w-64 flex-shrink-0 rounded-2xl bg-neutral-100 p-3">
+            <div
+              key={stage.key}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverStage(stage.key);
+              }}
+              onDragLeave={() => setDragOverStage((s) => (s === stage.key ? null : s))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const leadId = e.dataTransfer.getData("text/plain");
+                if (leadId) moveToStage(leadId, stage.key);
+                setDraggedId(null);
+                setDragOverStage(null);
+              }}
+              className={`w-64 flex-shrink-0 rounded-2xl p-3 transition ${
+                dragOverStage === stage.key ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100"
+              }`}
+            >
               <div className="mb-3 flex items-center gap-2 px-1">
                 <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
                 <p className="text-sm font-semibold text-neutral-700">{stage.label}</p>
@@ -90,8 +116,19 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                 {leads.map((lead) => (
                   <div
                     key={lead.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", lead.id);
+                      setDraggedId(lead.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedId(null);
+                      setDragOverStage(null);
+                    }}
                     onClick={() => setSelected(lead)}
-                    className="cursor-pointer rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal"
+                    className={`cursor-grab rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal active:cursor-grabbing ${
+                      draggedId === lead.id ? "opacity-40" : ""
+                    }`}
                   >
                     <p className="text-sm font-medium text-neutral-900">{lead.name}</p>
                     {lead.city && <p className="mt-0.5 text-xs text-neutral-500">{lead.city}</p>}

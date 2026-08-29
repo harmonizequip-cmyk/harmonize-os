@@ -87,7 +87,44 @@ export default function FinanceiroClient({
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm">
+      {/* Celular: lista de cartões empilhados */}
+      <div className="space-y-2 sm:hidden">
+        {filtered.map((t) => (
+          <div key={t.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-900">{t.description}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {formatDate(t.date)} · {t.categories?.name ?? "-"}
+                </p>
+              </div>
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                  t.type === "entrada" ? "bg-brand-teal/10 text-brand-teal" : "bg-brand-pink/10 text-brand-pink"
+                }`}
+              >
+                {t.type === "entrada" ? "Entrada" : "Saída"}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-neutral-500">{PAYMENT_LABELS[t.payment_method] ?? t.payment_method}</span>
+              <span
+                className={`font-medium ${t.type === "entrada" ? "text-brand-teal" : "text-brand-pink"}`}
+              >
+                {formatCurrency(Number(t.amount))}
+              </span>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400">
+            Nenhum lançamento encontrado.
+          </div>
+        )}
+      </div>
+
+      {/* Tablet e notebook: tabela completa */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm sm:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>
