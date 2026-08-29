@@ -23,7 +23,9 @@ interface TransactionRow {
   payment_method: string;
   date: string;
   category_id: string | null;
+  client_id: string | null;
   categories?: { name: string } | null;
+  clients?: { name: string } | null;
 }
 
 interface CategoryRow {
@@ -32,12 +34,19 @@ interface CategoryRow {
   type: "entrada" | "saida";
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 export default function FinanceiroClient({
   initialTransactions,
   categories,
+  clients,
 }: {
   initialTransactions: TransactionRow[];
   categories: CategoryRow[];
+  clients: ClientOption[];
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -103,6 +112,7 @@ export default function FinanceiroClient({
                 <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t.description}</p>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
+                  {t.clients?.name ? ` · ${t.clients.name}` : ""}
                 </p>
               </div>
               <span
@@ -161,7 +171,12 @@ export default function FinanceiroClient({
                   </span>
                 </td>
                 <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{t.categories?.name ?? "-"}</td>
-                <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{t.description}</td>
+                <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">
+                  {t.description}
+                  {t.clients?.name && (
+                    <span className="ml-1 text-xs font-normal text-neutral-400">· {t.clients.name}</span>
+                  )}
+                </td>
                 <td
                   className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
                     t.type === "entrada" ? "text-brand-teal" : "text-brand-pink"
@@ -186,13 +201,19 @@ export default function FinanceiroClient({
       </div>
 
       {modalOpen && (
-        <NovoLancamentoModal categories={categories} onClose={() => setModalOpen(false)} onCreated={handleCreated} />
+        <NovoLancamentoModal
+          categories={categories}
+          clients={clients}
+          onClose={() => setModalOpen(false)}
+          onCreated={handleCreated}
+        />
       )}
 
       {editing && (
         <EditarLancamentoModal
           transaction={editing}
           categories={categories}
+          clients={clients}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);

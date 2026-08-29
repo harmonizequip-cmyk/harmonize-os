@@ -135,6 +135,7 @@ create table public.categories (
 insert into categories (name, type, is_default) values
   ('Locação', 'entrada', true),
   ('Taxa de reserva', 'entrada', true),
+  ('Deslocamento', 'entrada', true),
   ('Mentoria', 'entrada', true),
   ('Outros', 'entrada', true),
   ('Combustível', 'saida', true),

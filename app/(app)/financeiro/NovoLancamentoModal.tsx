@@ -18,12 +18,19 @@ interface CategoryRow {
   type: "entrada" | "saida";
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 export default function NovoLancamentoModal({
   categories,
+  clients,
   onClose,
   onCreated,
 }: {
   categories: CategoryRow[];
+  clients: ClientOption[];
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -32,6 +39,7 @@ export default function NovoLancamentoModal({
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [clientId, setClientId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
@@ -53,6 +61,7 @@ export default function NovoLancamentoModal({
       category_id: categoryId,
       description,
       amount: numericAmount,
+      client_id: clientId || null,
       payment_method: paymentMethod,
       date,
       notes: notes || null,
@@ -133,6 +142,24 @@ export default function NovoLancamentoModal({
               placeholder="0,00"
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Cliente (opcional — deslocamento, etc.)
+            </label>
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              <option value="">Nenhum</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

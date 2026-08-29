@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ConfirmPinModal from "@/components/ConfirmPinModal";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -18,6 +19,11 @@ interface CategoryRow {
   type: "entrada" | "saida";
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 interface TransactionToEdit {
   id: string;
   type: "entrada" | "saida";
@@ -26,17 +32,20 @@ interface TransactionToEdit {
   payment_method: string;
   date: string;
   category_id: string | null;
+  client_id: string | null;
 }
 
 export default function EditarLancamentoModal({
   transaction,
   categories,
+  clients,
   onClose,
   onSaved,
   onDeleted,
 }: {
   transaction: TransactionToEdit;
   categories: CategoryRow[];
+  clients: ClientOption[];
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -46,12 +55,13 @@ export default function EditarLancamentoModal({
   const [description, setDescription] = useState(transaction.description);
   const [amount, setAmount] = useState(String(transaction.amount));
   const [categoryId, setCategoryId] = useState(transaction.category_id ?? "");
+  const [clientId, setClientId] = useState(transaction.client_id ?? "");
   const [paymentMethod, setPaymentMethod] = useState(transaction.payment_method);
   const [date, setDate] = useState(transaction.date);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinAction, setPinAction] = useState<"save" | "delete" | null>(null);
 
   const categoriasDoTipo = categories.filter((c) => c.type === type);
 
@@ -70,6 +80,7 @@ export default function EditarLancamentoModal({
         description: description.trim(),
         amount: amountNumber,
         category_id: categoryId || null,
+        client_id: clientId || null,
         payment_method: paymentMethod,
         date,
       })
@@ -83,10 +94,6 @@ export default function EditarLancamentoModal({
   }
 
   async function handleDelete() {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     setDeleting(true);
     setError(null);
     const { error } = await supabase.from("transactions").delete().eq("id", transaction.id);
@@ -159,6 +166,23 @@ export default function EditarLancamentoModal({
             </select>
           </div>
           <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Cliente (opcional — deslocamento, etc.)
+            </label>
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              <option value="">Nenhum</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
             <input
               type="date"
@@ -193,7 +217,13 @@ export default function EditarLancamentoModal({
             Cancelar
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => {
+              if (!description.trim()) {
+                setError("Preencha descrição, valor e data.");
+                return;
+              }
+              setPinAction("save");
+            }}
             disabled={saving}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white transition hover:bg-brand-teal-dark disabled:opacity-60"
           >
@@ -202,12 +232,27 @@ export default function EditarLancamentoModal({
         </div>
 
         <button
-          onClick={handleDelete}
+          onClick={() => setPinAction("delete")}
           disabled={deleting}
           className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
         >
-          {deleting ? "Excluindo..." : confirmDelete ? "Toque de novo para confirmar" : "Excluir lançamento"}
+          {deleting ? "Excluindo..." : "Excluir lançamento"}
         </button>
+
+        {pinAction && (
+          <ConfirmPinModal
+            title={pinAction === "delete" ? "Confirme com a senha para excluir" : "Confirme com a senha para salvar"}
+            confirmLabel={pinAction === "delete" ? "Excluir" : "Confirmar"}
+            danger={pinAction === "delete"}
+            onConfirm={() => {
+              const action = pinAction;
+              setPinAction(null);
+              if (action === "delete") handleDelete();
+              else handleSave();
+            }}
+            onCancel={() => setPinAction(null)}
+          />
+        )}
       </div>
     </div>
   );

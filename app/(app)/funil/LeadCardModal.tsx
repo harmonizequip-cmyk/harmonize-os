@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow } from "./FunilClient";
+import ConfirmPinModal from "@/components/ConfirmPinModal";
 
 export default function LeadCardModal({
   lead,
@@ -21,6 +22,7 @@ export default function LeadCardModal({
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [reservationFeeStatus, setReservationFeeStatus] = useState(lead.reservation_fee_status);
   const [saving, setSaving] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -144,13 +146,24 @@ export default function LeadCardModal({
             Cancelar
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => setShowPin(true)}
             disabled={saving}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white transition hover:bg-brand-teal-dark disabled:opacity-60"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
+
+        {showPin && (
+          <ConfirmPinModal
+            title="Confirme com a senha para salvar"
+            onConfirm={() => {
+              setShowPin(false);
+              handleSave();
+            }}
+            onCancel={() => setShowPin(false)}
+          />
+        )}
       </div>
     </div>
   );

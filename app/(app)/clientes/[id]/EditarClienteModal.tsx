@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ConfirmPinModal from "@/components/ConfirmPinModal";
 
 interface Client {
   id: string;
@@ -33,6 +34,7 @@ export default function EditarClienteModal({
   const [reservationFeeStatus, setReservationFeeStatus] = useState(client.reservation_fee_status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPin, setShowPin] = useState(false);
 
   async function handleSave() {
     if (!name.trim()) {
@@ -144,13 +146,30 @@ export default function EditarClienteModal({
             Cancelar
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => {
+              if (!name.trim()) {
+                setError("Informe o nome do cliente.");
+                return;
+              }
+              setShowPin(true);
+            }}
             disabled={saving}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white transition hover:bg-brand-teal-dark disabled:opacity-60"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
+
+        {showPin && (
+          <ConfirmPinModal
+            title="Confirme com a senha para salvar"
+            onConfirm={() => {
+              setShowPin(false);
+              handleSave();
+            }}
+            onCancel={() => setShowPin(false)}
+          />
+        )}
       </div>
     </div>
   );

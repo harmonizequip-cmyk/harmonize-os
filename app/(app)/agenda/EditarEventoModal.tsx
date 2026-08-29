@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import ConfirmPinModal from "@/components/ConfirmPinModal";
 
 interface ClientOption {
   id: string;
@@ -42,8 +43,8 @@ export default function EditarEventoModal({
   const [notes, setNotes] = useState(event.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinAction, setPinAction] = useState<"save" | "delete" | null>(null);
 
   async function handleSave() {
     if (!title.trim() || !dateStart) {
@@ -72,10 +73,6 @@ export default function EditarEventoModal({
   }
 
   async function handleDelete() {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     setDeleting(true);
     setError(null);
     const { error } = await supabase.from("calendar_events").delete().eq("id", event.id);
@@ -197,7 +194,13 @@ export default function EditarEventoModal({
             Cancelar
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => {
+              if (!title.trim() || !dateStart) {
+                setError("Informe o título e a data.");
+                return;
+              }
+              setPinAction("save");
+            }}
             disabled={saving}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white transition hover:bg-brand-teal-dark disabled:opacity-60"
           >
@@ -206,12 +209,27 @@ export default function EditarEventoModal({
         </div>
 
         <button
-          onClick={handleDelete}
+          onClick={() => setPinAction("delete")}
           disabled={deleting}
           className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
         >
-          {deleting ? "Excluindo..." : confirmDelete ? "Toque de novo para confirmar" : "Excluir evento"}
+          {deleting ? "Excluindo..." : "Excluir evento"}
         </button>
+
+        {pinAction && (
+          <ConfirmPinModal
+            title={pinAction === "delete" ? "Confirme com a senha para excluir" : "Confirme com a senha para salvar"}
+            confirmLabel={pinAction === "delete" ? "Excluir" : "Confirmar"}
+            danger={pinAction === "delete"}
+            onConfirm={() => {
+              const action = pinAction;
+              setPinAction(null);
+              if (action === "delete") handleDelete();
+              else handleSave();
+            }}
+            onCancel={() => setPinAction(null)}
+          />
+        )}
       </div>
     </div>
   );
