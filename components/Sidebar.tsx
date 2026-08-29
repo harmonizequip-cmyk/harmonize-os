@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "🏠", module: "dashboard" },
   { href: "/financeiro", label: "Financeiro", icon: "💰", module: "financeiro" },
   { href: "/clientes", label: "Clientes", icon: "👩", module: "clientes" },
+  { href: "/funil", label: "Funil", icon: "🧭", module: "clientes" },
   { href: "/agenda", label: "Agenda", icon: "📅", module: "agenda" },
   { href: "/equipamentos", label: "Equipamentos", icon: "📦", module: "equipamentos" },
   { href: "/relatorios", label: "Relatórios", icon: "📊", module: "relatorios" },

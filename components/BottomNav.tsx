@@ -7,6 +7,7 @@ const ITEMS = [
   { href: "/dashboard", label: "Início", icon: "🏠", module: "dashboard" },
   { href: "/financeiro", label: "Financeiro", icon: "💰", module: "financeiro" },
   { href: "/clientes", label: "Clientes", icon: "👩", module: "clientes" },
+  { href: "/funil", label: "Funil", icon: "🧭", module: "clientes" },
   { href: "/agenda", label: "Agenda", icon: "📅", module: "agenda" },
   { href: "/equipamentos", label: "Equip.", icon: "📦", module: "equipamentos" },
 ];

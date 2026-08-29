@@ -90,6 +90,13 @@ create table public.clients (
   email text,
   city text,
   notes text,
+  -- Funil de vendas: todo cliente carrega uma etapa. Cadastros feitos
+  -- direto em "Clientes" entram como 'cliente' (já convertido); leads
+  -- criados no Funil entram como 'lead' e avançam a partir daí.
+  stage text not null default 'cliente' check (stage in ('lead','contato','qualificado','agendado','cliente')),
+  data_evento date,
+  tags text[] not null default '{}',
+  origem text,
   created_by uuid references profiles(id),
   created_at timestamptz not null default now()
 );

@@ -11,6 +11,8 @@
 // Se algum valor mudar, edite só as constantes abaixo.
 // ============================================================
 
+export const RESERVATION_FEE = 250.0;
+
 export const PRICING = {
   FLAT_PACKAGE_LIMIT: 20_000,   // disparos incluídos no pacote fixo
   FLAT_PACKAGE_VALUE: 2500.0,   // valor do pacote fixo (R$)

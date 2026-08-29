@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calculateRentalValue } from "@/lib/rental-pricing";
-import { buildWhatsAppSummary, buildWhatsAppLink } from "@/lib/rental-summary";
+import { calculateRentalValue, RESERVATION_FEE } from "@/lib/rental-pricing";
+import {
+  buildWhatsAppSummary,
+  buildWhatsAppLink,
+  calculateTotals,
+  type ReservationFeeStatus,
+} from "@/lib/rental-summary";
 import { formatCurrency } from "@/lib/format";
 
 const PAYMENT_METHODS = [
@@ -13,6 +18,12 @@ const PAYMENT_METHODS = [
   { value: "credito", label: "Crédito" },
   { value: "transferencia", label: "Transferência" },
   { value: "outros", label: "Outros" },
+];
+
+const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
+  { value: "nao_aplica", label: "Não se aplica" },
+  { value: "ja_paga", label: "Já foi paga (creditar no total)" },
+  { value: "cobrar_agora", label: "Cobrar agora (R$ 250)" },
 ];
 
 interface EquipmentOption {
@@ -43,14 +54,25 @@ export default function NovaLocacaoModal({
   const [finalCount, setFinalCount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [notes, setNotes] = useState("");
+
+  const [showExtras, setShowExtras] = useState(false);
+  const [additionalDescription, setAdditionalDescription] = useState("");
+  const [additionalValue, setAdditionalValue] = useState("");
+  const [discountDescription, setDiscountDescription] = useState("");
+  const [discountValue, setDiscountValue] = useState("");
+  const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>("nao_aplica");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const initialNumber = Number(initialCount.replace(/\D/g, ""));
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
   const shots = finalCount && initialCount ? finalNumber - initialNumber : 0;
+  const additionalNumber = Number(additionalValue.replace(",", ".")) || 0;
+  const discountNumber = Number(discountValue.replace(",", ".")) || 0;
 
   const pricing = useMemo(() => {
     if (!shots || shots <= 0) return null;
@@ -60,6 +82,23 @@ export default function NovaLocacaoModal({
       return null;
     }
   }, [shots]);
+
+  const totals = useMemo(() => {
+    if (!pricing) return null;
+    return calculateTotals({
+      initialCount: initialNumber,
+      finalCount: finalNumber,
+      pricing,
+      additionalChargeValue: additionalNumber,
+      additionalChargeDescription: additionalDescription,
+      discountValue: discountNumber,
+      discountDescription,
+      reservationFeeStatus,
+      eventDate,
+      clientName,
+      paymentMethod,
+    });
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod]);
 
   async function handleSave() {
     if (!equipmentId || !eventDate) {
@@ -74,27 +113,27 @@ export default function NovaLocacaoModal({
       setError("A contagem final precisa ser maior que a inicial.");
       return;
     }
-    if (!pricing) {
+    if (!pricing || !totals) {
       setError("Não foi possível calcular o valor. Confira as contagens.");
       return;
     }
 
     setSaving(true);
     setError(null);
+    setWarning(null);
 
-    const { error: rpcError } = await supabase.rpc("create_rental", {
+    const { data: rentalId, error: rpcError } = await supabase.rpc("create_rental", {
       p_client_id: clientId,
       p_equipment_id: equipmentId,
       p_event_date: eventDate,
       p_shots: shots,
-      p_calculated_value: pricing.totalValue,
+      p_calculated_value: totals.rentalTransactionAmount,
       p_payment_method: paymentMethod,
       p_notes: notes || null,
     });
 
-    setSaving(false);
-
     if (rpcError) {
+      setSaving(false);
       if (rpcError.code === "23P01") {
         const equipmentName = equipments.find((e) => e.id === equipmentId)?.name ?? "equipamento";
         setError(`⚠️ O ${equipmentName} já está reservado neste período.`);
@@ -104,11 +143,48 @@ export default function NovaLocacaoModal({
       return;
     }
 
+    // Taxa de reserva cobrada agora vira uma transação própria, separada da
+    // locação, para ficar categorizada como "Taxa de reserva" no financeiro.
+    if (reservationFeeStatus === "cobrar_agora") {
+      const { data: category } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("type", "entrada")
+        .ilike("name", "Taxa%")
+        .limit(1)
+        .single();
+
+      if (category) {
+        const { error: feeError } = await supabase.from("transactions").insert({
+          type: "entrada",
+          category_id: category.id,
+          description: `Taxa de reserva - ${clientName}`,
+          amount: RESERVATION_FEE,
+          payment_method: paymentMethod,
+          date: eventDate,
+          scope: "harmonize",
+          client_id: clientId,
+          rental_id: rentalId,
+        });
+        if (feeError) {
+          setWarning("A locação foi salva, mas a taxa de reserva não foi registrada automaticamente. Adicione manualmente em Financeiro.");
+        }
+      } else {
+        setWarning("A locação foi salva, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
+      }
+    }
+
+    setSaving(false);
     setSummary(
       buildWhatsAppSummary({
         initialCount: initialNumber,
         finalCount: finalNumber,
         pricing,
+        additionalChargeValue: additionalNumber,
+        additionalChargeDescription: additionalDescription,
+        discountValue: discountNumber,
+        discountDescription,
+        reservationFeeStatus,
         eventDate,
         clientName,
         paymentMethod,
@@ -135,7 +211,8 @@ export default function NovaLocacaoModal({
       <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
         <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
           <h2 className="mb-1 text-lg font-semibold text-neutral-900">Locação salva ✅</h2>
-          <p className="mb-4 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
+          <p className="mb-2 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
+          {warning && <p className="mb-3 text-xs text-amber-600">{warning}</p>}
 
           <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
             {summary}
@@ -236,7 +313,7 @@ export default function NovaLocacaoModal({
           {pricing && (
             <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">Valor calculado</span>
+                <span className="text-neutral-600">Valor dos disparos</span>
                 <span className="font-semibold text-brand-teal">{formatCurrency(pricing.totalValue)}</span>
               </div>
               <p className="mt-1 text-xs text-neutral-500">
@@ -244,6 +321,80 @@ export default function NovaLocacaoModal({
                 {pricing.tier2Portion > 0 && ` · +${pricing.tier2Portion.toLocaleString("pt-BR")} a R$0,10`}
                 {pricing.tier3Portion > 0 && ` · +${pricing.tier3Portion.toLocaleString("pt-BR")} a R$0,07`}
               </p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowExtras((v) => !v)}
+            className="text-xs font-medium text-brand-teal underline underline-offset-2"
+          >
+            {showExtras ? "Ocultar cobranças adicionais, desconto e taxa de reserva" : "+ Cobrança adicional, desconto ou taxa de reserva"}
+          </button>
+
+          {showExtras && (
+            <div className="space-y-3 rounded-xl border border-neutral-200 p-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Cobrança adicional</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    value={additionalDescription}
+                    onChange={(e) => setAdditionalDescription(e.target.value)}
+                    placeholder="Ex: Deslocamento"
+                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                  <input
+                    inputMode="decimal"
+                    value={additionalValue}
+                    onChange={(e) => setAdditionalValue(e.target.value)}
+                    placeholder="R$ 0,00"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Desconto</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    value={discountDescription}
+                    onChange={(e) => setDiscountDescription(e.target.value)}
+                    placeholder="Ex: Fidelidade"
+                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                  <input
+                    inputMode="decimal"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder="R$ 0,00"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Taxa de reserva (R$ 250)</label>
+                <select
+                  value={reservationFeeStatus}
+                  onChange={(e) => setReservationFeeStatus(e.target.value as ReservationFeeStatus)}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                >
+                  {RESERVATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {totals && (
+            <div className="rounded-xl bg-neutral-900 p-3 text-sm text-white">
+              <div className="flex items-center justify-between">
+                <span>Total a pagar agora</span>
+                <span className="text-lg font-semibold">{formatCurrency(totals.totalToPayNow)}</span>
+              </div>
             </div>
           )}
 

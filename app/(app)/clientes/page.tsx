@@ -7,6 +7,7 @@ export default async function ClientesPage() {
   const { data: clients } = await supabase
     .from("clients")
     .select("id, name, clinic_name, whatsapp, city")
+    .eq("stage", "cliente")
     .order("name");
 
   return <ClientesClient initialClients={clients ?? []} />;
