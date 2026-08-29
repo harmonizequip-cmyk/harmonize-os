@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow } from "./FunilClient";
-import { buildMapsLink } from "@/lib/format";
+import { buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 
 export default function LeadCardModal({
   lead,
@@ -137,14 +137,14 @@ export default function LeadCardModal({
 
         {(lead.whatsapp || buildMapsLink(address)) && (
           <div className="mt-4 flex gap-2">
-            {lead.whatsapp && (
+            {buildWhatsAppLink(lead.whatsapp) && (
               <a
-                href={`https://wa.me/${lead.whatsapp.replace(/\D/g, "")}`}
+                href={buildWhatsAppLink(lead.whatsapp)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 text-center text-sm text-brand-teal underline underline-offset-2"
               >
-                Abrir WhatsApp
+                WhatsApp
               </a>
             )}
             {buildMapsLink(address) && (
@@ -154,7 +154,17 @@ export default function LeadCardModal({
                 rel="noopener noreferrer"
                 className="flex-1 text-center text-sm text-brand-blue underline underline-offset-2"
               >
-                Abrir no Maps
+                Maps
+              </a>
+            )}
+            {buildWazeLink(address) && (
+              <a
+                href={buildWazeLink(address)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center text-sm text-brand-lilac underline underline-offset-2"
+              >
+                Waze
               </a>
             )}
           </div>

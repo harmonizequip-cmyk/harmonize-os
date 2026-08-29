@@ -117,14 +117,5 @@ export function buildWhatsAppSummary(input: RentalChargesInput): string {
   return lines.join("\n");
 }
 
-/**
- * Monta o link wa.me a partir de um número em qualquer formato comum
- * ((83) 90000-0000, 83900000000, etc). Retorna null se o campo estiver vazio.
- */
-export function buildWhatsAppLink(phone: string | null | undefined, text: string): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return null;
-  const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
-  return `https://wa.me/${withCountryCode}?text=${encodeURIComponent(text)}`;
-}
+// Reexporta a versão central (evita duas implementações divergentes do +55)
+export { buildWhatsAppLink } from "./format";

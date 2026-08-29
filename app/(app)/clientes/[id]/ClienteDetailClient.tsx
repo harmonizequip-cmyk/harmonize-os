@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatCurrency, formatDate, buildMapsLink } from "@/lib/format";
+import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 import NovaLocacaoModal from "./NovaLocacaoModal";
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
@@ -128,9 +128,9 @@ export default function ClienteDetailClient({
 
         {(client.whatsapp || client.address) && (
           <div className="col-span-2 flex gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:col-span-4">
-            {client.whatsapp && (
+            {buildWhatsAppLink(client.whatsapp) && (
               <a
-                href={`https://wa.me/${client.whatsapp.replace(/\D/g, "")}`}
+                href={buildWhatsAppLink(client.whatsapp)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 rounded-lg bg-brand-teal/10 py-2 text-center text-xs font-medium text-brand-teal"
@@ -146,6 +146,16 @@ export default function ClienteDetailClient({
                 className="flex-1 rounded-lg bg-brand-blue/10 py-2 text-center text-xs font-medium text-brand-blue"
               >
                 Abrir no Maps
+              </a>
+            )}
+            {buildWazeLink(client.address) && (
+              <a
+                href={buildWazeLink(client.address)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 rounded-lg bg-brand-lilac/10 py-2 text-center text-xs font-medium text-brand-lilac"
+              >
+                Abrir no Waze
               </a>
             )}
           </div>

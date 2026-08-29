@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate, buildMapsLink } from "@/lib/format";
+import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 
 interface ClientRow {
   id: string;
@@ -139,9 +139,9 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
 
             {(c.whatsapp || c.address) && (
               <div className="mt-2 flex gap-2">
-                {c.whatsapp && (
+                {buildWhatsAppLink(c.whatsapp) && (
                   <a
-                    href={`https://wa.me/${c.whatsapp.replace(/\D/g, "")}`}
+                    href={buildWhatsAppLink(c.whatsapp)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
@@ -159,6 +159,17 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
                     className="flex-1 text-center text-xs text-brand-blue underline underline-offset-2"
                   >
                     Maps
+                  </a>
+                )}
+                {buildWazeLink(c.address) && (
+                  <a
+                    href={buildWazeLink(c.address)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-center text-xs text-brand-lilac underline underline-offset-2"
+                  >
+                    Waze
                   </a>
                 )}
               </div>
