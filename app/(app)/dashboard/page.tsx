@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
@@ -34,6 +35,37 @@ export default async function DashboardPage({
     .gte("event_date", fromStr)
     .lte("event_date", toStr);
 
+  const [{ count: concluidasCount }, { count: canceladasCount }, { count: reagendadasCount }] = await Promise.all([
+    supabase
+      .from("rentals")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "realizada")
+      .gte("event_date", fromStr)
+      .lte("event_date", toStr),
+    supabase
+      .from("rentals")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "cancelada")
+      .gte("event_date", fromStr)
+      .lte("event_date", toStr),
+    supabase
+      .from("rentals")
+      .select("id", { count: "exact", head: true })
+      .eq("rescheduled", true)
+      .gte("event_date", fromStr)
+      .lte("event_date", toStr),
+  ]);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const in7Str = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const { count: pendingConfirmations } = await supabase
+    .from("calendar_events")
+    .select("id", { count: "exact", head: true })
+    .eq("confirmed", false)
+    .neq("status", "cancelada")
+    .gte("date_start", todayStr)
+    .lte("date_start", in7Str);
+
   const rows = transactions ?? [];
   const normalizedRows = rows.map((t: any) => ({
     ...t,
@@ -64,7 +96,16 @@ export default async function DashboardPage({
         <PeriodFilter />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      {!!pendingConfirmations && pendingConfirmations > 0 && (
+        <Link
+          href="/agenda"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+        >
+          ⚠️ {pendingConfirmations} {pendingConfirmations === 1 ? "evento precisa" : "eventos precisam"} de confirmação nos próximos 7 dias →
+        </Link>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((card) => (
           <div key={card.label} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{card.label}</p>
@@ -78,6 +119,18 @@ export default async function DashboardPage({
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
           <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
+        </div>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Concluídas</p>
+          <p className="mt-1 text-lg font-semibold text-brand-teal">{concluidasCount ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Canceladas</p>
+          <p className="mt-1 text-lg font-semibold text-brand-pink">{canceladasCount ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Reagendadas</p>
+          <p className="mt-1 text-lg font-semibold text-brand-blue">{reagendadasCount ?? 0}</p>
         </div>
       </div>
 

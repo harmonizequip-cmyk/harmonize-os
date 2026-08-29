@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface ClientRow {
   id: string;
@@ -11,6 +12,7 @@ interface ClientRow {
   clinic_name: string | null;
   whatsapp: string | null;
   city: string | null;
+  stats: { count: number; total: number; lastDate: string | null };
 }
 
 export default function ClientesClient({ initialClients }: { initialClients: ClientRow[] }) {
@@ -54,18 +56,49 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((c) => (
-          <Link
+          <div
             key={c.id}
-            href={`/clientes/${c.id}`}
             className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-brand-teal dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <p className="font-medium text-neutral-900 dark:text-neutral-100">{c.name}</p>
-            {c.clinic_name && <p className="mt-0.5 text-sm text-neutral-500">{c.clinic_name}</p>}
-            <div className="mt-3 flex items-center justify-between text-xs text-neutral-400">
-              <span>{c.city ?? "-"}</span>
-              <span>{c.whatsapp ?? "-"}</span>
-            </div>
-          </Link>
+            <Link href={`/clientes/${c.id}`}>
+              <p className="font-medium text-neutral-900 dark:text-neutral-100">{c.name}</p>
+              {c.clinic_name && <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{c.clinic_name}</p>}
+              <p className="mt-0.5 text-xs text-neutral-400">{c.city ?? "-"}</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-neutral-50 p-2.5 text-xs dark:bg-neutral-800/60">
+                <div>
+                  <p className="text-neutral-400">Locações</p>
+                  <p className="font-medium text-neutral-700 dark:text-neutral-200">{c.stats.count}</p>
+                </div>
+                <div>
+                  <p className="text-neutral-400">Total</p>
+                  <p className="font-medium text-brand-teal">{formatCurrency(c.stats.total)}</p>
+                </div>
+                <div>
+                  <p className="text-neutral-400">Indicações</p>
+                  <p className="font-medium text-neutral-700 dark:text-neutral-200">—</p>
+                </div>
+                <div>
+                  <p className="text-neutral-400">Última reserva</p>
+                  <p className="font-medium text-neutral-700 dark:text-neutral-200">
+                    {c.stats.lastDate ? formatDate(c.stats.lastDate) : "-"}
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            {c.whatsapp && (
+              <a
+                href={`https://wa.me/${c.whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-2 block text-center text-xs text-brand-teal underline underline-offset-2"
+              >
+                Abrir WhatsApp
+              </a>
+            )}
+          </div>
         ))}
         {filtered.length === 0 && (
           <div className="col-span-full rounded-2xl border border-dashed border-neutral-300 bg-white py-12 text-center text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900">

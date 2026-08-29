@@ -177,6 +177,10 @@ create table public.rentals (
   calculated_value numeric(12,2) not null,
   payment_method payment_method_type not null,
   status event_status_type not null default 'confirmada',
+  -- Marcado automaticamente pela função update_rental quando a data
+  -- muda em relação ao valor gravado anteriormente. Não é editado
+  -- manualmente, fica registrado como fato histórico.
+  rescheduled boolean not null default false,
   transaction_id uuid references transactions(id),
   notes text,
   created_by uuid references profiles(id),
@@ -200,6 +204,10 @@ create table public.calendar_events (
   time_start time,
   time_end time,
   status event_status_type not null default 'pre_reserva',
+  -- Confirmação com o cliente próximo à data, distinta do status geral
+  -- da reserva. Começa como false; a Agenda destaca automaticamente
+  -- quem está a menos de 7 dias e ainda não foi confirmado.
+  confirmed boolean not null default false,
   value numeric(12,2),
   notes text,
   rental_id uuid references rentals(id),
@@ -360,11 +368,80 @@ begin
   insert into calendar_events (event_type, title, client_id, equipment_id, date_start, date_end, status, value, rental_id, created_by)
   values (v_equipment_code::text::calendar_event_type, 'Locação - ' || coalesce(v_client_name, ''), p_client_id, p_equipment_id, p_event_date, p_event_date, 'confirmada', p_calculated_value, v_rental_id, v_created_by);
 
+  -- Primeira locação promove o cliente automaticamente para a etapa final do funil.
+  update clients set stage = 'cliente' where id = p_client_id and stage <> 'cliente';
+
   return v_rental_id;
 end;
 $$;
 
 grant execute on function public.create_rental to authenticated;
+
+-- ============================================================
+-- FUNÇÃO: update_rental
+-- Edita uma locação já existente e mantém a transação financeira e o
+-- evento de agenda vinculados em sincronia. Sujeita à mesma constraint
+-- de conflito de agenda (no_equipment_double_booking).
+-- ============================================================
+create or replace function public.update_rental(
+  p_rental_id uuid,
+  p_equipment_id uuid,
+  p_event_date date,
+  p_shots integer,
+  p_calculated_value numeric,
+  p_payment_method payment_method_type,
+  p_status event_status_type,
+  p_notes text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_transaction_id uuid;
+  v_client_id uuid;
+  v_old_date date;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para editar locações';
+  end if;
+
+  select transaction_id, client_id, event_date into v_transaction_id, v_client_id, v_old_date
+  from rentals where id = p_rental_id;
+
+  update rentals
+  set equipment_id = p_equipment_id,
+      event_date = p_event_date,
+      shots = p_shots,
+      calculated_value = p_calculated_value,
+      payment_method = p_payment_method,
+      status = p_status,
+      notes = p_notes,
+      rescheduled = rescheduled or (v_old_date is not null and v_old_date <> p_event_date)
+  where id = p_rental_id;
+
+  if v_transaction_id is not null then
+    update transactions
+    set amount = p_calculated_value,
+        date = p_event_date,
+        payment_method = p_payment_method
+    where id = v_transaction_id;
+  end if;
+
+  -- Atualiza o evento de agenda vinculado; se a nova data/equipamento
+  -- conflitar com outra reserva, a constraint recusa e desfaz tudo.
+  update calendar_events
+  set equipment_id = p_equipment_id,
+      date_start = p_event_date,
+      date_end = p_event_date,
+      value = p_calculated_value,
+      status = p_status
+  where rental_id = p_rental_id;
+end;
+$$;
+
+grant execute on function public.update_rental to authenticated;
 
 -- ============================================================
 -- Depois de criar seu usuário em Authentication > Users,

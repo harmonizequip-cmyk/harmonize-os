@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/format";
 import NovoLancamentoModal from "./NovoLancamentoModal";
+import EditarLancamentoModal from "./EditarLancamentoModal";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -21,6 +22,7 @@ interface TransactionRow {
   amount: number;
   payment_method: string;
   date: string;
+  category_id: string | null;
   categories?: { name: string } | null;
 }
 
@@ -39,6 +41,7 @@ export default function FinanceiroClient({
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<TransactionRow | null>(null);
   const [typeFilter, setTypeFilter] = useState<"todos" | "entrada" | "saida">("todos");
   const [search, setSearch] = useState("");
 
@@ -90,7 +93,11 @@ export default function FinanceiroClient({
       {/* Celular: lista de cartões empilhados */}
       <div className="space-y-2 sm:hidden">
         {filtered.map((t) => (
-          <div key={t.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div
+            key={t.id}
+            onClick={() => setEditing(t)}
+            className="cursor-pointer rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal dark:border-neutral-800 dark:bg-neutral-900"
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t.description}</p>
@@ -138,7 +145,11 @@ export default function FinanceiroClient({
           </thead>
           <tbody>
             {filtered.map((t) => (
-              <tr key={t.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+              <tr
+                key={t.id}
+                onClick={() => setEditing(t)}
+                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
+              >
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatDate(t.date)}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <span
@@ -176,6 +187,22 @@ export default function FinanceiroClient({
 
       {modalOpen && (
         <NovoLancamentoModal categories={categories} onClose={() => setModalOpen(false)} onCreated={handleCreated} />
+      )}
+
+      {editing && (
+        <EditarLancamentoModal
+          transaction={editing}
+          categories={categories}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            router.refresh();
+          }}
+          onDeleted={() => {
+            setEditing(null);
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import NovaLocacaoModal from "./NovaLocacaoModal";
+import EditarClienteModal from "./EditarClienteModal";
+import EditarLocacaoModal from "./EditarLocacaoModal";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -32,7 +34,9 @@ interface RentalRow {
   calculated_value: number;
   payment_method: string;
   status: string;
+  rescheduled: boolean;
   equipment_id: string;
+  notes: string | null;
   equipments?: { name: string } | null;
 }
 
@@ -53,11 +57,16 @@ export default function ClienteDetailClient({
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editClientOpen, setEditClientOpen] = useState(false);
+  const [editingRental, setEditingRental] = useState<RentalRow | null>(null);
 
   const totalLocacoes = rentals.length;
   const totalFaturado = rentals.reduce((sum, r) => sum + Number(r.calculated_value), 0);
   const ticketMedio = totalLocacoes > 0 ? totalFaturado / totalLocacoes : 0;
   const ultimaLocacao = rentals[0]?.event_date;
+  const concluidas = rentals.filter((r) => r.status === "realizada").length;
+  const canceladas = rentals.filter((r) => r.status === "cancelada").length;
+  const reagendadas = rentals.filter((r) => r.rescheduled).length;
 
   function handleCreated() {
     setModalOpen(false);
@@ -74,7 +83,15 @@ export default function ClienteDetailClient({
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{client.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{client.name}</h1>
+            <button
+              onClick={() => setEditClientOpen(true)}
+              className="text-xs text-brand-teal underline underline-offset-2"
+            >
+              Editar
+            </button>
+          </div>
           {client.clinic_name && <p className="text-sm text-neutral-500">{client.clinic_name}</p>}
         </div>
         <button
@@ -125,10 +142,26 @@ export default function ClienteDetailClient({
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full bg-brand-teal/10 px-3 py-1 font-medium text-brand-teal">
+          ✓ {concluidas} concluída{concluidas === 1 ? "" : "s"}
+        </span>
+        <span className="rounded-full bg-brand-pink/10 px-3 py-1 font-medium text-brand-pink">
+          ✕ {canceladas} cancelada{canceladas === 1 ? "" : "s"}
+        </span>
+        <span className="rounded-full bg-brand-blue/10 px-3 py-1 font-medium text-brand-blue">
+          ↻ {reagendadas} reagendada{reagendadas === 1 ? "" : "s"}
+        </span>
+      </div>
+
       {/* Celular: cartões empilhados */}
       <div className="space-y-2 sm:hidden">
         {rentals.map((r) => (
-          <div key={r.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div
+            key={r.id}
+            onClick={() => setEditingRental(r)}
+            className="cursor-pointer rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal dark:border-neutral-800 dark:bg-neutral-900"
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{r.equipments?.name ?? "-"}</p>
@@ -136,8 +169,17 @@ export default function ClienteDetailClient({
                   {formatDate(r.event_date)} · {r.shots.toLocaleString("pt-BR")} disparos
                 </p>
               </div>
-              <span className="whitespace-nowrap text-xs capitalize text-neutral-500">
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                  r.status === "cancelada"
+                    ? "bg-brand-pink/10 text-brand-pink"
+                    : r.status === "realizada"
+                      ? "bg-brand-teal/10 text-brand-teal"
+                      : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                }`}
+              >
                 {r.status.replace("_", " ")}
+                {r.rescheduled && " · ↻"}
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
@@ -170,7 +212,11 @@ export default function ClienteDetailClient({
           </thead>
           <tbody>
             {rentals.map((r) => (
-              <tr key={r.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+              <tr
+                key={r.id}
+                onClick={() => setEditingRental(r)}
+                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
+              >
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatDate(r.event_date)}</td>
                 <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{r.equipments?.name ?? "-"}</td>
                 <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{r.shots.toLocaleString("pt-BR")}</td>
@@ -180,8 +226,19 @@ export default function ClienteDetailClient({
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
                   {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 capitalize">
-                  {r.status.replace("_", " ")}
+                <td className="whitespace-nowrap px-4 py-3">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                      r.status === "cancelada"
+                        ? "bg-brand-pink/10 text-brand-pink"
+                        : r.status === "realizada"
+                          ? "bg-brand-teal/10 text-brand-teal"
+                          : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                    }`}
+                  >
+                    {r.status.replace("_", " ")}
+                    {r.rescheduled && " · ↻"}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -204,6 +261,29 @@ export default function ClienteDetailClient({
           equipments={equipments}
           onClose={() => setModalOpen(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {editClientOpen && (
+        <EditarClienteModal
+          client={client}
+          onClose={() => setEditClientOpen(false)}
+          onSaved={() => {
+            setEditClientOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {editingRental && (
+        <EditarLocacaoModal
+          rental={editingRental}
+          equipments={equipments}
+          onClose={() => setEditingRental(null)}
+          onSaved={() => {
+            setEditingRental(null);
+            router.refresh();
+          }}
         />
       )}
     </div>
