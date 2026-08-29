@@ -94,6 +94,10 @@ create table public.clients (
   -- direto em "Clientes" entram como 'cliente' (já convertido); leads
   -- criados no Funil entram como 'lead' e avançam a partir daí.
   stage text not null default 'cliente' check (stage in ('lead','contato','qualificado','agendado','cliente')),
+  -- Rastreia se a taxa de reserva (R$250) foi pedida e paga para este
+  -- cliente. Independente do seletor por-locação da Nova Locação: aqui é
+  -- um status permanente do cliente, não gera lançamento sozinho.
+  reservation_fee_status text not null default 'nao_aplica' check (reservation_fee_status in ('nao_aplica', 'pendente', 'pago')),
   data_evento date,
   tags text[] not null default '{}',
   origem text,

@@ -19,6 +19,7 @@ export default function LeadCardModal({
   const [dataEvento, setDataEvento] = useState(lead.data_evento ?? "");
   const [tagsText, setTagsText] = useState((lead.tags ?? []).join(", "));
   const [notes, setNotes] = useState(lead.notes ?? "");
+  const [reservationFeeStatus, setReservationFeeStatus] = useState(lead.reservation_fee_status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +38,7 @@ export default function LeadCardModal({
         data_evento: dataEvento || null,
         tags,
         notes: notes || null,
+        reservation_fee_status: reservationFeeStatus,
       })
       .eq("id", lead.id);
 
@@ -101,6 +103,19 @@ export default function LeadCardModal({
               rows={3}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva</label>
+            <select
+              value={reservationFeeStatus}
+              onChange={(e) => setReservationFeeStatus(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              <option value="nao_aplica">Não se aplica</option>
+              <option value="pendente">Pendente</option>
+              <option value="pago">Paga</option>
+            </select>
           </div>
         </div>
 

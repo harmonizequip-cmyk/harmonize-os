@@ -11,6 +11,7 @@ interface Client {
   email: string | null;
   city: string | null;
   notes: string | null;
+  reservation_fee_status: string;
 }
 
 export default function EditarClienteModal({
@@ -29,6 +30,7 @@ export default function EditarClienteModal({
   const [email, setEmail] = useState(client.email ?? "");
   const [city, setCity] = useState(client.city ?? "");
   const [notes, setNotes] = useState(client.notes ?? "");
+  const [reservationFeeStatus, setReservationFeeStatus] = useState(client.reservation_fee_status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export default function EditarClienteModal({
         email: email || null,
         city: city || null,
         notes: notes || null,
+        reservation_fee_status: reservationFeeStatus,
       })
       .eq("id", client.id);
     setSaving(false);
@@ -116,6 +119,18 @@ export default function EditarClienteModal({
               rows={2}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva</label>
+            <select
+              value={reservationFeeStatus}
+              onChange={(e) => setReservationFeeStatus(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              <option value="nao_aplica">Não se aplica</option>
+              <option value="pendente">Pendente</option>
+              <option value="pago">Paga</option>
+            </select>
           </div>
         </div>
 

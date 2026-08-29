@@ -27,6 +27,8 @@ export interface LeadRow {
   tags: string[] | null;
   origem: string | null;
   notes: string | null;
+  reservation_fee_status: string;
+  nextEvent: { date_start: string; confirmed: boolean } | null;
 }
 
 export default function FunilClient({ initialClients }: { initialClients: LeadRow[] }) {
@@ -59,6 +61,21 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
     const idx = STAGES.findIndex((s) => s.key === lead.stage);
     if (idx === -1 || idx === STAGES.length - 1) return;
     moveToStage(lead.id, STAGES[idx + 1].key);
+  }
+
+  async function toggleConfirmed(lead: LeadRow) {
+    if (!lead.nextEvent) return;
+    await supabase
+      .from("calendar_events")
+      .update({ confirmed: !lead.nextEvent.confirmed })
+      .eq("client_id", lead.id)
+      .eq("date_start", lead.nextEvent.date_start);
+    router.refresh();
+  }
+
+  async function markFeePaid(lead: LeadRow) {
+    await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", lead.id);
+    router.refresh();
   }
 
   return (
@@ -132,9 +149,44 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                   >
                     <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
                     {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
-                    {lead.data_evento && (
-                      <p className="mt-1 text-xs text-brand-teal">📅 {formatDate(lead.data_evento)}</p>
+
+                    {lead.nextEvent ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleConfirmed(lead);
+                        }}
+                        className={`mt-1 block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          lead.nextEvent.confirmed
+                            ? "bg-brand-teal/10 text-brand-teal"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        }`}
+                      >
+                        📅 {formatDate(lead.nextEvent.date_start)} · {lead.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
+                      </button>
+                    ) : (
+                      lead.data_evento && (
+                        <p className="mt-1 text-xs text-neutral-400">📅 {formatDate(lead.data_evento)} (previsto)</p>
+                      )
                     )}
+
+                    {lead.reservation_fee_status === "pendente" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markFeePaid(lead);
+                        }}
+                        className="mt-1 block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      >
+                        💳 Taxa pendente
+                      </button>
+                    )}
+                    {lead.reservation_fee_status === "pago" && (
+                      <span className="mt-1 block w-fit rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-medium text-brand-teal">
+                        💳 Taxa paga
+                      </span>
+                    )}
+
                     {lead.tags && lead.tags.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {lead.tags.map((t) => (

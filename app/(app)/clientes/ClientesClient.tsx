@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
+import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface ClientRow {
@@ -12,11 +13,15 @@ interface ClientRow {
   clinic_name: string | null;
   whatsapp: string | null;
   city: string | null;
+  reservation_fee_status: string;
+  data_evento: string | null;
   stats: { count: number; total: number; lastDate: string | null };
+  nextEvent: { date_start: string; confirmed: boolean } | null;
 }
 
 export default function ClientesClient({ initialClients }: { initialClients: ClientRow[] }) {
   const router = useRouter();
+  const supabase = createClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -32,6 +37,20 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
 
   function handleCreated() {
     setModalOpen(false);
+    router.refresh();
+  }
+
+  async function toggleConfirmed(clientId: string, currentEvent: { date_start: string; confirmed: boolean }) {
+    await supabase
+      .from("calendar_events")
+      .update({ confirmed: !currentEvent.confirmed })
+      .eq("client_id", clientId)
+      .eq("date_start", currentEvent.date_start);
+    router.refresh();
+  }
+
+  async function markFeePaid(clientId: string) {
+    await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", clientId);
     router.refresh();
   }
 
@@ -86,6 +105,36 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
                 </div>
               </div>
             </Link>
+
+            {(c.nextEvent || c.reservation_fee_status !== "nao_aplica") && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {c.nextEvent && (
+                  <button
+                    onClick={() => toggleConfirmed(c.id, c.nextEvent!)}
+                    className={`rounded-full px-2 py-1 text-[11px] font-medium ${
+                      c.nextEvent.confirmed
+                        ? "bg-brand-teal/10 text-brand-teal"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    }`}
+                  >
+                    📅 {formatDate(c.nextEvent.date_start)} · {c.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
+                  </button>
+                )}
+                {c.reservation_fee_status === "pendente" && (
+                  <button
+                    onClick={() => markFeePaid(c.id)}
+                    className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  >
+                    💳 Taxa pendente
+                  </button>
+                )}
+                {c.reservation_fee_status === "pago" && (
+                  <span className="rounded-full bg-brand-teal/10 px-2 py-1 text-[11px] font-medium text-brand-teal">
+                    💳 Taxa paga
+                  </span>
+                )}
+              </div>
+            )}
 
             {c.whatsapp && (
               <a

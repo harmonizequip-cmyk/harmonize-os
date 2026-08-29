@@ -23,6 +23,7 @@ export default function NovoLeadModal({
   const [city, setCity] = useState("");
   const [origem, setOrigem] = useState("indicacao");
   const [notes, setNotes] = useState("");
+  const [chargeReservationFee, setChargeReservationFee] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +41,7 @@ export default function NovoLeadModal({
       origem,
       notes: notes || null,
       stage: "lead",
+      reservation_fee_status: chargeReservationFee ? "pendente" : "nao_aplica",
     });
     setSaving(false);
     if (error) {
@@ -106,6 +108,15 @@ export default function NovoLeadModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
+          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+            <input
+              type="checkbox"
+              checked={chargeReservationFee}
+              onChange={(e) => setChargeReservationFee(e.target.checked)}
+              className="h-4 w-4 rounded border-neutral-300"
+            />
+            Cobrar taxa de reserva (R$ 250)
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import NovoEventoModal from "./NovoEventoModal";
+import EditarEventoModal from "./EditarEventoModal";
 
 const EVENT_META: Record<string, { label: string; dot: string }> = {
   hipro_1: { label: "HIPRO 1", dot: "bg-brand-teal" },
@@ -24,6 +25,7 @@ interface EventRow {
   client_id: string | null;
   clients?: { name: string } | null;
   rental_id: string | null;
+  notes: string | null;
 }
 
 interface ClientOption {
@@ -51,6 +53,7 @@ export default function AgendaClient({
   const router = useRouter();
   const supabase = createClient();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
 
   const { needsConfirmation, upcoming } = useMemo(() => {
     const today = startOfToday();
@@ -81,7 +84,8 @@ export default function AgendaClient({
     return (
       <div
         key={e.id}
-        className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+        onClick={() => setEditingEvent(e)}
+        className="cursor-pointer rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal dark:border-neutral-800 dark:bg-neutral-900"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
@@ -95,7 +99,10 @@ export default function AgendaClient({
             </div>
           </div>
           <button
-            onClick={() => toggleConfirmed(e)}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              toggleConfirmed(e);
+            }}
             className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
               e.confirmed
                 ? "bg-brand-teal/10 text-brand-teal"
@@ -144,6 +151,22 @@ export default function AgendaClient({
 
       {modalOpen && (
         <NovoEventoModal clients={clients} onClose={() => setModalOpen(false)} onCreated={handleCreated} />
+      )}
+
+      {editingEvent && (
+        <EditarEventoModal
+          event={editingEvent}
+          clients={clients}
+          onClose={() => setEditingEvent(null)}
+          onSaved={() => {
+            setEditingEvent(null);
+            router.refresh();
+          }}
+          onDeleted={() => {
+            setEditingEvent(null);
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );
