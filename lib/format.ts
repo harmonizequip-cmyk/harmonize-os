@@ -30,12 +30,11 @@ export function buildWazeLink(address: string | null | undefined): string | null
  * ((83) 90000-0000, 83900000000, etc). Sempre garante o código do país (55),
  * sem o qual o wa.me não reconhece o número corretamente. Retorna null se o
  * campo estiver vazio. O parâmetro "text" é opcional (mensagem pré-preenchida).
- */
-/**
- * Monta o link do WhatsApp a partir de um número em qualquer formato comum
- * ((83) 90000-0000, 83900000000, etc). Sempre garante o código do país (55),
- * sem o qual o wa.me não reconhece o número corretamente. Retorna null se o
- * campo estiver vazio. O parâmetro "text" é opcional (mensagem pré-preenchida).
+ *
+ * No Android, aponta direto para o WhatsApp Business (pacote com.whatsapp.w4b),
+ * pulando o normal — com o link comum como alternativa automática caso o
+ * Business não esteja instalado. Fora do Android (iOS/desktop), usa o link
+ * comum, que abre o que estiver definido como padrão no aparelho.
  */
 export function buildWhatsAppLink(phone: string | null | undefined, text?: string): string | null {
   if (!phone) return null;
@@ -48,7 +47,14 @@ export function buildWhatsAppLink(phone: string | null | undefined, text?: strin
     digits = digits.slice(1);
   }
   const withCountryCode = digits.startsWith("55") ? digits : `55${digits}`;
-  return text ? `https://wa.me/${withCountryCode}?text=${encodeURIComponent(text)}` : `https://wa.me/${withCountryCode}`;
+  const textParam = text ? `&text=${encodeURIComponent(text)}` : "";
+  const fallbackLink = `https://wa.me/${withCountryCode}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+
+  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    return `intent://send?phone=${withCountryCode}${textParam}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=${encodeURIComponent(fallbackLink)};end`;
+  }
+  return fallbackLink;
 }
 
 // Cidades onde a Harmonize atua — usadas como reforço na detecção de
