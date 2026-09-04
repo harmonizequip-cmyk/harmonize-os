@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
+import { LogOut } from "lucide-react";
 
 export default function MobileHeader() {
   const router = useRouter();
@@ -20,9 +21,13 @@ export default function MobileHeader() {
         <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-8 w-auto" />
       </div>
       <div className="flex items-center gap-1">
-        <ThemeToggle className="px-2 py-1.5" />
-        <button onClick={handleLogout} className="px-2 py-1.5 text-sm text-neutral-500 dark:text-neutral-400">
-          Sair
+        <ThemeToggle compact className="h-8 w-8" />
+        <button
+          onClick={handleLogout}
+          aria-label="Sair"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+        >
+          <LogOut size={18} strokeWidth={1.75} />
         </button>
       </div>
     </header>
