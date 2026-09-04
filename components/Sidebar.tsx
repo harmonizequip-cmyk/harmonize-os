@@ -51,10 +51,12 @@ export default function Sidebar({
   return (
     <aside className="hidden w-60 flex-col border-r border-white/50 bg-white/70 p-4 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/60 md:flex">
       <div className="mb-8 px-2">
-        {/* Fundo sempre claro atrás da logo, já que o texto dela é preto */}
-        <div className="w-fit rounded-lg bg-white p-1.5">
-          <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-11 w-auto" />
-        </div>
+        <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-11 w-auto dark:hidden" />
+        <img
+          src="/harmonize-logo-full-dark.png"
+          alt="Harmonize"
+          className="hidden h-11 w-auto dark:block"
+        />
         <p className="mt-2 truncate text-xs font-medium text-neutral-400 dark:text-neutral-500">{name}</p>
       </div>
 
