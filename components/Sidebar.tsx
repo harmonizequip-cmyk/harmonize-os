@@ -38,7 +38,7 @@ export default function Sidebar({
   const items = NAV_ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
 
   return (
-    <aside className="hidden w-60 flex-col border-r border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:flex">
+    <aside className="hidden w-60 flex-col border-r border-white/50 bg-white/70 p-4 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/60 md:flex">
       <div className="mb-6 px-2">
         {/* Fundo sempre claro atrás da logo, já que o texto dela é preto */}
         <div className="w-fit rounded-lg bg-white p-1.5">
@@ -56,7 +56,7 @@ export default function Sidebar({
               href={item.href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
                 active
-                  ? "bg-brand-teal/10 font-medium text-brand-teal dark:bg-brand-teal/20"
+                  ? "bg-brand-gradient-soft border-l-2 border-brand-teal font-medium text-brand-teal-dark dark:text-brand-teal"
                   : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
               }`}
             >

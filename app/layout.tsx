@@ -27,7 +27,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
+      <body className="bg-brand-mesh bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
         {children}
       </body>
     </html>

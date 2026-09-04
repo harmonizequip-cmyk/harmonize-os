@@ -85,7 +85,7 @@ export default function AgendaClient({
       <div
         key={e.id}
         onClick={() => setEditingEvent(e)}
-        className="cursor-pointer rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal dark:border-neutral-800 dark:bg-neutral-900"
+        className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
@@ -122,7 +122,7 @@ export default function AgendaClient({
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Agenda</h1>
         <button
           onClick={() => setModalOpen(true)}
-          className="rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-teal-dark"
+          className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
         >
           + Novo evento
         </button>
@@ -142,7 +142,7 @@ export default function AgendaClient({
         <div className="space-y-2">
           {upcoming.map(renderCard)}
           {upcoming.length === 0 && (
-            <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-8 text-center text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900">
+            <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
               Nenhum evento futuro.
             </div>
           )}

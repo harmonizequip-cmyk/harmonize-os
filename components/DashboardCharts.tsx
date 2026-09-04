@@ -33,7 +33,7 @@ export default function DashboardCharts({ transactions }: { transactions: Transa
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
         <p className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">Fluxo financeiro</p>
         {fluxoData.length === 0 ? (
           <EmptyChart />
@@ -50,7 +50,7 @@ export default function DashboardCharts({ transactions }: { transactions: Transa
         )}
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
         <p className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">Receitas por categoria</p>
         {categoriaData.length === 0 ? (
           <EmptyChart />

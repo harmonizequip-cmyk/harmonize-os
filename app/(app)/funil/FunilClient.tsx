@@ -85,7 +85,7 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
         <button
           onClick={() => setModalOpen(true)}
-          className="rounded-xl bg-brand-teal px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-teal-dark"
+          className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
         >
           + Novo lead
         </button>
@@ -144,7 +144,7 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                       setDragOverStage(null);
                     }}
                     onClick={() => setSelected(lead)}
-                    className={`cursor-grab rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition hover:border-brand-teal active:cursor-grabbing dark:border-neutral-800 dark:bg-neutral-900 ${
+                    className={`cursor-grab rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand active:cursor-grabbing dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
                       draggedId === lead.id ? "opacity-40" : ""
                     }`}
                   >

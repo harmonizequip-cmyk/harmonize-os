@@ -42,7 +42,7 @@ export default async function EquipamentosPage() {
           const nextEvent = normalizedUpcoming.find((e) => e.equipment_id === eq.id);
 
           return (
-            <div key={eq.id} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <div key={eq.id} className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{eq.name}</h2>
@@ -83,7 +83,7 @@ export default async function EquipamentosPage() {
           );
         })}
         {(!equipments || equipments.length === 0) && (
-          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300 bg-white py-12 text-center text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
             Nenhum equipamento cadastrado.
           </div>
         )}

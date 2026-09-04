@@ -107,28 +107,28 @@ export default async function DashboardPage({
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div key={card.label} className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{card.label}</p>
             <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(card.value)}</p>
           </div>
         ))}
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações</p>
           <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{rentalsCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
           <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Concluídas</p>
           <p className="mt-1 text-lg font-semibold text-brand-teal">{concluidasCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Canceladas</p>
           <p className="mt-1 text-lg font-semibold text-brand-pink">{canceladasCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Reagendadas</p>
           <p className="mt-1 text-lg font-semibold text-brand-blue">{reagendadasCount ?? 0}</p>
         </div>

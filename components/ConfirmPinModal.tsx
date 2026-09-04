@@ -32,7 +32,7 @@ export default function ConfirmPinModal({
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
       <div
-        className="w-full max-w-xs rounded-2xl bg-white p-6 shadow-lg dark:bg-neutral-900"
+        className="w-full max-w-xs rounded-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="mb-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">{title}</p>

@@ -23,18 +23,24 @@ export default function BottomNav({
   const items = ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-neutral-200 bg-white py-2 dark:border-neutral-800 dark:bg-neutral-900 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-white/50 bg-white/75 py-2 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/70 md:hidden">
       {items.map((item) => {
         const active = pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center px-3 py-1 text-[10px] ${
-              active ? "text-brand-teal" : "text-neutral-500 dark:text-neutral-400"
+            className={`flex flex-col items-center rounded-xl px-3 py-1 text-[10px] transition ${
+              active ? "text-brand-teal-dark dark:text-brand-teal" : "text-neutral-500 dark:text-neutral-400"
             }`}
           >
-            <span className="text-lg leading-none">{item.icon}</span>
+            <span
+              className={`flex h-7 w-9 items-center justify-center rounded-full text-lg leading-none transition ${
+                active ? "bg-brand-gradient-soft" : ""
+              }`}
+            >
+              {item.icon}
+            </span>
             <span className="mt-0.5">{item.label}</span>
           </Link>
         );
