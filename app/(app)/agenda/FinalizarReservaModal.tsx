@@ -1,0 +1,407 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { calculateRentalValue, RESERVATION_FEE } from "@/lib/rental-pricing";
+import {
+  buildWhatsAppSummary,
+  buildWhatsAppLink,
+  calculateTotals,
+  type ReservationFeeStatus,
+} from "@/lib/rental-summary";
+import { formatCurrency, formatDate } from "@/lib/format";
+
+const PAYMENT_METHODS = [
+  { value: "pix", label: "PIX" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "debito", label: "Débito" },
+  { value: "credito", label: "Crédito" },
+  { value: "transferencia", label: "Transferência" },
+  { value: "outros", label: "Outros" },
+];
+
+const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
+  { value: "nao_aplica", label: "Não se aplica" },
+  { value: "ja_paga", label: "Já foi paga (creditar no total)" },
+  { value: "cobrar_agora", label: "Cobrar agora (R$ 250)" },
+];
+
+export interface ReservationToFinalize {
+  id: string; // id do calendar_events
+  clientId: string;
+  clientName: string;
+  clientWhatsapp?: string | null;
+  equipmentName: string;
+  eventDate: string; // date_start, YYYY-MM-DD
+}
+
+export default function FinalizarReservaModal({
+  reservation,
+  onClose,
+  onFinalized,
+}: {
+  reservation: ReservationToFinalize;
+  onClose: () => void;
+  onFinalized: () => void;
+}) {
+  const supabase = createClient();
+  const [initialCount, setInitialCount] = useState("");
+  const [finalCount, setFinalCount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("pix");
+  const [notes, setNotes] = useState("");
+
+  const [showExtras, setShowExtras] = useState(false);
+  const [additionalDescription, setAdditionalDescription] = useState("");
+  const [additionalValue, setAdditionalValue] = useState("");
+  const [discountDescription, setDiscountDescription] = useState("");
+  const [discountValue, setDiscountValue] = useState("");
+  const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>("nao_aplica");
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const initialNumber = Number(initialCount.replace(/\D/g, ""));
+  const finalNumber = Number(finalCount.replace(/\D/g, ""));
+  const shots = finalCount && initialCount ? finalNumber - initialNumber : 0;
+  const additionalNumber = Number(additionalValue.replace(",", ".")) || 0;
+  const discountNumber = Number(discountValue.replace(",", ".")) || 0;
+
+  const pricing = useMemo(() => {
+    if (!shots || shots <= 0) return null;
+    try {
+      return calculateRentalValue(shots);
+    } catch {
+      return null;
+    }
+  }, [shots]);
+
+  const totals = useMemo(() => {
+    if (!pricing) return null;
+    return calculateTotals({
+      initialCount: initialNumber,
+      finalCount: finalNumber,
+      pricing,
+      additionalChargeValue: additionalNumber,
+      additionalChargeDescription: additionalDescription,
+      discountValue: discountNumber,
+      discountDescription,
+      reservationFeeStatus,
+      eventDate: reservation.eventDate,
+      clientName: reservation.clientName,
+      paymentMethod,
+    });
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, paymentMethod, reservation.eventDate, reservation.clientName]);
+
+  async function handleSave() {
+    if (!initialCount || !finalCount) {
+      setError("Preencha a contagem inicial e final do equipamento.");
+      return;
+    }
+    if (finalNumber <= initialNumber) {
+      setError("A contagem final precisa ser maior que a inicial.");
+      return;
+    }
+    if (!pricing || !totals) {
+      setError("Não foi possível calcular o valor. Confira as contagens.");
+      return;
+    }
+    if (!window.confirm("Finalizar esta reserva com essa contagem de disparos? Isso cria a locação e o lançamento financeiro.")) return;
+
+    setSaving(true);
+    setError(null);
+    setWarning(null);
+
+    const { data: rentalId, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
+      p_calendar_event_id: reservation.id,
+      p_shots: shots,
+      p_calculated_value: totals.rentalTransactionAmount,
+      p_payment_method: paymentMethod,
+      p_notes: notes || null,
+    });
+
+    if (rpcError) {
+      setSaving(false);
+      setError("Não foi possível finalizar a reserva. Tente novamente.");
+      return;
+    }
+
+    if (reservationFeeStatus === "cobrar_agora") {
+      const { data: category } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("type", "entrada")
+        .ilike("name", "Taxa%")
+        .limit(1)
+        .single();
+
+      if (category) {
+        const { error: feeError } = await supabase.from("transactions").insert({
+          type: "entrada",
+          category_id: category.id,
+          description: `Taxa de reserva - ${reservation.clientName}`,
+          amount: RESERVATION_FEE,
+          payment_method: paymentMethod,
+          date: reservation.eventDate,
+          scope: "harmonize",
+          client_id: reservation.clientId,
+          rental_id: rentalId,
+        });
+        if (feeError) {
+          setWarning("A locação foi finalizada, mas a taxa de reserva não foi registrada automaticamente. Adicione manualmente em Financeiro.");
+        }
+      } else {
+        setWarning("A locação foi finalizada, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
+      }
+    }
+
+    setSaving(false);
+    setSummary(
+      buildWhatsAppSummary({
+        initialCount: initialNumber,
+        finalCount: finalNumber,
+        pricing,
+        additionalChargeValue: additionalNumber,
+        additionalChargeDescription: additionalDescription,
+        discountValue: discountNumber,
+        discountDescription,
+        reservationFeeStatus,
+        eventDate: reservation.eventDate,
+        clientName: reservation.clientName,
+        paymentMethod,
+      })
+    );
+  }
+
+  async function handleCopy() {
+    if (!summary) return;
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+    }
+  }
+
+  const whatsappLink = summary ? buildWhatsAppLink(reservation.clientWhatsapp, summary) : null;
+
+  if (summary) {
+    return (
+      <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl">
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Locação finalizada ✅</h2>
+          <p className="mb-2 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
+          {warning && <p className="mb-3 text-xs text-amber-600">{warning}</p>}
+
+          <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+            {summary}
+          </pre>
+
+          <div className="mt-4 flex flex-col gap-2">
+            {whatsappLink && (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl bg-brand-teal py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-teal-dark"
+              >
+                Enviar no WhatsApp
+              </a>
+            )}
+            <button
+              onClick={handleCopy}
+              className="rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
+            >
+              {copied ? "Copiado!" : "Copiar texto"}
+            </button>
+            <button
+              onClick={onFinalized}
+              className="rounded-xl bg-neutral-900 py-2.5 text-sm font-medium text-white"
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+      <div
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Finalizar reserva</h2>
+        <p className="mb-4 text-xs text-neutral-400">
+          {reservation.equipmentName} · {formatDate(reservation.eventDate)} · {reservation.clientName}
+        </p>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem inicial</label>
+              <input
+                inputMode="numeric"
+                value={initialCount}
+                onChange={(e) => setInitialCount(e.target.value)}
+                placeholder="Ex: 2907661"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem final</label>
+              <input
+                inputMode="numeric"
+                value={finalCount}
+                onChange={(e) => setFinalCount(e.target.value)}
+                placeholder="Ex: 2942213"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+            </div>
+          </div>
+
+          {shots > 0 && (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Disparos realizados: <span className="font-medium text-neutral-700 dark:text-neutral-300">{shots.toLocaleString("pt-BR")}</span>
+            </p>
+          )}
+
+          {pricing && (
+            <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-600">Valor dos disparos</span>
+                <span className="font-semibold text-brand-teal">{formatCurrency(pricing.totalValue)}</span>
+              </div>
+              <p className="mt-1 text-xs text-neutral-500">
+                Pacote fixo até 20.000: {formatCurrency(pricing.flatPackageValue)}
+                {pricing.tier2Portion > 0 && ` · +${pricing.tier2Portion.toLocaleString("pt-BR")} a R$0,10`}
+                {pricing.tier3Portion > 0 && ` · +${pricing.tier3Portion.toLocaleString("pt-BR")} a R$0,07`}
+              </p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowExtras((v) => !v)}
+            className="text-xs font-medium text-brand-teal underline underline-offset-2"
+          >
+            {showExtras ? "Ocultar cobranças adicionais, desconto e taxa de reserva" : "+ Cobrança adicional, desconto ou taxa de reserva"}
+          </button>
+
+          {showExtras && (
+            <div className="space-y-3 rounded-xl border border-neutral-200 p-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cobrança adicional</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    value={additionalDescription}
+                    onChange={(e) => setAdditionalDescription(e.target.value)}
+                    placeholder="Ex: Deslocamento"
+                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  />
+                  <input
+                    inputMode="decimal"
+                    value={additionalValue}
+                    onChange={(e) => setAdditionalValue(e.target.value)}
+                    placeholder="R$ 0,00"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Desconto</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    value={discountDescription}
+                    onChange={(e) => setDiscountDescription(e.target.value)}
+                    placeholder="Ex: Fidelidade"
+                    className="col-span-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  />
+                  <input
+                    inputMode="decimal"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder="R$ 0,00"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva (R$ 250)</label>
+                <select
+                  value={reservationFeeStatus}
+                  onChange={(e) => setReservationFeeStatus(e.target.value as ReservationFeeStatus)}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  {RESERVATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {totals && (
+            <div className="rounded-xl bg-neutral-900 p-3 text-sm text-white">
+              <div className="flex items-center justify-between">
+                <span>Total a pagar agora</span>
+                <span className="text-lg font-semibold">{formatCurrency(totals.totalToPayNow)}</span>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              {PAYMENT_METHODS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+        </div>
+
+        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !pricing}
+            className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:hover:brightness-100"
+          >
+            {saving ? "Salvando..." : "Finalizar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

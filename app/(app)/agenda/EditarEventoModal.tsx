@@ -4,6 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmPinModal from "@/components/ConfirmPinModal";
+import FinalizarReservaModal from "./FinalizarReservaModal";
+import { formatDate } from "@/lib/format";
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  hipro_1: "HIPRO 1",
+  hipro_2: "HIPRO 2",
+};
 
 interface ClientOption {
   id: string;
@@ -15,9 +22,12 @@ interface EventToEdit {
   event_type: string;
   title: string;
   date_start: string;
+  status?: string;
   client_id: string | null;
+  equipment_id?: string | null;
   rental_id: string | null;
   notes?: string | null;
+  clients?: { name: string; whatsapp?: string | null } | null;
 }
 
 export default function EditarEventoModal({
@@ -35,7 +45,15 @@ export default function EditarEventoModal({
 }) {
   const supabase = createClient();
   const isRentalEvent = !!event.rental_id;
+  const isPendingReservation = !isRentalEvent && !!event.equipment_id && (event.status ?? "pre_reserva") === "pre_reserva";
 
+  // Todos os hooks ficam aqui em cima, antes de qualquer return condicional
+  // (regras de hooks do React: mesma quantidade e ordem em toda renderização,
+  // independente de qual ramo — pendente, locação ou evento genérico — está
+  // sendo mostrado). Cada ramo só usa o subconjunto que precisa.
+  const [showFinalize, setShowFinalize] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [eventType, setEventType] = useState(event.event_type === "hipro_1" || event.event_type === "hipro_2" ? "outros" : event.event_type);
   const [title, setTitle] = useState(event.title);
   const [clientId, setClientId] = useState(event.client_id ?? "");
@@ -45,6 +63,80 @@ export default function EditarEventoModal({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeletePin, setShowDeletePin] = useState(false);
+
+  async function handleCancelReservation() {
+    if (!window.confirm("Cancelar esta reserva? O equipamento fica livre nessa data de novo.")) return;
+    setCancelling(true);
+    setCancelError(null);
+    const { error } = await supabase.from("calendar_events").update({ status: "cancelada" }).eq("id", event.id);
+    setCancelling(false);
+    if (error) {
+      setCancelError("Não foi possível cancelar. Tente novamente.");
+      return;
+    }
+    onDeleted();
+  }
+
+  if (isPendingReservation) {
+    if (showFinalize) {
+      return (
+        <FinalizarReservaModal
+          reservation={{
+            id: event.id,
+            clientId: event.client_id ?? "",
+            clientName: event.clients?.name ?? "Cliente",
+            clientWhatsapp: event.clients?.whatsapp ?? null,
+            equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
+            eventDate: event.date_start,
+          }}
+          onClose={() => setShowFinalize(false)}
+          onFinalized={onSaved}
+        />
+      );
+    }
+
+    return (
+      <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+        <div
+          className="w-full max-w-md rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Reserva pendente</h2>
+          <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+            {EQUIPMENT_LABELS[event.event_type] ?? event.event_type} · {formatDate(event.date_start)}
+            {event.clients?.name ? ` · ${event.clients.name}` : ""}
+            <br />
+            Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar.
+          </p>
+
+          {cancelError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{cancelError}</p>}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={() => setShowFinalize(true)}
+              className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+            >
+              Finalizar com disparos
+            </button>
+          </div>
+
+          <button
+            onClick={handleCancelReservation}
+            disabled={cancelling}
+            className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
+          >
+            {cancelling ? "Cancelando..." : "Cancelar reserva"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSave() {
     if (!title.trim() || !dateStart) {

@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsApp
 import NovaLocacaoModal from "./NovaLocacaoModal";
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
+import ReservarHiproModal from "../../agenda/ReservarHiproModal";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -59,6 +60,7 @@ export default function ClienteDetailClient({
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [reservaOpen, setReservaOpen] = useState(false);
   const [editClientOpen, setEditClientOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<RentalRow | null>(null);
 
@@ -96,12 +98,20 @@ export default function ClienteDetailClient({
           </div>
           {client.clinic_name && <p className="text-sm text-neutral-500">{client.clinic_name}</p>}
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
-        >
-          + Nova locação
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setReservaOpen(true)}
+            className="rounded-xl border border-brand-teal px-4 py-2.5 text-sm font-medium text-brand-teal transition active:scale-[0.98]"
+          >
+            Agendar sem disparos
+          </button>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+          >
+            + Nova locação
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55 sm:grid-cols-4">
@@ -311,6 +321,17 @@ export default function ClienteDetailClient({
           clientWhatsapp={client.whatsapp}
           equipments={equipments}
           onClose={() => setModalOpen(false)}
+          onCreated={handleCreated}
+        />
+      )}
+
+      {reservaOpen && (
+        <ReservarHiproModal
+          clients={[]}
+          equipments={equipments}
+          fixedClientId={client.id}
+          fixedClientName={client.name}
+          onClose={() => setReservaOpen(false)}
           onCreated={handleCreated}
         />
       )}

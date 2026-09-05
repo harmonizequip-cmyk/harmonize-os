@@ -450,6 +450,81 @@ $$;
 grant execute on function public.update_rental to authenticated;
 
 -- ============================================================
+-- FUNÇÃO: finalize_rental_reservation
+-- Converte uma pré-reserva de HIPRO (evento de agenda criado sem
+-- disparos, status 'pre_reserva', sem rental_id) em uma locação de
+-- verdade: cria a locação e a transação financeira, e ATUALIZA o
+-- calendar_events já existente em vez de inserir um novo (evita
+-- disparar a constraint no_equipment_double_booking contra a própria
+-- pré-reserva). Usada quando o cliente já fez o procedimento e a
+-- contagem de disparos finalmente existe.
+-- ============================================================
+create or replace function public.finalize_rental_reservation(
+  p_calendar_event_id uuid,
+  p_shots integer,
+  p_calculated_value numeric,
+  p_payment_method payment_method_type,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_category_id uuid;
+  v_client_id uuid;
+  v_equipment_id uuid;
+  v_event_date date;
+  v_client_name text;
+  v_created_by uuid := auth.uid();
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para finalizar locações';
+  end if;
+
+  select client_id, equipment_id, date_start into v_client_id, v_equipment_id, v_event_date
+  from calendar_events
+  where id = p_calendar_event_id and rental_id is null and status = 'pre_reserva';
+
+  if v_client_id is null then
+    raise exception 'Reserva não encontrada, já finalizada, ou sem cliente vinculado.';
+  end if;
+  if v_equipment_id is null then
+    raise exception 'Esta reserva não está vinculada a um equipamento HIPRO.';
+  end if;
+
+  select name into v_client_name from clients where id = v_client_id;
+  select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
+
+  insert into rentals (client_id, equipment_id, event_date, shots, calculated_value, payment_method, notes, created_by)
+  values (v_client_id, v_equipment_id, v_event_date, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by)
+  returning id into v_rental_id;
+
+  insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, created_by)
+  values ('entrada', v_category_id, 'Locação HIPRO - ' || coalesce(v_client_name, ''), p_calculated_value, p_payment_method, v_event_date, 'harmonize', v_client_id, v_rental_id, v_created_by)
+  returning id into v_transaction_id;
+
+  update rentals set transaction_id = v_transaction_id where id = v_rental_id;
+
+  update calendar_events
+  set status = 'confirmada',
+      value = p_calculated_value,
+      rental_id = v_rental_id,
+      notes = coalesce(p_notes, notes)
+  where id = p_calendar_event_id;
+
+  update clients set stage = 'cliente' where id = v_client_id and stage <> 'cliente';
+
+  return v_rental_id;
+end;
+$$;
+
+grant execute on function public.finalize_rental_reservation to authenticated;
+
+-- ============================================================
 -- Depois de criar seu usuário em Authentication > Users,
 -- rode isto trocando o e-mail, para virar admin com acesso total:
 -- ============================================================

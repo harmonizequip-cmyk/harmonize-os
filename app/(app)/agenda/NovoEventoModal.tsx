@@ -10,10 +10,12 @@ interface ClientOption {
 
 export default function NovoEventoModal({
   clients,
+  defaultDate,
   onClose,
   onCreated,
 }: {
   clients: ClientOption[];
+  defaultDate?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -21,7 +23,7 @@ export default function NovoEventoModal({
   const [title, setTitle] = useState("");
   const [eventType, setEventType] = useState<"mentoria" | "outros">("mentoria");
   const [clientId, setClientId] = useState("");
-  const [dateStart, setDateStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateStart, setDateStart] = useState(defaultDate ?? (() => new Date().toISOString().slice(0, 10))());
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
