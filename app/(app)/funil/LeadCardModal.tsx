@@ -3,15 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { STAGES, type LeadRow } from "./FunilClient";
+import { STAGES, type LeadRow, type TagOption } from "./FunilClient";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress } from "@/lib/format";
+
+const QUICK_COLOR = "#3DBFB8";
 
 export default function LeadCardModal({
   lead,
+  allTags,
   onClose,
   onSaved,
 }: {
   lead: LeadRow;
+  allTags: TagOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -20,39 +24,71 @@ export default function LeadCardModal({
   const [dataEvento, setDataEvento] = useState(lead.data_evento ?? "");
   const [city, setCity] = useState(lead.city ?? "");
   const [address, setAddress] = useState(lead.address ?? "");
-  const [tagsText, setTagsText] = useState((lead.tags ?? []).join(", "));
+  const [availableTags, setAvailableTags] = useState<TagOption[]>(allTags);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(lead.tags.map((t) => t.id));
+  const [newTagName, setNewTagName] = useState("");
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [reservationFeeStatus, setReservationFeeStatus] = useState(lead.reservation_fee_status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function toggleTag(tagId: string) {
+    setSelectedTagIds((prev) => (prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]));
+  }
+
+  async function handleCreateTag() {
+    const name = newTagName.trim();
+    if (!name) return;
+    const { data, error: createError } = await supabase
+      .from("tags")
+      .insert({ name, color: QUICK_COLOR })
+      .select("id, name, color")
+      .single();
+    if (createError || !data) {
+      setError(createError?.code === "23505" ? "Já existe uma tag com esse nome." : "Não foi possível criar a tag.");
+      return;
+    }
+    setAvailableTags((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setSelectedTagIds((prev) => [...prev, data.id]);
+    setNewTagName("");
+  }
+
   async function handleSave() {
     if (!window.confirm("Salvar essas alterações?")) return;
     setSaving(true);
     setError(null);
-    const tags = tagsText
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
 
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("clients")
       .update({
         stage,
         data_evento: dataEvento || null,
         city: city || null,
         address: address || null,
-        tags,
         notes: notes || null,
         reservation_fee_status: reservationFeeStatus,
       })
       .eq("id", lead.id);
 
-    setSaving(false);
-    if (error) {
+    if (updateError) {
+      setSaving(false);
       setError("Não foi possível salvar. Tente novamente.");
       return;
     }
+
+    // Sincroniza as tags: só grava o que mudou desde a abertura do modal.
+    const originalIds = lead.tags.map((t) => t.id);
+    const toAdd = selectedTagIds.filter((id) => !originalIds.includes(id));
+    const toRemove = originalIds.filter((id) => !selectedTagIds.includes(id));
+
+    if (toAdd.length > 0) {
+      await supabase.from("client_tags").insert(toAdd.map((tag_id) => ({ client_id: lead.id, tag_id })));
+    }
+    if (toRemove.length > 0) {
+      await supabase.from("client_tags").delete().eq("client_id", lead.id).in("tag_id", toRemove);
+    }
+
+    setSaving(false);
     onSaved();
   }
 
@@ -116,13 +152,39 @@ export default function LeadCardModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tags (separadas por vírgula)</label>
-            <input
-              value={tagsText}
-              onChange={(e) => setTagsText(e.target.value)}
-              placeholder="VIP, Recorrente"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            />
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tags</label>
+            <div className="flex flex-wrap gap-1.5">
+              {availableTags.map((t) => {
+                const active = selectedTagIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTag(t.id)}
+                    className="rounded-full px-2.5 py-1 text-[11px] font-medium transition"
+                    style={active ? { backgroundColor: t.color, color: "#fff" } : { backgroundColor: `${t.color}1A`, color: t.color }}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="Nova tag..."
+                className="flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+              <button
+                type="button"
+                onClick={handleCreateTag}
+                disabled={!newTagName.trim()}
+                className="rounded-lg border border-brand-teal px-3 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50"
+              >
+                Criar
+              </button>
+            </div>
           </div>
 
           <div>

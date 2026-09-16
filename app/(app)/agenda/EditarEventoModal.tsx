@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import ConfirmPinModal from "@/components/ConfirmPinModal";
 import FinalizarReservaModal from "./FinalizarReservaModal";
 import { formatDate } from "@/lib/format";
+import type { PricingConfig } from "@/lib/rental-pricing";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
@@ -33,12 +34,16 @@ interface EventToEdit {
 export default function EditarEventoModal({
   event,
   clients,
+  pricingConfig,
+  reservationFee,
   onClose,
   onSaved,
   onDeleted,
 }: {
   event: EventToEdit;
   clients: ClientOption[];
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -89,6 +94,8 @@ export default function EditarEventoModal({
             equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
             eventDate: event.date_start,
           }}
+          pricingConfig={pricingConfig}
+          reservationFee={reservationFee}
           onClose={() => setShowFinalize(false)}
           onFinalized={onSaved}
         />

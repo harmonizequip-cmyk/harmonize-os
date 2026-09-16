@@ -18,6 +18,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
+import type { PricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
 import ReservarHiproModal from "./ReservarHiproModal";
@@ -69,10 +70,14 @@ export default function AgendaClient({
   initialEvents,
   clients,
   equipments,
+  pricingConfig,
+  reservationFee,
 }: {
   initialEvents: EventRow[];
   clients: ClientOption[];
   equipments: EquipmentOption[];
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -331,6 +336,8 @@ export default function AgendaClient({
         <EditarEventoModal
           event={editingEvent}
           clients={clients}
+          pricingConfig={pricingConfig}
+          reservationFee={reservationFee}
           onClose={() => setEditingEvent(null)}
           onSaved={() => {
             setEditingEvent(null);

@@ -6,8 +6,12 @@ export default async function FunilPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, city, address, whatsapp, stage, data_evento, tags, origem, notes, reservation_fee_status")
+    .select(
+      "id, name, city, address, whatsapp, stage, data_evento, origem, notes, reservation_fee_status, client_tags(tags(id, name, color))"
+    )
     .order("created_at", { ascending: false });
+
+  const { data: allTags } = await supabase.from("tags").select("id, name, color").order("name");
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const { data: upcomingEvents } = await supabase
@@ -25,10 +29,11 @@ export default async function FunilPage() {
     }
   }
 
-  const clientsWithEvents = (clients ?? []).map((c) => ({
+  const clientsWithEvents = (clients ?? []).map((c: any) => ({
     ...c,
+    tags: (c.client_tags ?? []).map((ct: any) => ct.tags).filter(Boolean),
     nextEvent: nextEventByClient.get(c.id) ?? null,
   }));
 
-  return <FunilClient initialClients={clientsWithEvents} />;
+  return <FunilClient initialClients={clientsWithEvents} allTags={allTags ?? []} />;
 }

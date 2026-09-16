@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
+import type { PricingConfig } from "@/lib/rental-pricing";
 import NovaLocacaoModal from "./NovaLocacaoModal";
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
@@ -53,10 +54,14 @@ export default function ClienteDetailClient({
   client,
   rentals,
   equipments,
+  pricingConfig,
+  reservationFee,
 }: {
   client: Client;
   rentals: RentalRow[];
   equipments: EquipmentOption[];
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -320,6 +325,8 @@ export default function ClienteDetailClient({
           clientName={client.name}
           clientWhatsapp={client.whatsapp}
           equipments={equipments}
+          pricingConfig={pricingConfig}
+          reservationFee={reservationFee}
           onClose={() => setModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -351,6 +358,7 @@ export default function ClienteDetailClient({
         <EditarLocacaoModal
           rental={editingRental}
           equipments={equipments}
+          pricingConfig={pricingConfig}
           onClose={() => setEditingRental(null)}
           onSaved={() => {
             setEditingRental(null);

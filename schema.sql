@@ -100,7 +100,8 @@ create table public.clients (
   -- um status permanente do cliente, não gera lançamento sozinho.
   reservation_fee_status text not null default 'nao_aplica' check (reservation_fee_status in ('nao_aplica', 'pendente', 'pago')),
   data_evento date,
-  tags text[] not null default '{}',
+  -- Tags vivem em tabelas próprias (ver "tags" e "client_tags" logo
+  -- abaixo de equipments), não mais como array nesta tabela.
   origem text,
   created_by uuid references profiles(id),
   created_at timestamptz not null default now()
@@ -120,6 +121,47 @@ create table public.equipments (
 insert into equipments (code, name) values
   ('hipro_1', 'HIPRO 1'),
   ('hipro_2', 'HIPRO 2');
+
+-- ------------------------------------------------------------
+-- SETTINGS: linha única de configuração do sistema (preços da
+-- locação HIPRO e limiar de inatividade de cliente). id boolean +
+-- check garante que só existe uma linha.
+-- ------------------------------------------------------------
+create table public.settings (
+  id boolean primary key default true check (id),
+  flat_package_limit integer not null default 20000,
+  flat_package_value numeric(10,2) not null default 2500.00,
+  tier2_limit integer not null default 80000,
+  tier2_rate numeric(6,4) not null default 0.10,
+  tier3_rate numeric(6,4) not null default 0.07,
+  reservation_fee numeric(10,2) not null default 250.00,
+  inactive_days_threshold integer not null default 60,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references profiles(id)
+);
+
+insert into settings (id) values (true);
+
+-- ------------------------------------------------------------
+-- TAGS: tabela própria com cor. is_automatic fica reservado para o
+-- futuro (tarefa automática aplicando tag de verdade); hoje nenhuma
+-- tag usa isso, a badge "Inativo" é calculada na tela a partir de
+-- settings.inactive_days_threshold, não é uma tag armazenada.
+-- ------------------------------------------------------------
+create table public.tags (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  color text not null default '#3DBFB8',
+  is_automatic boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table public.client_tags (
+  client_id uuid not null references clients(id) on delete cascade,
+  tag_id uuid not null references tags(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (client_id, tag_id)
+);
 
 -- ------------------------------------------------------------
 -- CATEGORIAS (padrão + extensíveis em Configurações)
@@ -272,6 +314,9 @@ create table public.expense_limits (
 alter table profiles enable row level security;
 alter table clients enable row level security;
 alter table equipments enable row level security;
+alter table settings enable row level security;
+alter table tags enable row level security;
+alter table client_tags enable row level security;
 alter table categories enable row level security;
 alter table transactions enable row level security;
 alter table rentals enable row level security;
@@ -285,6 +330,22 @@ create policy "profiles_self_update" on profiles for update using (id = auth.uid
 
 -- clientes
 create policy "clients_rw" on clients for all using (has_module_permission('clientes')) with check (has_module_permission('clientes'));
+
+-- settings: leitura ampla (preço é usado em qualquer locação), escrita só em configurações
+create policy "settings_select" on settings for select using (auth.uid() is not null);
+create policy "settings_update" on settings for update using (has_module_permission('configuracoes'));
+
+-- tags: leitura ampla; criar é ação do dia a dia (clientes ou agenda/funil),
+-- renomear/mudar cor/apagar afeta todo mundo que já usa a tag, fica em configurações
+create policy "tags_select" on tags for select using (auth.uid() is not null);
+create policy "tags_insert" on tags for insert
+  with check (has_module_permission('clientes') or has_module_permission('agenda') or has_module_permission('configuracoes'));
+create policy "tags_update" on tags for update using (has_module_permission('configuracoes'));
+create policy "tags_delete" on tags for delete using (has_module_permission('configuracoes'));
+
+create policy "client_tags_rw" on client_tags for all
+  using (has_module_permission('clientes'))
+  with check (has_module_permission('clientes'));
 
 -- equipamentos: leitura ampla, escrita restrita a configurações
 create policy "equipments_select" on equipments for select using (auth.uid() is not null);

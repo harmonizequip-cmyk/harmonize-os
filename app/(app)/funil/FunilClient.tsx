@@ -17,6 +17,12 @@ export const STAGES = [
 
 export type StageKey = (typeof STAGES)[number]["key"];
 
+export interface TagOption {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface LeadRow {
   id: string;
   name: string;
@@ -25,14 +31,14 @@ export interface LeadRow {
   whatsapp: string | null;
   stage: StageKey;
   data_evento: string | null;
-  tags: string[] | null;
+  tags: TagOption[];
   origem: string | null;
   notes: string | null;
   reservation_fee_status: string;
   nextEvent: { date_start: string; confirmed: boolean } | null;
 }
 
-export default function FunilClient({ initialClients }: { initialClients: LeadRow[] }) {
+export default function FunilClient({ initialClients, allTags }: { initialClients: LeadRow[]; allTags: TagOption[] }) {
   const router = useRouter();
   const supabase = createClient();
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,13 +46,16 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
   const [search, setSearch] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<StageKey | null>(null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
     return initialClients.filter(
-      (c) => c.name.toLowerCase().includes(term) || (c.city ?? "").toLowerCase().includes(term)
+      (c) =>
+        (c.name.toLowerCase().includes(term) || (c.city ?? "").toLowerCase().includes(term)) &&
+        (!tagFilter || c.tags.some((t) => t.id === tagFilter))
     );
-  }, [initialClients, search]);
+  }, [initialClients, search, tagFilter]);
 
   function handleCreated() {
     setModalOpen(false);
@@ -97,6 +106,25 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
         onChange={(e) => setSearch(e.target.value)}
         className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
       />
+
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {allTags.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTagFilter((cur) => (cur === t.id ? null : t.id))}
+              className="rounded-full px-2.5 py-1 text-[11px] font-medium transition"
+              style={
+                tagFilter === t.id
+                  ? { backgroundColor: t.color, color: "#fff" }
+                  : { backgroundColor: `${t.color}1A`, color: t.color }
+              }
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <p className="hidden text-xs text-neutral-400 sm:block">
         Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.
@@ -188,14 +216,15 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
                       </span>
                     )}
 
-                    {lead.tags && lead.tags.length > 0 && (
+                    {lead.tags.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {lead.tags.map((t) => (
                           <span
-                            key={t}
-                            className="rounded-full bg-brand-pink/10 px-2 py-0.5 text-[10px] font-medium text-brand-pink"
+                            key={t.id}
+                            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                            style={{ backgroundColor: `${t.color}1A`, color: t.color }}
                           >
-                            {t}
+                            {t.name}
                           </span>
                         ))}
                       </div>
@@ -226,6 +255,7 @@ export default function FunilClient({ initialClients }: { initialClients: LeadRo
       {selected && (
         <LeadCardModal
           lead={selected}
+          allTags={allTags}
           onClose={() => setSelected(null)}
           onSaved={() => {
             setSelected(null);

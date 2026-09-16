@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calculateRentalValue } from "@/lib/rental-pricing";
+import { calculateRentalValue, type PricingConfig } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
 
 const PAYMENT_METHODS = [
@@ -41,11 +41,13 @@ interface RentalToEdit {
 export default function EditarLocacaoModal({
   rental,
   equipments,
+  pricingConfig,
   onClose,
   onSaved,
 }: {
   rental: RentalToEdit;
   equipments: EquipmentOption[];
+  pricingConfig?: PricingConfig;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -65,11 +67,11 @@ export default function EditarLocacaoModal({
   const suggestedValue = useMemo(() => {
     if (!shotsNumber || shotsNumber <= 0) return null;
     try {
-      return calculateRentalValue(shotsNumber).totalValue;
+      return calculateRentalValue(shotsNumber, pricingConfig).totalValue;
     } catch {
       return null;
     }
-  }, [shotsNumber]);
+  }, [shotsNumber, pricingConfig]);
 
   function usarValorSugerido() {
     if (suggestedValue !== null) setValor(String(suggestedValue));

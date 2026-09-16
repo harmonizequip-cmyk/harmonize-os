@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calculateRentalValue, RESERVATION_FEE } from "@/lib/rental-pricing";
+import { calculateRentalValue, RESERVATION_FEE, type PricingConfig } from "@/lib/rental-pricing";
 import {
   buildWhatsAppSummary,
   buildWhatsAppLink,
@@ -20,12 +20,6 @@ const PAYMENT_METHODS = [
   { value: "outros", label: "Outros" },
 ];
 
-const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
-  { value: "nao_aplica", label: "Não se aplica" },
-  { value: "ja_paga", label: "Já foi paga (creditar no total)" },
-  { value: "cobrar_agora", label: "Cobrar agora (R$ 250)" },
-];
-
 interface EquipmentOption {
   id: string;
   code: string;
@@ -37,6 +31,8 @@ export default function NovaLocacaoModal({
   clientName,
   clientWhatsapp,
   equipments,
+  pricingConfig,
+  reservationFee,
   onClose,
   onCreated,
 }: {
@@ -44,10 +40,21 @@ export default function NovaLocacaoModal({
   clientName: string;
   clientWhatsapp?: string | null;
   equipments: EquipmentOption[];
+  // Config de preço vinda de settings (ver lib/settings.ts). Se não
+  // vier (prop omitida), calculateRentalValue cai no DEFAULT_PRICING
+  // interno, que hoje tem exatamente os mesmos valores.
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const supabase = createClient();
+  const fee = reservationFee ?? RESERVATION_FEE;
+  const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
+    { value: "nao_aplica", label: "Não se aplica" },
+    { value: "ja_paga", label: "Já foi paga (creditar no total)" },
+    { value: "cobrar_agora", label: `Cobrar agora (${formatCurrency(fee)})` },
+  ];
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [initialCount, setInitialCount] = useState("");
@@ -78,11 +85,11 @@ export default function NovaLocacaoModal({
   const pricing = useMemo(() => {
     if (!shots || shots <= 0) return null;
     try {
-      return calculateRentalValue(shots);
+      return calculateRentalValue(shots, pricingConfig);
     } catch {
       return null;
     }
-  }, [shots]);
+  }, [shots, pricingConfig]);
 
   const totals = useMemo(() => {
     if (!pricing) return null;
@@ -98,8 +105,9 @@ export default function NovaLocacaoModal({
       eventDate,
       clientName,
       paymentMethod,
+      reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
 
   const previewSummary = useMemo(() => {
     if (!pricing) return null;
@@ -115,8 +123,9 @@ export default function NovaLocacaoModal({
       eventDate,
       clientName,
       paymentMethod,
+      reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
 
   const previewWhatsappLink = previewSummary ? buildWhatsAppLink(clientWhatsapp, previewSummary) : null;
 
@@ -190,7 +199,7 @@ export default function NovaLocacaoModal({
           type: "entrada",
           category_id: category.id,
           description: `Taxa de reserva - ${clientName}`,
-          amount: RESERVATION_FEE,
+          amount: fee,
           payment_method: paymentMethod,
           date: eventDate,
           scope: "harmonize",

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchSettings } from "@/lib/settings";
 import AgendaClient from "./AgendaClient";
 
 export default async function AgendaPage() {
@@ -14,11 +15,20 @@ export default async function AgendaPage() {
 
   const { data: clients } = await supabase.from("clients").select("id, name").order("name");
   const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
+  const settings = await fetchSettings(supabase);
 
   const normalizedEvents = (events ?? []).map((e: any) => ({
     ...e,
     clients: Array.isArray(e.clients) ? (e.clients[0] ?? null) : (e.clients ?? null),
   }));
 
-  return <AgendaClient initialEvents={normalizedEvents} clients={clients ?? []} equipments={equipments ?? []} />;
+  return (
+    <AgendaClient
+      initialEvents={normalizedEvents}
+      clients={clients ?? []}
+      equipments={equipments ?? []}
+      pricingConfig={settings.pricing}
+      reservationFee={settings.reservationFee}
+    />
+  );
 }

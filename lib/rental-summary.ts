@@ -20,6 +20,10 @@ function fmtMoney(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function fmtRate(n: number): string {
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
 function fmtDate(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString("pt-BR");
 }
@@ -36,6 +40,10 @@ export interface RentalChargesInput {
   eventDate: string;
   clientName: string;
   paymentMethod: string;
+  // Taxa de reserva real (settings.reservation_fee). Opcional por
+  // compatibilidade: quem não passar cai no fallback fixo de
+  // rental-pricing.ts, mas o certo é sempre passar o valor de settings.
+  reservationFee?: number;
 }
 
 /**
@@ -44,8 +52,9 @@ export interface RentalChargesInput {
  * quando cobrada nesta mesma locação).
  */
 export function calculateTotals(input: RentalChargesInput) {
-  const reservationCredit = input.reservationFeeStatus === "ja_paga" ? RESERVATION_FEE : 0;
-  const reservationChargeNow = input.reservationFeeStatus === "cobrar_agora" ? RESERVATION_FEE : 0;
+  const fee = input.reservationFee ?? RESERVATION_FEE;
+  const reservationCredit = input.reservationFeeStatus === "ja_paga" ? fee : 0;
+  const reservationChargeNow = input.reservationFeeStatus === "cobrar_agora" ? fee : 0;
 
   const rentalTransactionAmount = Math.max(
     0,
@@ -58,6 +67,7 @@ export function calculateTotals(input: RentalChargesInput) {
 
 export function buildWhatsAppSummary(input: RentalChargesInput): string {
   const { pricing } = input;
+  const { config } = pricing;
   const { reservationCredit, reservationChargeNow, totalToPayNow } = calculateTotals(input);
 
   const lines: string[] = [];
@@ -71,12 +81,16 @@ export function buildWhatsAppSummary(input: RentalChargesInput): string {
   lines.push(`  • Disparos realizados: *${fmtInt(pricing.shots)}*`);
   lines.push("");
   lines.push("💡 *VALOR DOS DISPAROS*");
-  lines.push(`  Pacote fixo (até 20.000): ${fmtMoney(pricing.flatPackageValue)}`);
+  lines.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(pricing.flatPackageValue)}`);
   if (pricing.tier2Portion > 0) {
-    lines.push(`  Excedente 20.001–80.000: ${fmtInt(pricing.tier2Portion)} x R$ 0,10 = ${fmtMoney(pricing.tier2Value)}`);
+    lines.push(
+      `  Excedente ${fmtInt(config.flatPackageLimit + 1)}–${fmtInt(config.tier2Limit)}: ${fmtInt(pricing.tier2Portion)} x R$ ${fmtRate(config.tier2Rate)} = ${fmtMoney(pricing.tier2Value)}`
+    );
   }
   if (pricing.tier3Portion > 0) {
-    lines.push(`  Excedente acima de 80.000: ${fmtInt(pricing.tier3Portion)} x R$ 0,07 = ${fmtMoney(pricing.tier3Value)}`);
+    lines.push(
+      `  Excedente acima de ${fmtInt(config.tier2Limit)}: ${fmtInt(pricing.tier3Portion)} x R$ ${fmtRate(config.tier3Rate)} = ${fmtMoney(pricing.tier3Value)}`
+    );
   }
   lines.push(`  ▸ *Subtotal disparos: ${fmtMoney(pricing.totalValue)}*`);
 

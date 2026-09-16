@@ -17,32 +17,50 @@
 // disparar um pouco mais pode custar menos no total. Isso é
 // intencional conforme confirmado, não é bug.
 //
-// Se algum valor mudar, edite só as constantes abaixo.
+// Configurável (Bloco 1): esses valores agora vivem na tabela
+// `settings` do Supabase e são editáveis em Configurações. As
+// constantes abaixo (DEFAULT_PRICING) só servem de fallback — para
+// telas que ainda não recebem a config carregada, ou se a leitura de
+// settings falhar. Toda página que já busca settings deve passar o
+// PricingConfig real para calculateRentalValue.
 // ============================================================
 
-export const RESERVATION_FEE = 250.0;
+export interface PricingConfig {
+  flatPackageLimit: number; // disparos incluídos no pacote fixo
+  flatPackageValue: number; // valor do pacote fixo (R$)
+  tier2Limit: number; // até aqui, o excedente todo é a tier2Rate
+  tier2Rate: number; // R$/disparo sobre o excedente, faixa (flatPackageLimit, tier2Limit]
+  tier3Rate: number; // R$/disparo sobre TODO o excedente, acima de tier2Limit
+  minimumShots: number | null;
+}
 
-export const PRICING = {
-  FLAT_PACKAGE_LIMIT: 20_000,   // disparos incluídos no pacote fixo
-  FLAT_PACKAGE_VALUE: 2500.0,   // valor do pacote fixo (R$)
-  TIER_2_LIMIT: 80_000,         // até aqui, o excedente todo é a TIER_2_RATE
-  TIER_2_RATE: 0.10,            // R$/disparo sobre o excedente, faixa 20.001-80.000
-  TIER_3_RATE: 0.07,            // R$/disparo sobre TODO o excedente, acima de 80.000
-
+export const DEFAULT_PRICING: PricingConfig = {
+  flatPackageLimit: 20_000,
+  flatPackageValue: 2500.0,
+  tier2Limit: 80_000,
+  tier2Rate: 0.1,
+  tier3Rate: 0.07,
   // Confirmado: não existe mínimo de disparos por sessão.
-  // O valor fixo de R$ 2.500 cobre qualquer volume até 20.000.
-  MINIMUM_SHOTS: null as number | null,
-} as const;
+  minimumShots: null,
+};
+
+// Fallback de taxa de reserva para código que ainda não recebe o valor
+// de settings.reservation_fee. Prefira sempre passar o valor real.
+export const RESERVATION_FEE = 250.0;
 
 export interface RentalPricingBreakdown {
   shots: number;
-  flatPackagePortion: number;   // disparos cobertos pelo pacote fixo
-  tier2Portion: number;         // disparos cobrados a TIER_2_RATE (0 se estiver na faixa 3)
-  tier3Portion: number;         // disparos cobrados a TIER_3_RATE (0 se estiver na faixa 1 ou 2)
+  flatPackagePortion: number; // disparos cobertos pelo pacote fixo
+  tier2Portion: number; // disparos cobrados a tier2Rate (0 se estiver na faixa 3)
+  tier3Portion: number; // disparos cobrados a tier3Rate (0 se estiver na faixa 1 ou 2)
   flatPackageValue: number;
   tier2Value: number;
   tier3Value: number;
   totalValue: number;
+  // Carrega a config usada neste cálculo, para quem só tem o breakdown
+  // em mãos (ex: montagem do resumo de WhatsApp) conseguir descrever as
+  // faixas corretamente sem precisar receber o config de novo.
+  config: PricingConfig;
 }
 
 export class RentalPricingError extends Error {}
@@ -50,35 +68,37 @@ export class RentalPricingError extends Error {}
 /**
  * Calcula o valor de uma locação HIPRO Day a partir da quantidade de disparos.
  * Lança RentalPricingError se a quantidade for inválida ou abaixo do mínimo
- * (quando PRICING.MINIMUM_SHOTS estiver configurado).
+ * (quando config.minimumShots estiver configurado).
+ *
+ * `config` é opcional e cai em DEFAULT_PRICING quando omitido — sempre que
+ * possível, busque o valor real em `settings` (ver lib/settings.ts) e passe
+ * aqui, para respeitar o que foi configurado em vez do fallback fixo.
  */
-export function calculateRentalValue(shots: number): RentalPricingBreakdown {
+export function calculateRentalValue(shots: number, config: PricingConfig = DEFAULT_PRICING): RentalPricingBreakdown {
   if (!Number.isFinite(shots) || shots <= 0) {
     throw new RentalPricingError("Quantidade de disparos deve ser um número positivo.");
   }
-  if (PRICING.MINIMUM_SHOTS !== null && shots < PRICING.MINIMUM_SHOTS) {
-    throw new RentalPricingError(
-      `Quantidade mínima de disparos é ${PRICING.MINIMUM_SHOTS.toLocaleString("pt-BR")}.`
-    );
+  if (config.minimumShots !== null && shots < config.minimumShots) {
+    throw new RentalPricingError(`Quantidade mínima de disparos é ${config.minimumShots.toLocaleString("pt-BR")}.`);
   }
 
-  const flatPackagePortion = Math.min(shots, PRICING.FLAT_PACKAGE_LIMIT);
-  const excess = Math.max(0, shots - PRICING.FLAT_PACKAGE_LIMIT);
+  const flatPackagePortion = Math.min(shots, config.flatPackageLimit);
+  const excess = Math.max(0, shots - config.flatPackageLimit);
 
   let tier2Portion = 0;
   let tier3Portion = 0;
 
-  if (shots > PRICING.TIER_2_LIMIT) {
-    // Acima de 80.000: todo o excedente (acima de 20.000) vai para a taxa menor.
+  if (shots > config.tier2Limit) {
+    // Acima do limite 2: todo o excedente (acima do pacote fixo) vai para a taxa menor.
     tier3Portion = excess;
-  } else if (shots > PRICING.FLAT_PACKAGE_LIMIT) {
-    // Entre 20.001 e 80.000: todo o excedente vai para a taxa intermediária.
+  } else if (shots > config.flatPackageLimit) {
+    // Entre o pacote fixo e o limite 2: todo o excedente vai para a taxa intermediária.
     tier2Portion = excess;
   }
 
-  const flatPackageValue = PRICING.FLAT_PACKAGE_VALUE;
-  const tier2Value = round2(tier2Portion * PRICING.TIER_2_RATE);
-  const tier3Value = round2(tier3Portion * PRICING.TIER_3_RATE);
+  const flatPackageValue = config.flatPackageValue;
+  const tier2Value = round2(tier2Portion * config.tier2Rate);
+  const tier3Value = round2(tier3Portion * config.tier3Rate);
 
   const totalValue = round2(flatPackageValue + tier2Value + tier3Value);
 
@@ -91,6 +111,7 @@ export function calculateRentalValue(shots: number): RentalPricingBreakdown {
     tier2Value,
     tier3Value,
     totalValue,
+    config,
   };
 }
 

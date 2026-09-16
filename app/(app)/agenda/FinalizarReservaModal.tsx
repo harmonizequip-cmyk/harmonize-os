@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calculateRentalValue, RESERVATION_FEE } from "@/lib/rental-pricing";
+import { calculateRentalValue, RESERVATION_FEE, type PricingConfig } from "@/lib/rental-pricing";
 import {
   buildWhatsAppSummary,
   buildWhatsAppLink,
@@ -20,10 +20,9 @@ const PAYMENT_METHODS = [
   { value: "outros", label: "Outros" },
 ];
 
-const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
+const RESERVATION_OPTIONS_BASE: { value: ReservationFeeStatus; label: string }[] = [
   { value: "nao_aplica", label: "Não se aplica" },
   { value: "ja_paga", label: "Já foi paga (creditar no total)" },
-  { value: "cobrar_agora", label: "Cobrar agora (R$ 250)" },
 ];
 
 export interface ReservationToFinalize {
@@ -37,14 +36,23 @@ export interface ReservationToFinalize {
 
 export default function FinalizarReservaModal({
   reservation,
+  pricingConfig,
+  reservationFee,
   onClose,
   onFinalized,
 }: {
   reservation: ReservationToFinalize;
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
   onClose: () => void;
   onFinalized: () => void;
 }) {
   const supabase = createClient();
+  const fee = reservationFee ?? RESERVATION_FEE;
+  const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
+    ...RESERVATION_OPTIONS_BASE,
+    { value: "cobrar_agora", label: `Cobrar agora (${formatCurrency(fee)})` },
+  ];
   const [initialCount, setInitialCount] = useState("");
   const [finalCount, setFinalCount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("pix");
@@ -72,11 +80,11 @@ export default function FinalizarReservaModal({
   const pricing = useMemo(() => {
     if (!shots || shots <= 0) return null;
     try {
-      return calculateRentalValue(shots);
+      return calculateRentalValue(shots, pricingConfig);
     } catch {
       return null;
     }
-  }, [shots]);
+  }, [shots, pricingConfig]);
 
   const totals = useMemo(() => {
     if (!pricing) return null;
@@ -92,8 +100,9 @@ export default function FinalizarReservaModal({
       eventDate: reservation.eventDate,
       clientName: reservation.clientName,
       paymentMethod,
+      reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, paymentMethod, reservation.eventDate, reservation.clientName]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, paymentMethod, reservation.eventDate, reservation.clientName, fee]);
 
   async function handleSave() {
     if (!initialCount || !finalCount) {
@@ -142,7 +151,7 @@ export default function FinalizarReservaModal({
           type: "entrada",
           category_id: category.id,
           description: `Taxa de reserva - ${reservation.clientName}`,
-          amount: RESERVATION_FEE,
+          amount: fee,
           payment_method: paymentMethod,
           date: reservation.eventDate,
           scope: "harmonize",
@@ -171,6 +180,7 @@ export default function FinalizarReservaModal({
         eventDate: reservation.eventDate,
         clientName: reservation.clientName,
         paymentMethod,
+        reservationFee: fee,
       })
     );
   }

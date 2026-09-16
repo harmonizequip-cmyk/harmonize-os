@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fetchSettings } from "@/lib/settings";
 import ClienteDetailClient from "./ClienteDetailClient";
 
 export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
@@ -18,6 +19,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
     .order("event_date", { ascending: false });
 
   const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
+  const settings = await fetchSettings(supabase);
 
   const normalizedRentals = (rentals ?? []).map((r: any) => ({
     ...r,
@@ -25,6 +27,12 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
   }));
 
   return (
-    <ClienteDetailClient client={client} rentals={normalizedRentals} equipments={equipments ?? []} />
+    <ClienteDetailClient
+      client={client}
+      rentals={normalizedRentals}
+      equipments={equipments ?? []}
+      pricingConfig={settings.pricing}
+      reservationFee={settings.reservationFee}
+    />
   );
 }
