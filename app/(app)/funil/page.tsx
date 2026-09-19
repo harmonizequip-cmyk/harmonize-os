@@ -13,6 +13,22 @@ export default async function FunilPage() {
 
   const { data: allTags } = await supabase.from("tags").select("id, name, color").order("name");
 
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("id, client_id, type, follow_up_number, title, due_date, clients(name)")
+    .eq("status", "pendente")
+    .order("due_date", { ascending: true });
+
+  const initialTasks = (tasks ?? []).map((t: any) => ({
+    id: t.id,
+    client_id: t.client_id,
+    client_name: Array.isArray(t.clients) ? t.clients[0]?.name ?? "" : t.clients?.name ?? "",
+    type: t.type,
+    follow_up_number: t.follow_up_number,
+    title: t.title,
+    due_date: t.due_date,
+  }));
+
   const todayStr = new Date().toISOString().slice(0, 10);
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
@@ -35,5 +51,5 @@ export default async function FunilPage() {
     nextEvent: nextEventByClient.get(c.id) ?? null,
   }));
 
-  return <FunilClient initialClients={clientsWithEvents} allTags={allTags ?? []} />;
+  return <FunilClient initialClients={clientsWithEvents} allTags={allTags ?? []} initialTasks={initialTasks} />;
 }
