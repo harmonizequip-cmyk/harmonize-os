@@ -56,6 +56,16 @@ export default async function DashboardPage({
       .lte("event_date", toStr),
   ]);
 
+  // Resumo por equipamento (HIPRO 1 / HIPRO 2), no mesmo período filtrado
+  // acima — antes só existia na tela separada de Equipamentos; junto no
+  // Dashboard porque é a primeira coisa que se quer ver ao abrir o app.
+  const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
+  const { data: equipmentRentals } = await supabase
+    .from("rentals")
+    .select("equipment_id, calculated_value")
+    .gte("event_date", fromStr)
+    .lte("event_date", toStr);
+
   const todayStr = new Date().toISOString().slice(0, 10);
   const in7Str = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const { count: pendingConfirmations } = await supabase
@@ -88,6 +98,19 @@ export default async function DashboardPage({
     { label: "Saídas", value: saidas },
     { label: "Resultado", value: resultado },
   ];
+
+  const EQUIPMENT_COLORS: Record<string, string> = {
+    hipro_1: "bg-brand-teal",
+    hipro_2: "bg-brand-blue",
+  };
+  const equipmentSummary = (equipments ?? []).map((eq) => {
+    const eqRentals = (equipmentRentals ?? []).filter((r) => r.equipment_id === eq.id);
+    return {
+      ...eq,
+      locacoes: eqRentals.length,
+      receita: eqRentals.reduce((sum, r) => sum + Number(r.calculated_value), 0),
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -133,6 +156,29 @@ export default async function DashboardPage({
           <p className="mt-1 text-lg font-semibold text-brand-blue">{reagendadasCount ?? 0}</p>
         </div>
       </div>
+
+      {equipmentSummary.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Equipamentos</p>
+          <div className="grid grid-cols-2 gap-3">
+            {equipmentSummary.map((eq) => (
+              <div
+                key={eq.id}
+                className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
+                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{eq.name}</p>
+                </div>
+                <p className="mt-2 text-lg font-semibold text-brand-teal">{formatCurrency(eq.receita)}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {eq.locacoes} {eq.locacoes === 1 ? "locação" : "locações"} no período
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DashboardCharts transactions={normalizedRows} />
     </div>
