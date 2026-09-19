@@ -1,9 +1,17 @@
 import Link from "next/link";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
+
+function formatWeekdayDate(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const s = format(d, "EEE, dd 'de' MMM", { locale: ptBR });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -75,6 +83,38 @@ export default async function DashboardPage({
     .neq("status", "cancelada")
     .gte("date_start", todayStr)
     .lte("date_start", in7Str);
+
+  // Próximas locações (prévia no Dashboard) — eventos de HIPRO 1/2 a partir
+  // de hoje, pra dar um resumo rápido da agenda sem precisar abrir a tela
+  // de Agenda. Busca um pouco mais que 7 pra poder agrupar corretamente
+  // quando os dois HIPROs caem no mesmo dia.
+  const { data: upcomingRaw } = await supabase
+    .from("calendar_events")
+    .select("id, event_type, date_start, confirmed, client_id, clients(name)")
+    .in("event_type", ["hipro_1", "hipro_2"])
+    .neq("status", "cancelada")
+    .gte("date_start", todayStr)
+    .order("date_start", { ascending: true })
+    .limit(14);
+
+  const normalizedUpcoming = (upcomingRaw ?? []).map((e: any) => ({
+    ...e,
+    clients: Array.isArray(e.clients) ? (e.clients[0] ?? null) : (e.clients ?? null),
+  }));
+
+  const upcomingByDate = new Map<string, typeof normalizedUpcoming>();
+  for (const e of normalizedUpcoming) {
+    const list = upcomingByDate.get(e.date_start) ?? [];
+    list.push(e);
+    upcomingByDate.set(e.date_start, list);
+  }
+  const upcomingGroups: { date: string; events: typeof normalizedUpcoming }[] = [];
+  let countedLocacoes = 0;
+  for (const [date, events] of upcomingByDate) {
+    if (countedLocacoes >= 7) break;
+    upcomingGroups.push({ date, events });
+    countedLocacoes += events.length;
+  }
 
   const rows = transactions ?? [];
   const normalizedRows = rows.map((t: any) => ({
@@ -176,6 +216,65 @@ export default async function DashboardPage({
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {upcomingGroups.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Próximas locações</p>
+            <Link href="/agenda" className="text-xs text-brand-teal underline underline-offset-2">
+              Ver agenda →
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {upcomingGroups.map(({ date, events }) => {
+              const bothHipros = events.length > 1;
+              return (
+                <div
+                  key={date}
+                  className={`rounded-2xl border p-3 shadow-sm backdrop-blur-xl ${
+                    bothHipros
+                      ? "border-brand-pink/50 bg-brand-pink/5 dark:border-brand-pink/40 dark:bg-brand-pink/10"
+                      : "border-white/60 bg-white/70 dark:border-neutral-800/60 dark:bg-neutral-900/55"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                      {formatWeekdayDate(date)}
+                    </p>
+                    {bothHipros && (
+                      <span className="rounded-full bg-brand-pink/15 px-2 py-0.5 text-[10px] font-medium text-brand-pink-dark dark:text-brand-pink">
+                        2 HIPROs no mesmo dia
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 space-y-1">
+                    {events.map((e) => (
+                      <div key={e.id} className="flex items-center gap-2 text-sm">
+                        <span
+                          className={`h-2 w-2 flex-shrink-0 rounded-full ${
+                            e.event_type === "hipro_1" ? "bg-brand-teal" : "bg-brand-blue"
+                          }`}
+                        />
+                        <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                          {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
+                        </span>
+                        {e.clients?.name && (
+                          <span className="text-neutral-500 dark:text-neutral-400">· {e.clients.name}</span>
+                        )}
+                        {!e.confirmed && (
+                          <span className="ml-auto whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            não confirmado
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
