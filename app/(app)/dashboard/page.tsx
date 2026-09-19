@@ -6,6 +6,7 @@ import { resolvePeriod } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
+import OpportunityRadar from "@/components/OpportunityRadar";
 
 function formatWeekdayDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -116,6 +117,41 @@ export default async function DashboardPage({
     countedLocacoes += events.length;
   }
 
+  // Radar de oportunidades: cruza dias com os 2 HIPROs livres nos próximos
+  // 30 dias com leads que esfriaram (Nutrição/Interesse, sem data travada).
+  // Equipamento parado é receita parada, e ninguém para pra somar isso com
+  // "quem eu já deveria ter reativado" — o radar faz essa conta sozinho.
+  const radarHorizonDays = 30;
+  const radarEndStr = new Date(Date.now() + radarHorizonDays * 86400000).toISOString().slice(0, 10);
+  const { data: radarEvents } = await supabase
+    .from("calendar_events")
+    .select("date_start, client_id, clients(city)")
+    .in("event_type", ["hipro_1", "hipro_2"])
+    .neq("status", "cancelada")
+    .gt("date_start", todayStr)
+    .lte("date_start", radarEndStr);
+
+  const normalizedRadarEvents = (radarEvents ?? []).map((e: any) => ({
+    date_start: e.date_start as string,
+    city: (Array.isArray(e.clients) ? e.clients[0]?.city : e.clients?.city) ?? null,
+  }));
+  const busyDaysSet = new Set(normalizedRadarEvents.map((e) => e.date_start));
+  const citiesInRoute = Array.from(
+    new Set(normalizedRadarEvents.map((e) => e.city).filter((c): c is string => !!c))
+  );
+
+  const freeDays: string[] = [];
+  for (let i = 1; i <= radarHorizonDays; i++) {
+    const d = new Date(Date.now() + i * 86400000).toISOString().slice(0, 10);
+    if (!busyDaysSet.has(d)) freeDays.push(d);
+  }
+
+  const { data: dormantLeads } = await supabase
+    .from("clients")
+    .select("id, name, city, whatsapp, stage")
+    .in("stage", ["nutricao", "qualificado"])
+    .order("name");
+
   const rows = transactions ?? [];
   const normalizedRows = rows.map((t: any) => ({
     ...t,
@@ -167,6 +203,8 @@ export default async function DashboardPage({
           ⚠️ {pendingConfirmations} {pendingConfirmations === 1 ? "evento precisa" : "eventos precisam"} de confirmação nos próximos 7 dias →
         </Link>
       )}
+
+      <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((card) => (
