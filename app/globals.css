@@ -6,6 +6,14 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Reforça o bloqueio de zoom do <meta name="viewport"> (ver app/layout.tsx):
+   remove o atraso/gesto de duplo-toque para ampliar, para toques rápidos
+   (ex: nos botões e cards) responderem na hora, como em um app nativo. */
+html,
+body {
+  touch-action: manipulation;
+}
+
 /* Fundo com manchas suaves de gradiente nas cores da marca, atrás de tudo */
 .bg-brand-mesh {
   background-image:
