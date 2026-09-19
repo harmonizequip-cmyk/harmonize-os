@@ -1,9 +1,20 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Harmonize OS",
   description: "Gestão da Harmonize",
+};
+
+// Trava o zoom (pinça e duplo-toque) e fixa a largura na tela do
+// dispositivo, para o app se comportar como um app nativo instalado em
+// vez de uma página que pode ser ampliada/reduzida no navegador.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  minimumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
