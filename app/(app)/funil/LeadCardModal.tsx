@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow, type TagOption } from "./FunilClient";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress } from "@/lib/format";
+import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 
 const QUICK_COLOR = "#3DBFB8";
 
@@ -31,6 +32,7 @@ export default function LeadCardModal({
   const [reservationFeeStatus, setReservationFeeStatus] = useState(lead.reservation_fee_status);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
 
   function toggleTag(tagId: string) {
     setSelectedTagIds((prev) => (prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]));
@@ -248,6 +250,14 @@ export default function LeadCardModal({
           </div>
         )}
 
+        <button
+          type="button"
+          onClick={() => setAvailabilityOpen(true)}
+          className="mt-4 w-full rounded-xl border border-brand-teal py-2 text-xs font-medium text-brand-teal"
+        >
+          📅 Enviar datas disponíveis
+        </button>
+
         <Link href={`/clientes/${lead.id}`} className="mt-2 block text-center text-xs text-neutral-400 underline">
           Ver perfil completo
         </Link>
@@ -268,6 +278,15 @@ export default function LeadCardModal({
           </button>
         </div>
       </div>
+
+      {availabilityOpen && (
+        <AvailabilityImageModal
+          mode="funil"
+          clientName={lead.name}
+          whatsapp={lead.whatsapp}
+          onClose={() => setAvailabilityOpen(false)}
+        />
+      )}
     </div>
   );
 }
