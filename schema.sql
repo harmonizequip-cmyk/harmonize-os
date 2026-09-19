@@ -94,7 +94,7 @@ create table public.clients (
   -- Funil de vendas: todo cliente carrega uma etapa. Cadastros feitos
   -- direto em "Clientes" entram como 'cliente' (já convertido); leads
   -- criados no Funil entram como 'lead' e avançam a partir daí.
-  stage text not null default 'cliente' check (stage in ('lead','contato','qualificado','agendado','cliente')),
+  stage text not null default 'cliente' check (stage in ('lead','contato','nutricao','qualificado','agendado','cliente')),
   -- Rastreia se a taxa de reserva (R$250) foi pedida e paga para este
   -- cliente. Independente do seletor por-locação da Nova Locação: aqui é
   -- um status permanente do cliente, não gera lançamento sozinho.
@@ -584,6 +584,185 @@ end;
 $$;
 
 grant execute on function public.finalize_rental_reservation to authenticated;
+
+-- ============================================================
+-- FASE 2 — Funil: etapa Nutrição, tarefas de contato e tags
+-- automáticas de follow-up/reagendamento.
+-- Em uma base já existente, rode o "alter constraint" abaixo (numa
+-- base nova o check da tabela clients acima já inclui 'nutricao').
+-- ============================================================
+alter table clients drop constraint if exists clients_stage_check;
+alter table clients add constraint clients_stage_check
+  check (stage in ('lead','contato','nutricao','qualificado','agendado','cliente'));
+
+-- Tarefas de contato: uma por cliente, criada automaticamente ao
+-- entrar em "Tentativa de contato" e a cada tentativa sem resposta.
+create table public.tasks (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup')),
+  follow_up_number integer,
+  title text not null,
+  due_date date not null default current_date,
+  status text not null default 'pendente' check (status in ('pendente', 'concluida')),
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index tasks_client_id_idx on tasks(client_id);
+create index tasks_status_due_date_idx on tasks(status, due_date);
+
+alter table tasks enable row level security;
+create policy "tasks_rw" on tasks for all
+  using (has_module_permission('clientes'))
+  with check (has_module_permission('clientes'));
+
+-- Tags automáticas usadas pelo fluxo de follow-up/reagendamento.
+insert into tags (name, color, is_automatic) values
+  ('Follow-up 1', '#7EC8E3', true),
+  ('Follow-up 2', '#7EC8E3', true),
+  ('Follow-up 3', '#B8A0D0', true),
+  ('Follow-up 4', '#B8A0D0', true),
+  ('Follow-up 5', '#E8789A', true),
+  ('Reagendamento', '#d85f83', true)
+on conflict (name) do nothing;
+
+-- Gatilho: ao entrar em "Tentativa de contato", cria a tarefa inicial
+-- ("já entrou em contato?"), se ainda não existir uma pendente.
+create or replace function public.handle_client_enter_contato()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.stage = 'contato' and (tg_op = 'INSERT' or old.stage is distinct from new.stage) then
+    if not exists (
+      select 1 from tasks
+      where client_id = new.id and status = 'pendente' and type = 'contato_inicial'
+    ) then
+      insert into tasks (client_id, type, title, due_date)
+      values (new.id, 'contato_inicial', 'Fazer o primeiro contato com ' || new.name, current_date);
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_client_enter_contato on clients;
+create trigger trg_client_enter_contato
+  after insert or update of stage on clients
+  for each row execute function public.handle_client_enter_contato();
+
+-- RPC: registra a resposta de uma tarefa de contato. Se não
+-- respondeu, troca a etiqueta de follow-up pela próxima e cria uma
+-- nova tarefa em 2 dias; depois do Follow-up 5, move o cliente pra
+-- "Nutrição" em vez de criar mais uma tarefa.
+create or replace function public.register_contact_attempt(
+  p_task_id uuid,
+  p_responded boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_client_name text;
+  v_current_followup integer;
+  v_next_followup integer;
+  v_tag_id uuid;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para atualizar tarefas de contato';
+  end if;
+
+  select client_id, follow_up_number into v_client_id, v_current_followup
+  from tasks
+  where id = p_task_id and status = 'pendente';
+
+  if v_client_id is null then
+    raise exception 'Tarefa não encontrada ou já concluída.';
+  end if;
+
+  update tasks
+  set status = 'concluida', completed_at = now()
+  where id = p_task_id;
+
+  if p_responded then
+    return;
+  end if;
+
+  select name into v_client_name from clients where id = v_client_id;
+  v_next_followup := coalesce(v_current_followup, 0) + 1;
+
+  if v_next_followup > 5 then
+    update clients set stage = 'nutricao' where id = v_client_id;
+    return;
+  end if;
+
+  delete from client_tags
+  where client_id = v_client_id
+    and tag_id in (select id from tags where name like 'Follow-up %');
+
+  select id into v_tag_id from tags where name = 'Follow-up ' || v_next_followup;
+  if v_tag_id is not null then
+    insert into client_tags (client_id, tag_id) values (v_client_id, v_tag_id)
+    on conflict do nothing;
+  end if;
+
+  insert into tasks (client_id, type, follow_up_number, title, due_date)
+  values (
+    v_client_id,
+    'followup',
+    v_next_followup,
+    'Confirmar se ' || coalesce(v_client_name, 'o cliente') || ' respondeu (Follow-up ' || v_next_followup || ')',
+    current_date + 2
+  );
+end;
+$$;
+
+grant execute on function public.register_contact_attempt to authenticated;
+
+-- Gatilho: reagendar um evento na Agenda aplica a etiqueta
+-- "Reagendamento" no cliente (cobre edição direta na Agenda e
+-- locações editadas via update_rental, já que as duas gravam em
+-- calendar_events).
+create or replace function public.handle_calendar_event_reschedule()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tag_id uuid;
+begin
+  if new.client_id is not null and old.date_start is distinct from new.date_start then
+    select id into v_tag_id from tags where name = 'Reagendamento';
+    if v_tag_id is not null then
+      insert into client_tags (client_id, tag_id) values (new.client_id, v_tag_id)
+      on conflict do nothing;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_calendar_event_reschedule on calendar_events;
+create trigger trg_calendar_event_reschedule
+  after update of date_start on calendar_events
+  for each row execute function public.handle_calendar_event_reschedule();
+
+-- Backfill: clientes que já estavam em "contato" antes desta
+-- migration e ainda não têm a tarefa inicial pendente.
+insert into tasks (client_id, type, title, due_date)
+select c.id, 'contato_inicial', 'Fazer o primeiro contato com ' || c.name, current_date
+from clients c
+where c.stage = 'contato'
+  and not exists (
+    select 1 from tasks t where t.client_id = c.id and t.status = 'pendente' and t.type = 'contato_inicial'
+  );
 
 -- ============================================================
 -- Depois de criar seu usuário em Authentication > Users,
