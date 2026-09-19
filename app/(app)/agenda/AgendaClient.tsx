@@ -17,11 +17,12 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/format";
+import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import type { PricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
 import ReservarHiproModal from "./ReservarHiproModal";
+import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 
 const EVENT_META: Record<string, { label: string; dot: string }> = {
   hipro_1: { label: "HIPRO 1", dot: "bg-brand-teal" },
@@ -66,6 +67,14 @@ function parseDate(dateStr: string) {
   return new Date(`${dateStr}T00:00:00`);
 }
 
+function buildConfirmationMessage(event: EventRow) {
+  const meta = EVENT_META[event.event_type] ?? { label: event.event_type };
+  const name = event.clients?.name;
+  return `Oi${name ? `, ${name}` : ""}! Confirmando sua sessão de ${meta.label} para o dia ${formatDate(
+    event.date_start
+  )}. Te espero! 💛`;
+}
+
 export default function AgendaClient({
   initialEvents,
   clients,
@@ -88,6 +97,9 @@ export default function AgendaClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [reservaModalOpen, setReservaModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [confirmingEvent, setConfirmingEvent] = useState<EventRow | null>(null);
+  const [confirmationMessage, setConfirmationMessage] = useState("");
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRow[]>();
@@ -118,8 +130,15 @@ export default function AgendaClient({
   const selectedDayEvents = eventsByDate.get(selectedDate) ?? [];
 
   async function toggleConfirmed(event: EventRow) {
-    await supabase.from("calendar_events").update({ confirmed: !event.confirmed }).eq("id", event.id);
+    const nextConfirmed = !event.confirmed;
+    await supabase.from("calendar_events").update({ confirmed: nextConfirmed }).eq("id", event.id);
     router.refresh();
+    // Só oferece a mensagem de aviso quando está confirmando (não ao desfazer),
+    // e só se tiver um WhatsApp cadastrado pra mandar.
+    if (nextConfirmed && event.clients?.whatsapp) {
+      setConfirmingEvent(event);
+      setConfirmationMessage(buildConfirmationMessage(event));
+    }
   }
 
   function handleCreated() {
@@ -182,12 +201,20 @@ export default function AgendaClient({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Agenda</h1>
-        <button
-          onClick={goToToday}
-          className="self-start rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300 sm:self-auto"
-        >
-          Hoje
-        </button>
+        <div className="flex gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setAvailabilityOpen(true)}
+            className="rounded-xl border border-brand-teal px-3 py-1.5 text-xs font-medium text-brand-teal"
+          >
+            📅 Datas disponíveis
+          </button>
+          <button
+            onClick={goToToday}
+            className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Hoje
+          </button>
+        </div>
       </div>
 
       {needsConfirmation.length > 0 && (
@@ -348,6 +375,49 @@ export default function AgendaClient({
             router.refresh();
           }}
         />
+      )}
+
+      {availabilityOpen && <AvailabilityImageModal mode="agenda" onClose={() => setAvailabilityOpen(false)} />}
+
+      {confirmingEvent && (
+        <div
+          className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setConfirmingEvent(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Avisar o cliente?</h2>
+            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+              Confirmado! Já deixei uma mensagem pronta pra avisar {confirmingEvent.clients?.name ?? "o cliente"}.
+            </p>
+            <textarea
+              value={confirmationMessage}
+              onChange={(e) => setConfirmationMessage(e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmingEvent(null)}
+                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              >
+                Agora não
+              </button>
+              <a
+                href={buildWhatsAppLink(confirmingEvent.clients?.whatsapp, confirmationMessage) ?? "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setConfirmingEvent(null)}
+                className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-center text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+              >
+                Enviar no WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
