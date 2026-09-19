@@ -20,10 +20,11 @@ import {
 } from "@dnd-kit/core";
 
 export const STAGES = [
-  { key: "lead", label: "Lead", dot: "bg-neutral-400" },
-  { key: "contato", label: "Contato", dot: "bg-brand-blue" },
-  { key: "qualificado", label: "Qualificado", dot: "bg-brand-lilac" },
-  { key: "agendado", label: "Agendado", dot: "bg-brand-pink" },
+  { key: "lead", label: "Novo contato", dot: "bg-neutral-400" },
+  { key: "contato", label: "Tentativa de contato", dot: "bg-brand-blue" },
+  { key: "nutricao", label: "Nutrição", dot: "bg-amber-400" },
+  { key: "qualificado", label: "Interesse", dot: "bg-brand-lilac" },
+  { key: "agendado", label: "Agendamento", dot: "bg-brand-pink" },
   { key: "cliente", label: "Cliente", dot: "bg-brand-teal" },
 ] as const;
 
@@ -50,15 +51,35 @@ export interface LeadRow {
   nextEvent: { date_start: string; confirmed: boolean } | null;
 }
 
-export default function FunilClient({ initialClients, allTags }: { initialClients: LeadRow[]; allTags: TagOption[] }) {
+export interface TaskRow {
+  id: string;
+  client_id: string;
+  client_name: string;
+  type: "contato_inicial" | "followup";
+  follow_up_number: number | null;
+  title: string;
+  due_date: string;
+}
+
+export default function FunilClient({
+  initialClients,
+  allTags,
+  initialTasks,
+}: {
+  initialClients: LeadRow[];
+  allTags: TagOption[];
+  initialTasks: TaskRow[];
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [leads, setLeads] = useState(initialClients);
+  const [tasks, setTasks] = useState(initialTasks);
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
 
   // Mantém o estado local em sincronia sempre que o servidor manda dados
   // novos (ex: depois de um router.refresh()), sem perder a atualização
@@ -66,6 +87,29 @@ export default function FunilClient({ initialClients, allTags }: { initialClient
   useEffect(() => {
     setLeads(initialClients);
   }, [initialClients]);
+
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  async function registerContactAttempt(taskId: string, responded: boolean) {
+    // Remove da lista na hora — a tarefa some do painel assim que a
+    // pessoa responde, sem esperar o round-trip do servidor.
+    setTaskBusyId(taskId);
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    const { error } = await supabase.rpc("register_contact_attempt", {
+      p_task_id: taskId,
+      p_responded: responded,
+    });
+    setTaskBusyId(null);
+    if (error) {
+      // Se der erro, devolve a tarefa pra lista e deixa o refresh
+      // trazer o estado real do servidor.
+      router.refresh();
+      return;
+    }
+    router.refresh();
+  }
 
   // Toque precisa de um pequeno atraso segurando o card antes de iniciar o
   // arrasto (senão todo swipe pra rolar as colunas seria confundido com um
@@ -147,6 +191,54 @@ export default function FunilClient({ initialClients, allTags }: { initialClient
           + Novo lead
         </button>
       </div>
+
+      {tasks.length > 0 && (
+        <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+            📋 Tarefas de contato pendentes
+          </p>
+          <div className="space-y-2">
+            {tasks.map((task) => {
+              const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
+              const busy = taskBusyId === task.id;
+              return (
+                <div
+                  key={task.id}
+                  className="flex flex-col gap-2 rounded-xl bg-white/80 p-3 shadow-sm dark:bg-neutral-900/60 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{task.title}</p>
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                      {formatDate(task.due_date)}
+                      {atrasada && (
+                        <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                          Atrasada
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={busy}
+                      onClick={() => registerContactAttempt(task.id, true)}
+                      className="flex-1 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50 sm:flex-none"
+                    >
+                      ✅ Respondeu
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => registerContactAttempt(task.id, false)}
+                      className="flex-1 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400 sm:flex-none"
+                    >
+                      🔁 Sem resposta
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <input
         placeholder="Buscar por nome ou cidade..."
