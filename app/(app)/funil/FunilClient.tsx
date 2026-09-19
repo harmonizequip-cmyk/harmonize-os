@@ -1,11 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import NovoLeadModal from "./NovoLeadModal";
 import LeadCardModal from "./LeadCardModal";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 
 export const STAGES = [
   { key: "lead", label: "Lead", dot: "bg-neutral-400" },
@@ -41,21 +53,39 @@ export interface LeadRow {
 export default function FunilClient({ initialClients, allTags }: { initialClients: LeadRow[]; allTags: TagOption[] }) {
   const router = useRouter();
   const supabase = createClient();
+  const [leads, setLeads] = useState(initialClients);
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [search, setSearch] = useState("");
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<StageKey | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Mantém o estado local em sincronia sempre que o servidor manda dados
+  // novos (ex: depois de um router.refresh()), sem perder a atualização
+  // otimista que já tinha sido aplicada na hora do arrasto.
+  useEffect(() => {
+    setLeads(initialClients);
+  }, [initialClients]);
+
+  // Toque precisa de um pequeno atraso segurando o card antes de iniciar o
+  // arrasto (senão todo swipe pra rolar as colunas seria confundido com um
+  // drag). Mouse usa distância mínima, que é instantâneo o suficiente no
+  // desktop sem atrapalhar cliques normais no card.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+  );
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
-    return initialClients.filter(
+    return leads.filter(
       (c) =>
         (c.name.toLowerCase().includes(term) || (c.city ?? "").toLowerCase().includes(term)) &&
         (!tagFilter || c.tags.some((t) => t.id === tagFilter))
     );
-  }, [initialClients, search, tagFilter]);
+  }, [leads, search, tagFilter]);
+
+  const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
   function handleCreated() {
     setModalOpen(false);
@@ -63,6 +93,9 @@ export default function FunilClient({ initialClients, allTags }: { initialClient
   }
 
   async function moveToStage(leadId: string, newStage: StageKey) {
+    // Move na tela imediatamente, sem esperar a resposta do servidor — é
+    // isso que faz o arrasto parecer fluido em vez de travado.
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
     await supabase.from("clients").update({ stage: newStage }).eq("id", leadId);
     router.refresh();
   }
@@ -86,6 +119,21 @@ export default function FunilClient({ initialClients, allTags }: { initialClient
   async function markFeePaid(lead: LeadRow) {
     await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", lead.id);
     router.refresh();
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveId(null);
+    if (!over) return;
+    const lead = leads.find((l) => l.id === active.id);
+    const newStage = over.id as StageKey;
+    if (lead && lead.stage !== newStage) {
+      moveToStage(lead.id, newStage);
+    }
   }
 
   return (
@@ -126,130 +174,51 @@ export default function FunilClient({ initialClients, allTags }: { initialClient
         </div>
       )}
 
-      <p className="hidden text-xs text-neutral-400 sm:block">
-        Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.
+      <p className="text-xs text-neutral-400">
+        <span className="sm:hidden">Arraste os cards para o lado para mudar de etapa, ou role a tela para ver as outras colunas.</span>
+        <span className="hidden sm:inline">Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.</span>
       </p>
 
-      <div className="flex gap-3 overflow-x-auto pb-4">
-        {STAGES.map((stage) => {
-          const leads = filtered.filter((c) => c.stage === stage.key);
-          return (
-            <div
-              key={stage.key}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOverStage(stage.key);
-              }}
-              onDragLeave={() => setDragOverStage((s) => (s === stage.key ? null : s))}
-              onDrop={(e) => {
-                e.preventDefault();
-                const leadId = e.dataTransfer.getData("text/plain");
-                if (leadId) moveToStage(leadId, stage.key);
-                setDraggedId(null);
-                setDragOverStage(null);
-              }}
-              className={`w-64 flex-shrink-0 rounded-2xl p-3 transition ${
-                dragOverStage === stage.key ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100 dark:bg-neutral-800/60"
-              }`}
-            >
-              <div className="mb-3 flex items-center gap-2 px-1">
-                <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
-                <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{stage.label}</p>
-                <span className="ml-auto text-xs text-neutral-400">{leads.length}</span>
-              </div>
-
-              <div className="space-y-2">
-                {leads.map((lead) => (
-                  <div
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div
+          className={`flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 scroll-smooth sm:mx-0 sm:px-0 sm:snap-none ${
+            activeId ? "" : "snap-x snap-mandatory"
+          }`}
+        >
+          {STAGES.map((stage) => {
+            const stageLeads = filtered.filter((c) => c.stage === stage.key);
+            return (
+              <FunilColumn key={stage.key} stage={stage} count={stageLeads.length}>
+                {stageLeads.map((lead) => (
+                  <LeadCard
                     key={lead.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", lead.id);
-                      setDraggedId(lead.id);
-                    }}
-                    onDragEnd={() => {
-                      setDraggedId(null);
-                      setDragOverStage(null);
-                    }}
-                    onClick={() => setSelected(lead)}
-                    className={`cursor-grab rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand active:cursor-grabbing dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
-                      draggedId === lead.id ? "opacity-40" : ""
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
-                    {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
-
-                    {lead.nextEvent ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleConfirmed(lead);
-                        }}
-                        className={`mt-1 block rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          lead.nextEvent.confirmed
-                            ? "bg-brand-teal/10 text-brand-teal"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        }`}
-                      >
-                        📅 {formatDate(lead.nextEvent.date_start)} · {lead.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
-                      </button>
-                    ) : (
-                      lead.data_evento && (
-                        <p className="mt-1 text-xs text-neutral-400">📅 {formatDate(lead.data_evento)} (previsto)</p>
-                      )
-                    )}
-
-                    {lead.reservation_fee_status === "pendente" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markFeePaid(lead);
-                        }}
-                        className="mt-1 block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      >
-                        💳 Taxa pendente
-                      </button>
-                    )}
-                    {lead.reservation_fee_status === "pago" && (
-                      <span className="mt-1 block w-fit rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-medium text-brand-teal">
-                        💳 Taxa paga
-                      </span>
-                    )}
-
-                    {lead.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {lead.tags.map((t) => (
-                          <span
-                            key={t.id}
-                            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                            style={{ backgroundColor: `${t.color}1A`, color: t.color }}
-                          >
-                            {t.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {stage.key !== "cliente" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          avancarEtapa(lead);
-                        }}
-                        className="mt-2 w-full rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal dark:bg-neutral-800 dark:text-neutral-300"
-                      >
-                        Avançar →
-                      </button>
-                    )}
-                  </div>
+                    lead={lead}
+                    stage={stage}
+                    isDragging={activeId === lead.id}
+                    onOpen={() => setSelected(lead)}
+                    onToggleConfirmed={() => toggleConfirmed(lead)}
+                    onMarkFeePaid={() => markFeePaid(lead)}
+                    onAvancar={() => avancarEtapa(lead)}
+                  />
                 ))}
-                {leads.length === 0 && (
+                {stageLeads.length === 0 && (
                   <p className="px-1 py-4 text-center text-xs text-neutral-400">Vazio</p>
                 )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              </FunilColumn>
+            );
+          })}
+        </div>
+
+        <DragOverlay>
+          {activeLead ? (
+            <LeadCardContent
+              lead={activeLead}
+              stage={STAGES.find((s) => s.key === activeLead.stage)!}
+              floating
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {modalOpen && <NovoLeadModal onClose={() => setModalOpen(false)} onCreated={handleCreated} />}
       {selected && (
@@ -262,6 +231,168 @@ export default function FunilClient({ initialClients, allTags }: { initialClient
             router.refresh();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function FunilColumn({
+  stage,
+  count,
+  children,
+}: {
+  stage: (typeof STAGES)[number];
+  count: number;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage.key });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`w-[82vw] max-w-[340px] flex-shrink-0 snap-start rounded-2xl p-3 transition sm:w-64 sm:max-w-none sm:snap-align-none ${
+        isOver ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100 dark:bg-neutral-800/60"
+      }`}
+    >
+      <div className="mb-3 flex items-center gap-2 px-1">
+        <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
+        <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{stage.label}</p>
+        <span className="ml-auto text-xs text-neutral-400">{count}</span>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function LeadCard({
+  lead,
+  stage,
+  isDragging,
+  onOpen,
+  onToggleConfirmed,
+  onMarkFeePaid,
+  onAvancar,
+}: {
+  lead: LeadRow;
+  stage: (typeof STAGES)[number];
+  isDragging: boolean;
+  onOpen: () => void;
+  onToggleConfirmed: () => void;
+  onMarkFeePaid: () => void;
+  onAvancar: () => void;
+}) {
+  const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onOpen}
+      className={`touch-none cursor-grab rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand active:cursor-grabbing dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
+        isDragging ? "opacity-30" : ""
+      }`}
+    >
+      <LeadCardContent
+        lead={lead}
+        stage={stage}
+        onToggleConfirmed={onToggleConfirmed}
+        onMarkFeePaid={onMarkFeePaid}
+        onAvancar={onAvancar}
+      />
+    </div>
+  );
+}
+
+// Conteúdo visual do card, compartilhado entre o card real (na coluna) e o
+// clone que flutua sob o dedo/cursor durante o arrasto (DragOverlay). O
+// clone (floating=true) não tem botões clicáveis, é só a aparência.
+function LeadCardContent({
+  lead,
+  stage,
+  floating,
+  onToggleConfirmed,
+  onMarkFeePaid,
+  onAvancar,
+}: {
+  lead: LeadRow;
+  stage: (typeof STAGES)[number];
+  floating?: boolean;
+  onToggleConfirmed?: () => void;
+  onMarkFeePaid?: () => void;
+  onAvancar?: () => void;
+}) {
+  return (
+    <div
+      className={
+        floating
+          ? "w-[82vw] max-w-[340px] rounded-xl border border-brand-teal/60 bg-white p-3 shadow-2xl dark:bg-neutral-900 sm:w-64 sm:max-w-none"
+          : ""
+      }
+    >
+      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+      {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
+
+      {lead.nextEvent ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleConfirmed?.();
+          }}
+          className={`mt-1 block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            lead.nextEvent.confirmed
+              ? "bg-brand-teal/10 text-brand-teal"
+              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          }`}
+        >
+          📅 {formatDate(lead.nextEvent.date_start)} · {lead.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
+        </button>
+      ) : (
+        lead.data_evento && (
+          <p className="mt-1 text-xs text-neutral-400">📅 {formatDate(lead.data_evento)} (previsto)</p>
+        )
+      )}
+
+      {lead.reservation_fee_status === "pendente" && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMarkFeePaid?.();
+          }}
+          className="mt-1 block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+        >
+          💳 Taxa pendente
+        </button>
+      )}
+      {lead.reservation_fee_status === "pago" && (
+        <span className="mt-1 block w-fit rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-medium text-brand-teal">
+          💳 Taxa paga
+        </span>
+      )}
+
+      {lead.tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {lead.tags.map((t) => (
+            <span
+              key={t.id}
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{ backgroundColor: `${t.color}1A`, color: t.color }}
+            >
+              {t.name}
+            </span>
+          ))}
+        </div>
+      )}
+      {stage.key !== "cliente" && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAvancar?.();
+          }}
+          className="mt-2 w-full rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal dark:bg-neutral-800 dark:text-neutral-300"
+        >
+          Avançar →
+        </button>
       )}
     </div>
   );
