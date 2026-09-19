@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import NovoLeadModal from "./NovoLeadModal";
@@ -80,6 +81,9 @@ export default function FunilClient({
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
+  const [confirmAlertOpen, setConfirmAlertOpen] = useState(false);
+  const [tasksAlertOpen, setTasksAlertOpen] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   // Mantém o estado local em sincronia sempre que o servidor manda dados
   // novos (ex: depois de um router.refresh()), sem perder a atualização
@@ -130,6 +134,14 @@ export default function FunilClient({
   }, [leads, search, tagFilter]);
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
+
+  // Eventos de HIPRO aguardando confirmação, separado de propósito das
+  // tarefas de contato do funil — são coisas diferentes (agenda x etapa),
+  // por isso ficam em alertas distintos em vez de uma lista só.
+  const pendingConfirmationLeads = useMemo(
+    () => leads.filter((l) => l.nextEvent && !l.nextEvent.confirmed),
+    [leads]
+  );
 
   function handleCreated() {
     setModalOpen(false);
@@ -182,61 +194,114 @@ export default function FunilClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
-        >
-          + Novo lead
-        </button>
-      </div>
+      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
 
-      {tasks.length > 0 && (
-        <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-            📋 Tarefas de contato pendentes
-          </p>
-          <div className="space-y-2">
-            {tasks.map((task) => {
-              const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
-              const busy = taskBusyId === task.id;
-              return (
+      {/* Alerta 1: confirmação de agenda do HIPRO — separado de propósito
+          das tarefas de etapa do funil abaixo. Fechado por padrão, só
+          expande com um toque, igual ao aviso amarelo do Dashboard. */}
+      {pendingConfirmationLeads.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10">
+          <button
+            onClick={() => setConfirmAlertOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-amber-800 dark:text-amber-400"
+          >
+            <span>
+              ⚠️ {pendingConfirmationLeads.length}{" "}
+              {pendingConfirmationLeads.length === 1
+                ? "evento de agenda precisa"
+                : "eventos de agenda precisam"}{" "}
+              de confirmação
+            </span>
+            <span className="text-xs">{confirmAlertOpen ? "▲" : "▼"}</span>
+          </button>
+          {confirmAlertOpen && (
+            <div className="space-y-1.5 border-t border-amber-200/60 p-3 pt-2 dark:border-amber-900/30">
+              {pendingConfirmationLeads.map((lead) => (
                 <div
-                  key={task.id}
-                  className="flex flex-col gap-2 rounded-xl bg-white/80 p-3 shadow-sm dark:bg-neutral-900/60 sm:flex-row sm:items-center sm:justify-between"
+                  key={lead.id}
+                  className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
                 >
                   <div>
-                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{task.title}</p>
-                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      {formatDate(task.due_date)}
-                      {atrasada && (
-                        <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                          Atrasada
-                        </span>
-                      )}
+                    <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      {formatDate(lead.nextEvent!.date_start)}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      disabled={busy}
-                      onClick={() => registerContactAttempt(task.id, true)}
-                      className="flex-1 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50 sm:flex-none"
-                    >
-                      ✅ Respondeu
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => registerContactAttempt(task.id, false)}
-                      className="flex-1 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400 sm:flex-none"
-                    >
-                      🔁 Sem resposta
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => toggleConfirmed(lead)}
+                    className="flex-shrink-0 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal"
+                  >
+                    Confirmar
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Alerta 2: tarefas de contato das etapas do funil (não misturar
+          com a confirmação de agenda acima). Cada tarefa só mostra os
+          botões de ação depois de tocada, pra ficar enxuto no celular. */}
+      {tasks.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 dark:border-brand-blue/20 dark:bg-brand-blue/10">
+          <button
+            onClick={() => setTasksAlertOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-brand-blue"
+          >
+            <span>
+              📋 {tasks.length} {tasks.length === 1 ? "tarefa de contato pendente" : "tarefas de contato pendentes"}
+            </span>
+            <span className="text-xs">{tasksAlertOpen ? "▲" : "▼"}</span>
+          </button>
+          {tasksAlertOpen && (
+            <div className="space-y-1.5 border-t border-brand-blue/20 p-3 pt-2">
+              {tasks.map((task) => {
+                const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
+                const busy = taskBusyId === task.id;
+                const expanded = expandedTaskId === task.id;
+                return (
+                  <div key={task.id} className="overflow-hidden rounded-xl bg-white/80 dark:bg-neutral-900/50">
+                    <button
+                      onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                    >
+                      <span className="text-xs">
+                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
+                        <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">
+                          {formatDate(task.due_date)}
+                        </span>
+                        {atrasada && (
+                          <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                            Atrasada
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
+                    </button>
+                    {expanded && (
+                      <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+                        <button
+                          disabled={busy}
+                          onClick={() => registerContactAttempt(task.id, true)}
+                          className="flex-1 rounded-lg bg-brand-teal/10 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50"
+                        >
+                          ✅ Respondeu
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => registerContactAttempt(task.id, false)}
+                          className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                        >
+                          🔁 Sem resposta
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -311,6 +376,14 @@ export default function FunilClient({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <button
+        onClick={() => setModalOpen(true)}
+        aria-label="Novo lead"
+        className="fixed bottom-20 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-white shadow-glow-teal transition hover:brightness-110 active:scale-95 md:bottom-6"
+      >
+        <Plus size={26} strokeWidth={2} />
+      </button>
 
       {modalOpen && <NovoLeadModal onClose={() => setModalOpen(false)} onCreated={handleCreated} />}
       {selected && (
