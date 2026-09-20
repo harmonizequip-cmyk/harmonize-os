@@ -296,7 +296,7 @@ export async function drawAvailabilityImage({
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("Fale comigo para garantir sua data 💬", ctaX + ctaWidth / 2, ctaY + ctaH / 2 + 1);
+  fillTextSpaced(ctx, "RESERVE E GARANTA O HIPRO", ctaX + ctaWidth / 2, ctaY + ctaH / 2 + 1, 1.5);
 
   return canvas;
 }
