@@ -8,6 +8,7 @@ import NovaTarefaModal from "@/app/(app)/funil/NovaTarefaModal";
 import NovoLeadModal from "@/app/(app)/funil/NovoLeadModal";
 import NovoLancamentoModal from "@/app/(app)/financeiro/NovoLancamentoModal";
 import NovoEventoModal from "@/app/(app)/agenda/NovoEventoModal";
+import ReservarHiproModal from "@/app/(app)/agenda/ReservarHiproModal";
 
 interface ClientOption {
   id: string;
@@ -20,7 +21,13 @@ interface CategoryOption {
   type: "entrada" | "saida";
 }
 
-type ActionKey = "tarefa" | "lancamento" | "lead" | "evento";
+interface EquipmentOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+type ActionKey = "tarefa" | "lancamento" | "lead" | "evento" | "locacao";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -30,6 +37,7 @@ const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[
   { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
   { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
   { key: "evento", label: "Novo evento na agenda", emoji: "📅", module: "agenda" },
+  { key: "locacao", label: "Nova locação (Reservar HIPRO)", emoji: "📦", module: "agenda" },
 ];
 
 // Botão "+" único, disponível em toda tela (fica no layout, não em cada
@@ -49,21 +57,24 @@ export default function QuickActionsButton({
   const [activeModal, setActiveModal] = useState<ActionKey | null>(null);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [equipments, setEquipments] = useState<EquipmentOption[]>([]);
 
   const visibleActions = ACTIONS.filter((a) => isAdmin || permissions?.[a.module]);
 
-  // Busca clientes e categorias de novo a cada vez que o menu abre, em vez
-  // de guardar em cache — assim os dropdowns de cliente (tarefa, lançamento,
-  // evento) sempre refletem um lead recém-criado em outra tela, sem
-  // depender de recarregar a página inteira.
+  // Busca clientes, categorias e equipamentos de novo a cada vez que o menu
+  // abre, em vez de guardar em cache — assim os dropdowns (tarefa,
+  // lançamento, evento, locação) sempre refletem um lead ou equipamento
+  // recém-criado em outra tela, sem depender de recarregar a página inteira.
   async function openMenu() {
     setMenuOpen(true);
-    const [clientsRes, categoriesRes] = await Promise.all([
+    const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
       supabase.from("clients").select("id, name").order("name"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
+      supabase.from("equipments").select("id, code, name").order("code"),
     ]);
     setClients(clientsRes.data ?? []);
     setCategories(categoriesRes.data ?? []);
+    setEquipments(equipmentsRes.data ?? []);
   }
 
   function handlePick(key: ActionKey) {
@@ -138,6 +149,14 @@ export default function QuickActionsButton({
       )}
       {activeModal === "evento" && (
         <NovoEventoModal clients={clients} onClose={() => setActiveModal(null)} onCreated={handleCreated} />
+      )}
+      {activeModal === "locacao" && (
+        <ReservarHiproModal
+          clients={clients}
+          equipments={equipments}
+          onClose={() => setActiveModal(null)}
+          onCreated={handleCreated}
+        />
       )}
     </>
   );
