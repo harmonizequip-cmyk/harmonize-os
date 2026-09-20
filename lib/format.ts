@@ -8,6 +8,28 @@ export function formatDate(date: string | Date): string {
 }
 
 /**
+ * Padroniza campos de identificação (nome, cidade, endereço) em
+ * maiúsculas na hora de salvar — digita como quiser, o que fica gravado
+ * (e reaparece depois de recarregar) já vem uniforme, pra ficar
+ * consistente em cards, PDFs e mensagens. Uso: campo obrigatório, que
+ * nunca deve virar null (ex: nome do cliente). Observação: não
+ * uniformiza acerto de cidades escritas de formas diferentes (ex:
+ * "João Pessoa" vs "João Pessoa - PB") — isso é outro problema.
+ */
+export function toUpperTrim(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+/**
+ * Mesma padronização acima, mas para campo opcional: string vazia vira
+ * null em vez de "" (mesmo comportamento que já existia com `|| null`).
+ */
+export function toUpperOrNull(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+/**
  * Monta o link que abre o endereço direto no Google Maps (app se instalado,
  * senão o navegador). Retorna null se o endereço estiver vazio.
  */
