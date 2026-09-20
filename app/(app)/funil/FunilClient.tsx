@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import NovoLeadModal from "./NovoLeadModal";
 import LeadCardModal from "./LeadCardModal";
+import NovaTarefaModal from "./NovaTarefaModal";
 import {
   DndContext,
   DragOverlay,
@@ -54,9 +55,10 @@ export interface LeadRow {
 
 export interface TaskRow {
   id: string;
-  client_id: string;
-  client_name: string;
-  type: "contato_inicial" | "followup";
+  // Tarefa manual pode não ter cliente vinculado (tarefa solta).
+  client_id: string | null;
+  client_name: string | null;
+  type: "contato_inicial" | "followup" | "manual";
   follow_up_number: number | null;
   title: string;
   due_date: string;
@@ -84,6 +86,7 @@ export default function FunilClient({
   const [confirmAlertOpen, setConfirmAlertOpen] = useState(false);
   const [tasksAlertOpen, setTasksAlertOpen] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   const alertsRef = useRef<HTMLDivElement>(null);
   const [alertsHeight, setAlertsHeight] = useState(0);
 
@@ -129,6 +132,21 @@ export default function FunilClient({
       router.refresh();
       return;
     }
+    router.refresh();
+  }
+
+  // Tarefa manual não tem a lógica de follow-up (sem próxima etiqueta, sem
+  // criar a próxima tarefa) — é só marcar como feita.
+  async function completeManualTask(taskId: string) {
+    setTaskBusyId(taskId);
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    await supabase.from("tasks").update({ status: "concluida", completed_at: new Date().toISOString() }).eq("id", taskId);
+    setTaskBusyId(null);
+    router.refresh();
+  }
+
+  function handleTaskCreated() {
+    setNovaTarefaOpen(false);
     router.refresh();
   }
 
@@ -269,70 +287,99 @@ export default function FunilClient({
           </div>
         )}
 
-        {/* Alerta 2: tarefas de contato das etapas do funil (não misturar
-            com a confirmação de agenda acima). Cada tarefa só mostra os
-            botões de ação depois de tocada, pra ficar enxuto no celular. */}
-        {tasks.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 shadow-lg dark:border-brand-blue/20 dark:bg-brand-blue/10 md:shadow-none">
+        {/* Alerta 2: tarefas (as de contato automáticas do funil e as
+            manuais, criadas pelo botão "+" ou pela ficha do cliente). Cada
+            tarefa só mostra os botões de ação depois de tocada, pra ficar
+            enxuto no celular. Esse bloco fica sempre visível (mesmo sem
+            nenhuma pendente), porque o "+" de criar tarefa mora aqui. */}
+        <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 shadow-lg dark:border-brand-blue/20 dark:bg-brand-blue/10 md:shadow-none">
+          <div className="flex items-center justify-between gap-2 p-3 text-sm text-brand-blue">
+            {tasks.length > 0 ? (
+              <button
+                onClick={() => setTasksAlertOpen((v) => !v)}
+                className="flex flex-1 items-center justify-between gap-2 text-left"
+              >
+                <span>
+                  📋 {tasks.length} {tasks.length === 1 ? "tarefa pendente" : "tarefas pendentes"}
+                </span>
+                <span className="text-xs">{tasksAlertOpen ? "▲" : "▼"}</span>
+              </button>
+            ) : (
+              <span className="flex-1">📋 Nenhuma tarefa pendente</span>
+            )}
             <button
-              onClick={() => setTasksAlertOpen((v) => !v)}
-              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-brand-blue"
+              type="button"
+              onClick={() => setNovaTarefaOpen(true)}
+              aria-label="Nova tarefa"
+              className="flex-shrink-0 rounded-full bg-brand-blue/10 p-1.5 text-brand-blue"
             >
-              <span>
-                📋 {tasks.length} {tasks.length === 1 ? "tarefa de contato pendente" : "tarefas de contato pendentes"}
-              </span>
-              <span className="text-xs">{tasksAlertOpen ? "▲" : "▼"}</span>
+              <Plus size={14} strokeWidth={2.5} />
             </button>
-            {tasksAlertOpen && (
-              <div className="max-h-[45vh] space-y-1.5 overflow-y-auto border-t border-brand-blue/20 p-3 pt-2 md:max-h-none md:overflow-visible">
-                {tasks.map((task) => {
-                  const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
-                  const busy = taskBusyId === task.id;
-                  const expanded = expandedTaskId === task.id;
-                  return (
-                    <div key={task.id} className="overflow-hidden rounded-xl bg-white/80 dark:bg-neutral-900/50">
-                      <button
-                        onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
-                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
-                      >
-                        <span className="text-xs">
-                          <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
-                          <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">
-                            {formatDate(task.due_date)}
-                          </span>
-                          {atrasada && (
-                            <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                              Atrasada
-                            </span>
-                          )}
+          </div>
+          {tasksAlertOpen && tasks.length > 0 && (
+            <div className="max-h-[45vh] space-y-1.5 overflow-y-auto border-t border-brand-blue/20 p-3 pt-2 md:max-h-none md:overflow-visible">
+              {tasks.map((task) => {
+                const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
+                const busy = taskBusyId === task.id;
+                const expanded = expandedTaskId === task.id;
+                return (
+                  <div key={task.id} className="overflow-hidden rounded-xl bg-white/80 dark:bg-neutral-900/50">
+                    <button
+                      onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                    >
+                      <span className="text-xs">
+                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
+                        <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">
+                          {formatDate(task.due_date)}
                         </span>
-                        <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
-                      </button>
-                      {expanded && (
-                        <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+                        {atrasada && (
+                          <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                            Atrasada
+                          </span>
+                        )}
+                        {task.client_name && (
+                          <span className="mt-0.5 block text-[10px] text-neutral-400">{task.client_name}</span>
+                        )}
+                      </span>
+                      <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
+                    </button>
+                    {expanded && (
+                      <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+                        {task.type === "manual" ? (
                           <button
                             disabled={busy}
-                            onClick={() => registerContactAttempt(task.id, true)}
+                            onClick={() => completeManualTask(task.id)}
                             className="flex-1 rounded-lg bg-brand-teal/10 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50"
                           >
-                            ✅ Respondeu
+                            ✅ Concluir
                           </button>
-                          <button
-                            disabled={busy}
-                            onClick={() => registerContactAttempt(task.id, false)}
-                            className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
-                          >
-                            🔁 Sem resposta
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                        ) : (
+                          <>
+                            <button
+                              disabled={busy}
+                              onClick={() => registerContactAttempt(task.id, true)}
+                              className="flex-1 rounded-lg bg-brand-teal/10 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50"
+                            >
+                              ✅ Respondeu
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() => registerContactAttempt(task.id, false)}
+                              className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                            >
+                              🔁 Sem resposta
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Reserva, só no celular, o espaço que os alertas ocupariam no fluxo
@@ -431,6 +478,9 @@ export default function FunilClient({
       </button>
 
       {modalOpen && <NovoLeadModal onClose={() => setModalOpen(false)} onCreated={handleCreated} />}
+      {novaTarefaOpen && (
+        <NovaTarefaModal leads={leads} onClose={() => setNovaTarefaOpen(false)} onCreated={handleTaskCreated} />
+      )}
       {selected && (
         <LeadCardModal
           lead={selected}
