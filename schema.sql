@@ -597,10 +597,13 @@ alter table clients add constraint clients_stage_check
 
 -- Tarefas de contato: uma por cliente, criada automaticamente ao
 -- entrar em "Tentativa de contato" e a cada tentativa sem resposta.
+-- Também aceita tarefas manuais (type = 'manual'), criadas pela pessoa
+-- pelo botão "+" ou pela ficha do cliente — por isso client_id é opcional
+-- (tarefa solta, sem cliente vinculado).
 create table public.tasks (
   id uuid primary key default gen_random_uuid(),
-  client_id uuid not null references clients(id) on delete cascade,
-  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup')),
+  client_id uuid references clients(id) on delete cascade,
+  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup', 'manual')),
   follow_up_number integer,
   title text not null,
   due_date date not null default current_date,
@@ -616,6 +619,16 @@ alter table tasks enable row level security;
 create policy "tasks_rw" on tasks for all
   using (has_module_permission('clientes'))
   with check (has_module_permission('clientes'));
+
+-- ============================================================
+-- Tarefas manuais (client_id opcional, type 'manual'): numa base já
+-- existente (criada antes deste recurso), rode o bloco abaixo para
+-- liberar client_id e o novo valor de type.
+-- ============================================================
+alter table tasks alter column client_id drop not null;
+alter table tasks drop constraint if exists tasks_type_check;
+alter table tasks add constraint tasks_type_check
+  check (type in ('contato_inicial', 'followup', 'manual'));
 
 -- Tags automáticas usadas pelo fluxo de follow-up/reagendamento.
 insert into tags (name, color, is_automatic) values
