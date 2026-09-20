@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { extractCityFromAddress } from "@/lib/format";
+import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
 const ORIGENS = [
   { value: "indicacao", label: "Indicação" },
@@ -37,10 +37,10 @@ export default function NovoLeadModal({
     setSaving(true);
     setError(null);
     const { error } = await supabase.from("clients").insert({
-      name: name.trim(),
+      name: toUpperTrim(name),
       whatsapp: whatsapp || null,
-      city: city || null,
-      address: address || null,
+      city: toUpperOrNull(city),
+      address: toUpperOrNull(address),
       origem,
       notes: notes || null,
       stage: "lead",
