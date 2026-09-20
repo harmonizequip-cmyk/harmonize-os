@@ -22,7 +22,10 @@ export default async function FunilPage() {
   const initialTasks = (tasks ?? []).map((t: any) => ({
     id: t.id,
     client_id: t.client_id,
-    client_name: Array.isArray(t.clients) ? t.clients[0]?.name ?? "" : t.clients?.name ?? "",
+    // Tarefa manual pode não ter cliente vinculado (tarefa solta) — nesse
+    // caso o join com "clients" volta vazio, e client_name fica null em
+    // vez de string vazia, pra dar pra distinguir "sem cliente" de fato.
+    client_name: Array.isArray(t.clients) ? t.clients[0]?.name ?? null : t.clients?.name ?? null,
     type: t.type,
     follow_up_number: t.follow_up_number,
     title: t.title,
