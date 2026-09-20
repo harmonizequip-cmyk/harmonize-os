@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
-import NovoLeadModal from "./NovoLeadModal";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import {
@@ -77,7 +76,6 @@ export default function FunilClient({
   const supabase = createClient();
   const [leads, setLeads] = useState(initialClients);
   const [tasks, setTasks] = useState(initialTasks);
-  const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -105,7 +103,7 @@ export default function FunilClient({
   // tira eles do fluxo normal da página. Esse observer mede a altura real
   // desse bloco (que muda quando um alerta abre/fecha ou quando a lista de
   // pendências muda) pra reservar o mesmo espaço logo depois, evitando que a
-  // busca e o resto da tela pulem pra cima e fiquem escondidos atrás dele.
+  // busca e o resto da tela pulem pra cima e fiquem escondidas atrás dele.
   useEffect(() => {
     const el = alertsRef.current;
     if (!el) return;
@@ -177,11 +175,6 @@ export default function FunilClient({
     () => leads.filter((l) => l.nextEvent && !l.nextEvent.confirmed),
     [leads]
   );
-
-  function handleCreated() {
-    setModalOpen(false);
-    router.refresh();
-  }
 
   async function moveToStage(leadId: string, newStage: StageKey) {
     // Move na tela imediatamente, sem esperar a resposta do servidor — é
@@ -469,15 +462,10 @@ export default function FunilClient({
         </DragOverlay>
       </DndContext>
 
-      <button
-        onClick={() => setModalOpen(true)}
-        aria-label="Novo lead"
-        className="fixed bottom-20 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-white shadow-glow-teal transition hover:brightness-110 active:scale-95 md:bottom-6"
-      >
-        <Plus size={26} strokeWidth={2} />
-      </button>
-
-      {modalOpen && <NovoLeadModal onClose={() => setModalOpen(false)} onCreated={handleCreated} />}
+      {/* O antigo botão "+" fixo de "Novo lead" saiu daqui — virou o botão
+          "+" global (components/QuickActionsButton.tsx), que fica
+          disponível em toda tela e inclui esta opção junto com as outras
+          (tarefa, lançamento, evento). */}
       {novaTarefaOpen && (
         <NovaTarefaModal leads={leads} onClose={() => setNovaTarefaOpen(false)} onCreated={handleTaskCreated} />
       )}
