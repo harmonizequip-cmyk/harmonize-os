@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -84,6 +84,8 @@ export default function FunilClient({
   const [confirmAlertOpen, setConfirmAlertOpen] = useState(false);
   const [tasksAlertOpen, setTasksAlertOpen] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const alertsRef = useRef<HTMLDivElement>(null);
+  const [alertsHeight, setAlertsHeight] = useState(0);
 
   // Mantém o estado local em sincronia sempre que o servidor manda dados
   // novos (ex: depois de um router.refresh()), sem perder a atualização
@@ -95,6 +97,21 @@ export default function FunilClient({
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  // No celular os alertas viram um bloco flutuante fixo (ver abaixo), o que
+  // tira eles do fluxo normal da página. Esse observer mede a altura real
+  // desse bloco (que muda quando um alerta abre/fecha ou quando a lista de
+  // pendências muda) pra reservar o mesmo espaço logo depois, evitando que a
+  // busca e o resto da tela pulem pra cima e fiquem escondidos atrás dele.
+  useEffect(() => {
+    const el = alertsRef.current;
+    if (!el) return;
+    const update = () => setAlertsHeight(el.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   async function registerContactAttempt(taskId: string, responded: boolean) {
     // Remove da lista na hora — a tarefa some do painel assim que a
@@ -196,114 +213,135 @@ export default function FunilClient({
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
 
-      {/* Alerta 1: confirmação de agenda do HIPRO — separado de propósito
-          das tarefas de etapa do funil abaixo. Fechado por padrão, só
-          expande com um toque, igual ao aviso amarelo do Dashboard. */}
-      {pendingConfirmationLeads.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10">
-          <button
-            onClick={() => setConfirmAlertOpen((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-amber-800 dark:text-amber-400"
-          >
-            <span>
-              ⚠️ {pendingConfirmationLeads.length}{" "}
-              {pendingConfirmationLeads.length === 1
-                ? "evento de agenda precisa"
-                : "eventos de agenda precisam"}{" "}
-              de confirmação
-            </span>
-            <span className="text-xs">{confirmAlertOpen ? "▲" : "▼"}</span>
-          </button>
-          {confirmAlertOpen && (
-            <div className="space-y-1.5 border-t border-amber-200/60 p-3 pt-2 dark:border-amber-900/30">
-              {pendingConfirmationLeads.map((lead) => (
-                <div
-                  key={lead.id}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
-                >
-                  <div>
-                    <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      {formatDate(lead.nextEvent!.date_start)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => toggleConfirmed(lead)}
-                    className="flex-shrink-0 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal"
+      {/* Os dois alertas abaixo ficam num bloco só, flutuante e fixo no topo
+          da tela no celular (logo abaixo do título "Funil de vendas"), pra
+          não sumirem de vista quando a página rola ou quando arrasta as
+          colunas do funil pro lado. "left-4 right-4" em vez de "inset-x-0"
+          é de propósito: fica com respiro nas laterais, sem grudar de ponta
+          a ponta na tela. No desktop (md:) volta pro lugar de sempre, dentro
+          do fluxo normal da página — lá não existe esse problema de rolagem
+          e a barra lateral já ocupa espaço real ao lado do conteúdo. */}
+      <div
+        ref={alertsRef}
+        className="fixed left-4 right-4 top-28 z-20 space-y-2 md:static md:left-auto md:right-auto md:top-auto md:z-auto md:space-y-4"
+      >
+        {/* Alerta 1: confirmação de agenda do HIPRO — separado de propósito
+            das tarefas de etapa do funil abaixo. Fechado por padrão, só
+            expande com um toque, igual ao aviso amarelo do Dashboard. */}
+        {pendingConfirmationLeads.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-lg dark:border-amber-900/40 dark:bg-amber-900/10 md:shadow-none">
+            <button
+              onClick={() => setConfirmAlertOpen((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-amber-800 dark:text-amber-400"
+            >
+              <span>
+                ⚠️ {pendingConfirmationLeads.length}{" "}
+                {pendingConfirmationLeads.length === 1
+                  ? "evento de agenda precisa"
+                  : "eventos de agenda precisam"}{" "}
+                de confirmação
+              </span>
+              <span className="text-xs">{confirmAlertOpen ? "▲" : "▼"}</span>
+            </button>
+            {confirmAlertOpen && (
+              <div className="max-h-[45vh] space-y-1.5 overflow-y-auto border-t border-amber-200/60 p-3 pt-2 dark:border-amber-900/30 md:max-h-none md:overflow-visible">
+                {pendingConfirmationLeads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
                   >
-                    Confirmar
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Alerta 2: tarefas de contato das etapas do funil (não misturar
-          com a confirmação de agenda acima). Cada tarefa só mostra os
-          botões de ação depois de tocada, pra ficar enxuto no celular. */}
-      {tasks.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 dark:border-brand-blue/20 dark:bg-brand-blue/10">
-          <button
-            onClick={() => setTasksAlertOpen((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-brand-blue"
-          >
-            <span>
-              📋 {tasks.length} {tasks.length === 1 ? "tarefa de contato pendente" : "tarefas de contato pendentes"}
-            </span>
-            <span className="text-xs">{tasksAlertOpen ? "▲" : "▼"}</span>
-          </button>
-          {tasksAlertOpen && (
-            <div className="space-y-1.5 border-t border-brand-blue/20 p-3 pt-2">
-              {tasks.map((task) => {
-                const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
-                const busy = taskBusyId === task.id;
-                const expanded = expandedTaskId === task.id;
-                return (
-                  <div key={task.id} className="overflow-hidden rounded-xl bg-white/80 dark:bg-neutral-900/50">
+                    <div>
+                      <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        {formatDate(lead.nextEvent!.date_start)}
+                      </p>
+                    </div>
                     <button
-                      onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                      onClick={() => toggleConfirmed(lead)}
+                      className="flex-shrink-0 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal"
                     >
-                      <span className="text-xs">
-                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
-                        <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">
-                          {formatDate(task.due_date)}
-                        </span>
-                        {atrasada && (
-                          <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                            Atrasada
-                          </span>
-                        )}
-                      </span>
-                      <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
+                      Confirmar
                     </button>
-                    {expanded && (
-                      <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
-                        <button
-                          disabled={busy}
-                          onClick={() => registerContactAttempt(task.id, true)}
-                          className="flex-1 rounded-lg bg-brand-teal/10 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50"
-                        >
-                          ✅ Respondeu
-                        </button>
-                        <button
-                          disabled={busy}
-                          onClick={() => registerContactAttempt(task.id, false)}
-                          className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
-                        >
-                          🔁 Sem resposta
-                        </button>
-                      </div>
-                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Alerta 2: tarefas de contato das etapas do funil (não misturar
+            com a confirmação de agenda acima). Cada tarefa só mostra os
+            botões de ação depois de tocada, pra ficar enxuto no celular. */}
+        {tasks.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 shadow-lg dark:border-brand-blue/20 dark:bg-brand-blue/10 md:shadow-none">
+            <button
+              onClick={() => setTasksAlertOpen((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-brand-blue"
+            >
+              <span>
+                📋 {tasks.length} {tasks.length === 1 ? "tarefa de contato pendente" : "tarefas de contato pendentes"}
+              </span>
+              <span className="text-xs">{tasksAlertOpen ? "▲" : "▼"}</span>
+            </button>
+            {tasksAlertOpen && (
+              <div className="max-h-[45vh] space-y-1.5 overflow-y-auto border-t border-brand-blue/20 p-3 pt-2 md:max-h-none md:overflow-visible">
+                {tasks.map((task) => {
+                  const atrasada = task.due_date < new Date().toISOString().slice(0, 10);
+                  const busy = taskBusyId === task.id;
+                  const expanded = expandedTaskId === task.id;
+                  return (
+                    <div key={task.id} className="overflow-hidden rounded-xl bg-white/80 dark:bg-neutral-900/50">
+                      <button
+                        onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                      >
+                        <span className="text-xs">
+                          <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
+                          <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">
+                            {formatDate(task.due_date)}
+                          </span>
+                          {atrasada && (
+                            <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                              Atrasada
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
+                      </button>
+                      {expanded && (
+                        <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+                          <button
+                            disabled={busy}
+                            onClick={() => registerContactAttempt(task.id, true)}
+                            className="flex-1 rounded-lg bg-brand-teal/10 py-1.5 text-xs font-medium text-brand-teal disabled:opacity-50"
+                          >
+                            ✅ Respondeu
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => registerContactAttempt(task.id, false)}
+                            className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                          >
+                            🔁 Sem resposta
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Reserva, só no celular, o espaço que os alertas ocupariam no fluxo
+          normal da página — sem isso, a busca e o resto da tela subiriam e
+          ficariam escondidas atrás do bloco flutuante fixo acima. No desktop
+          os alertas continuam no fluxo normal (md:static), então essa
+          reserva não faz efeito nenhum lá (fica com altura 0 visualmente,
+          porque a div toda vira "display: none" a partir do md:). */}
+      <div style={{ height: alertsHeight }} className="md:hidden" aria-hidden="true" />
 
       <input
         placeholder="Buscar por nome ou cidade..."
