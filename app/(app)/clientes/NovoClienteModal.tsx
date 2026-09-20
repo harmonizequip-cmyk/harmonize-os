@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { extractCityFromAddress } from "@/lib/format";
+import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
 export default function NovoClienteModal({
   onClose,
@@ -31,12 +31,12 @@ export default function NovoClienteModal({
     setSaving(true);
     setError(null);
     const { error } = await supabase.from("clients").insert({
-      name: name.trim(),
-      clinic_name: clinicName || null,
+      name: toUpperTrim(name),
+      clinic_name: toUpperOrNull(clinicName),
       whatsapp: whatsapp || null,
       email: email || null,
-      city: city || null,
-      address: address || null,
+      city: toUpperOrNull(city),
+      address: toUpperOrNull(address),
       notes: notes || null,
       reservation_fee_status: chargeReservationFee ? "pendente" : "nao_aplica",
     });
