@@ -456,12 +456,18 @@ function LeadCard({
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
 
   return (
+    // Sem "touch-none" de propósito: essa classe desliga a rolagem nativa
+    // do navegador assim que o dedo toca o card, antes mesmo do sensor de
+    // toque (delay: 200, tolerance: 8 lá em cima) ter chance de decidir se
+    // é um toque-e-segura (arrastar) ou um deslize rápido (rolar a tela).
+    // Sem ela, o navegador rola normalmente em qualquer toque rápido, e só
+    // quando o dedo fica parado no card pelos 200ms é que o arrasto assume.
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onOpen}
-      className={`touch-none cursor-grab rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand active:cursor-grabbing dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
+      className={`cursor-grab rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand active:cursor-grabbing dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
         isDragging ? "opacity-30" : ""
       }`}
     >
