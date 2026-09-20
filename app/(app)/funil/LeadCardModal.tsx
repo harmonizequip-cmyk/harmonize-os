@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow, type TagOption } from "./FunilClient";
-import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress } from "@/lib/format";
+import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress, toUpperOrNull } from "@/lib/format";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 
 const QUICK_COLOR = "#3DBFB8";
@@ -65,8 +65,8 @@ export default function LeadCardModal({
       .update({
         stage,
         data_evento: dataEvento || null,
-        city: city || null,
-        address: address || null,
+        city: toUpperOrNull(city),
+        address: toUpperOrNull(address),
         notes: notes || null,
         reservation_fee_status: reservationFeeStatus,
       })
