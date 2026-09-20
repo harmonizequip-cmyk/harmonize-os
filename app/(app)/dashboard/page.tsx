@@ -142,7 +142,9 @@ export default async function DashboardPage({
 
   const freeDays: string[] = [];
   for (let i = 1; i <= radarHorizonDays; i++) {
-    const d = new Date(Date.now() + i * 86400000).toISOString().slice(0, 10);
+    const dateObj = new Date(Date.now() + i * 86400000);
+    if (dateObj.getUTCDay() === 0) continue; // domingo nunca entra como dia livre sugerido
+    const d = dateObj.toISOString().slice(0, 10);
     if (!busyDaysSet.has(d)) freeDays.push(d);
   }
 
@@ -320,4 +322,4 @@ export default async function DashboardPage({
       <DashboardCharts transactions={normalizedRows} />
     </div>
   );
-}
+}a
