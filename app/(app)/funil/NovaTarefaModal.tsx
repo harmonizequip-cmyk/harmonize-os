@@ -2,13 +2,21 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { LeadRow } from "./FunilClient";
 
-// Modal único, usado em dois lugares: solto no painel de tarefas do Funil
-// (aí "leads" vem preenchido e a pessoa escolhe o cliente numa lista, ou
-// deixa "Nenhum" pra criar uma tarefa solta) e dentro da ficha de um lead
-// (aí vem "lockedClientId"/"lockedClientName" e o cliente já fica fixo,
-// sem lista pra escolher).
+// Tipo mínimo de propósito — este modal é usado em vários lugares (Funil,
+// ficha do cliente, botão "+" global em qualquer tela), então não depende
+// do tipo completo de nenhuma tela específica, só do que realmente precisa
+// pra montar a lista.
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
+// Modal único, usado em três lugares: solto no painel de tarefas do Funil e
+// no botão "+" global (aí "leads" vem preenchido e a pessoa escolhe o
+// cliente numa lista, ou deixa "Nenhum" pra criar uma tarefa solta) e
+// dentro da ficha de um lead (aí vem "lockedClientId"/"lockedClientName" e
+// o cliente já fica fixo, sem lista pra escolher).
 export default function NovaTarefaModal({
   leads = [],
   lockedClientId,
@@ -16,7 +24,7 @@ export default function NovaTarefaModal({
   onClose,
   onCreated,
 }: {
-  leads?: LeadRow[];
+  leads?: ClientOption[];
   lockedClientId?: string;
   lockedClientName?: string;
   onClose: () => void;
