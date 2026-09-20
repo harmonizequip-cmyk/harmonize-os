@@ -31,12 +31,13 @@ function defaultMessage(clientName?: string) {
 
 /**
  * Calcula quais dias do mês entram como "sugestão automática" de disponível:
- * livre nos dois HIPROs, não é dia passado, e (se uma cidade base foi
- * informada) não é o dia seguinte a um evento em outra cidade — porque
- * quem trabalha sozinho e viaja pode não conseguir emendar. Simplificação
- * de propósito: não calcula distância de verdade entre cidades, só compara
- * nome da cidade do evento com a cidade base. Sem cidade base preenchida,
- * essa parte do cálculo é ignorada (comportamento antigo).
+ * livre nos dois HIPROs, não é dia passado, não é domingo, e (se uma cidade
+ * base foi informada) não é o dia seguinte a um evento em outra cidade —
+ * porque quem trabalha sozinho e viaja pode não conseguir emendar.
+ * Simplificação de propósito: não calcula distância de verdade entre
+ * cidades, só compara nome da cidade do evento com a cidade base. Sem
+ * cidade base preenchida, essa parte do cálculo é ignorada (comportamento
+ * antigo).
  */
 function computeAutoFree(
   days: Date[],
@@ -54,7 +55,9 @@ function computeAutoFree(
       travel.add(nextKey);
     }
   }
-  const free = days.filter((d) => !isBefore(d, today) && !busy.has(toDateKey(d)) && !travel.has(toDateKey(d)));
+  const free = days.filter(
+    (d) => !isBefore(d, today) && d.getDay() !== 0 && !busy.has(toDateKey(d)) && !travel.has(toDateKey(d))
+  );
   return new Set(free.map(toDateKey));
 }
 
@@ -68,7 +71,8 @@ function computeAutoFree(
  * O dia começa marcado automaticamente quando os dois equipamentos estão
  * livres, mas dá pra desmarcar qualquer um — pensado pra quem viaja pra
  * outra cidade ou trabalha sozinho e sabe de compromissos que não estão
- * na agenda do sistema.
+ * na agenda do sistema. Domingo é tratado como dia fechado: nunca entra
+ * na sugestão automática e não dá nem pra marcar na mão.
  */
 export default function AvailabilityImageModal({
   onClose,
@@ -330,8 +334,11 @@ export default function AvailabilityImageModal({
               const key = toDateKey(day);
               const isPast = isBefore(day, today);
               const isBusy = busyDates.has(key);
+              // Domingo nunca entra como disponível — nem sugerido
+              // automaticamente, nem selecionável na mão.
+              const isSunday = day.getDay() === 0;
               const isSelected = selectedDays.has(key);
-              const disabled = isPast || isBusy;
+              const disabled = isPast || isBusy || isSunday;
               return (
                 <button
                   key={key}
@@ -349,6 +356,8 @@ export default function AvailabilityImageModal({
                   {day.getDate()}
                   {isBusy ? (
                     <span className="block text-[9px] leading-tight">ocupado</span>
+                  ) : isSunday ? (
+                    <span className="block text-[9px] leading-tight">fechado</span>
                   ) : (
                     travelDays.has(key) && (
                       <span className="block text-[9px] leading-tight text-amber-500">viagem?</span>
