@@ -51,7 +51,11 @@ export async function drawAvailabilityImage(days: Date[], monthLabel: string): P
   ctx.fillRect(0, 0, width, headerHeight);
 
   try {
-    const logo = await loadImage("/harmonize-logo-full-dark.png");
+    // Usa a versão com texto escuro (não a "-dark", pensada pra fundo escuro
+    // de verdade) porque o cabeçalho aqui é um degradê claro (teal/azul/lilás
+    // pastel) — a versão de texto branco ficava lavada e quase invisível
+    // em cima dele.
+    const logo = await loadImage("/harmonize-logo-full.png");
     const logoH = 64;
     const logoW = (logo.width / logo.height) * logoH;
     ctx.drawImage(logo, (width - logoW) / 2, 56, logoW, logoH);
