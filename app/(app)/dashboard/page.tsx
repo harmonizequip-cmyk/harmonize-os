@@ -322,4 +322,4 @@ export default async function DashboardPage({
       <DashboardCharts transactions={normalizedRows} />
     </div>
   );
-}a
+}
