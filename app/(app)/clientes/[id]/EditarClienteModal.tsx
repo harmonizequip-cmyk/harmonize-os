@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { extractCityFromAddress } from "@/lib/format";
+import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
 interface Client {
   id: string;
@@ -48,12 +48,12 @@ export default function EditarClienteModal({
     const { error } = await supabase
       .from("clients")
       .update({
-        name: name.trim(),
-        clinic_name: clinicName || null,
+        name: toUpperTrim(name),
+        clinic_name: toUpperOrNull(clinicName),
         whatsapp: whatsapp || null,
         email: email || null,
-        city: city || null,
-        address: address || null,
+        city: toUpperOrNull(city),
+        address: toUpperOrNull(address),
         notes: notes || null,
         reservation_fee_status: reservationFeeStatus,
       })
@@ -174,4 +174,4 @@ export default function EditarClienteModal({
       </div>
     </div>
   );
-}
+}w
