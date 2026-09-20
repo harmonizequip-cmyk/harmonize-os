@@ -438,4 +438,4 @@ export default function AvailabilityImageModal({
       </div>
     </div>
   );
-}2
+}
