@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Users,
+  ListChecks,
   Package,
   BarChart3,
   Settings,
@@ -26,10 +27,12 @@ const MAIN_ITEMS = [
 ];
 
 // Tudo que não é atalho do dia a dia fica atrás do botão de menu:
-// Clientes, Equipamentos (cujos números principais já aparecem resumidos
-// no Dashboard), Relatórios e Configurações.
+// Clientes, Tarefas (visão completa, pendentes + concluídas — o Funil só
+// mostra as pendentes), Equipamentos (cujos números principais já aparecem
+// resumidos no Dashboard), Relatórios e Configurações.
 const MORE_ITEMS = [
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
+  { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
   { href: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
