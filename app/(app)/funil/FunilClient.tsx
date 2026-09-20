@@ -337,9 +337,16 @@ export default function FunilClient({
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {/* "scroll-smooth" (rolagem suave via CSS) some daqui de propósito:
+            junto com "snap-mandatory" ele trava a rolagem no celular, porque
+            o navegador fica tentando terminar a animação suave até a coluna
+            mais próxima enquanto o dedo ainda está arrastando a tela, e as
+            duas coisas disputam a posição do scroll. "proximity" no lugar de
+            "mandatory" também ajuda: só encaixa quando você já está perto
+            do limite da coluna, em vez de forçar parar em toda coluna. */}
         <div
-          className={`flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 scroll-smooth sm:mx-0 sm:px-0 sm:snap-none ${
-            activeId ? "" : "snap-x snap-mandatory"
+          className={`flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:snap-none ${
+            activeId ? "" : "snap-x snap-proximity"
           }`}
         >
           {STAGES.map((stage) => {
