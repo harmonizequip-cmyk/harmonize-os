@@ -62,11 +62,11 @@ function computeAutoFree(
 }
 
 /**
- * Gera uma imagem só com as datas livres (os dois HIPROs sem locação),
- * pra mandar pro cliente sem expor mais nada da agenda. Usado de dois
- * jeitos: na Agenda (mode="agenda", só baixar/compartilhar) e no Funil,
- * dentro do card de um lead (mode="funil", já com mensagem e atalho de
- * WhatsApp pro número daquele cliente).
+ * Gera uma imagem de calendário do mês inteiro com os dias já reservados
+ * circulados, pra mandar pro cliente sem expor mais nada da agenda. Usado
+ * de dois jeitos: na Agenda (mode="agenda", só baixar/compartilhar) e no
+ * Funil, dentro do card de um lead (mode="funil", já com mensagem e
+ * atalho de WhatsApp pro número daquele cliente).
  *
  * O dia começa marcado automaticamente quando os dois equipamentos estão
  * livres, mas dá pra desmarcar qualquer um — pensado pra quem viaja pra
@@ -207,10 +207,7 @@ export default function AvailabilityImageModal({
   async function handleGenerate() {
     setGenerating(true);
     setShareNote(null);
-    const chosen = daysInMonth.filter((d) => selectedDays.has(toDateKey(d)));
-    const monthLabelRaw = format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR });
-    const monthLabel = monthLabelRaw.charAt(0).toUpperCase() + monthLabelRaw.slice(1);
-    const canvas = await drawAvailabilityImage(chosen, monthLabel);
+    const canvas = await drawAvailabilityImage({ daysInMonth, selectedDays, busyDates, today });
     const file = await canvasToPngFile(canvas, `datas-disponiveis-${monthKey}.png`);
     setCanvasFile(file);
     setPreviewUrl(canvas.toDataURL("image/png"));
@@ -441,4 +438,4 @@ export default function AvailabilityImageModal({
       </div>
     </div>
   );
-}
+}2
