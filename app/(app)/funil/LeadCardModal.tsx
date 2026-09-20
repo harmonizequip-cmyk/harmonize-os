@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STAGES, type LeadRow, type TagOption } from "./FunilClient";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress, toUpperOrNull } from "@/lib/format";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
+import NovaTarefaModal from "./NovaTarefaModal";
 
 const QUICK_COLOR = "#3DBFB8";
 
@@ -21,6 +23,7 @@ export default function LeadCardModal({
   onSaved: () => void;
 }) {
   const supabase = createClient();
+  const router = useRouter();
   const [stage, setStage] = useState(lead.stage);
   const [dataEvento, setDataEvento] = useState(lead.data_evento ?? "");
   const [city, setCity] = useState(lead.city ?? "");
@@ -33,6 +36,7 @@ export default function LeadCardModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
 
   function toggleTag(tagId: string) {
     setSelectedTagIds((prev) => (prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]));
@@ -258,6 +262,14 @@ export default function LeadCardModal({
           📅 Enviar datas disponíveis
         </button>
 
+        <button
+          type="button"
+          onClick={() => setNovaTarefaOpen(true)}
+          className="mt-2 w-full rounded-xl border border-brand-blue py-2 text-xs font-medium text-brand-blue"
+        >
+          🗒️ Nova tarefa para este cliente
+        </button>
+
         <Link href={`/clientes/${lead.id}`} className="mt-2 block text-center text-xs text-neutral-400 underline">
           Ver perfil completo
         </Link>
@@ -285,6 +297,18 @@ export default function LeadCardModal({
           clientName={lead.name}
           whatsapp={lead.whatsapp}
           onClose={() => setAvailabilityOpen(false)}
+        />
+      )}
+
+      {novaTarefaOpen && (
+        <NovaTarefaModal
+          lockedClientId={lead.id}
+          lockedClientName={lead.name}
+          onClose={() => setNovaTarefaOpen(false)}
+          onCreated={() => {
+            setNovaTarefaOpen(false);
+            router.refresh();
+          }}
         />
       )}
     </div>
