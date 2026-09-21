@@ -9,10 +9,14 @@ import NovoLeadModal from "@/app/(app)/funil/NovoLeadModal";
 import NovoLancamentoModal from "@/app/(app)/financeiro/NovoLancamentoModal";
 import NovoEventoModal from "@/app/(app)/agenda/NovoEventoModal";
 import ReservarHiproModal from "@/app/(app)/agenda/ReservarHiproModal";
+import NovaLocacaoModal from "@/app/(app)/clientes/[id]/NovaLocacaoModal";
+import type { PricingConfig } from "@/lib/rental-pricing";
 
 interface ClientOption {
   id: string;
   name: string;
+  whatsapp?: string | null;
+  reservation_fee_status?: string;
 }
 
 interface CategoryOption {
@@ -27,7 +31,7 @@ interface EquipmentOption {
   name: string;
 }
 
-type ActionKey = "tarefa" | "lancamento" | "lead" | "evento" | "locacao";
+type ActionKey = "tarefa" | "lancamento" | "lead" | "evento" | "locacao" | "locacao_disparos";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -37,7 +41,11 @@ const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[
   { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
   { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
   { key: "evento", label: "Novo evento na agenda", emoji: "📅", module: "agenda" },
-  { key: "locacao", label: "Nova locação (Reservar HIPRO)", emoji: "📦", module: "agenda" },
+  // Pedido 1 da auditoria: antes só existia a reserva sem disparos aqui no
+  // "+", e pra lançar disparos direto era preciso entrar na ficha do
+  // cliente. Nomes escolhidos pra não se confundirem entre si.
+  { key: "locacao_disparos", label: "Lançar locação (com disparos)", emoji: "🎯", module: "agenda" },
+  { key: "locacao", label: "Reservar data (sem disparos ainda)", emoji: "📦", module: "agenda" },
 ];
 
 // Botão "+" único, disponível em toda tela (fica no layout, não em cada
@@ -47,9 +55,13 @@ const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[
 export default function QuickActionsButton({
   permissions,
   isAdmin,
+  pricingConfig,
+  reservationFee,
 }: {
   permissions: Record<string, boolean>;
   isAdmin: boolean;
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -68,7 +80,7 @@ export default function QuickActionsButton({
   async function openMenu() {
     setMenuOpen(true);
     const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
-      supabase.from("clients").select("id, name").order("name"),
+      supabase.from("clients").select("id, name, whatsapp, reservation_fee_status").order("name"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
       supabase.from("equipments").select("id, code, name").order("code"),
     ]);
@@ -154,6 +166,16 @@ export default function QuickActionsButton({
         <ReservarHiproModal
           clients={clients}
           equipments={equipments}
+          onClose={() => setActiveModal(null)}
+          onCreated={handleCreated}
+        />
+      )}
+      {activeModal === "locacao_disparos" && (
+        <NovaLocacaoModal
+          clients={clients}
+          equipments={equipments}
+          pricingConfig={pricingConfig}
+          reservationFee={reservationFee}
           onClose={() => setActiveModal(null)}
           onCreated={handleCreated}
         />
