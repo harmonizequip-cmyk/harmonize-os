@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
+import GlobalSearch from "./GlobalSearch";
 import {
   LayoutDashboard,
   Wallet,
@@ -60,6 +61,10 @@ export default function Sidebar({
           className="hidden h-11 w-auto dark:block"
         />
         <p className="mt-2 truncate text-xs font-medium text-neutral-400 dark:text-neutral-500">{name}</p>
+      </div>
+
+      <div className="mb-2">
+        <GlobalSearch />
       </div>
 
       <nav className="flex-1 space-y-0.5">
