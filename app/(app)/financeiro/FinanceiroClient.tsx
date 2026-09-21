@@ -26,6 +26,11 @@ interface TransactionRow {
   client_id: string | null;
   categories?: { name: string } | null;
   clients?: { name: string } | null;
+  // Lançamento criado com o modo teste ligado. Continua aparecendo aqui
+  // de propósito (é onde se confere o que foi lançado), mas fica
+  // marcado, porque um número que não bate com o relatório sem
+  // explicação visível é pior do que o número estar errado.
+  is_test?: boolean;
 }
 
 interface CategoryRow {
@@ -109,7 +114,14 @@ export default function FinanceiroClient({
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t.description}</p>
+                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  {t.description}
+                  {t.is_test && (
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      TESTE
+                    </span>
+                  )}
+                </p>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
                   {t.clients?.name ? ` · ${t.clients.name}` : ""}
@@ -173,6 +185,11 @@ export default function FinanceiroClient({
                 <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{t.categories?.name ?? "-"}</td>
                 <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">
                   {t.description}
+                  {t.is_test && (
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      TESTE
+                    </span>
+                  )}
                   {t.clients?.name && (
                     <span className="ml-1 text-xs font-normal text-neutral-400">· {t.clients.name}</span>
                   )}
