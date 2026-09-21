@@ -34,6 +34,13 @@ interface EquipmentOption {
   name: string;
 }
 
+// Abre o link do WhatsApp numa aba nova. Era uma tag de link comum antes,
+// mas botão evita o bloqueio de pop-up herdado e mantém o mesmo visual.
+function openInNewTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.href = url;
+}
+
 export default function NovaLocacaoModal({
   clientId,
   clientName,
@@ -91,7 +98,7 @@ export default function NovaLocacaoModal({
 
   // Se o cliente já tem uma pré-reserva pendente (feita em "Reservar
   // HIPRO"), lançar os disparos aqui pelo mesmo equipamento/data vai
-  // esbarrar na trava de conflito de agenda — porque criaria uma SEGUNDA
+  // esbarrar na trava de conflito de agenda, porque criaria uma SEGUNDA
   // entrada em cima da mesma reserva, em vez de completar a que já existe.
   // Mostra isso antes, com o link direto pra Agenda, pra finalizar a
   // reserva certa em vez de bater nesse erro sem entender por quê.
@@ -136,7 +143,7 @@ export default function NovaLocacaoModal({
 
   // Em modo percentual, discountValue guarda o número da porcentagem
   // (ex: "10"), não reais. discountNumber é sempre o valor final em
-  // reais, calculado sobre o subtotal dos disparos — é o que entra em
+  // reais, calculado sobre o subtotal dos disparos, é o que entra em
   // calculateTotals/buildWhatsAppSummary, que não sabem de porcentagem.
   const discountRawNumber = Number(discountValue.replace(",", ".")) || 0;
   const discountNumber =
@@ -233,7 +240,7 @@ export default function NovaLocacaoModal({
       p_payment_method: paymentMethod,
       p_notes: notes || null,
     });
-<a
+
     if (rpcError) {
       setSaving(false);
       if (rpcError.code === "23P01") {
@@ -241,7 +248,7 @@ export default function NovaLocacaoModal({
         const matchingPending = pendingReservations.find((r) => r.equipment_id === equipmentId && r.date_start === eventDate);
         if (matchingPending) {
           setError(
-            `⚠️ ${clientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Não dá pra criar uma locação nova em cima dela — abra essa reserva na Agenda e use "Finalizar com disparos" nela em vez disso.`
+            `⚠️ ${clientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Não dá pra criar uma locação nova em cima dela. Abra essa reserva na Agenda e use "Finalizar com disparos" nela em vez disso.`
           );
         } else {
           setError(`⚠️ O ${equipmentName} já está reservado neste período.`);
@@ -332,14 +339,13 @@ export default function NovaLocacaoModal({
 
           <div className="mt-4 flex flex-col gap-2">
             {whatsappLink && (
-              <a
-                href={whatsappLink}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openInNewTab(whatsappLink)}
                 className="rounded-xl bg-brand-teal py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-teal-dark"
               >
                 Enviar no WhatsApp
-              </a>
+              </button>
             )}
             <button
               onClick={handleCopy}
@@ -375,7 +381,7 @@ export default function NovaLocacaoModal({
             <ul className="mt-1 space-y-0.5">
               {pendingReservations.map((r) => (
                 <li key={r.id}>
-                  {r.equipmentName} · {formatDate(r.date_start)} —{" "}
+                  {r.equipmentName} · {formatDate(r.date_start)} ·{" "}
                   <Link href={`/agenda?date=${r.date_start}`} className="underline underline-offset-2">
                     abrir na Agenda
                   </Link>
@@ -566,14 +572,13 @@ export default function NovaLocacaoModal({
           {previewSummary && (
             <div className="flex gap-2">
               {previewWhatsappLink && (
-                <a
-                  href={previewWhatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => openInNewTab(previewWhatsappLink)}
                   className="flex-1 rounded-xl border border-brand-teal py-2 text-center text-xs font-medium text-brand-teal"
                 >
                   Enviar orçamento no WhatsApp
-                </a>
+                </button>
               )}
               <button
                 type="button"
