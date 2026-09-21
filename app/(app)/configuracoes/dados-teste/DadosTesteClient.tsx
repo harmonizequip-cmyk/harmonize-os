@@ -503,6 +503,16 @@ export default function DadosTesteClient({
             {passwordError && <p className="mt-1 text-xs text-red-600">{passwordError}</p>}
             <div className="mt-4 flex gap-2">
               <button
+                onClick={() => {
+                  setPending(null);
+                  setPassword("");
+                  setPasswordError(null);
+                }}
+                className="flex-1 rounded-xl border border-neutral-200 py-2 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              >
+                Cancelar
+              </button>
+              <button
                 disabled={checkingPassword || password.length === 0}
                 onClick={confirmPending}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 py-2 text-sm font-medium text-white disabled:opacity-50"
