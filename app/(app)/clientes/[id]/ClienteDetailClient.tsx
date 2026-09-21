@@ -52,7 +52,7 @@ interface EquipmentOption {
 
 // Abre um link numa aba nova. Eram tags de link comuns antes, mas botão
 // evita o bloqueio de pop-up herdado, mantém o mesmo visual, e evita a
-// tag <a> ser corrompida numa aplicação manual via GitHub.
+// tag de link ser corrompida numa aplicação manual via GitHub.
 function openInNewTab(url: string) {
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   if (!opened) window.location.href = url;
@@ -61,12 +61,20 @@ function openInNewTab(url: string) {
 export default function ClienteDetailClient({
   client,
   rentals,
+  billableCount,
+  billableTotal,
   equipments,
   pricingConfig,
   reservationFee,
 }: {
   client: Client;
   rentals: RentalRow[];
+  // Contagem e soma já calculadas no servidor a partir da view
+  // rentals_contabilizaveis (exclui cancelada e modo teste). Não dá pra
+  // recalcular aqui a partir de `rentals`, porque essa lista é a do
+  // histórico e inclui as canceladas de propósito.
+  billableCount: number;
+  billableTotal: number;
   equipments: EquipmentOption[];
   pricingConfig?: PricingConfig;
   reservationFee?: number;
@@ -78,8 +86,11 @@ export default function ClienteDetailClient({
   const [editingRental, setEditingRental] = useState<RentalRow | null>(null);
 
   const totalLocacoes = rentals.length;
-  const totalFaturado = rentals.reduce((sum, r) => sum + Number(r.calculated_value), 0);
-  const ticketMedio = totalLocacoes > 0 ? totalFaturado / totalLocacoes : 0;
+  // Faturado e ticket médio saem da contagem contabilizável, não do
+  // tamanho da lista do histórico. Locação cancelada continua aparecendo
+  // na tabela abaixo, mas não entra em nenhum dos dois números.
+  const totalFaturado = billableTotal;
+  const ticketMedio = billableCount > 0 ? billableTotal / billableCount : 0;
   const ultimaLocacao = rentals[0]?.event_date;
   const concluidas = rentals.filter((r) => r.status === "realizada").length;
   const canceladas = rentals.filter((r) => r.status === "cancelada").length;
