@@ -24,11 +24,15 @@ export default async function DashboardPage({
   const fromStr = from.toISOString().slice(0, 10);
   const toStr = to.toISOString().slice(0, 10);
 
+  // Todas as consultas abaixo filtram is_test = false: o Dashboard é
+  // tela de decisão, então registro de teste não entra em nenhum número.
+  // Eles continuam visíveis no Financeiro e na Agenda, com etiqueta.
   // Lançamentos do período filtrado, para os cards de Entradas/Saídas/Resultado e os gráficos
   const { data: transactions } = await supabase
     .from("transactions")
     .select("id, type, amount, date, category_id, categories(name)")
     .eq("scope", "harmonize")
+    .eq("is_test", false)
     .gte("date", fromStr)
     .lte("date", toStr);
 
@@ -36,11 +40,13 @@ export default async function DashboardPage({
   const { data: allTimeTransactions } = await supabase
     .from("transactions")
     .select("type, amount")
-    .eq("scope", "harmonize");
+    .eq("scope", "harmonize")
+    .eq("is_test", false);
 
   const { count: rentalsCount } = await supabase
     .from("rentals")
     .select("id", { count: "exact", head: true })
+    .eq("is_test", false)
     .gte("event_date", fromStr)
     .lte("event_date", toStr);
 
@@ -49,18 +55,21 @@ export default async function DashboardPage({
       .from("rentals")
       .select("id", { count: "exact", head: true })
       .eq("status", "realizada")
+      .eq("is_test", false)
       .gte("event_date", fromStr)
       .lte("event_date", toStr),
     supabase
       .from("rentals")
       .select("id", { count: "exact", head: true })
       .eq("status", "cancelada")
+      .eq("is_test", false)
       .gte("event_date", fromStr)
       .lte("event_date", toStr),
     supabase
       .from("rentals")
       .select("id", { count: "exact", head: true })
       .eq("rescheduled", true)
+      .eq("is_test", false)
       .gte("event_date", fromStr)
       .lte("event_date", toStr),
   ]);
@@ -72,6 +81,7 @@ export default async function DashboardPage({
   const { data: equipmentRentals } = await supabase
     .from("rentals")
     .select("equipment_id, calculated_value")
+    .eq("is_test", false)
     .gte("event_date", fromStr)
     .lte("event_date", toStr);
 
@@ -81,6 +91,7 @@ export default async function DashboardPage({
     .from("calendar_events")
     .select("id", { count: "exact", head: true })
     .eq("confirmed", false)
+    .eq("is_test", false)
     .neq("status", "cancelada")
     .gte("date_start", todayStr)
     .lte("date_start", in7Str);
@@ -92,6 +103,7 @@ export default async function DashboardPage({
   const { data: upcomingRaw } = await supabase
     .from("calendar_events")
     .select("id, event_type, date_start, confirmed, client_id, clients(name)")
+    .eq("is_test", false)
     .in("event_type", ["hipro_1", "hipro_2"])
     .neq("status", "cancelada")
     .gte("date_start", todayStr)
@@ -126,6 +138,7 @@ export default async function DashboardPage({
   const { data: radarEvents } = await supabase
     .from("calendar_events")
     .select("date_start, client_id, clients(city)")
+    .eq("is_test", false)
     .in("event_type", ["hipro_1", "hipro_2"])
     .neq("status", "cancelada")
     .gt("date_start", todayStr)
@@ -151,6 +164,7 @@ export default async function DashboardPage({
   const { data: dormantLeads } = await supabase
     .from("clients")
     .select("id, name, city, whatsapp, stage")
+    .eq("is_test", false)
     .in("stage", ["nutricao", "qualificado"])
     .order("name");
 
@@ -215,111 +229,3 @@ export default async function DashboardPage({
             <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(card.value)}</p>
           </div>
         ))}
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{rentalsCount ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Concluídas</p>
-          <p className="mt-1 text-lg font-semibold text-brand-teal">{concluidasCount ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Canceladas</p>
-          <p className="mt-1 text-lg font-semibold text-brand-pink">{canceladasCount ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Reagendadas</p>
-          <p className="mt-1 text-lg font-semibold text-brand-blue">{reagendadasCount ?? 0}</p>
-        </div>
-      </div>
-
-      {equipmentSummary.length > 0 && (
-        <div>
-          <p className="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Equipamentos</p>
-          <div className="grid grid-cols-2 gap-3">
-            {equipmentSummary.map((eq) => (
-              <div
-                key={eq.id}
-                className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{eq.name}</p>
-                </div>
-                <p className="mt-2 text-lg font-semibold text-brand-teal">{formatCurrency(eq.receita)}</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {eq.locacoes} {eq.locacoes === 1 ? "locação" : "locações"} no período
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {upcomingGroups.length > 0 && (
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Próximas locações</p>
-            <Link href="/agenda" className="text-xs text-brand-teal underline underline-offset-2">
-              Ver agenda →
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {upcomingGroups.map(({ date, events }) => {
-              const bothHipros = events.length > 1;
-              return (
-                <div
-                  key={date}
-                  className={`rounded-2xl border p-3 shadow-sm backdrop-blur-xl ${
-                    bothHipros
-                      ? "border-brand-pink/50 bg-brand-pink/5 dark:border-brand-pink/40 dark:bg-brand-pink/10"
-                      : "border-white/60 bg-white/70 dark:border-neutral-800/60 dark:bg-neutral-900/55"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                      {formatWeekdayDate(date)}
-                    </p>
-                    {bothHipros && (
-                      <span className="rounded-full bg-brand-pink/15 px-2 py-0.5 text-[10px] font-medium text-brand-pink-dark dark:text-brand-pink">
-                        2 HIPROs no mesmo dia
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1.5 space-y-1">
-                    {events.map((e) => (
-                      <div key={e.id} className="flex items-center gap-2 text-sm">
-                        <span
-                          className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                            e.event_type === "hipro_1" ? "bg-brand-teal" : "bg-brand-blue"
-                          }`}
-                        />
-                        <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                          {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
-                        </span>
-                        {e.clients?.name && (
-                          <span className="text-neutral-500 dark:text-neutral-400">· {e.clients.name}</span>
-                        )}
-                        {!e.confirmed && (
-                          <span className="ml-auto whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                            não confirmado
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <DashboardCharts transactions={normalizedRows} />
-    </div>
-  );
-}
