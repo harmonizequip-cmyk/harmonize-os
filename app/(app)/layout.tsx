@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { fetchSettings } from "@/lib/settings";
 import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/BottomNav";
 import MobileHeader from "@/components/MobileHeader";
@@ -41,6 +42,10 @@ export default async function AppLayout({
   const { data: testModeRow } = await supabase.from("settings").select("test_mode").eq("id", true).single();
   const testMode = !!testModeRow?.test_mode;
 
+  // Lançar locação direto pelo "+" (Pedido 1 da auditoria) precisa da
+  // mesma config de preço/taxa que a ficha do cliente já usa.
+  const settings = await fetchSettings(supabase);
+
   return (
     <div className="flex min-h-screen">
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
@@ -57,7 +62,12 @@ export default async function AppLayout({
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">{children}</div>
       </main>
       <BottomNav permissions={permissions} isAdmin={isAdmin} permissionsLoaded={permissionsLoaded} />
-      <QuickActionsButton permissions={permissions} isAdmin={isAdmin} />
+      <QuickActionsButton
+        permissions={permissions}
+        isAdmin={isAdmin}
+        pricingConfig={settings.pricing}
+        reservationFee={settings.reservationFee}
+      />
     </div>
   );
 }
