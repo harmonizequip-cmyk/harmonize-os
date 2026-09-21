@@ -1,0 +1,63 @@
+name: Backup do banco
+
+# Roda sozinho todo dia às 03:00 (horário de Fortaleza / 06:00 UTC).
+# Também pode ser disparado manualmente pela aba "Actions" do GitHub,
+# clicando em "Run workflow", útil pra testar sem esperar o horário.
+#
+# O backup fica guardado como artefato da própria execução, com 30 dias
+# de retenção. Pra baixar: aba Actions, abre a execução do dia, seção
+# "Artifacts" no fim da página.
+#
+# Esse workflow já foi "Backup do banco para o Google Drive". O envio pro
+# Drive foi removido porque o Google bloqueia os dois caminhos possíveis
+# numa conta pessoal (sem Workspace): conta de serviço não tem cota de
+# armazenamento no Drive, e o token OAuth de app não publicado é revogado
+# logo depois de ser emitido (invalid_grant, confirmado testando o
+# refresh direto no endpoint do Google). Se um dia fizer sentido ter uma
+# cópia fora do GitHub, o caminho sem essa fragilidade é um bucket
+# S3-compatível (Cloudflare R2, Backblaze B2), que usa chave de acesso
+# em vez de OAuth.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instala o cliente PostgreSQL 17 (pg_dump compatível com o Supabase)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg lsb-release
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          # O pacote genérico "postgresql-client" instala a versão padrão do
+          # Ubuntu (16), mais antiga que o servidor do Supabase (17.x), e o
+          # pg_dump recusa a dar dump de um servidor mais novo que ele mesmo.
+          # Por isso pedimos explicitamente a versão 17 do repositório pgdg.
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Gera o dump completo do banco (formato SQL, compactado)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%d_%H-%M-%S)
+          FILENAME="harmonize-backup-${TIMESTAMP}.sql"
+          # Chama o binário da versão 17 pelo caminho completo: o runner do
+          # GitHub já vem com um pg_dump 16 pré-instalado em /usr/bin, e o
+          # $PATH resolve pra ele primeiro mesmo depois de instalarmos a
+          # versão 17 (que fica em /usr/lib/postgresql/17/bin).
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" --no-owner --no-privileges -f "$FILENAME"
+          gzip "$FILENAME"
+          echo "BACKUP_FILE=${FILENAME}.gz" >> "$GITHUB_ENV"
+          ls -lh "${FILENAME}.gz"
+
+      - name: Guarda o backup como artefato (30 dias de retenção)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
