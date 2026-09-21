@@ -1,0 +1,63 @@
+name: Backup do banco para o Google Drive
+
+# Roda sozinho todo dia às 03:00 (horário de Fortaleza / 06:00 UTC).
+# Também pode ser disparado manualmente pela aba "Actions" do GitHub,
+# clicando em "Run workflow" — útil pra testar sem esperar o horário.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instala a versão mais recente do cliente PostgreSQL (pg_dump)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg lsb-release
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Gera o dump completo do banco (formato SQL, compactado)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%d_%H-%M-%S)
+          FILENAME="harmonize-backup-${TIMESTAMP}.sql"
+          pg_dump "$DATABASE_URL" --no-owner --no-privileges -f "$FILENAME"
+          gzip "$FILENAME"
+          echo "BACKUP_FILE=${FILENAME}.gz" >> "$GITHUB_ENV"
+
+      - name: Instala o rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configura o rclone com a conta de serviço do Google
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: |
+          echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive-service-account.json
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [gdrive]
+          type = drive
+          scope = drive
+          service_account_file = /tmp/gdrive-service-account.json
+          root_folder_id = ${DRIVE_FOLDER_ID}
+          EOF
+
+      - name: Envia o backup para a pasta no Google Drive
+        run: |
+          rclone copy "$BACKUP_FILE" gdrive: --drive-chunk-size 32M
+
+      - name: Remove backups com mais de 30 dias (mantém o Drive organizado)
+        run: |
+          rclone delete gdrive: --min-age 30d
+
+      - name: Confirma o que ficou salvo
+        run: |
+          rclone lsl gdrive:
