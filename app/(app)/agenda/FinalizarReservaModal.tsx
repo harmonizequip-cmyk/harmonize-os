@@ -34,6 +34,13 @@ export interface ReservationToFinalize {
   eventDate: string; // date_start, YYYY-MM-DD
 }
 
+// Abre o link do WhatsApp numa aba nova. Era uma tag de link comum antes,
+// mas botão evita o bloqueio de pop-up herdado e mantém o mesmo visual.
+function openInNewTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.href = url;
+}
+
 export default function FinalizarReservaModal({
   reservation,
   pricingConfig,
@@ -91,7 +98,7 @@ export default function FinalizarReservaModal({
 
   // Em modo percentual, discountValue guarda o número da porcentagem
   // (ex: "10"), não reais. discountNumber é sempre o valor final em
-  // reais, calculado sobre o subtotal dos disparos — é o que entra em
+  // reais, calculado sobre o subtotal dos disparos, é o que entra em
   // calculateTotals/buildWhatsAppSummary, que não sabem de porcentagem.
   const discountRawNumber = Number(discountValue.replace(",", ".")) || 0;
   const discountNumber =
@@ -234,14 +241,13 @@ export default function FinalizarReservaModal({
 
           <div className="mt-4 flex flex-col gap-2">
             {whatsappLink && (
-              
-                href={whatsappLink}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openInNewTab(whatsappLink)}
                 className="rounded-xl bg-brand-teal py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-teal-dark"
               >
                 Enviar no WhatsApp
-              </a>
+              </button>
             )}
             <button
               onClick={handleCopy}
