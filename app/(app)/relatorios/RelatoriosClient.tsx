@@ -206,4 +206,145 @@ export default function RelatoriosClient({
           accent="amber"
         >
           {pendingFeeNames.length > 0 && (
-            <div className="sp
+            <div className="space-y-1">
+              {pendingFeeNames.map((name, i) => (
+                <p key={i} className="text-xs text-neutral-700 dark:text-neutral-300">
+                  · {name}
+                </p>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card
+          icon="⚠️"
+          title="Concentração de receita"
+          summary={
+            topClients.length > 0
+              ? `Os ${Math.min(3, topClients.length)} maiores clientes respondem por ${fmtPct(
+                  top3Share
+                )} de tudo que já entrou (${formatCurrency(totalRevenue)} no total).`
+              : "Ainda sem lançamentos de entrada suficientes para calcular."
+          }
+          accent="blue"
+        >
+          <div className="space-y-1.5">
+            {topClients.map((c, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-neutral-700 dark:text-neutral-300">
+                  {i + 1}. {c.name}
+                </span>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  {formatCurrency(c.total)} · {totalRevenue > 0 ? fmtPct(c.total / totalRevenue) : "0%"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+            Quanto mais concentrado, maior o risco de um único cliente parar de fechar e derrubar o caixa do mês.
+          </p>
+        </Card>
+
+        <Card
+          icon="📍"
+          title="De onde vêm os clientes que fecham"
+          summary={
+            bestOrigem
+              ? `"${bestOrigem.origem}" converte melhor: ${fmtPct(bestOrigem.taxa)} dos leads viram cliente.`
+              : "Ainda sem dados de origem suficientes pra apontar um canal melhor que outro."
+          }
+          accent="teal"
+        >
+          <div className="space-y-1.5">
+            {origemBreakdown.map((o) => (
+              <div key={o.origem} className="flex items-center justify-between text-xs">
+                <span className="text-neutral-700 dark:text-neutral-300">{o.origem}</span>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  {o.convertidos}/{o.total} · {fmtPct(o.taxa)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card
+          icon="🔁"
+          title="Onde as tentativas de contato perdem força"
+          summary={`${nutricaoCount} ${
+            nutricaoCount === 1 ? "cliente esfriou" : "clientes esfriaram"
+          } depois de esgotar as 5 tentativas de follow-up.`}
+          accent="amber"
+        >
+          <div className="space-y-1.5">
+            {followupBreakdown.map((f) => (
+              <div key={f.label} className="flex items-center justify-between text-xs">
+                <span className="text-neutral-700 dark:text-neutral-300">{f.label}</span>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">{f.count}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+            Se a contagem cai muito rápido de uma tentativa pra outra, vale mudar a abordagem (mensagem, canal ou
+            horário) antes de chegar lá, em vez de só repetir a mesma tentativa 5 vezes.
+          </p>
+        </Card>
+
+        <Card
+          icon="📅"
+          title="Dias da semana mais vazios"
+          summary={
+            emptiestWeekday
+              ? `${emptiestWeekday.label} é o dia com menos eventos agendados no histórico (${emptiestWeekday.count}).`
+              : "Ainda sem eventos suficientes pra um padrão confiável."
+          }
+          accent="blue"
+        >
+          <div className="space-y-1.5">
+            {weekdayBreakdown.map((w) => (
+              <div key={w.label} className="flex items-center gap-2 text-xs">
+                <span className="w-16 flex-shrink-0 text-neutral-600 dark:text-neutral-300">{w.label}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                  <div
+                    className="h-full rounded-full bg-brand-blue"
+                    style={{ width: `${(w.count / maxWeekdayCount) * 100}%` }}
+                  />
+                </div>
+                <span className="w-6 flex-shrink-0 text-right text-neutral-400">{w.count}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+            Dia parado é agenda livre pra oferecer com desconto, promoção relâmpago, ou pra puxar os leads parados do
+            radar do Dashboard.
+          </p>
+        </Card>
+
+        <Card
+          icon="🧪"
+          title="De onde vem o dinheiro"
+          summary={
+            revenueMix[0]
+              ? `"${revenueMix[0].name}" é a maior fatia: ${fmtPct(revenueMix[0].share)} da receita.`
+              : "Ainda sem lançamentos suficientes pra calcular o mix."
+          }
+          accent="teal"
+        >
+          <div className="space-y-1.5">
+            {revenueMix.map((r) => (
+              <div key={r.name} className="flex items-center justify-between text-xs">
+                <span className="text-neutral-700 dark:text-neutral-300">{r.name}</span>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  {formatCurrency(r.total)} · {fmtPct(r.share)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+            Se quase tudo depende de uma única linha, vale pensar em diversificar (mentoria, novos serviços,
+            parcerias) pra não ficar refém de um único produto.
+          </p>
+        </Card>
+      </div>
+    </div>
+  );
+}
