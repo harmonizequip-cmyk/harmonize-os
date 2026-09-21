@@ -12,14 +12,18 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Instala a versão mais recente do cliente PostgreSQL (pg_dump)
+      - name: Instala o cliente PostgreSQL 17 (pg_dump compatível com o Supabase)
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gnupg lsb-release
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
           echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          # O pacote genérico "postgresql-client" instala a versão padrão do
+          # Ubuntu (16), mais antiga que o servidor do Supabase (17.x), e o
+          # pg_dump recusa a dar dump de um servidor mais novo que ele mesmo.
+          # Por isso pedimos explicitamente a versão 17 do repositório pgdg.
+          sudo apt-get install -y postgresql-client-17
 
       - name: Gera o dump completo do banco (formato SQL, compactado)
         env:
