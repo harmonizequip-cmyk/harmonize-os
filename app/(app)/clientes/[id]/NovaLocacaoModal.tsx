@@ -233,7 +233,7 @@ export default function NovaLocacaoModal({
       p_payment_method: paymentMethod,
       p_notes: notes || null,
     });
-
+<a
     if (rpcError) {
       setSaving(false);
       if (rpcError.code === "23P01") {
@@ -332,7 +332,7 @@ export default function NovaLocacaoModal({
 
           <div className="mt-4 flex flex-col gap-2">
             {whatsappLink && (
-              
+              <a
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -566,7 +566,7 @@ export default function NovaLocacaoModal({
           {previewSummary && (
             <div className="flex gap-2">
               {previewWhatsappLink && (
-                
+                <a
                   href={previewWhatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
