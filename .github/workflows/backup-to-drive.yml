@@ -31,7 +31,11 @@ jobs:
         run: |
           TIMESTAMP=$(date -u +%Y-%m-%d_%H-%M-%S)
           FILENAME="harmonize-backup-${TIMESTAMP}.sql"
-          pg_dump "$DATABASE_URL" --no-owner --no-privileges -f "$FILENAME"
+          # Chama o binário da versão 17 pelo caminho completo: o runner do
+          # GitHub já vem com um pg_dump 16 pré-instalado em /usr/bin, e o
+          # $PATH resolve pra ele primeiro mesmo depois de instalarmos a
+          # versão 17 (que fica em /usr/lib/postgresql/17/bin).
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" --no-owner --no-privileges -f "$FILENAME"
           gzip "$FILENAME"
           echo "BACKUP_FILE=${FILENAME}.gz" >> "$GITHUB_ENV"
 
