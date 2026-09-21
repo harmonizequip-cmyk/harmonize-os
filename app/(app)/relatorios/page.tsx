@@ -28,19 +28,25 @@ export default async function RelatoriosPage() {
     { data: followupTags },
     { data: bookedEvents },
   ] = await Promise.all([
-    supabase.from("rentals").select("shots, calculated_value"),
-    supabase.from("clients").select("id, name, origem, stage, reservation_fee_status"),
+    // is_test = false em tudo: relatório é a tela de decidir, e teste
+    // não pode entrar na conta. Quem quiser conferir o que acabou de
+    // lançar em modo teste vê no Financeiro e na Agenda, que mostram
+    // tudo com a etiqueta "TESTE".
+    supabase.from("rentals").select("shots, calculated_value").eq("is_test", false),
+    supabase.from("clients").select("id, name, origem, stage, reservation_fee_status").eq("is_test", false),
     supabase
       .from("transactions")
       .select("amount, client_id, categories(name), clients(name)")
       .eq("scope", "harmonize")
-      .eq("type", "entrada"),
+      .eq("type", "entrada")
+      .eq("is_test", false),
     supabase.from("tags").select("id, name").like("name", "Follow-up %"),
     supabase
       .from("calendar_events")
       .select("date_start")
       .in("event_type", ["hipro_1", "hipro_2"])
-      .neq("status", "cancelada"),
+      .neq("status", "cancelada")
+      .eq("is_test", false),
   ]);
 
   // ---- 1) Degrau de incentivo de volume ----
