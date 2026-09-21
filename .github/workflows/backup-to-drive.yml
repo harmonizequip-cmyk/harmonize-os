@@ -43,18 +43,25 @@ jobs:
         run: |
           curl https://rclone.org/install.sh | sudo bash
 
-      - name: Configura o rclone com a conta de serviço do Google
+      - name: Configura o rclone com login OAuth do Google Drive
+        # Contas de serviço não têm cota de armazenamento no Drive pessoal
+        # (só funcionam com Shared Drives, que exigem Google Workspace).
+        # Como essa é uma conta pessoal, autenticamos como o próprio usuário
+        # via OAuth, usando um token gerado uma vez com "rclone authorize".
         env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_OAUTH_TOKEN: ${{ secrets.GDRIVE_OAUTH_TOKEN }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: |
-          echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive-service-account.json
           mkdir -p ~/.config/rclone
           cat > ~/.config/rclone/rclone.conf << EOF
           [gdrive]
           type = drive
-          scope = drive
-          service_account_file = /tmp/gdrive-service-account.json
+          scope = drive.file
+          client_id = ${GDRIVE_CLIENT_ID}
+          client_secret = ${GDRIVE_CLIENT_SECRET}
+          token = ${GDRIVE_OAUTH_TOKEN}
           root_folder_id = ${DRIVE_FOLDER_ID}
           EOF
 
