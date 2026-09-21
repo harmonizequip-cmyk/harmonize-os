@@ -8,7 +8,7 @@ export default async function AgendaPage() {
   const { data: events } = await supabase
     .from("calendar_events")
     .select(
-      "id, event_type, title, date_start, status, confirmed, value, client_id, equipment_id, clients(name, whatsapp), rental_id, notes"
+      "id, event_type, title, date_start, status, confirmed, value, client_id, equipment_id, clients(name, whatsapp, reservation_fee_status), rental_id, notes"
     )
     .neq("status", "cancelada")
     .order("date_start", { ascending: true });
