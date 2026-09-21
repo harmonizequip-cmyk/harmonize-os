@@ -43,7 +43,7 @@ interface EventRow {
   value: number | null;
   client_id: string | null;
   equipment_id: string | null;
-  clients?: { name: string; whatsapp?: string | null } | null;
+  clients?: { name: string; whatsapp?: string | null; reservation_fee_status?: string | null } | null;
   rental_id: string | null;
   notes: string | null;
 }
