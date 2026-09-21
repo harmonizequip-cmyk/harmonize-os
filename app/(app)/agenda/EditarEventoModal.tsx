@@ -1,91 +1,166 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmPinModal from "@/components/ConfirmPinModal";
+import FinalizarReservaModal from "./FinalizarReservaModal";
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
+import { formatDate } from "@/lib/format";
+import type { PricingConfig } from "@/lib/rental-pricing";
 
-const PAYMENT_METHODS = [
-  { value: "pix", label: "PIX" },
-  { value: "dinheiro", label: "Dinheiro" },
-  { value: "debito", label: "Débito" },
-  { value: "credito", label: "Crédito" },
-  { value: "transferencia", label: "Transferência" },
-  { value: "outros", label: "Outros" },
-];
+const EQUIPMENT_LABELS: Record<string, string> = {
+  hipro_1: "HIPRO 1",
+  hipro_2: "HIPRO 2",
+};
 
-interface CategoryRow {
+interface EventToEdit {
   id: string;
-  name: string;
-  type: "entrada" | "saida";
-}
-
-interface ClientOption {
-  id: string;
-  name: string;
-}
-
-interface TransactionToEdit {
-  id: string;
-  type: "entrada" | "saida";
-  description: string;
-  amount: number;
-  payment_method: string;
-  date: string;
-  category_id: string | null;
+  event_type: string;
+  title: string;
+  date_start: string;
+  status?: string;
   client_id: string | null;
+  equipment_id?: string | null;
+  rental_id: string | null;
+  notes?: string | null;
+  clients?: { name: string; whatsapp?: string | null } | null;
 }
 
-export default function EditarLancamentoModal({
-  transaction,
-  categories,
+export default function EditarEventoModal({
+  event,
   clients,
+  pricingConfig,
+  reservationFee,
   onClose,
   onSaved,
   onDeleted,
 }: {
-  transaction: TransactionToEdit;
-  categories: CategoryRow[];
+  event: EventToEdit;
   clients: ClientOption[];
+  pricingConfig?: PricingConfig;
+  reservationFee?: number;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
 }) {
   const supabase = createClient();
-  const [type, setType] = useState<"entrada" | "saida">(transaction.type);
-  const [description, setDescription] = useState(transaction.description);
-  const [amount, setAmount] = useState(String(transaction.amount));
-  const [categoryId, setCategoryId] = useState(transaction.category_id ?? "");
-  const [clientId, setClientId] = useState(transaction.client_id ?? "");
-  const [paymentMethod, setPaymentMethod] = useState(transaction.payment_method);
-  const [date, setDate] = useState(transaction.date);
+  const isRentalEvent = !!event.rental_id;
+  const isPendingReservation = !isRentalEvent && !!event.equipment_id && (event.status ?? "pre_reserva") === "pre_reserva";
+
+  // Todos os hooks ficam aqui em cima, antes de qualquer return condicional
+  // (regras de hooks do React: mesma quantidade e ordem em toda renderização,
+  // independente de qual ramo — pendente, locação ou evento genérico — está
+  // sendo mostrado). Cada ramo só usa o subconjunto que precisa.
+  const [showFinalize, setShowFinalize] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [eventType, setEventType] = useState(event.event_type === "hipro_1" || event.event_type === "hipro_2" ? "outros" : event.event_type);
+  const [title, setTitle] = useState(event.title);
+  const [localClients, setLocalClients] = useState(clients);
+  const [clientId, setClientId] = useState(event.client_id ?? "");
+  const [dateStart, setDateStart] = useState(event.date_start);
+  const [notes, setNotes] = useState(event.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeletePin, setShowDeletePin] = useState(false);
 
-  const categoriasDoTipo = categories.filter((c) => c.type === type);
-
-  async function handleSave() {
-    const amountNumber = Number(amount.replace(",", "."));
-    if (!description.trim() || !amountNumber || !date) {
-      setError("Preencha descrição, valor e data.");
+  async function handleCancelReservation() {
+    if (!window.confirm("Cancelar esta reserva? O equipamento fica livre nessa data de novo.")) return;
+    setCancelling(true);
+    setCancelError(null);
+    const { error } = await supabase.from("calendar_events").update({ status: "cancelada" }).eq("id", event.id);
+    setCancelling(false);
+    if (error) {
+      setCancelError("Não foi possível cancelar. Tente novamente.");
       return;
     }
-    if (!window.confirm("Salvar essas alterações no lançamento?")) return;
+    onDeleted();
+  }
+
+  if (isPendingReservation) {
+    if (showFinalize) {
+      return (
+        <FinalizarReservaModal
+          reservation={{
+            id: event.id,
+            clientId: event.client_id ?? "",
+            clientName: event.clients?.name ?? "Cliente",
+            clientWhatsapp: event.clients?.whatsapp ?? null,
+            equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
+            eventDate: event.date_start,
+          }}
+          pricingConfig={pricingConfig}
+          reservationFee={reservationFee}
+          onClose={() => setShowFinalize(false)}
+          onFinalized={onSaved}
+        />
+      );
+    }
+
+    return (
+      <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+        <div
+          className="w-full max-w-md rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Reserva pendente</h2>
+          <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+            {EQUIPMENT_LABELS[event.event_type] ?? event.event_type} · {formatDate(event.date_start)}
+            {event.clients?.name ? ` · ${event.clients.name}` : ""}
+            <br />
+            Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar.
+          </p>
+
+          {cancelError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{cancelError}</p>}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={() => setShowFinalize(true)}
+              className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+            >
+              Finalizar com disparos
+            </button>
+          </div>
+
+          <button
+            onClick={handleCancelReservation}
+            disabled={cancelling}
+            className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
+          >
+            {cancelling ? "Cancelando..." : "Cancelar reserva"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  async function handleSave() {
+    if (!title.trim() || !dateStart) {
+      setError("Informe o título e a data.");
+      return;
+    }
+    if (!window.confirm("Salvar essas alterações no evento?")) return;
     setSaving(true);
     setError(null);
     const { error } = await supabase
-      .from("transactions")
+      .from("calendar_events")
       .update({
-        type,
-        description: description.trim(),
-        amount: amountNumber,
-        category_id: categoryId || null,
+        event_type: eventType,
+        title: title.trim(),
         client_id: clientId || null,
-        payment_method: paymentMethod,
-        date,
+        date_start: dateStart,
+        date_end: dateStart,
+        notes: notes || null,
       })
-      .eq("id", transaction.id);
+      .eq("id", event.id);
     setSaving(false);
     if (error) {
       setError("Não foi possível salvar. Tente novamente.");
@@ -97,13 +172,12 @@ export default function EditarLancamentoModal({
   async function handleDelete() {
     setDeleting(true);
     setError(null);
-    // Delete direto na tabela falha sempre que o lançamento veio de uma
-    // locação (rentals.transaction_id aponta pra ele, e o banco recusa
-    // apagar com esse vínculo em pé). delete_record_forever desfaz esse
-    // vínculo antes de apagar, então funciona pra qualquer lançamento.
+    // Mesmo caso do Financeiro: se existir uma mentoria vinculada a este
+    // evento, o delete direto falha. delete_record_forever desfaz esse
+    // vínculo antes de apagar.
     const { error } = await supabase.rpc("delete_record_forever", {
-      p_table: "transactions",
-      p_id: transaction.id,
+      p_table: "calendar_events",
+      p_id: event.id,
     });
     setDeleting(false);
     if (error) {
@@ -113,105 +187,95 @@ export default function EditarLancamentoModal({
     onDeleted();
   }
 
+  if (isRentalEvent) {
+    return (
+      <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+        <div
+          className="w-full max-w-md rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{event.title}</h2>
+          <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+            Este evento veio de uma locação HIPRO. Para editar data, equipamento, disparos ou valor, isso é feito na
+            própria locação, para manter o financeiro e a agenda sincronizados.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Fechar
+            </button>
+            {event.client_id && (
+              <Link
+                href={`/clientes/${event.client_id}`}
+                className="flex-1 rounded-xl bg-brand-teal py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-teal-dark"
+              >
+                Ir para a locação
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar lançamento</h2>
-
-        <div className="mb-3 flex gap-2">
-          {(["entrada", "saida"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-                type === t
-                  ? t === "entrada"
-                    ? "bg-brand-teal text-white"
-                    : "bg-brand-pink text-white"
-                  : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
-              }`}
-            >
-              {t === "entrada" ? "Entrada" : "Saída"}
-            </button>
-          ))}
-        </div>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar evento</h2>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Descrição</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tipo</label>
+            <select
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              <option value="mentoria">Mentoria</option>
+              <option value="outros">Outro</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Título</label>
             <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Valor</label>
-            <input
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Categoria</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">Sem categoria</option>
-              {categoriasDoTipo.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-              Cliente (opcional — deslocamento, etc.)
-            </label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">Nenhum</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+
+          <ClientPicker
+            clients={localClients}
+            value={clientId}
+            onChange={setClientId}
+            onClientCreated={(c) => setLocalClients((prev) => [...prev, c])}
+            optional
+          />
+
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
             <input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              value={dateStart}
+              onChange={(e) => setDateStart(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
+
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              {PAYMENT_METHODS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
@@ -238,7 +302,7 @@ export default function EditarLancamentoModal({
           disabled={deleting}
           className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
         >
-          {deleting ? "Excluindo..." : "Excluir lançamento"}
+          {deleting ? "Excluindo..." : "Excluir evento"}
         </button>
 
         {showDeletePin && (
