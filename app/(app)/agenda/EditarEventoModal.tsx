@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmPinModal from "@/components/ConfirmPinModal";
 import FinalizarReservaModal from "./FinalizarReservaModal";
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { formatDate } from "@/lib/format";
 import type { PricingConfig } from "@/lib/rental-pricing";
 
@@ -12,11 +13,6 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
   hipro_2: "HIPRO 2",
 };
-
-interface ClientOption {
-  id: string;
-  name: string;
-}
 
 interface EventToEdit {
   id: string;
@@ -61,6 +57,7 @@ export default function EditarEventoModal({
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [eventType, setEventType] = useState(event.event_type === "hipro_1" || event.event_type === "hipro_2" ? "outros" : event.event_type);
   const [title, setTitle] = useState(event.title);
+  const [localClients, setLocalClients] = useState(clients);
   const [clientId, setClientId] = useState(event.client_id ?? "");
   const [dateStart, setDateStart] = useState(event.date_start);
   const [notes, setNotes] = useState(event.notes ?? "");
@@ -247,21 +244,13 @@ export default function EditarEventoModal({
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cliente (opcional)</label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">Nenhum</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ClientPicker
+            clients={localClients}
+            value={clientId}
+            onChange={setClientId}
+            onClientCreated={(c) => setLocalClients((prev) => [...prev, c])}
+            optional
+          />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
