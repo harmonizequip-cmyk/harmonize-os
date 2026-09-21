@@ -49,12 +49,91 @@ jobs:
           # GitHub já vem com um pg_dump 16 pré-instalado em /usr/bin, e o
           # $PATH resolve pra ele primeiro mesmo depois de instalarmos a
           # versão 17 (que fica em /usr/lib/postgresql/17/bin).
-          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" --no-owner --no-privileges -f "$FILENAME"
+          #
+          # --no-owner fica: os papéis donos dos objetos mudam de nome entre
+          # projetos Supabase, e sem essa flag a restauração para no primeiro
+          # ALTER OWNER pra um papel que não existe no destino.
+          #
+          # --no-privileges FOI REMOVIDO de propósito, em 21/09/2026, depois
+          # de auditar um dump real. Com ela, o arquivo saía sem nenhum GRANT:
+          # vinham as tabelas, os dados, o RLS ligado e as políticas, mas
+          # nenhuma permissão pros papéis anon/authenticated. Política de RLS
+          # decide QUAIS linhas aparecem; o GRANT decide se o papel pode
+          # encostar na tabela. Restaurar aquele dump dava um banco íntegro e
+          # um aplicativo em que toda consulta respondia "permission denied".
+          # Os GRANTs referenciam papéis padrão do Supabase, que existem em
+          # qualquer projeto novo, então manter as permissões só ajuda.
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" --no-owner -f "$FILENAME"
           gzip "$FILENAME"
           echo "BACKUP_FILE=${FILENAME}.gz" >> "$GITHUB_ENV"
+          echo "BACKUP_SQL=${FILENAME}" >> "$GITHUB_ENV"
           ls -lh "${FILENAME}.gz"
 
+      # Um backup só vale se restaurar um sistema que funciona, e a única
+      # forma de saber isso sem restaurar é conferir o conteúdo do arquivo.
+      # Esta etapa derruba o workflow quando falta qualquer peça sem a qual
+      # a restauração produziria um sistema quebrado. Assim o problema
+      # aparece no dia em que nasce, e não no dia em que o banco cair.
+      - name: Confere se o dump restauraria um sistema funcionando
+        run: |
+          set -euo pipefail
+          gunzip -c "${BACKUP_FILE}" > conferencia.sql
+          FALHOU=0
+
+          exige() {
+            # $1 = descrição, $2 = padrão grep, $3 = mínimo de ocorrências
+            local qtd
+            qtd=$(grep -c "$2" conferencia.sql || true)
+            if [ "$qtd" -lt "$3" ]; then
+              echo "FALTANDO: $1 (encontrei $qtd, esperava pelo menos $3)"
+              FALHOU=1
+            else
+              echo "ok: $1 ($qtd)"
+            fi
+          }
+
+          # Permissões: sem elas o aplicativo não lê nada depois de restaurar.
+          exige "GRANTs de permissão" "^GRANT" 50
+          # Acesso: sem o schema auth e a tabela de usuários, ninguém loga.
+          exige "schema auth" "CREATE SCHEMA auth;" 1
+          exige "tabela de usuários" "CREATE TABLE auth.users" 1
+          exige "dados de usuários" "^COPY auth.users " 1
+          # Segurança por linha.
+          exige "políticas de RLS" "CREATE POLICY" 20
+          # Regras de negócio que moram no banco, não no código.
+          exige "função create_rental" "FUNCTION public.create_rental" 1
+          exige "função update_rental" "FUNCTION public.update_rental" 1
+          exige "função finalize_rental_reservation" "FUNCTION public.finalize_rental_reservation" 1
+          exige "função has_module_permission" "FUNCTION public.has_module_permission" 1
+          exige "função delete_record_forever" "FUNCTION public.delete_record_forever" 1
+          exige "trava de conflito de agenda" "no_equipment_double_booking" 1
+          # Modo teste: o código no ar filtra por essa coluna, e sem ela as
+          # telas não dão erro, mostram zero, que é pior.
+          exige "coluna is_test" "is_test" 5
+          # Fonte única dos valores (Leva A): sem as views, as telas de
+          # dinheiro também mostram zero silenciosamente.
+          exige "view rentals_contabilizaveis" "rentals_contabilizaveis" 1
+          exige "view transactions_contabilizaveis" "transactions_contabilizaveis" 1
+          # Tabelas de dados principais, com pelo menos uma linha cada.
+          for t in clients rentals transactions calendar_events categories settings profiles equipments; do
+            exige "dados de public.$t" "^COPY public.$t " 1
+          done
+
+          rm -f conferencia.sql
+          if [ "$FALHOU" -ne 0 ]; then
+            echo ""
+            echo "O backup foi gerado, mas restaurá-lo NÃO devolveria um sistema"
+            echo "funcionando. Veja os itens marcados como FALTANDO acima."
+            exit 1
+          fi
+          echo ""
+          echo "Dump conferido: restauraria um sistema funcionando."
+
       - name: Guarda o backup como artefato (30 dias de retenção)
+        # Roda mesmo se a conferência falhar: um backup com problema ainda é
+        # melhor que nenhum, e o arquivo é justamente o que vai ser analisado
+        # pra entender o que faltou.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BACKUP_FILE }}
