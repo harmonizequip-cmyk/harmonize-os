@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import ClientPicker from "@/components/ClientPicker";
 import { calculateRentalValue, RESERVATION_FEE, type PricingConfig } from "@/lib/rental-pricing";
 import {
   buildWhatsAppSummary,
@@ -17,6 +18,19 @@ interface PendingReservation {
   equipment_id: string | null;
   date_start: string;
   equipmentName: string;
+}
+
+// Lista de clientes usada só quando o modal abre sem cliente fixo (menu
+// "+" global). Além de id/nome (o que o ClientPicker precisa), carrega
+// whatsapp e o status da taxa de reserva, pra pré-selecionar "já paga" ou
+// "cobrar agora" assim que a pessoa escolhe o cliente (Pedido 3 da
+// auditoria). Cliente cadastrado na hora pelo próprio picker entra sem
+// esses dois campos, o formulário cai no padrão de qualquer jeito.
+interface ClientWithExtras {
+  id: string;
+  name: string;
+  whatsapp?: string | null;
+  reservation_fee_status?: string;
 }
 
 const PAYMENT_METHODS = [
@@ -45,15 +59,22 @@ export default function NovaLocacaoModal({
   clientId,
   clientName,
   clientWhatsapp,
+  clientReservationFeeStatus,
+  clients,
   equipments,
   pricingConfig,
   reservationFee,
   onClose,
   onCreated,
 }: {
-  clientId: string;
-  clientName: string;
+  // Cliente fixo (aberto de dentro da ficha do cliente) ou nenhum dos três,
+  // caso em que o modal mostra o ClientPicker (aberto pelo "+" global, sem
+  // partir de uma ficha específica, Pedido 1 da auditoria).
+  clientId?: string;
+  clientName?: string;
   clientWhatsapp?: string | null;
+  clientReservationFeeStatus?: string;
+  clients?: ClientWithExtras[];
   equipments: EquipmentOption[];
   // Config de preço vinda de settings (ver lib/settings.ts). Se não
   // vier (prop omitida), calculateRentalValue cai no DEFAULT_PRICING
@@ -70,6 +91,21 @@ export default function NovaLocacaoModal({
     { value: "ja_paga", label: "Já foi paga (creditar no total)" },
     { value: "cobrar_agora", label: `Cobrar agora (${formatCurrency(fee)})` },
   ];
+
+  const isFixedClient = !!clientId;
+  const [localClientList, setLocalClientList] = useState<ClientWithExtras[]>(clients ?? []);
+  const [pickedClientId, setPickedClientId] = useState("");
+  const pickedClient = localClientList.find((c) => c.id === pickedClientId);
+  // A partir daqui o formulário inteiro usa esses quatro "active*" em vez
+  // dos props crus, então funciona igual nos dois modos: cliente fixo (vem
+  // pronto) ou escolhido no picker (muda em runtime).
+  const activeClientId = isFixedClient ? clientId! : pickedClientId;
+  const activeClientName = isFixedClient ? clientName ?? "" : pickedClient?.name ?? "";
+  const activeClientWhatsapp = isFixedClient ? clientWhatsapp : pickedClient?.whatsapp ?? null;
+  const activeClientFeeStatus = isFixedClient
+    ? clientReservationFeeStatus ?? "nao_aplica"
+    : pickedClient?.reservation_fee_status ?? "nao_aplica";
+
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [initialCount, setInitialCount] = useState("");
@@ -104,10 +140,14 @@ export default function NovaLocacaoModal({
   // reserva certa em vez de bater nesse erro sem entender por quê.
   useEffect(() => {
     let active = true;
+    if (!activeClientId) {
+      setPendingReservations([]);
+      return;
+    }
     supabase
       .from("calendar_events")
       .select("id, equipment_id, date_start, equipments(name)")
-      .eq("client_id", clientId)
+      .eq("client_id", activeClientId)
       .eq("status", "pre_reserva")
       .is("rental_id", null)
       .then(({ data }) => {
@@ -125,7 +165,23 @@ export default function NovaLocacaoModal({
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  }, [activeClientId]);
+
+  // Pedido 3 da auditoria: se o cliente já está com a taxa de reserva paga
+  // ou pendente, pré-seleciona a opção certa e abre a seção de extras
+  // sozinha (M5), em vez de depender de lembrar de marcar isso manualmente.
+  // Roda de novo sempre que o cliente ativo muda (troca no picker).
+  useEffect(() => {
+    if (!activeClientId) return;
+    if (activeClientFeeStatus === "pago") {
+      setReservationFeeStatus("ja_paga");
+      setShowExtras(true);
+    } else if (activeClientFeeStatus === "pendente") {
+      setReservationFeeStatus("cobrar_agora");
+      setShowExtras(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId]);
 
   const initialNumber = Number(initialCount.replace(/\D/g, ""));
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
@@ -172,11 +228,11 @@ export default function NovaLocacaoModal({
       discountDescription: effectiveDiscountDescription,
       reservationFeeStatus,
       eventDate,
-      clientName,
+      clientName: activeClientName,
       paymentMethod,
       reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, eventDate, activeClientName, paymentMethod, fee]);
 
   const previewSummary = useMemo(() => {
     if (!pricing) return null;
@@ -190,13 +246,13 @@ export default function NovaLocacaoModal({
       discountDescription: effectiveDiscountDescription,
       reservationFeeStatus,
       eventDate,
-      clientName,
+      clientName: activeClientName,
       paymentMethod,
       reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, eventDate, activeClientName, paymentMethod, fee]);
 
-  const previewWhatsappLink = previewSummary ? buildWhatsAppLink(clientWhatsapp, previewSummary) : null;
+  const previewWhatsappLink = previewSummary ? buildWhatsAppLink(activeClientWhatsapp, previewSummary) : null;
 
   async function handleCopyPreview() {
     if (!previewSummary) return;
@@ -210,6 +266,10 @@ export default function NovaLocacaoModal({
   }
 
   async function handleSave() {
+    if (!activeClientId) {
+      setError("Selecione o cliente.");
+      return;
+    }
     if (!equipmentId || !eventDate) {
       setError("Preencha o equipamento e a data.");
       return;
@@ -232,7 +292,7 @@ export default function NovaLocacaoModal({
     setWarning(null);
 
     const { data: rentalId, error: rpcError } = await supabase.rpc("create_rental", {
-      p_client_id: clientId,
+      p_client_id: activeClientId,
       p_equipment_id: equipmentId,
       p_event_date: eventDate,
       p_shots: shots,
@@ -248,7 +308,7 @@ export default function NovaLocacaoModal({
         const matchingPending = pendingReservations.find((r) => r.equipment_id === equipmentId && r.date_start === eventDate);
         if (matchingPending) {
           setError(
-            `⚠️ ${clientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Não dá pra criar uma locação nova em cima dela. Abra essa reserva na Agenda e use "Finalizar com disparos" nela em vez disso.`
+            `⚠️ ${activeClientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Não dá pra criar uma locação nova em cima dela. Abra essa reserva na Agenda e use "Finalizar com disparos" nela em vez disso.`
           );
         } else {
           setError(`⚠️ O ${equipmentName} já está reservado neste período.`);
@@ -274,12 +334,12 @@ export default function NovaLocacaoModal({
         const { error: feeError } = await supabase.from("transactions").insert({
           type: "entrada",
           category_id: category.id,
-          description: `Taxa de reserva - ${clientName}`,
+          description: `Taxa de reserva - ${activeClientName}`,
           amount: fee,
           payment_method: paymentMethod,
           date: eventDate,
           scope: "harmonize",
-          client_id: clientId,
+          client_id: activeClientId,
           rental_id: rentalId,
         });
         if (feeError) {
@@ -288,6 +348,15 @@ export default function NovaLocacaoModal({
       } else {
         setWarning("A locação foi salva, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
       }
+      // B2 da auditoria: cobrar a taxa aqui nunca marcava o cliente como
+      // pago, então ele ficava "taxa pendente" pra sempre mesmo já tendo
+      // pago, e o Relatórios continuava somando ele na taxa a receber.
+      await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", activeClientId);
+    } else if (reservationFeeStatus === "ja_paga") {
+      // B3 da auditoria: creditar a taxa aqui não consumia o crédito, então
+      // o mesmo valor podia ser descontado de novo na próxima locação do
+      // mesmo cliente, sem nenhum aviso.
+      await supabase.from("clients").update({ reservation_fee_status: "nao_aplica" }).eq("id", activeClientId);
     }
 
     setSaving(false);
@@ -302,7 +371,7 @@ export default function NovaLocacaoModal({
         discountDescription: effectiveDiscountDescription,
         reservationFeeStatus,
         eventDate,
-        clientName,
+        clientName: activeClientName,
         paymentMethod,
         // Faltava aqui (bug da auditoria): sem isso, o resumo final usava
         // sempre o fallback fixo de R$ 250 em vez da taxa configurada.
@@ -322,7 +391,7 @@ export default function NovaLocacaoModal({
     }
   }
 
-  const whatsappLink = summary ? buildWhatsAppLink(clientWhatsapp, summary) : null;
+  const whatsappLink = summary ? buildWhatsAppLink(activeClientWhatsapp, summary) : null;
 
   // Tela de sucesso: locação já salva, mostra o resumo para copiar/enviar
   if (summary) {
@@ -373,10 +442,34 @@ export default function NovaLocacaoModal({
       >
         <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nova locação</h2>
 
+        {!isFixedClient && (
+          <div className="mb-3">
+            <ClientPicker
+              clients={localClientList}
+              value={pickedClientId}
+              onChange={setPickedClientId}
+              onClientCreated={(c) => setLocalClientList((prev) => [...prev, c])}
+            />
+          </div>
+        )}
+
+        {activeClientFeeStatus === "pago" && (
+          <div className="mb-4 rounded-xl border border-brand-teal/30 bg-brand-teal/10 p-3 text-xs text-brand-teal">
+            💳 {activeClientName || "Este cliente"} já pagou a taxa de reserva ({formatCurrency(fee)}). A opção "Já foi
+            paga" abaixo já está marcada para descontar do total.
+          </div>
+        )}
+        {activeClientFeeStatus === "pendente" && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+            💳 {activeClientName || "Este cliente"} está com a taxa de reserva pendente. A opção "Cobrar agora" abaixo
+            já está marcada.
+          </div>
+        )}
+
         {pendingReservations.length > 0 && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
             <p className="font-medium">
-              {clientName} já tem {pendingReservations.length > 1 ? "pré-reservas pendentes" : "uma pré-reserva pendente"}:
+              {activeClientName} já tem {pendingReservations.length > 1 ? "pré-reservas pendentes" : "uma pré-reserva pendente"}:
             </p>
             <ul className="mt-1 space-y-0.5">
               {pendingReservations.map((r) => (
