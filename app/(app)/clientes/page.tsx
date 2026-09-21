@@ -10,8 +10,11 @@ export default async function ClientesPage() {
     .eq("stage", "cliente")
     .order("name");
 
+  // Lê da view rentals_contabilizaveis, não da tabela rentals. A view já
+  // exclui cancelada e modo teste, que era o filtro que esta tela não
+  // tinha: locação cancelada entrava no total faturado de cada cliente.
   const { data: rentals } = await supabase
-    .from("rentals")
+    .from("rentals_contabilizaveis")
     .select("client_id, calculated_value, event_date");
 
   const todayStr = new Date().toISOString().slice(0, 10);
