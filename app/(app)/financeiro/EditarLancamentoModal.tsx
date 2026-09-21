@@ -97,10 +97,17 @@ export default function EditarLancamentoModal({
   async function handleDelete() {
     setDeleting(true);
     setError(null);
-    const { error } = await supabase.from("transactions").delete().eq("id", transaction.id);
+    // Delete direto na tabela falha sempre que o lançamento veio de uma
+    // locação (rentals.transaction_id aponta pra ele, e o banco recusa
+    // apagar com esse vínculo em pé). delete_record_forever desfaz esse
+    // vínculo antes de apagar, então funciona pra qualquer lançamento.
+    const { error } = await supabase.rpc("delete_record_forever", {
+      p_table: "transactions",
+      p_id: transaction.id,
+    });
     setDeleting(false);
     if (error) {
-      setError("Não foi possível excluir. Tente novamente.");
+      setError(error.message || "Não foi possível excluir. Tente novamente.");
       return;
     }
     onDeleted();
