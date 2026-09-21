@@ -75,6 +75,13 @@ function buildConfirmationMessage(event: EventRow) {
   )}. Te espero! 💛`;
 }
 
+// Abre o link do WhatsApp numa aba nova. Era uma tag de link comum antes,
+// mas botão evita o bloqueio de pop-up herdado e mantém o mesmo visual.
+function openInNewTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.href = url;
+}
+
 export default function AgendaClient({
   initialEvents,
   clients,
@@ -199,25 +206,19 @@ export default function AgendaClient({
               </p>
             </div>
           </div>
-          {isPending ? (
-            <span className="whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              Pendente
-            </span>
-          ) : (
-            <button
-              onClick={(ev) => {
-                ev.stopPropagation();
-                toggleConfirmed(e);
-              }}
-              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
-                e.confirmed
-                  ? "bg-brand-teal/10 text-brand-teal"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-              }`}
-            >
-              {e.confirmed ? "Confirmado ✓" : "Não confirmado"}
-            </button>
-          )}
+          <button
+            onClick={(ev) => {
+              ev.stopPropagation();
+              toggleConfirmed(e);
+            }}
+            className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
+              e.confirmed
+                ? "bg-brand-teal/10 text-brand-teal"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+            }`}
+          >
+            {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
+          </button>
         </div>
       </div>
     );
@@ -462,15 +463,17 @@ export default function AgendaClient({
               >
                 Agora não
               </button>
-              <a
-                href={buildWhatsAppLink(confirmingEvent.clients?.whatsapp, confirmationMessage) ?? "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setConfirmingEvent(null)}
+              <button
+                type="button"
+                onClick={() => {
+                  const link = buildWhatsAppLink(confirmingEvent.clients?.whatsapp, confirmationMessage);
+                  if (link) openInNewTab(link);
+                  setConfirmingEvent(null);
+                }}
                 className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-center text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
               >
                 Enviar no WhatsApp
-              </a>
+              </button>
             </div>
           </div>
         </div>
