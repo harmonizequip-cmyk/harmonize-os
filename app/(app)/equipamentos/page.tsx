@@ -15,7 +15,12 @@ export default async function EquipamentosPage() {
     .select("id, code, name, status")
     .order("code");
 
-  const { data: rentals } = await supabase.from("rentals").select("equipment_id, calculated_value");
+  // Lê da view rentals_contabilizaveis, não da tabela rentals: a receita
+  // por equipamento contava locação cancelada e locação de modo teste,
+  // divergindo do mesmo número mostrado no Dashboard.
+  const { data: rentals } = await supabase
+    .from("rentals_contabilizaveis")
+    .select("equipment_id, calculated_value");
 
   const { data: upcoming } = await supabase
     .from("calendar_events")
