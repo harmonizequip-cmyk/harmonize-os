@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-interface ClientOption {
-  id: string;
-  name: string;
-}
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 
 interface EquipmentOption {
   id: string;
@@ -36,6 +32,7 @@ export default function ReservarHiproModal({
   onCreated: () => void;
 }) {
   const supabase = createClient();
+  const [localClients, setLocalClients] = useState(clients);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(defaultDate ?? (() => new Date().toISOString().slice(0, 10))());
@@ -58,7 +55,7 @@ export default function ReservarHiproModal({
     setError(null);
 
     const equipment = equipments.find((e) => e.id === equipmentId);
-    const clientName = isFixedClient ? fixedClientName ?? "" : clients.find((c) => c.id === clientId)?.name ?? "";
+    const clientName = isFixedClient ? fixedClientName ?? "" : localClients.find((c) => c.id === clientId)?.name ?? "";
 
     const { error: insertError } = await supabase.from("calendar_events").insert({
       event_type: equipment?.code ?? "outros",
@@ -105,21 +102,12 @@ export default function ReservarHiproModal({
               </p>
             </div>
           ) : (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cliente</label>
-              <select
-                value={selectedClientId}
-                onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-              >
-                <option value="">Selecione...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ClientPicker
+              clients={localClients}
+              value={selectedClientId}
+              onChange={setSelectedClientId}
+              onClientCreated={(c) => setLocalClients((prev) => [...prev, c])}
+            />
           )}
 
           <div>
