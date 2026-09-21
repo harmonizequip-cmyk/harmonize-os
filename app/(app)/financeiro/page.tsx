@@ -7,7 +7,7 @@ export default async function FinanceiroPage() {
   const [{ data: transactions }, { data: categories }, { data: clients }] = await Promise.all([
     supabase
       .from("transactions")
-      .select("id, type, description, amount, payment_method, date, category_id, client_id, categories(name), clients(name)")
+      .select("id, type, description, amount, payment_method, date, category_id, client_id, is_test, categories(name), clients(name)")
       .eq("scope", "harmonize")
       .order("date", { ascending: false })
       .limit(200),
@@ -33,4 +33,3 @@ export default async function FinanceiroPage() {
     />
   );
 }
-
