@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
@@ -29,11 +29,13 @@ export default function TarefasClient({
   initialConcluidas: TarefaRow[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [pendentes, setPendentes] = useState(initialPendentes);
   const [concluidas, setConcluidas] = useState(initialConcluidas);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     setPendentes(initialPendentes);
@@ -42,6 +44,33 @@ export default function TarefasClient({
   useEffect(() => {
     setConcluidas(initialConcluidas);
   }, [initialConcluidas]);
+
+  // Chegando aqui pela busca global (ver components/GlobalSearch.tsx),
+  // a tarefa achada vem com o id em ?highlight= — abre ela expandida e
+  // rola até ela, pra não precisar procurar de novo na lista.
+  useEffect(() => {
+    const highlight = searchParams.get("highlight");
+    if (!highlight) return;
+    setExpandedTaskId(highlight);
+    const el = document.getElementById(`task-${highlight}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [searchParams]);
+
+  const term = search.trim().toLowerCase();
+  const filteredPendentes = useMemo(
+    () =>
+      term
+        ? pendentes.filter((t) => t.title.toLowerCase().includes(term) || (t.client_name ?? "").toLowerCase().includes(term))
+        : pendentes,
+    [pendentes, term]
+  );
+  const filteredConcluidas = useMemo(
+    () =>
+      term
+        ? concluidas.filter((t) => t.title.toLowerCase().includes(term) || (t.client_name ?? "").toLowerCase().includes(term))
+        : concluidas,
+    [concluidas, term]
+  );
 
   async function registerContactAttempt(taskId: string, responded: boolean) {
     setTaskBusyId(taskId);
@@ -65,21 +94,31 @@ export default function TarefasClient({
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Tarefas</h1>
 
+      <input
+        placeholder="Buscar por título ou cliente..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+      />
+
       <section>
         <h2 className="mb-2 text-sm font-semibold text-brand-blue">
-          📋 Pendentes {pendentes.length > 0 && `(${pendentes.length})`}
+          📋 Pendentes {filteredPendentes.length > 0 && `(${filteredPendentes.length})`}
         </h2>
-        {pendentes.length === 0 ? (
-          <p className="text-sm text-neutral-400">Nenhuma tarefa pendente. Use o botão "+" pra criar uma.</p>
+        {filteredPendentes.length === 0 ? (
+          <p className="text-sm text-neutral-400">
+            {term ? "Nenhuma tarefa pendente bate com essa busca." : 'Nenhuma tarefa pendente. Use o botão "+" pra criar uma.'}
+          </p>
         ) : (
           <div className="space-y-1.5">
-            {pendentes.map((task) => {
+            {filteredPendentes.map((task) => {
               const atrasada = task.due_date < todayStr;
               const busy = taskBusyId === task.id;
               const expanded = expandedTaskId === task.id;
               return (
                 <div
                   key={task.id}
+                  id={`task-${task.id}`}
                   className="overflow-hidden rounded-xl border border-brand-blue/20 bg-brand-blue/5 dark:border-brand-blue/15 dark:bg-brand-blue/10"
                 >
                   <button
@@ -145,15 +184,18 @@ export default function TarefasClient({
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-          ✅ Concluídas {concluidas.length > 0 && `(últimas ${concluidas.length})`}
+          ✅ Concluídas {filteredConcluidas.length > 0 && `(últimas ${filteredConcluidas.length})`}
         </h2>
-        {concluidas.length === 0 ? (
-          <p className="text-sm text-neutral-400">Nenhuma tarefa concluída ainda.</p>
+        {filteredConcluidas.length === 0 ? (
+          <p className="text-sm text-neutral-400">
+            {term ? "Nenhuma tarefa concluída bate com essa busca." : "Nenhuma tarefa concluída ainda."}
+          </p>
         ) : (
           <div className="space-y-1.5">
-            {concluidas.map((task) => (
+            {filteredConcluidas.map((task) => (
               <div
                 key={task.id}
+                id={`task-${task.id}`}
                 className="flex items-center justify-between gap-2 rounded-xl bg-neutral-100/70 px-3 py-2 text-xs dark:bg-neutral-800/40"
               >
                 <div>
