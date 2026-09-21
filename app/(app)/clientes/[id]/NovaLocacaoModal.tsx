@@ -75,6 +75,10 @@ export default function NovaLocacaoModal({
   const [additionalValue, setAdditionalValue] = useState("");
   const [discountDescription, setDiscountDescription] = useState("");
   const [discountValue, setDiscountValue] = useState("");
+  // "valor" = discountValue já é reais. "percentual" = discountValue é uma
+  // porcentagem (0-100) sobre o valor dos disparos (pricing.totalValue),
+  // convertida pra reais em discountNumber logo abaixo.
+  const [discountType, setDiscountType] = useState<"valor" | "percentual">("valor");
   const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>("nao_aplica");
 
   const [saving, setSaving] = useState(false);
@@ -120,7 +124,6 @@ export default function NovaLocacaoModal({
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
   const shots = finalCount && initialCount ? finalNumber - initialNumber : 0;
   const additionalNumber = Number(additionalValue.replace(",", ".")) || 0;
-  const discountNumber = Number(discountValue.replace(",", ".")) || 0;
 
   const pricing = useMemo(() => {
     if (!shots || shots <= 0) return null;
@@ -131,6 +134,25 @@ export default function NovaLocacaoModal({
     }
   }, [shots, pricingConfig]);
 
+  // Em modo percentual, discountValue guarda o número da porcentagem
+  // (ex: "10"), não reais. discountNumber é sempre o valor final em
+  // reais, calculado sobre o subtotal dos disparos — é o que entra em
+  // calculateTotals/buildWhatsAppSummary, que não sabem de porcentagem.
+  const discountRawNumber = Number(discountValue.replace(",", ".")) || 0;
+  const discountNumber =
+    discountType === "percentual"
+      ? pricing
+        ? Math.round(pricing.totalValue * (discountRawNumber / 100) * 100) / 100
+        : 0
+      : discountRawNumber;
+  // Se a descrição ficou em branco no modo percentual, o resumo de
+  // WhatsApp mostraria só "Desconto: - R$ X" sem dizer que foi 10%.
+  // Preenche automaticamente pra deixar isso explícito pro cliente.
+  const effectiveDiscountDescription =
+    discountType === "percentual" && !discountDescription.trim()
+      ? `${discountRawNumber}% de desconto`
+      : discountDescription;
+
   const totals = useMemo(() => {
     if (!pricing) return null;
     return calculateTotals({
@@ -140,14 +162,14 @@ export default function NovaLocacaoModal({
       additionalChargeValue: additionalNumber,
       additionalChargeDescription: additionalDescription,
       discountValue: discountNumber,
-      discountDescription,
+      discountDescription: effectiveDiscountDescription,
       reservationFeeStatus,
       eventDate,
       clientName,
       paymentMethod,
       reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
 
   const previewSummary = useMemo(() => {
     if (!pricing) return null;
@@ -158,14 +180,14 @@ export default function NovaLocacaoModal({
       additionalChargeValue: additionalNumber,
       additionalChargeDescription: additionalDescription,
       discountValue: discountNumber,
-      discountDescription,
+      discountDescription: effectiveDiscountDescription,
       reservationFeeStatus,
       eventDate,
       clientName,
       paymentMethod,
       reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, discountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
+  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, eventDate, clientName, paymentMethod, fee]);
 
   const previewWhatsappLink = previewSummary ? buildWhatsAppLink(clientWhatsapp, previewSummary) : null;
 
@@ -270,11 +292,14 @@ export default function NovaLocacaoModal({
         additionalChargeValue: additionalNumber,
         additionalChargeDescription: additionalDescription,
         discountValue: discountNumber,
-        discountDescription,
+        discountDescription: effectiveDiscountDescription,
         reservationFeeStatus,
         eventDate,
         clientName,
         paymentMethod,
+        // Faltava aqui (bug da auditoria): sem isso, o resumo final usava
+        // sempre o fallback fixo de R$ 250 em vez da taxa configurada.
+        reservationFee: fee,
       })
     );
   }
@@ -307,7 +332,7 @@ export default function NovaLocacaoModal({
 
           <div className="mt-4 flex flex-col gap-2">
             {whatsappLink && (
-              <a
+              
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -462,7 +487,33 @@ export default function NovaLocacaoModal({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Desconto</label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400">Desconto</label>
+                  <div className="flex rounded-lg border border-neutral-300 p-0.5 dark:border-neutral-700">
+                    <button
+                      type="button"
+                      onClick={() => setDiscountType("valor")}
+                      className={`rounded px-2 py-0.5 text-xs font-medium transition ${
+                        discountType === "valor"
+                          ? "bg-brand-teal text-white"
+                          : "text-neutral-500 dark:text-neutral-400"
+                      }`}
+                    >
+                      R$
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDiscountType("percentual")}
+                      className={`rounded px-2 py-0.5 text-xs font-medium transition ${
+                        discountType === "percentual"
+                          ? "bg-brand-teal text-white"
+                          : "text-neutral-500 dark:text-neutral-400"
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   <input
                     value={discountDescription}
@@ -474,10 +525,16 @@ export default function NovaLocacaoModal({
                     inputMode="decimal"
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
-                    placeholder="R$ 0,00"
+                    placeholder={discountType === "percentual" ? "Ex: 10" : "R$ 0,00"}
                     className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                   />
                 </div>
+                {discountType === "percentual" && discountRawNumber > 0 && (
+                  <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                    {discountRawNumber}% sobre o valor dos disparos ({formatCurrency(pricing?.totalValue ?? 0)}) ={" "}
+                    {formatCurrency(discountNumber)}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -509,7 +566,7 @@ export default function NovaLocacaoModal({
           {previewSummary && (
             <div className="flex gap-2">
               {previewWhatsappLink && (
-                <a
+                
                   href={previewWhatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
