@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-interface ClientOption {
-  id: string;
-  name: string;
-}
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 
 export default function NovoEventoModal({
   clients,
@@ -20,6 +16,7 @@ export default function NovoEventoModal({
   onCreated: () => void;
 }) {
   const supabase = createClient();
+  const [localClients, setLocalClients] = useState(clients);
   const [title, setTitle] = useState("");
   const [eventType, setEventType] = useState<"mentoria" | "outros">("mentoria");
   const [clientId, setClientId] = useState("");
@@ -86,21 +83,13 @@ export default function NovoEventoModal({
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cliente (opcional)</label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">Nenhum</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ClientPicker
+            clients={localClients}
+            value={clientId}
+            onChange={setClientId}
+            onClientCreated={(c) => setLocalClients((prev) => [...prev, c])}
+            optional
+          />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
