@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   addMonths,
   eachDayOfInterval,
@@ -89,6 +89,7 @@ export default function AgendaClient({
   reservationFee?: number;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
@@ -100,6 +101,31 @@ export default function AgendaClient({
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [confirmingEvent, setConfirmingEvent] = useState<EventRow | null>(null);
   const [confirmationMessage, setConfirmationMessage] = useState("");
+  const [eventSearch, setEventSearch] = useState("");
+
+  // Chegando aqui pela busca global (ver components/GlobalSearch.tsx), o
+  // evento achado vem com a data em ?date= — pula direto pro mês/dia certo
+  // em vez de precisar navegar mês a mês até achar.
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (!dateParam) return;
+    setCurrentMonth(startOfMonth(parseDate(dateParam)));
+    setSelectedDate(dateParam);
+  }, [searchParams]);
+
+  const eventSearchTerm = eventSearch.trim().toLowerCase();
+  const eventMatches = useMemo(() => {
+    if (!eventSearchTerm) return [];
+    return initialEvents
+      .filter((e) => e.title.toLowerCase().includes(eventSearchTerm) || (e.clients?.name ?? "").toLowerCase().includes(eventSearchTerm))
+      .slice(0, 8);
+  }, [initialEvents, eventSearchTerm]);
+
+  function goToEvent(e: EventRow) {
+    setCurrentMonth(startOfMonth(parseDate(e.date_start)));
+    setSelectedDate(e.date_start);
+    setEventSearch("");
+  }
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRow[]>();
@@ -215,6 +241,36 @@ export default function AgendaClient({
             Hoje
           </button>
         </div>
+      </div>
+
+      <div className="relative">
+        <input
+          placeholder="Buscar evento por título ou cliente..."
+          value={eventSearch}
+          onChange={(e) => setEventSearch(e.target.value)}
+          className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+        />
+        {eventSearchTerm && (
+          <div className="mt-1 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800 sm:max-w-sm">
+            {eventMatches.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-neutral-400">Nenhum evento bate com essa busca.</p>
+            ) : (
+              eventMatches.map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => goToEvent(e)}
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                >
+                  <span className="font-medium text-neutral-800 dark:text-neutral-100">{e.title}</span>
+                  <span className="ml-2 text-xs text-neutral-400">
+                    {formatDate(e.date_start)}
+                    {e.clients?.name ? ` · ${e.clients.name}` : ""}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {needsConfirmation.length > 0 && (
