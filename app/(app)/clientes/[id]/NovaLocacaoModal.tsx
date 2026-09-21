@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { calculateRentalValue, RESERVATION_FEE, type PricingConfig } from "@/lib/rental-pricing";
 import {
@@ -9,7 +10,14 @@ import {
   calculateTotals,
   type ReservationFeeStatus,
 } from "@/lib/rental-summary";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
+
+interface PendingReservation {
+  id: string;
+  equipment_id: string | null;
+  date_start: string;
+  equipmentName: string;
+}
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -75,6 +83,38 @@ export default function NovaLocacaoModal({
   const [summary, setSummary] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [previewCopied, setPreviewCopied] = useState(false);
+  const [pendingReservations, setPendingReservations] = useState<PendingReservation[]>([]);
+
+  // Se o cliente já tem uma pré-reserva pendente (feita em "Reservar
+  // HIPRO"), lançar os disparos aqui pelo mesmo equipamento/data vai
+  // esbarrar na trava de conflito de agenda — porque criaria uma SEGUNDA
+  // entrada em cima da mesma reserva, em vez de completar a que já existe.
+  // Mostra isso antes, com o link direto pra Agenda, pra finalizar a
+  // reserva certa em vez de bater nesse erro sem entender por quê.
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from("calendar_events")
+      .select("id, equipment_id, date_start, equipments(name)")
+      .eq("client_id", clientId)
+      .eq("status", "pre_reserva")
+      .is("rental_id", null)
+      .then(({ data }) => {
+        if (!active) return;
+        setPendingReservations(
+          (data ?? []).map((r: any) => ({
+            id: r.id,
+            equipment_id: r.equipment_id,
+            date_start: r.date_start,
+            equipmentName: (Array.isArray(r.equipments) ? r.equipments[0] : r.equipments)?.name ?? "equipamento",
+          }))
+        );
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
 
   const initialNumber = Number(initialCount.replace(/\D/g, ""));
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
@@ -176,7 +216,14 @@ export default function NovaLocacaoModal({
       setSaving(false);
       if (rpcError.code === "23P01") {
         const equipmentName = equipments.find((e) => e.id === equipmentId)?.name ?? "equipamento";
-        setError(`⚠️ O ${equipmentName} já está reservado neste período.`);
+        const matchingPending = pendingReservations.find((r) => r.equipment_id === equipmentId && r.date_start === eventDate);
+        if (matchingPending) {
+          setError(
+            `⚠️ ${clientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Não dá pra criar uma locação nova em cima dela — abra essa reserva na Agenda e use "Finalizar com disparos" nela em vez disso.`
+          );
+        } else {
+          setError(`⚠️ O ${equipmentName} já está reservado neste período.`);
+        }
       } else {
         setError("Não foi possível salvar a locação. Tente novamente.");
       }
@@ -293,7 +340,28 @@ export default function NovaLocacaoModal({
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nova locação</h2>
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nova locação</h2>
+
+        {pendingReservations.length > 0 && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+            <p className="font-medium">
+              {clientName} já tem {pendingReservations.length > 1 ? "pré-reservas pendentes" : "uma pré-reserva pendente"}:
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {pendingReservations.map((r) => (
+                <li key={r.id}>
+                  {r.equipmentName} · {formatDate(r.date_start)} —{" "}
+                  <Link href={`/agenda?date=${r.date_start}`} className="underline underline-offset-2">
+                    abrir na Agenda
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1">
+              Pra lançar os disparos de uma dessas, use "Finalizar com disparos" nela, em vez de criar uma locação nova aqui.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-3">
           <div>
