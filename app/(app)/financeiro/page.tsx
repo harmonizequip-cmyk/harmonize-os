@@ -4,9 +4,14 @@ import FinanceiroClient from "./FinanceiroClient";
 export default async function FinanceiroPage() {
   const supabase = createClient();
 
+  // Lê da view transactions_contabilizaveis, não da tabela transactions.
+  // A view exclui modo teste e lançamento preso a locação cancelada, que
+  // é a mesma regra usada por Dashboard e Relatórios. Antes esta tela não
+  // filtrava nem modo teste, então lançamento de teste aparecia no meio
+  // dos reais.
   const [{ data: transactions }, { data: categories }, { data: clients }] = await Promise.all([
     supabase
-      .from("transactions")
+      .from("transactions_contabilizaveis")
       .select("id, type, description, amount, payment_method, date, category_id, client_id, is_test, categories(name), clients(name)")
       .eq("scope", "harmonize")
       .order("date", { ascending: false })
