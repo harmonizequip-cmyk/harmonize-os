@@ -30,6 +30,7 @@ export interface ReservationToFinalize {
   clientId: string;
   clientName: string;
   clientWhatsapp?: string | null;
+  clientReservationFeeStatus?: string;
   equipmentName: string;
   eventDate: string; // date_start, YYYY-MM-DD
 }
@@ -65,7 +66,9 @@ export default function FinalizarReservaModal({
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [notes, setNotes] = useState("");
 
-  const [showExtras, setShowExtras] = useState(false);
+  const [showExtras, setShowExtras] = useState(
+    reservation.clientReservationFeeStatus === "pago" || reservation.clientReservationFeeStatus === "pendente"
+  );
   const [additionalDescription, setAdditionalDescription] = useState("");
   const [additionalValue, setAdditionalValue] = useState("");
   const [discountDescription, setDiscountDescription] = useState("");
@@ -74,7 +77,16 @@ export default function FinalizarReservaModal({
   // porcentagem (0-100) sobre o valor dos disparos (pricing.totalValue),
   // convertida pra reais em discountNumber logo abaixo.
   const [discountType, setDiscountType] = useState<"valor" | "percentual">("valor");
-  const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>("nao_aplica");
+  // Pedido 3 da auditoria: se o cliente já está com a taxa paga ou pendente
+  // (visto na ficha dele), o formulário já abre com a opção certa marcada
+  // e a seção de extras já aberta (M5), em vez de depender de lembrar.
+  const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>(
+    reservation.clientReservationFeeStatus === "pago"
+      ? "ja_paga"
+      : reservation.clientReservationFeeStatus === "pendente"
+      ? "cobrar_agora"
+      : "nao_aplica"
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -193,6 +205,17 @@ export default function FinalizarReservaModal({
       } else {
         setWarning("A locação foi finalizada, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
       }
+      // B2 da auditoria: cobrar a taxa aqui nunca marcava o cliente como
+      // pago, então ele ficava "taxa pendente" pra sempre mesmo já tendo
+      // pago, e o Relatórios continuava somando ele na taxa a receber.
+      if (reservation.clientId) {
+        await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", reservation.clientId);
+      }
+    } else if (reservationFeeStatus === "ja_paga" && reservation.clientId) {
+      // B3 da auditoria: creditar a taxa aqui não consumia o crédito, então
+      // o mesmo valor podia ser descontado de novo na próxima locação do
+      // mesmo cliente, sem nenhum aviso.
+      await supabase.from("clients").update({ reservation_fee_status: "nao_aplica" }).eq("id", reservation.clientId);
     }
 
     setSaving(false);
@@ -277,6 +300,19 @@ export default function FinalizarReservaModal({
         <p className="mb-4 text-xs text-neutral-400">
           {reservation.equipmentName} · {formatDate(reservation.eventDate)} · {reservation.clientName}
         </p>
+
+        {reservation.clientReservationFeeStatus === "pago" && (
+          <div className="mb-4 rounded-xl border border-brand-teal/30 bg-brand-teal/10 p-3 text-xs text-brand-teal">
+            💳 {reservation.clientName} já pagou a taxa de reserva ({formatCurrency(fee)}). A opção "Já foi paga"
+            abaixo já está marcada para descontar do total.
+          </div>
+        )}
+        {reservation.clientReservationFeeStatus === "pendente" && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+            💳 {reservation.clientName} está com a taxa de reserva pendente. A opção "Cobrar agora" abaixo já está
+            marcada.
+          </div>
+        )}
 
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
