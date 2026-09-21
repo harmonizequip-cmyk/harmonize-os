@@ -28,18 +28,20 @@ export default async function RelatoriosPage() {
     { data: followupTags },
     { data: bookedEvents },
   ] = await Promise.all([
-    // is_test = false em tudo: relatório é a tela de decidir, e teste
-    // não pode entrar na conta. Quem quiser conferir o que acabou de
-    // lançar em modo teste vê no Financeiro e na Agenda, que mostram
-    // tudo com a etiqueta "TESTE".
-    supabase.from("rentals").select("shots, calculated_value").eq("is_test", false),
+    // Relatório é a tela de decidir, então nem teste nem locação
+    // cancelada podem entrar na conta. As views rentals_contabilizaveis
+    // e transactions_contabilizaveis já carregam as duas exclusões
+    // dentro delas, por isso o .eq("is_test", false) sumiu dessas duas
+    // linhas: a regra agora mora no banco, igual para todas as telas.
+    // O que foi lançado em modo teste continua visível na tela de dados
+    // de teste, que é quem lê a tabela crua de propósito.
+    supabase.from("rentals_contabilizaveis").select("shots, calculated_value"),
     supabase.from("clients").select("id, name, origem, stage, reservation_fee_status").eq("is_test", false),
     supabase
-      .from("transactions")
+      .from("transactions_contabilizaveis")
       .select("amount, client_id, categories(name), clients(name)")
       .eq("scope", "harmonize")
-      .eq("type", "entrada")
-      .eq("is_test", false),
+      .eq("type", "entrada"),
     supabase.from("tags").select("id, name").like("name", "Follow-up %"),
     supabase
       .from("calendar_events")
