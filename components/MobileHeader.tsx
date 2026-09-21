@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
+import GlobalSearch from "./GlobalSearch";
 import { LogOut } from "lucide-react";
 
 // O menu de navegação (antigo botão de hambúrguer aqui no topo) mudou para
@@ -30,6 +31,7 @@ export default function MobileHeader() {
         />
       </div>
       <div className="flex items-center gap-1">
+        <GlobalSearch compact />
         <ThemeToggle compact className="h-8 w-8" />
         <button
           onClick={handleLogout}
