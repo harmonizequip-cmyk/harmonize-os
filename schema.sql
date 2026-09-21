@@ -767,6 +767,36 @@ create trigger trg_calendar_event_reschedule
   after update of date_start on calendar_events
   for each row execute function public.handle_calendar_event_reschedule();
 
+-- Gatilho: ao agendar uma locação HIPRO (evento de agenda com
+-- equipamento e cliente vinculados — cobre tanto a pré-reserva feita em
+-- "Reservar HIPRO" quanto uma locação já fechada direto), promove o
+-- cliente pra etapa "Agendado" automaticamente. Não regride quem já
+-- virou "Cliente" (locação nova de alguém que já é cliente não deveria
+-- voltar pra trás no funil), e create_rental/finalize_rental_reservation
+-- continuam responsáveis por levar pra "Cliente" quando os disparos são
+-- lançados de fato — este gatilho só cobre o momento do agendamento.
+create or replace function public.handle_locacao_agendada()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.equipment_id is not null and new.client_id is not null then
+    update clients
+    set stage = 'agendado'
+    where id = new.client_id
+      and stage not in ('agendado', 'cliente');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_locacao_agendada on calendar_events;
+create trigger trg_locacao_agendada
+  after insert on calendar_events
+  for each row execute function public.handle_locacao_agendada();
+
 -- Backfill: clientes que já estavam em "contato" antes desta
 -- migration e ainda não têm a tarefa inicial pendente.
 insert into tasks (client_id, type, title, due_date)
