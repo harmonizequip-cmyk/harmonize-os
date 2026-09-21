@@ -91,6 +91,8 @@ export default function RelatoriosClient({
   cliff,
   dealsInDeadZoneCount,
   deadZoneTotal,
+  nearMissCount,
+  nearMissThreshold,
   pendingFeeCount,
   pendingFeeTotal,
   pendingFeeNames,
@@ -106,6 +108,8 @@ export default function RelatoriosClient({
   cliff: PricingCliff | null;
   dealsInDeadZoneCount: number;
   deadZoneTotal: number;
+  nearMissCount: number;
+  nearMissThreshold: number;
   pendingFeeCount: number;
   pendingFeeTotal: number;
   pendingFeeNames: string[];
@@ -145,45 +149,47 @@ export default function RelatoriosClient({
       <div className="space-y-3">
         {cliff ? (
           <Card
-            icon="🕳️"
-            title="Buraco na tabela de preços"
-            summary={`Uma locação de ${fmtInt(cliff.cliffStartShots)} disparos paga ${formatCurrency(
-              cliff.cliffStartValue
-            )} — ${formatCurrency(cliff.dropAmount)} a menos que uma de ${fmtInt(cliff.peakShots)} disparos.`}
-            accent="pink"
+            icon="🎯"
+            title="Degrau de incentivo: rodar mais disparos sai mais barato"
+            summary={`${nearMissCount} ${
+              nearMissCount === 1 ? "locação do histórico ficou" : "locações do histórico ficaram"
+            } perto de ${fmtInt(cliff.peakShots)} disparos sem cruzar a linha — candidatas a um empurrãozinho na
+              próxima.`}
+            accent="teal"
           >
             <div className="space-y-2 text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
               <p>
-                Hoje a tabela cobra {formatCurrency(cliff.peakValue)} para {fmtInt(cliff.peakShots)} disparos (o topo
-                da faixa intermediária). Só mais um disparo — {fmtInt(cliff.cliffStartShots)} — já entra na faixa
-                seguinte, que aplica uma taxa menor sobre TODO o excedente, não apenas sobre o que passou do limite.
-                O valor cobrado despenca para {formatCurrency(cliff.cliffStartValue)}.
+                A tabela hoje cobra {formatCurrency(cliff.peakValue)} para {fmtInt(cliff.peakShots)} disparos (o topo
+                da faixa intermediária). A partir de {fmtInt(cliff.cliffStartShots)} disparos, a taxa menor passa a
+                valer sobre TODO o excedente, e o valor cai para {formatCurrency(cliff.cliffStartValue)} — uma
+                diferença de {formatCurrency(cliff.dropAmount)}. É esse degrau que dá ao cliente um motivo concreto
+                pra rodar mais um pouco em vez de parar perto do limite.
               </p>
               <p>
-                Isso vale pra qualquer locação entre {fmtInt(cliff.cliffStartShots)} e {fmtInt(cliff.deadZoneEndShots)}{" "}
-                disparos: todas pagam menos do que uma locação de {fmtInt(cliff.peakShots)} disparos, mesmo tendo
-                rodado mais.{" "}
+                {nearMissCount > 0
+                  ? `${nearMissCount} ${
+                      nearMissCount === 1 ? "locação" : "locações"
+                    } do seu histórico pararam entre ${fmtInt(nearMissThreshold)} e ${fmtInt(
+                      cliff.peakShots
+                    )} disparos — perto o bastante da linha pra valer avisar, na hora do atendimento, que rodar mais
+                    um pouco reduz o valor total.`
+                  : "Nenhuma locação do seu histórico parou perto da linha sem cruzar — sinal de que o degrau já está sendo bem aproveitado, ou de que ainda não surgiu a situação."}
+              </p>
+              <p>
                 {dealsInDeadZoneCount > 0
-                  ? `No seu histórico, ${dealsInDeadZoneCount} ${
-                      dealsInDeadZoneCount === 1 ? "locação caiu" : "locações caíram"
-                    } nessa faixa, somando ${formatCurrency(deadZoneTotal)} cobrados nelas.`
-                  : "Nenhuma locação do seu histórico caiu nessa faixa até agora — mas o risco fica pra próxima vez que alguém passar de " +
-                    fmtInt(cliff.peakShots) +
-                    " disparos."}
-              </p>
-              <p>
-                Sugestão: trocar o modelo de "faixa cheia" por um progressivo (cada faixa cobra só sobre o que excede
-                o limite anterior, como imposto de renda) elimina essa inversão sem mudar o preço de quem já está nas
-                pontas da tabela.
+                  ? `${dealsInDeadZoneCount} ${
+                      dealsInDeadZoneCount === 1 ? "locação já cruzou" : "locações já cruzaram"
+                    } a linha e aproveitou a taxa menor, somando ${formatCurrency(deadZoneTotal)} cobrados nelas.`
+                  : "Ainda nenhuma locação do histórico cruzou a linha pra aproveitar a taxa menor."}
               </p>
             </div>
           </Card>
         ) : (
           <Card
-            icon="✅"
-            title="Tabela de preços sem inversões"
-            summary="A configuração atual de preços não tem pontos em que disparar mais custa menos."
-            accent="teal"
+            icon="ℹ️"
+            title="Sem degrau de incentivo configurado"
+            summary="A configuração atual de preços não tem um ponto em que rodar mais disparos reduza o valor total."
+            accent="blue"
           />
         )}
 
@@ -200,145 +206,4 @@ export default function RelatoriosClient({
           accent="amber"
         >
           {pendingFeeNames.length > 0 && (
-            <div className="space-y-1">
-              {pendingFeeNames.map((name, i) => (
-                <p key={i} className="text-xs text-neutral-700 dark:text-neutral-300">
-                  · {name}
-                </p>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card
-          icon="⚠️"
-          title="Concentração de receita"
-          summary={
-            topClients.length > 0
-              ? `Os ${Math.min(3, topClients.length)} maiores clientes respondem por ${fmtPct(
-                  top3Share
-                )} de tudo que já entrou (${formatCurrency(totalRevenue)} no total).`
-              : "Ainda sem lançamentos de entrada suficientes para calcular."
-          }
-          accent="blue"
-        >
-          <div className="space-y-1.5">
-            {topClients.map((c, i) => (
-              <div key={i} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">
-                  {i + 1}. {c.name}
-                </span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                  {formatCurrency(c.total)} · {totalRevenue > 0 ? fmtPct(c.total / totalRevenue) : "0%"}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-            Quanto mais concentrado, maior o risco de um único cliente parar de fechar e derrubar o caixa do mês.
-          </p>
-        </Card>
-
-        <Card
-          icon="📍"
-          title="De onde vêm os clientes que fecham"
-          summary={
-            bestOrigem
-              ? `"${bestOrigem.origem}" converte melhor: ${fmtPct(bestOrigem.taxa)} dos leads viram cliente.`
-              : "Ainda sem dados de origem suficientes pra apontar um canal melhor que outro."
-          }
-          accent="teal"
-        >
-          <div className="space-y-1.5">
-            {origemBreakdown.map((o) => (
-              <div key={o.origem} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{o.origem}</span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                  {o.convertidos}/{o.total} · {fmtPct(o.taxa)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card
-          icon="🔁"
-          title="Onde as tentativas de contato perdem força"
-          summary={`${nutricaoCount} ${
-            nutricaoCount === 1 ? "cliente esfriou" : "clientes esfriaram"
-          } depois de esgotar as 5 tentativas de follow-up.`}
-          accent="amber"
-        >
-          <div className="space-y-1.5">
-            {followupBreakdown.map((f) => (
-              <div key={f.label} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{f.label}</span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">{f.count}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-            Se a contagem cai muito rápido de uma tentativa pra outra, vale mudar a abordagem (mensagem, canal ou
-            horário) antes de chegar lá, em vez de só repetir a mesma tentativa 5 vezes.
-          </p>
-        </Card>
-
-        <Card
-          icon="📅"
-          title="Dias da semana mais vazios"
-          summary={
-            emptiestWeekday
-              ? `${emptiestWeekday.label} é o dia com menos eventos agendados no histórico (${emptiestWeekday.count}).`
-              : "Ainda sem eventos suficientes pra um padrão confiável."
-          }
-          accent="blue"
-        >
-          <div className="space-y-1.5">
-            {weekdayBreakdown.map((w) => (
-              <div key={w.label} className="flex items-center gap-2 text-xs">
-                <span className="w-16 flex-shrink-0 text-neutral-600 dark:text-neutral-300">{w.label}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-                  <div
-                    className="h-full rounded-full bg-brand-blue"
-                    style={{ width: `${(w.count / maxWeekdayCount) * 100}%` }}
-                  />
-                </div>
-                <span className="w-6 flex-shrink-0 text-right text-neutral-400">{w.count}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-            Dia parado é agenda livre pra oferecer com desconto, promoção relâmpago, ou pra puxar os leads parados do
-            radar do Dashboard.
-          </p>
-        </Card>
-
-        <Card
-          icon="🧪"
-          title="De onde vem o dinheiro"
-          summary={
-            revenueMix[0]
-              ? `"${revenueMix[0].name}" é a maior fatia: ${fmtPct(revenueMix[0].share)} da receita.`
-              : "Ainda sem lançamentos suficientes pra calcular o mix."
-          }
-          accent="teal"
-        >
-          <div className="space-y-1.5">
-            {revenueMix.map((r) => (
-              <div key={r.name} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{r.name}</span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                  {formatCurrency(r.total)} · {fmtPct(r.share)}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-            Se quase tudo depende de uma única linha, vale pensar em diversificar (mentoria, novos serviços,
-            parcerias) pra não ficar refém de um único produto.
-          </p>
-        </Card>
-      </div>
-    </div>
-  );
-}
+            <div className="sp
