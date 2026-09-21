@@ -39,11 +39,26 @@ jobs:
           gzip "$FILENAME"
           echo "BACKUP_FILE=${FILENAME}.gz" >> "$GITHUB_ENV"
 
+      # Destino garantido do backup, sem depender de credencial externa
+      # nenhuma. O envio pro Google Drive continua logo abaixo, mas como
+      # passo opcional: se a autenticação do Google falhar, o backup do dia
+      # já está salvo aqui de qualquer jeito. Pra baixar, é só abrir a
+      # execução na aba Actions e clicar no arquivo em "Artifacts".
+      - name: Guarda o backup como artefato do GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Instala o rclone
+        continue-on-error: true
         run: |
           curl https://rclone.org/install.sh | sudo bash
 
       - name: Configura o rclone com login OAuth do Google Drive
+        continue-on-error: true
         # Contas de serviço não têm cota de armazenamento no Drive pessoal
         # (só funcionam com Shared Drives, que exigem Google Workspace).
         # Como essa é uma conta pessoal, autenticamos como o próprio usuário
@@ -72,13 +87,16 @@ jobs:
           EOF
 
       - name: Envia o backup para a pasta no Google Drive
+        continue-on-error: true
         run: |
           rclone copy "$BACKUP_FILE" gdrive: --drive-chunk-size 32M
 
       - name: Remove backups com mais de 30 dias (mantém o Drive organizado)
+        continue-on-error: true
         run: |
           rclone delete gdrive: --min-age 30d
 
       - name: Confirma o que ficou salvo
+        continue-on-error: true
         run: |
           rclone lsl gdrive:
