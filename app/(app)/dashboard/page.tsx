@@ -24,29 +24,39 @@ export default async function DashboardPage({
   const fromStr = from.toISOString().slice(0, 10);
   const toStr = to.toISOString().slice(0, 10);
 
-  // Todas as consultas abaixo filtram is_test = false: o Dashboard é
-  // tela de decisão, então registro de teste não entra em nenhum número.
-  // Eles continuam visíveis no Financeiro e na Agenda, com etiqueta.
+  // O Dashboard é tela de decisão, então registro de teste não entra em
+  // nenhum número. Onde a consulta lê de uma view _contabilizaveis, esse
+  // filtro já vem de dentro dela junto com a exclusão de locação
+  // cancelada, e por isso o .eq("is_test", false) não aparece; onde lê a
+  // tabela crua, o filtro continua explícito na consulta.
   // Lançamentos do período filtrado, para os cards de Entradas/Saídas/Resultado e os gráficos
   const { data: transactions } = await supabase
-    .from("transactions")
+    .from("transactions_contabilizaveis")
     .select("id, type, amount, date, category_id, categories(name)")
     .eq("scope", "harmonize")
-    .eq("is_test", false)
     .gte("date", fromStr)
     .lte("date", toStr);
 
   // Todos os lançamentos históricos, para o Saldo acumulado (não depende do filtro de período)
   const { data: allTimeTransactions } = await supabase
-    .from("transactions")
+    .from("transactions_contabilizaveis")
     .select("type, amount")
-    .eq("scope", "harmonize")
-    .eq("is_test", false);
+    .eq("scope", "harmonize");
 
   const { count: rentalsCount } = await supabase
     .from("rentals")
     .select("id", { count: "exact", head: true })
     .eq("is_test", false)
+    .gte("event_date", fromStr)
+    .lte("event_date", toStr);
+
+  // Divisor do ticket médio. Precisa sair da view, senão dividiríamos uma
+  // receita que já exclui cancelada por uma contagem que inclui, e o
+  // ticket sairia menor do que é de verdade. O card "Locações" acima
+  // continua mostrando rentalsCount, que é o total do período.
+  const { count: billableRentalsCount } = await supabase
+    .from("rentals_contabilizaveis")
+    .select("id", { count: "exact", head: true })
     .gte("event_date", fromStr)
     .lte("event_date", toStr);
 
@@ -78,10 +88,12 @@ export default async function DashboardPage({
   // acima — antes só existia na tela separada de Equipamentos; junto no
   // Dashboard porque é a primeira coisa que se quer ver ao abrir o app.
   const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
+  // Receita por equipamento sai da view: os contadores acima ficam na
+  // tabela rentals de propósito, porque contar cancelada é justamente o
+  // objetivo de um deles, mas somar dinheiro de cancelada não é.
   const { data: equipmentRentals } = await supabase
-    .from("rentals")
+    .from("rentals_contabilizaveis")
     .select("equipment_id, calculated_value")
-    .eq("is_test", false)
     .gte("event_date", fromStr)
     .lte("event_date", toStr);
 
@@ -182,7 +194,7 @@ export default async function DashboardPage({
     0
   );
 
-  const ticketMedio = rentalsCount && rentalsCount > 0 ? entradas / rentalsCount : 0;
+  const ticketMedio = billableRentalsCount && billableRentalsCount > 0 ? entradas / billableRentalsCount : 0;
 
   const cards = [
     { label: "Saldo", value: saldoTotal },
