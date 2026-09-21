@@ -50,6 +50,14 @@ interface EquipmentOption {
   name: string;
 }
 
+// Abre um link numa aba nova. Eram tags de link comuns antes, mas botão
+// evita o bloqueio de pop-up herdado, mantém o mesmo visual, e evita a
+// tag <a> ser corrompida numa aplicação manual via GitHub.
+function openInNewTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.href = url;
+}
+
 export default function ClienteDetailClient({
   client,
   rentals,
@@ -144,34 +152,31 @@ export default function ClienteDetailClient({
         {(client.whatsapp || client.address) && (
           <div className="col-span-2 flex gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:col-span-4">
             {buildWhatsAppLink(client.whatsapp) && (
-              <a
-                href={buildWhatsAppLink(client.whatsapp)!}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openInNewTab(buildWhatsAppLink(client.whatsapp)!)}
                 className="flex-1 rounded-lg bg-brand-teal/10 py-2 text-center text-xs font-medium text-brand-teal"
               >
                 Abrir WhatsApp
-              </a>
+              </button>
             )}
             {buildMapsLink(client.address) && (
-              <a
-                href={buildMapsLink(client.address)!}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openInNewTab(buildMapsLink(client.address)!)}
                 className="flex-1 rounded-lg bg-brand-blue/10 py-2 text-center text-xs font-medium text-brand-blue"
               >
                 Abrir no Maps
-              </a>
+              </button>
             )}
             {buildWazeLink(client.address) && (
-              <a
-                href={buildWazeLink(client.address)!}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openInNewTab(buildWazeLink(client.address)!)}
                 className="flex-1 rounded-lg bg-brand-lilac/10 py-2 text-center text-xs font-medium text-brand-lilac"
               >
                 Abrir no Waze
-              </a>
+              </button>
             )}
           </div>
         )}
@@ -324,6 +329,7 @@ export default function ClienteDetailClient({
           clientId={client.id}
           clientName={client.name}
           clientWhatsapp={client.whatsapp}
+          clientReservationFeeStatus={client.reservation_fee_status}
           equipments={equipments}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
