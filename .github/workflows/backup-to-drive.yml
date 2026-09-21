@@ -51,9 +51,15 @@ jobs:
         env:
           GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-          GDRIVE_OAUTH_TOKEN: ${{ secrets.GDRIVE_OAUTH_TOKEN }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: |
+          # Montamos o JSON do token aqui em vez de pedir pra colar ele
+          # pronto num secret: colar um bloco grande com chaves e aspas
+          # pelo celular corrompe fácil (um caractere a menos já quebra o
+          # refresh token). Colando só o refresh token puro, sem
+          # formatação nenhuma, é bem mais difícil de dar errado.
+          TOKEN_JSON=$(printf '{"access_token":"","token_type":"Bearer","refresh_token":"%s","expiry":"2020-01-01T00:00:00.000000000Z"}' "$GDRIVE_REFRESH_TOKEN")
           mkdir -p ~/.config/rclone
           cat > ~/.config/rclone/rclone.conf << EOF
           [gdrive]
@@ -61,7 +67,7 @@ jobs:
           scope = drive.file
           client_id = ${GDRIVE_CLIENT_ID}
           client_secret = ${GDRIVE_CLIENT_SECRET}
-          token = ${GDRIVE_OAUTH_TOKEN}
+          token = ${TOKEN_JSON}
           root_folder_id = ${DRIVE_FOLDER_ID}
           EOF
 
