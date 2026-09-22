@@ -39,6 +39,80 @@ jobs:
           # Por isso pedimos explicitamente a versão 17 do repositório pgdg.
           sudo apt-get install -y postgresql-client-17
 
+      # Sem esta etapa, um segredo errado só aparece como erro do pg_dump, que
+      # fala de socket e de autenticação em vez de falar do que está errado na
+      # string. Aqui a string é quebrada em pedaços e só as partes que NÃO são
+      # segredo são impressas. A senha nunca é impressa, nem inteira nem em
+      # parte, nem mesmo o tamanho dela.
+      - name: Confere a string de conexão antes de tentar o dump
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "ERRO: o segredo SUPABASE_DB_URL chegou vazio."
+            echo "Confira em Settings > Secrets and variables > Actions se ele"
+            echo "existe em Repository secrets com esse nome exato."
+            exit 1
+          fi
+
+          SEM_ESQUEMA="${DATABASE_URL#*://}"
+          # Corta no ÚLTIMO arroba, não no primeiro: senha pode conter arroba,
+          # e cortar no primeiro partiria a string no lugar errado.
+          USERINFO="${SEM_ESQUEMA%@*}"
+          DEPOIS_DO_ARROBA="${SEM_ESQUEMA##*@}"
+          USUARIO="${USERINFO%%:*}"
+          HOSTPORTA="${DEPOIS_DO_ARROBA%%/*}"
+          BANCO="${DEPOIS_DO_ARROBA#*/}"
+          HOST="${HOSTPORTA%%:*}"
+          PORTA="${HOSTPORTA##*:}"
+
+          echo "usuário: $USUARIO"
+          echo "host:    $HOST"
+          echo "porta:   $PORTA"
+          echo "banco:   ${BANCO%%\?*}"
+          echo ""
+
+          PROBLEMA=0
+
+          case "$HOST" in
+            *pooler.supabase.com)
+              # No pooler do Supabase o usuário carrega o código do projeto
+              # depois de um ponto, e é ele que diz pro pooler qual projeto
+              # atender. Vale conferir aqui porque a mensagem de erro do
+              # pooler não ajuda: ela diz "password authentication failed for
+              # user postgres" tanto quando a senha está errada quanto em
+              # outros casos, sempre citando o papel interno postgres, nunca o
+              # usuário que foi realmente enviado.
+              case "$USUARIO" in
+                postgres.?*) echo "ok: usuário tem o sufixo do projeto" ;;
+                *)
+                  echo "ERRO: o host é o pooler, mas o usuário é '$USUARIO'."
+                  echo "No pooler ele precisa ser 'postgres.CODIGO-DO-PROJETO'."
+                  echo "Pegue a string na aba Session pooler usando o botão de"
+                  echo "copiar, sem selecionar com o mouse nem digitar à mão."
+                  PROBLEMA=1
+                  ;;
+              esac
+              if [ "$PORTA" = "6543" ]; then
+                echo "ERRO: porta 6543 é a do Transaction pooler, que não serve"
+                echo "pro pg_dump. Use o Session pooler, na porta 5432."
+                PROBLEMA=1
+              fi
+              ;;
+            db.*.supabase.co)
+              echo "AVISO: esta é a conexão direta. Os servidores do GitHub só"
+              echo "falam IPv4 e a conexão direta costuma ser só IPv6. Se o"
+              echo "dump falhar por conexão ou DNS, troque pelo Session pooler."
+              ;;
+          esac
+
+          if [ "$PROBLEMA" -ne 0 ]; then
+            exit 1
+          fi
+          echo "String de conexão com formato válido."
+
       - name: Gera o dump completo do banco (formato SQL, compactado)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
