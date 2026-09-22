@@ -104,4 +104,4 @@ export default function Sidebar({
       </div>
     </aside>
   );
-}2
+}
