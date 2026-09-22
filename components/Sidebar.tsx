@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Package,
   BarChart3,
+  History,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -27,6 +28,9 @@ const NAV_ITEMS = [
   { href: "/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
+  // Histórico de movimentações: fica no módulo de configurações porque é
+  // ferramenta de controle, não de operação do dia a dia.
+  { href: "/movimentacoes", label: "Movimentações", icon: History, module: "configuracoes" },
   { href: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
 ];
 
@@ -100,4 +104,4 @@ export default function Sidebar({
       </div>
     </aside>
   );
-}
+}2
