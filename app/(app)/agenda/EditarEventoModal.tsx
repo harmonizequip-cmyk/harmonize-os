@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import ConfirmPinModal from "@/components/ConfirmPinModal";
+import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import FinalizarReservaModal from "./FinalizarReservaModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { formatDate } from "@/lib/format";
@@ -62,9 +62,8 @@ export default function EditarEventoModal({
   const [dateStart, setDateStart] = useState(event.date_start);
   const [notes, setNotes] = useState(event.notes ?? "");
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showDeletePin, setShowDeletePin] = useState(false);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   async function handleCancelReservation() {
     if (!window.confirm("Cancelar esta reserva? O equipamento fica livre nessa data de novo.")) return;
@@ -168,24 +167,6 @@ export default function EditarEventoModal({
       return;
     }
     onSaved();
-  }
-
-  async function handleDelete() {
-    setDeleting(true);
-    setError(null);
-    // Mesmo caso do Financeiro: se existir uma mentoria vinculada a este
-    // evento, o delete direto falha. delete_record_forever desfaz esse
-    // vínculo antes de apagar.
-    const { error } = await supabase.rpc("delete_record_forever", {
-      p_table: "calendar_events",
-      p_id: event.id,
-    });
-    setDeleting(false);
-    if (error) {
-      setError(error.message || "Não foi possível excluir. Tente novamente.");
-      return;
-    }
-    onDeleted();
   }
 
   if (isRentalEvent) {
@@ -299,23 +280,24 @@ export default function EditarEventoModal({
         </div>
 
         <button
-          onClick={() => setShowDeletePin(true)}
-          disabled={deleting}
-          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
+          onClick={() => setConfirmarExclusao(true)}
+          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
         >
-          {deleting ? "Excluindo..." : "Excluir evento"}
+          Excluir evento
         </button>
 
-        {showDeletePin && (
-          <ConfirmPinModal
-            title="Confirme com a senha para excluir"
-            confirmLabel="Excluir"
-            danger
-            onConfirm={() => {
-              setShowDeletePin(false);
-              handleDelete();
+        {/* Evento que pertence a uma locação faz a exclusão subir para a
+            locação inteira, com o lançamento financeiro junto. A prévia
+            avisa isso antes de confirmar. */}
+        {confirmarExclusao && (
+          <ConfirmarExclusaoModal
+            table="calendar_events"
+            id={event.id}
+            onCancel={() => setConfirmarExclusao(false)}
+            onDeleted={() => {
+              setConfirmarExclusao(false);
+              onDeleted();
             }}
-            onCancel={() => setShowDeletePin(false)}
           />
         )}
       </div>
