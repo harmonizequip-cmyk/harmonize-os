@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import ConfirmPinModal from "@/components/ConfirmPinModal";
+import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -59,9 +59,8 @@ export default function EditarLancamentoModal({
   const [paymentMethod, setPaymentMethod] = useState(transaction.payment_method);
   const [date, setDate] = useState(transaction.date);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showDeletePin, setShowDeletePin] = useState(false);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   const categoriasDoTipo = categories.filter((c) => c.type === type);
 
@@ -92,25 +91,6 @@ export default function EditarLancamentoModal({
       return;
     }
     onSaved();
-  }
-
-  async function handleDelete() {
-    setDeleting(true);
-    setError(null);
-    // Delete direto na tabela falha sempre que o lançamento veio de uma
-    // locação (rentals.transaction_id aponta pra ele, e o banco recusa
-    // apagar com esse vínculo em pé). delete_record_forever desfaz esse
-    // vínculo antes de apagar, então funciona pra qualquer lançamento.
-    const { error } = await supabase.rpc("delete_record_forever", {
-      p_table: "transactions",
-      p_id: transaction.id,
-    });
-    setDeleting(false);
-    if (error) {
-      setError(error.message || "Não foi possível excluir. Tente novamente.");
-      return;
-    }
-    onDeleted();
   }
 
   return (
@@ -200,60 +180,4 @@ export default function EditarLancamentoModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              {PAYMENT_METHODS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
-
-        <div className="mt-5 flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:hover:brightness-100"
-          >
-            {saving ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
-
-        <button
-          onClick={() => setShowDeletePin(true)}
-          disabled={deleting}
-          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
-        >
-          {deleting ? "Excluindo..." : "Excluir lançamento"}
-        </button>
-
-        {showDeletePin && (
-          <ConfirmPinModal
-            title="Confirme com a senha para excluir"
-            confirmLabel="Excluir"
-            danger
-            onConfirm={() => {
-              setShowDeletePin(false);
-              handleDelete();
-            }}
-            onCancel={() => setShowDeletePin(false)}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>w
