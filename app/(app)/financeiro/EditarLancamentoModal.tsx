@@ -180,4 +180,62 @@ export default function EditarLancamentoModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>w
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              {PAYMENT_METHODS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60 disabled:hover:brightness-100"
+          >
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+
+        <button
+          onClick={() => setConfirmarExclusao(true)}
+          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+        >
+          Excluir lançamento
+        </button>
+
+        {/* A confirmação chama preview_exclusao antes de apagar e mostra o
+            que sai junto. Lançamento que pertence a uma locação faz a
+            exclusão subir para a locação inteira, e o aviso diz isso na
+            tela antes de confirmar. */}
+        {confirmarExclusao && (
+          <ConfirmarExclusaoModal
+            table="transactions"
+            id={transaction.id}
+            onCancel={() => setConfirmarExclusao(false)}
+            onDeleted={() => {
+              setConfirmarExclusao(false);
+              onDeleted();
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
