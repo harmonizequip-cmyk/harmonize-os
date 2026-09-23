@@ -8,6 +8,7 @@ import { STAGES, type LeadRow, type TagOption } from "./FunilClient";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress, toUpperOrNull } from "@/lib/format";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import NovaTarefaModal from "./NovaTarefaModal";
+import AgendamentosDoCliente from "@/components/AgendamentosDoCliente";
 
 const QUICK_COLOR = "#3DBFB8";
 
@@ -253,6 +254,13 @@ export default function LeadCardModal({
             )}
           </div>
         )}
+
+        {/* Os botões de status de cada agendamento (confirmar, reagendar,
+            realizar, cancelar) vivem num componente próprio porque a mesma
+            lista precisa aparecer também na ficha completa do cliente. Cada
+            ação chama uma função do banco, que é quem valida conflito de
+            data e registra no histórico de movimentações. */}
+        <AgendamentosDoCliente clientId={lead.id} onChanged={() => router.refresh()} />
 
         <button
           type="button"
