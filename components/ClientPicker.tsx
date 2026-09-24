@@ -78,6 +78,7 @@ export default function ClientPicker({
         name: toUpperTrim(newName),
         whatsapp: newWhatsapp || null,
         stage: newStage,
+        is_client: newStage === "cliente",
       })
       .select("id, name")
       .single();
