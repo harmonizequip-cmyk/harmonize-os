@@ -26,11 +26,18 @@ import EditarEventoModal from "./EditarEventoModal";
 import ReservarHiproModal from "./ReservarHiproModal";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 
-const EVENT_META: Record<string, { label: string; dot: string }> = {
-  hipro_1: { label: "HIPRO 1", dot: "bg-brand-teal" },
-  hipro_2: { label: "HIPRO 2", dot: "bg-brand-blue" },
-  mentoria: { label: "Mentoria", dot: "bg-brand-lilac" },
-  outros: { label: "Outro", dot: "bg-brand-pink" },
+// `hex` é a mesma cor de `dot`, só que em valor puro — necessário porque o
+// indicador do dia no calendário (abaixo) usa conic-gradient via style
+// inline quando há mais de um tipo no mesmo dia, e isso não lê classes do
+// Tailwind. HIPRO 1/2 ficaram parecidos demais (teal e azul, os dois
+// "esverdeados"/claros); trocado o HIPRO 2 para rosa, que também liberou
+// o rosa que "Outro" usava antes — foi para o azul que sobrou do HIPRO 2.
+// Mentoria ganhou amarelo, uma cor que não existia ainda na paleta.
+const EVENT_META: Record<string, { label: string; dot: string; hex: string }> = {
+  hipro_1: { label: "HIPRO 1", dot: "bg-brand-teal", hex: "#3DBFB8" },
+  hipro_2: { label: "HIPRO 2", dot: "bg-brand-pink", hex: "#E8789A" },
+  mentoria: { label: "Mentoria", dot: "bg-yellow-400", hex: "#FACC15" },
+  outros: { label: "Outro", dot: "bg-brand-blue", hex: "#7EC8E3" },
 };
 
 const WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -71,11 +78,33 @@ interface EventRow {
 // mentoria usa a mesma cor/etiqueta do event_type 'mentoria' avulso,
 // mas sem perder qual equipamento é (o rótulo normal continua junto).
 function eventMeta(e: EventRow) {
-  const base = EVENT_META[e.event_type] ?? { label: e.event_type, dot: "bg-neutral-400" };
+  const base = EVENT_META[e.event_type] ?? { label: e.event_type, dot: "bg-neutral-400", hex: "#a3a3a3" };
   if (e.is_mentoria && (e.event_type === "hipro_1" || e.event_type === "hipro_2")) {
-    return { label: `${base.label} · Mentoria`, dot: EVENT_META.mentoria.dot };
+    return { label: `${base.label} · Mentoria`, dot: EVENT_META.mentoria.dot, hex: EVENT_META.mentoria.hex };
   }
   return base;
+}
+
+// Indicador de um dia no calendário: quando os eventos daquele dia são
+// todos do mesmo tipo, é só um pontinho sólido da cor de sempre. Quando há
+// mais de um tipo (ex: um HIPRO 1 e uma Mentoria no mesmo dia), o pontinho
+// vira um mini "pizza" dividido nas cores de cada tipo, cada fatia
+// proporcional a quantos eventos daquele tipo caem no dia (2 de um + 1 de
+// outro = 2/3 + 1/3, não simplesmente 50/50 entre tipos).
+function buildDayIndicator(events: EventRow[]): string {
+  const cores = events.map((e) => eventMeta(e).hex);
+  const unicas = Array.from(new Set(cores));
+  if (unicas.length <= 1) return unicas[0] ?? "transparent";
+  const contagem = new Map<string, number>();
+  for (const c of cores) contagem.set(c, (contagem.get(c) ?? 0) + 1);
+  let acumulado = 0;
+  const fatias = unicas.map((cor) => {
+    const grausFatia = (contagem.get(cor)! / cores.length) * 360;
+    const trecho = `${cor} ${acumulado}deg ${acumulado + grausFatia}deg`;
+    acumulado += grausFatia;
+    return trecho;
+  });
+  return `conic-gradient(${fatias.join(", ")})`;
 }
 
 interface ClientOption {
@@ -565,16 +594,10 @@ export default function AgendaClient({
               >
                 <span>{day.getDate()}</span>
                 {dayEvents.length > 0 && (
-                  <span className="mt-0.5 flex gap-0.5">
-                    {dayEvents.slice(0, 3).map((e, i) => (
-                      <span
-                        key={i}
-                        className={`h-1 w-1 rounded-full ${
-                          selected ? "bg-white" : eventMeta(e).dot
-                        }`}
-                      />
-                    ))}
-                  </span>
+                  <span
+                    className="mt-0.5 h-1.5 w-1.5 rounded-full"
+                    style={{ background: selected ? "#ffffff" : buildDayIndicator(dayEvents) }}
+                  />
                 )}
               </button>
             );
