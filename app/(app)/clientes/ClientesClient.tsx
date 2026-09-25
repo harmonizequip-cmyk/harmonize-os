@@ -14,7 +14,9 @@ interface ClientRow {
   whatsapp: string | null;
   city: string | null;
   address: string | null;
-  reservation_fee_status: string;
+  taxasPendentes: number;
+  taxasPagas: number;
+  valorPendente: number;
   data_evento: string | null;
   stats: { count: number; total: number; lastDate: string | null };
   nextEvent: { date_start: string; confirmed: boolean } | null;
@@ -47,11 +49,6 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
       .update({ confirmed: !currentEvent.confirmed })
       .eq("client_id", clientId)
       .eq("date_start", currentEvent.date_start);
-    router.refresh();
-  }
-
-  async function markFeePaid(clientId: string) {
-    await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", clientId);
     router.refresh();
   }
 
@@ -107,7 +104,7 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
               </div>
             </Link>
 
-            {(c.nextEvent || c.reservation_fee_status !== "nao_aplica") && (
+            {(c.nextEvent || c.taxasPendentes > 0 || c.taxasPagas > 0) && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {c.nextEvent && (
                   <button
@@ -121,17 +118,18 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
                     📅 {formatDate(c.nextEvent.date_start)} · {c.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
                   </button>
                 )}
-                {c.reservation_fee_status === "pendente" && (
-                  <button
-                    onClick={() => markFeePaid(c.id)}
-                    className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  >
-                    💳 Taxa pendente
-                  </button>
+                {/* Etiqueta, não botão: com várias datas reservadas,
+                    "marcar paga" daqui não diria qual delas. Os botões por
+                    agendamento ficam na ficha do cliente. */}
+                {c.taxasPendentes > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    💳 {c.taxasPendentes === 1 ? "Taxa pendente" : `${c.taxasPendentes} taxas pendentes`}
+                    {c.valorPendente > 0 ? ` · ${formatCurrency(c.valorPendente)}` : ""}
+                  </span>
                 )}
-                {c.reservation_fee_status === "pago" && (
+                {c.taxasPendentes === 0 && c.taxasPagas > 0 && (
                   <span className="rounded-full bg-brand-teal/10 px-2 py-1 text-[11px] font-medium text-brand-teal">
-                    💳 Taxa paga
+                    💳 {c.taxasPagas === 1 ? "Taxa paga" : `${c.taxasPagas} taxas pagas`}
                   </span>
                 )}
               </div>

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { hojeLocal } from "@/lib/period";
 import ClientesClient from "./ClientesClient";
 
 export default async function ClientesPage() {
@@ -6,7 +7,7 @@ export default async function ClientesPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, clinic_name, whatsapp, city, address, reservation_fee_status, data_evento")
+    .select("id, name, clinic_name, whatsapp, city, address, data_evento")
     .eq("stage", "cliente")
     .order("name");
 
@@ -17,7 +18,9 @@ export default async function ClientesPage() {
     .from("rentals_contabilizaveis")
     .select("client_id, calculated_value, event_date");
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // hojeLocal em vez de toISOString: o segundo devolve a data em UTC, e
+  // à noite fazia o "próximo evento" pular o dia seguinte.
+  const todayStr = hojeLocal();
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
     .select("client_id, date_start, confirmed")
@@ -43,11 +46,24 @@ export default async function ClientesPage() {
     }
   }
 
-  const clientsWithStats = (clients ?? []).map((c) => ({
-    ...c,
-    stats: statsByClient.get(c.id) ?? { count: 0, total: 0, lastDate: null },
-    nextEvent: nextEventByClient.get(c.id) ?? null,
-  }));
+  // A taxa vem dos agendamentos, não do cliente: quem reserva cinco
+  // datas deve cinco taxas, e o campo antigo guardava uma só.
+  const { data: taxas } = await supabase
+    .from("clientes_taxas")
+    .select("client_id, taxas_pendentes, taxas_pagas, valor_pendente");
+  const taxaPorCliente = new Map((taxas ?? []).map((t: any) => [t.client_id, t]));
+
+  const clientsWithStats = (clients ?? []).map((c) => {
+    const t: any = taxaPorCliente.get(c.id);
+    return {
+      ...c,
+      stats: statsByClient.get(c.id) ?? { count: 0, total: 0, lastDate: null },
+      nextEvent: nextEventByClient.get(c.id) ?? null,
+      taxasPendentes: Number(t?.taxas_pendentes ?? 0),
+      taxasPagas: Number(t?.taxas_pagas ?? 0),
+      valorPendente: Number(t?.valor_pendente ?? 0),
+    };
+  });
 
   return <ClientesClient initialClients={clientsWithStats} />;
 }
