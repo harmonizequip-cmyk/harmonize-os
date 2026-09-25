@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calculateRentalValue, type PricingConfig } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -42,12 +43,20 @@ export default function EditarLocacaoModal({
   rental,
   equipments,
   pricingConfig,
+  currentClientId,
+  currentClientName,
   onClose,
   onSaved,
 }: {
   rental: RentalToEdit;
   equipments: EquipmentOption[];
   pricingConfig?: PricingConfig;
+  // Leva P.2: cliente atual desta locação (a página de onde o modal é
+  // aberto é sempre a ficha de UM cliente, então não vem em `rental`).
+  // Junto com a lista buscada abaixo, dá pra trocar o cliente quando a
+  // locação foi lançada na pessoa errada.
+  currentClientId: string;
+  currentClientName: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -61,6 +70,25 @@ export default function EditarLocacaoModal({
   const [notes, setNotes] = useState(rental.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ------------------------------------------------------------
+  // Cliente (leva P.2): corrige quando a locação foi lançada na pessoa
+  // errada. Busca a lista de clientes só quando o modal abre (a página
+  // de origem não carrega essa lista, já que normalmente é fixa em um
+  // cliente só).
+  // ------------------------------------------------------------
+  const [clientId, setClientId] = useState(currentClientId);
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>([{ id: currentClientId, name: currentClientName }]);
+  useEffect(() => {
+    supabase
+      .from("clients")
+      .select("id, name")
+      .order("name")
+      .then(({ data }) => {
+        if (data && data.length > 0) setClientOptions(data);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const shotsNumber = Number(shots.replace(/\D/g, ""));
 
@@ -79,6 +107,10 @@ export default function EditarLocacaoModal({
 
   async function handleSave() {
     const valorNumber = Number(valor.replace(",", "."));
+    if (!clientId) {
+      setError("Selecione o cliente.");
+      return;
+    }
     if (!equipmentId || !eventDate || !shotsNumber || !valorNumber) {
       setError("Preencha equipamento, data, disparos e valor.");
       return;
@@ -86,6 +118,21 @@ export default function EditarLocacaoModal({
     if (!window.confirm("Salvar essas alterações na locação?")) return;
     setSaving(true);
     setError(null);
+
+    // Cliente trocado primeiro (leva P.2): se falhar, não chega a mexer
+    // no resto — evita salvar equipamento/data/valor novos numa locação
+    // que ficou com o cliente errado por causa de um erro no meio.
+    if (clientId !== currentClientId) {
+      const { error: transferError } = await supabase.rpc("transferir_cliente_locacao", {
+        p_rental_id: rental.id,
+        p_novo_client_id: clientId,
+      });
+      if (transferError) {
+        setSaving(false);
+        setError("Não foi possível trocar o cliente desta locação. Tente novamente.");
+        return;
+      }
+    }
 
     const { error: rpcError } = await supabase.rpc("update_rental", {
       p_rental_id: rental.id,
@@ -120,6 +167,15 @@ export default function EditarLocacaoModal({
         <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar locação</h2>
 
         <div className="space-y-3">
+          <div>
+            <ClientPicker clients={clientOptions} value={clientId} onChange={setClientId} onClientCreated={(c) => setClientOptions((prev) => [...prev, c])} />
+            {clientId !== currentClientId && (
+              <p className="mt-1 text-xs text-amber-600">
+                ⚠️ Isso muda o cliente desta locação — o financeiro e o evento na Agenda ligados a ela mudam junto.
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Equipamento</label>
             <select
