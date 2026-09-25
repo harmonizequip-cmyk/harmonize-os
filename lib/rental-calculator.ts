@@ -301,3 +301,12 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
   linhas.push("━━━━━━━━━━━━━━━━━━━━━");
 
   return linhas.join("\
+linhas.push("");
+  linhas.push(`📅 Data: ${fmtDate(input.eventDate)}`);
+  linhas.push(`🏥 ${input.isMentoria ? "Cliente/mentorando" : "Cliente"}: ${input.clientName}`);
+  linhas.push("━━━━━━━━━━━━━━━━━━━━━");
+
+  return linhas.join("\n");
+}
+
+export { RESERVATION_FEE };
