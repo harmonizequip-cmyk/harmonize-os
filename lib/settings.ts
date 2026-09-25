@@ -1,16 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_PRICING, RESERVATION_FEE, type PricingConfig } from "./rental-pricing";
+import {
+  DEFAULT_PRICING,
+  RESERVATION_FEE,
+  DEFAULT_MENTORIA_PRICING,
+  type PricingConfig,
+  type MentoriaPricingConfig,
+} from "./rental-pricing";
 
 export interface AppSettings {
   pricing: PricingConfig;
   reservationFee: number;
   inactiveDaysThreshold: number;
+  mentoriaPricing: MentoriaPricingConfig;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   pricing: DEFAULT_PRICING,
   reservationFee: RESERVATION_FEE,
   inactiveDaysThreshold: 60,
+  mentoriaPricing: DEFAULT_MENTORIA_PRICING,
 };
 
 /**
@@ -25,7 +33,7 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
   const { data, error } = await supabase
     .from("settings")
     .select(
-      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold"
+      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado"
     )
     .eq("id", true)
     .single();
@@ -45,5 +53,9 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
     },
     reservationFee: Number(data.reservation_fee),
     inactiveDaysThreshold: data.inactive_days_threshold,
+    mentoriaPricing: {
+      valorAvista: Number(data.mentoria_valor_avista),
+      valorParcelado: Number(data.mentoria_valor_parcelado),
+    },
   };
 }
