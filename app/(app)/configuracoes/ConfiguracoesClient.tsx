@@ -47,6 +47,8 @@ export default function ConfiguracoesClient({
   const [tier3Rate, setTier3Rate] = useState(String(initialSettings.pricing.tier3Rate));
   const [reservationFee, setReservationFee] = useState(String(initialSettings.reservationFee));
   const [inactiveDays, setInactiveDays] = useState(String(initialSettings.inactiveDaysThreshold));
+  const [mentoriaValorAvista, setMentoriaValorAvista] = useState(String(initialSettings.mentoriaPricing.valorAvista));
+  const [mentoriaValorParcelado, setMentoriaValorParcelado] = useState(String(initialSettings.mentoriaPricing.valorParcelado));
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -70,6 +72,8 @@ export default function ConfiguracoesClient({
       tier3_rate: n(tier3Rate),
       reservation_fee: n(reservationFee),
       inactive_days_threshold: Math.round(n(inactiveDays)),
+      mentoria_valor_avista: n(mentoriaValorAvista),
+      mentoria_valor_parcelado: n(mentoriaValorParcelado),
     };
 
     if (Object.values(payload).some((v) => !Number.isFinite(v) || v < 0)) {
@@ -226,6 +230,35 @@ export default function ConfiguracoesClient({
         <p className="mt-3 text-xs text-neutral-400">
           Prévia: {formatCurrency(n(flatPackageValue) || 0)} até {flatPackageLimit || 0} disparos.
         </p>
+
+        <h2 className="mb-1 mt-6 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Preço da mentoria</h2>
+        <p className="mb-4 text-xs text-neutral-400">
+          Por paciente modelo. Pagamento em crédito usa o valor parcelado; qualquer outra forma usa o valor à vista.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Valor à vista por paciente (R$)
+            </label>
+            <input
+              inputMode="decimal"
+              value={mentoriaValorAvista}
+              onChange={(e) => setMentoriaValorAvista(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Valor parcelado no crédito por paciente (R$)
+            </label>
+            <input
+              inputMode="decimal"
+              value={mentoriaValorParcelado}
+              onChange={(e) => setMentoriaValorParcelado(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+          </div>
+        </div>
 
         <h2 className="mb-1 mt-6 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Cliente inativo</h2>
         <p className="mb-2 text-xs text-neutral-400">Dias sem locação para o cliente ganhar a badge "Inativo" na lista.</p>
