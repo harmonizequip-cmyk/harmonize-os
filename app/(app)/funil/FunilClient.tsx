@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { exportarCsv } from "@/lib/exportar-csv";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
+import { ORIGENS } from "./NovoLeadModal";
 import {
   DndContext,
   DragOverlay,
@@ -84,6 +86,7 @@ export default function FunilClient({
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [origemFilter, setOrigemFilter] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
   const [confirmAlertOpen, setConfirmAlertOpen] = useState(false);
@@ -162,14 +165,39 @@ export default function FunilClient({
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
 
+  // Sem filtro de período de propósito: o funil mostra quem está em
+  // negociação agora, e "quando o lead entrou" não é motivo para ele sumir
+  // do quadro — é o mesmo raciocínio da tela de Clientes (uma vez no
+  // funil, continua visível até sair dele). Os filtros aqui são todos por
+  // característica do lead (busca, tag, origem), nunca por data.
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
     return leads.filter(
       (c) =>
         (c.name.toLowerCase().includes(term) || (c.city ?? "").toLowerCase().includes(term)) &&
-        (!tagFilter || c.tags.some((t) => t.id === tagFilter))
+        (!tagFilter || c.tags.some((t) => t.id === tagFilter)) &&
+        (!origemFilter || c.origem === origemFilter)
     );
-  }, [leads, search, tagFilter]);
+  }, [leads, search, tagFilter, origemFilter]);
+
+  const origemLabel = (valor: string | null) => ORIGENS.find((o) => o.value === valor)?.label ?? valor ?? "";
+
+  function baixarCsv() {
+    exportarCsv(
+      filtered,
+      [
+        { titulo: "Nome", valor: (c) => c.name },
+        { titulo: "Cidade", valor: (c) => c.city ?? "" },
+        { titulo: "Etapa", valor: (c) => STAGES.find((s) => s.key === c.stage)?.label ?? c.stage },
+        { titulo: "Origem", valor: (c) => origemLabel(c.origem) },
+        { titulo: "Tags", valor: (c) => c.tags.map((t) => t.name).join(", ") },
+        { titulo: "Próximo evento", valor: (c) => (c.nextEvent ? formatDate(c.nextEvent.date_start) : "") },
+        { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes },
+        { titulo: "Em aberto", valor: (c) => c.valorPendente },
+      ],
+      "funil"
+    );
+  }
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
@@ -384,12 +412,34 @@ export default function FunilClient({
           porque a div toda vira "display: none" a partir do md:). */}
       <div style={{ height: alertsHeight }} className="md:hidden" aria-hidden="true" />
 
-      <input
-        placeholder="Buscar por nome ou cidade..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          placeholder="Buscar por nome ou cidade..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+        />
+        <select
+          value={origemFilter ?? ""}
+          onChange={(e) => setOrigemFilter(e.target.value || null)}
+          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+        >
+          <option value="">Todas as origens</option>
+          {ORIGENS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={baixarCsv}
+          disabled={filtered.length === 0}
+          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+        >
+          Exportar CSV
+        </button>
+      </div>
 
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -408,6 +458,12 @@ export default function FunilClient({
             </button>
           ))}
         </div>
+      )}
+
+      {(search.trim() || tagFilter || origemFilter) && (
+        <p className="text-xs text-neutral-400">
+          Mostrando {filtered.length} de {leads.length} leads com esse filtro.
+        </p>
       )}
 
       <p className="text-xs text-neutral-400">

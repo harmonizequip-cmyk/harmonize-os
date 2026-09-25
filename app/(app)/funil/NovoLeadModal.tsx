@@ -4,7 +4,9 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
-const ORIGENS = [
+// Exportado para o filtro do Funil usar a mesma lista, em vez de duplicar
+// os valores em outro arquivo.
+export const ORIGENS = [
   { value: "indicacao", label: "Indicação" },
   { value: "instagram", label: "Instagram" },
   { value: "whatsapp", label: "WhatsApp" },
