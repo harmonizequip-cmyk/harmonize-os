@@ -56,6 +56,12 @@ export interface PagamentoLinha {
   valor: number;
   // Só relevante quando forma === "pix".
   pixConta: PixContaValue | "";
+  // Data em que o pagamento entrou de fato (PIX caiu, cartão passou,
+  // dinheiro foi recebido) — independente da data do HIPRO/evento
+  // (rentals.event_date). Nasce com a data de hoje (mesma regra do
+  // default do banco em registrar_pagamento_locacao), mas é editável:
+  // um pagamento pode chegar dias antes ou depois do evento.
+  data: string;
 }
 
 function round2(value: number): number {
