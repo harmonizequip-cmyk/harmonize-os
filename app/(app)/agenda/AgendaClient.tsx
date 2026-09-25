@@ -18,6 +18,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
+import { exportarCsv } from "@/lib/exportar-csv";
 import type { PricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
@@ -109,6 +110,12 @@ export default function AgendaClient({
   const [confirmingEvent, setConfirmingEvent] = useState<EventRow | null>(null);
   const [confirmationMessage, setConfirmationMessage] = useState("");
   const [eventSearch, setEventSearch] = useState("");
+  // Aqui o "período" já é o mês que a pessoa está olhando no calendário —
+  // trocar de mês É o filtro de período desta tela, então não faz sentido
+  // duplicar isso com um segundo seletor. O que faltava eram os filtros
+  // por categoria, e são esses dois que entram agora.
+  const [tipoFiltro, setTipoFiltro] = useState<string | null>(null);
+  const [confirmadoFiltro, setConfirmadoFiltro] = useState<"todos" | "sim" | "nao">("todos");
 
   // Chegando aqui pela busca global (ver components/GlobalSearch.tsx), o
   // evento achado vem com a data em ?date= — pula direto pro mês/dia certo
@@ -120,13 +127,36 @@ export default function AgendaClient({
     setSelectedDate(dateParam);
   }, [searchParams]);
 
+  // Tipos que realmente existem nos eventos carregados, não uma lista fixa
+  // — assim, se um equipamento novo entrar, o filtro já aparece sozinho.
+  const tiposDisponiveis = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const e of initialEvents) {
+      if (!vistos.has(e.event_type)) {
+        vistos.set(e.event_type, EVENT_META[e.event_type]?.label ?? e.event_type);
+      }
+    }
+    return Array.from(vistos.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [initialEvents]);
+
+  const eventosFiltrados = useMemo(() => {
+    return initialEvents.filter((e) => {
+      if (tipoFiltro && e.event_type !== tipoFiltro) return false;
+      if (confirmadoFiltro === "sim" && !e.confirmed) return false;
+      if (confirmadoFiltro === "nao" && e.confirmed) return false;
+      return true;
+    });
+  }, [initialEvents, tipoFiltro, confirmadoFiltro]);
+
+  const filtroAtivo = tipoFiltro !== null || confirmadoFiltro !== "todos";
+
   const eventSearchTerm = eventSearch.trim().toLowerCase();
   const eventMatches = useMemo(() => {
     if (!eventSearchTerm) return [];
-    return initialEvents
+    return eventosFiltrados
       .filter((e) => e.title.toLowerCase().includes(eventSearchTerm) || (e.clients?.name ?? "").toLowerCase().includes(eventSearchTerm))
       .slice(0, 8);
-  }, [initialEvents, eventSearchTerm]);
+  }, [eventosFiltrados, eventSearchTerm]);
 
   function goToEvent(e: EventRow) {
     setCurrentMonth(startOfMonth(parseDate(e.date_start)));
@@ -136,23 +166,62 @@ export default function AgendaClient({
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRow[]>();
-    for (const e of initialEvents) {
+    for (const e of eventosFiltrados) {
       const list = map.get(e.date_start) ?? [];
       list.push(e);
       map.set(e.date_start, list);
     }
     return map;
-  }, [initialEvents]);
+  }, [eventosFiltrados]);
 
   const needsConfirmation = useMemo(() => {
     const today = parseDate(toDateKey(new Date()));
     const in7 = new Date(today);
     in7.setDate(in7.getDate() + 7);
-    return initialEvents.filter((e) => {
+    return eventosFiltrados.filter((e) => {
       const d = parseDate(e.date_start);
       return !e.confirmed && d >= today && d <= in7;
     });
-  }, [initialEvents]);
+  }, [eventosFiltrados]);
+
+  // Resumo do mês aberto no calendário, já com os filtros aplicados — é o
+  // "total" desta tela. Não soma o histórico inteiro de propósito: quem
+  // está olhando outubro quer saber quanto tem outubro, não o ano todo.
+  const resumoMes = useMemo(() => {
+    const inicio = startOfMonth(currentMonth);
+    const fim = endOfMonth(currentMonth);
+    const doMes = eventosFiltrados.filter((e) => {
+      const d = parseDate(e.date_start);
+      return d >= inicio && d <= fim;
+    });
+    const porTipo = new Map<string, number>();
+    for (const e of doMes) {
+      porTipo.set(e.event_type, (porTipo.get(e.event_type) ?? 0) + 1);
+    }
+    return {
+      total: doMes.length,
+      eventos: doMes,
+      porTipo: Array.from(porTipo.entries())
+        .map(([tipo, qtd]) => ({ tipo, label: EVENT_META[tipo]?.label ?? tipo, qtd }))
+        .sort((a, b) => b.qtd - a.qtd),
+    };
+  }, [eventosFiltrados, currentMonth]);
+
+  function baixarCsv() {
+    exportarCsv(
+      resumoMes.eventos,
+      [
+        { titulo: "Data", valor: (e) => formatDate(e.date_start) },
+        { titulo: "Título", valor: (e) => e.title },
+        { titulo: "Tipo", valor: (e) => EVENT_META[e.event_type]?.label ?? e.event_type },
+        { titulo: "Cliente", valor: (e) => e.clients?.name ?? "" },
+        { titulo: "Confirmado", valor: (e) => (e.confirmed ? "Sim" : "Não") },
+        { titulo: "Valor", valor: (e) => e.value ?? "" },
+      ],
+      "agenda",
+      format(currentMonth, "MMMM_yyyy", { locale: ptBR })
+    );
+  }
 
   const gridDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
@@ -273,6 +342,58 @@ export default function AgendaClient({
           </div>
         )}
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={tipoFiltro ?? ""}
+          onChange={(e) => setTipoFiltro(e.target.value || null)}
+          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+        >
+          <option value="">Todos os tipos</option>
+          {tiposDisponiveis.map(([tipo, label]) => (
+            <option key={tipo} value={tipo}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={confirmadoFiltro}
+          onChange={(e) => setConfirmadoFiltro(e.target.value as "todos" | "sim" | "nao")}
+          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+        >
+          <option value="todos">Confirmado e não confirmado</option>
+          <option value="sim">Só confirmados</option>
+          <option value="nao">Só não confirmados</option>
+        </select>
+        {filtroAtivo && (
+          <button
+            type="button"
+            onClick={() => {
+              setTipoFiltro(null);
+              setConfirmadoFiltro("todos");
+            }}
+            className="text-xs text-neutral-400 underline underline-offset-2"
+          >
+            Limpar filtros
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={baixarCsv}
+          disabled={resumoMes.total === 0}
+          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+        >
+          Exportar CSV do mês
+        </button>
+      </div>
+
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        {resumoMes.total === 0
+          ? `Nenhum evento em ${format(currentMonth, "MMMM", { locale: ptBR })}${filtroAtivo ? " com esse filtro" : ""}.`
+          : `${resumoMes.total} ${resumoMes.total === 1 ? "evento" : "eventos"} em ${format(currentMonth, "MMMM", {
+              locale: ptBR,
+            })}${filtroAtivo ? " (filtrado)" : ""}: ${resumoMes.porTipo.map((t) => `${t.label} ${t.qtd}`).join(" · ")}`}
+      </p>
 
       {needsConfirmation.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
