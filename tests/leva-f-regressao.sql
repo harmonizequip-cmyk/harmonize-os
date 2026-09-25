@@ -327,5 +327,6 @@ end $$;
 
 rollback;
 
+-- rollback de propósito: este script só verifica comportamento, não
 -- deve deixar dado de teste no banco (nem em ambiente local nem, por
 -- engano, se alguém apontar isso para outro banco).
