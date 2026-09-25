@@ -2,11 +2,22 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { calculateRentalValue, RESERVATION_FEE, type PricingConfig } from "@/lib/rental-pricing";
+import {
+  calculateRentalValue,
+  calculateMentoriaValue,
+  RESERVATION_FEE,
+  DEFAULT_MENTORIA_PRICING,
+  type PricingConfig,
+  type MentoriaPricingConfig,
+  type RentalPricingBreakdown,
+  type MentoriaPricingBreakdown,
+} from "@/lib/rental-pricing";
 import {
   buildWhatsAppSummary,
+  buildMentoriaWhatsAppSummary,
   buildWhatsAppLink,
   calculateTotals,
+  calculateMentoriaTotals,
   type ReservationFeeStatus,
 } from "@/lib/rental-summary";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -43,19 +54,27 @@ function openInNewTab(url: string) {
 
 export default function FinalizarReservaModal({
   reservation,
+  isMentoria,
   pricingConfig,
   reservationFee,
+  mentoriaPricing,
   onClose,
   onFinalized,
 }: {
   reservation: ReservationToFinalize;
+  // Reserva de HIPRO marcada como mentoria (leva K): troca a contagem de
+  // disparos por quantidade de pacientes modelo e cobra pela tabela de
+  // mentoria (leva M/N) em vez da tabela de disparos.
+  isMentoria?: boolean;
   pricingConfig?: PricingConfig;
   reservationFee?: number;
+  mentoriaPricing?: MentoriaPricingConfig;
   onClose: () => void;
   onFinalized: () => void;
 }) {
   const supabase = createClient();
   const fee = reservationFee ?? RESERVATION_FEE;
+  const mentoriaPricingResolved = mentoriaPricing ?? DEFAULT_MENTORIA_PRICING;
   // taxa_status é a fonte da verdade deste agendamento específico, não um
   // campo do cliente. "paga" só é possível se alguém já marcou como paga
   // pela ficha do cliente antes de finalizar — nesse caso o valor já virou
@@ -65,6 +84,10 @@ export default function FinalizarReservaModal({
 
   const [initialCount, setInitialCount] = useState("");
   const [finalCount, setFinalCount] = useState("");
+  // Só usado quando isMentoria: substitui a contagem de disparos, que não
+  // existe em mentoria. Começa em "1" porque é o caso mais comum
+  // ("normalmente é 1 quando se faz individual"); já aconteceu até 3.
+  const [patientCount, setPatientCount] = useState("1");
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [notes, setNotes] = useState("");
 
@@ -96,16 +119,25 @@ export default function FinalizarReservaModal({
   const initialNumber = Number(initialCount.replace(/\D/g, ""));
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
   const shots = finalCount && initialCount ? finalNumber - initialNumber : 0;
+  const patientCountNumber = Number(patientCount.replace(/\D/g, "")) || 0;
   const additionalNumber = Number(additionalValue.replace(",", ".")) || 0;
 
   const pricing = useMemo(() => {
+    if (isMentoria) {
+      if (!patientCountNumber || patientCountNumber <= 0) return null;
+      try {
+        return calculateMentoriaValue(patientCountNumber, paymentMethod, mentoriaPricingResolved);
+      } catch {
+        return null;
+      }
+    }
     if (!shots || shots <= 0) return null;
     try {
       return calculateRentalValue(shots, pricingConfig);
     } catch {
       return null;
     }
-  }, [shots, pricingConfig]);
+  }, [isMentoria, patientCountNumber, paymentMethod, mentoriaPricingResolved, shots, pricingConfig]);
 
   // Em modo percentual, discountValue guarda o número da porcentagem
   // (ex: "10"), não reais. discountNumber é sempre o valor final em
@@ -128,10 +160,24 @@ export default function FinalizarReservaModal({
 
   const totals = useMemo(() => {
     if (!pricing) return null;
+    if (isMentoria) {
+      return calculateMentoriaTotals({
+        pricing: pricing as MentoriaPricingBreakdown,
+        additionalChargeValue: additionalNumber,
+        additionalChargeDescription: additionalDescription,
+        discountValue: discountNumber,
+        discountDescription: effectiveDiscountDescription,
+        reservationFeeStatus,
+        eventDate: reservation.eventDate,
+        clientName: reservation.clientName,
+        paymentMethod,
+        reservationFee: fee,
+      });
+    }
     return calculateTotals({
       initialCount: initialNumber,
       finalCount: finalNumber,
-      pricing,
+      pricing: pricing as RentalPricingBreakdown,
       additionalChargeValue: additionalNumber,
       additionalChargeDescription: additionalDescription,
       discountValue: discountNumber,
@@ -142,22 +188,32 @@ export default function FinalizarReservaModal({
       paymentMethod,
       reservationFee: fee,
     });
-  }, [pricing, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, paymentMethod, reservation.eventDate, reservation.clientName, fee]);
+  }, [pricing, isMentoria, initialNumber, finalNumber, additionalNumber, additionalDescription, discountNumber, effectiveDiscountDescription, reservationFeeStatus, paymentMethod, reservation.eventDate, reservation.clientName, fee]);
 
   async function handleSave() {
-    if (!initialCount || !finalCount) {
-      setError("Preencha a contagem inicial e final do equipamento.");
-      return;
-    }
-    if (finalNumber <= initialNumber) {
-      setError("A contagem final precisa ser maior que a inicial.");
-      return;
+    if (isMentoria) {
+      if (!patientCount || patientCountNumber <= 0) {
+        setError("Informe a quantidade de pacientes modelo.");
+        return;
+      }
+    } else {
+      if (!initialCount || !finalCount) {
+        setError("Preencha a contagem inicial e final do equipamento.");
+        return;
+      }
+      if (finalNumber <= initialNumber) {
+        setError("A contagem final precisa ser maior que a inicial.");
+        return;
+      }
     }
     if (!pricing || !totals) {
-      setError("Não foi possível calcular o valor. Confira as contagens.");
+      setError(isMentoria ? "Não foi possível calcular o valor. Confira a quantidade de pacientes modelo." : "Não foi possível calcular o valor. Confira as contagens.");
       return;
     }
-    if (!window.confirm("Finalizar esta reserva com essa contagem de disparos? Isso cria a locação e o lançamento financeiro.")) return;
+    const confirmMessage = isMentoria
+      ? `Finalizar esta mentoria com ${patientCountNumber} paciente(s) modelo? Isso cria a locação e o lançamento financeiro.`
+      : "Finalizar esta reserva com essa contagem de disparos? Isso cria a locação e o lançamento financeiro.";
+    if (!window.confirm(confirmMessage)) return;
 
     setSaving(true);
     setError(null);
@@ -165,7 +221,10 @@ export default function FinalizarReservaModal({
 
     const { error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
       p_calendar_event_id: reservation.id,
-      p_shots: shots,
+      // Fora de mentoria, quantidade de disparos; em mentoria, quantidade
+      // de pacientes modelo — os dois usam a mesma coluna rentals.shots
+      // (leva N), só o significado muda conforme is_mentoria.
+      p_shots: isMentoria ? patientCountNumber : shots,
       p_calculated_value: totals.rentalTransactionAmount,
       p_payment_method: paymentMethod,
       p_notes: notes || null,
@@ -198,20 +257,33 @@ export default function FinalizarReservaModal({
 
     setSaving(false);
     setSummary(
-      buildWhatsAppSummary({
-        initialCount: initialNumber,
-        finalCount: finalNumber,
-        pricing,
-        additionalChargeValue: additionalNumber,
-        additionalChargeDescription: additionalDescription,
-        discountValue: discountNumber,
-        discountDescription: effectiveDiscountDescription,
-        reservationFeeStatus,
-        eventDate: reservation.eventDate,
-        clientName: reservation.clientName,
-        paymentMethod,
-        reservationFee: fee,
-      })
+      isMentoria
+        ? buildMentoriaWhatsAppSummary({
+            pricing: pricing as MentoriaPricingBreakdown,
+            additionalChargeValue: additionalNumber,
+            additionalChargeDescription: additionalDescription,
+            discountValue: discountNumber,
+            discountDescription: effectiveDiscountDescription,
+            reservationFeeStatus,
+            eventDate: reservation.eventDate,
+            clientName: reservation.clientName,
+            paymentMethod,
+            reservationFee: fee,
+          })
+        : buildWhatsAppSummary({
+            initialCount: initialNumber,
+            finalCount: finalNumber,
+            pricing: pricing as RentalPricingBreakdown,
+            additionalChargeValue: additionalNumber,
+            additionalChargeDescription: additionalDescription,
+            discountValue: discountNumber,
+            discountDescription: effectiveDiscountDescription,
+            reservationFeeStatus,
+            eventDate: reservation.eventDate,
+            clientName: reservation.clientName,
+            paymentMethod,
+            reservationFee: fee,
+          })
     );
   }
 
@@ -232,7 +304,9 @@ export default function FinalizarReservaModal({
     return (
       <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
         <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl">
-          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Locação finalizada ✅</h2>
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            {isMentoria ? "Mentoria finalizada ✅" : "Locação finalizada ✅"}
+          </h2>
           <p className="mb-2 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
           {warning && <p className="mb-3 text-xs text-amber-600">{warning}</p>}
 
@@ -274,7 +348,9 @@ export default function FinalizarReservaModal({
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Finalizar reserva</h2>
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          {isMentoria ? "Finalizar mentoria" : "Finalizar reserva"}
+        </h2>
         <p className="mb-4 text-xs text-neutral-400">
           {reservation.equipmentName} · {formatDate(reservation.eventDate)} · {reservation.clientName}
         </p>
@@ -293,45 +369,75 @@ export default function FinalizarReservaModal({
         )}
 
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          {isMentoria ? (
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem inicial</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Quantidade de pacientes modelo</label>
               <input
                 inputMode="numeric"
-                value={initialCount}
-                onChange={(e) => setInitialCount(e.target.value)}
-                placeholder="Ex: 2907661"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                value={patientCount}
+                onChange={(e) => setPatientCount(e.target.value.replace(/\D/g, ""))}
+                placeholder="Ex: 1"
+                className="w-full max-w-[140px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
               />
+              <p className="mt-1 text-xs text-neutral-400">Normalmente 1 (individual); já aconteceu até 3 na mesma mentoria.</p>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem final</label>
-              <input
-                inputMode="numeric"
-                value={finalCount}
-                onChange={(e) => setFinalCount(e.target.value)}
-                placeholder="Ex: 2942213"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-              />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem inicial</label>
+                <input
+                  inputMode="numeric"
+                  value={initialCount}
+                  onChange={(e) => setInitialCount(e.target.value)}
+                  placeholder="Ex: 2907661"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Contagem final</label>
+                <input
+                  inputMode="numeric"
+                  value={finalCount}
+                  onChange={(e) => setFinalCount(e.target.value)}
+                  placeholder="Ex: 2942213"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          {shots > 0 && (
+          {!isMentoria && shots > 0 && (
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               Disparos realizados: <span className="font-medium text-neutral-700 dark:text-neutral-300">{shots.toLocaleString("pt-BR")}</span>
             </p>
           )}
 
-          {pricing && (
+          {pricing && isMentoria && (
+            <div className="rounded-xl bg-brand-lilac/10 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-600">Valor da mentoria</span>
+                <span className="font-semibold text-brand-lilac">{formatCurrency(pricing.totalValue)}</span>
+              </div>
+              <p className="mt-1 text-xs text-neutral-500">
+                {(pricing as MentoriaPricingBreakdown).patientCount} paciente(s) x{" "}
+                {formatCurrency((pricing as MentoriaPricingBreakdown).unitValue)}
+                {(pricing as MentoriaPricingBreakdown).isParcelado ? " (parcelado no crédito até 10x)" : " (à vista)"}
+              </p>
+            </div>
+          )}
+
+          {pricing && !isMentoria && (
             <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-neutral-600">Valor dos disparos</span>
                 <span className="font-semibold text-brand-teal">{formatCurrency(pricing.totalValue)}</span>
               </div>
               <p className="mt-1 text-xs text-neutral-500">
-                Pacote fixo até 20.000: {formatCurrency(pricing.flatPackageValue)}
-                {pricing.tier2Portion > 0 && ` · +${pricing.tier2Portion.toLocaleString("pt-BR")} a R$0,10`}
-                {pricing.tier3Portion > 0 && ` · +${pricing.tier3Portion.toLocaleString("pt-BR")} a R$0,07`}
+                Pacote fixo até 20.000: {formatCurrency((pricing as RentalPricingBreakdown).flatPackageValue)}
+                {(pricing as RentalPricingBreakdown).tier2Portion > 0 &&
+                  ` · +${(pricing as RentalPricingBreakdown).tier2Portion.toLocaleString("pt-BR")} a R$0,10`}
+                {(pricing as RentalPricingBreakdown).tier3Portion > 0 &&
+                  ` · +${(pricing as RentalPricingBreakdown).tier3Portion.toLocaleString("pt-BR")} a R$0,07`}
               </p>
             </div>
           )}
@@ -410,8 +516,8 @@ export default function FinalizarReservaModal({
                 </div>
                 {discountType === "percentual" && discountRawNumber > 0 && (
                   <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                    {discountRawNumber}% sobre o valor dos disparos ({formatCurrency(pricing?.totalValue ?? 0)}) ={" "}
-                    {formatCurrency(discountNumber)}
+                    {discountRawNumber}% sobre {isMentoria ? "o valor da mentoria" : "o valor dos disparos"} (
+                    {formatCurrency(pricing?.totalValue ?? 0)}) = {formatCurrency(discountNumber)}
                   </p>
                 )}
               </div>
