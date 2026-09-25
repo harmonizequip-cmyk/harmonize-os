@@ -16,6 +16,10 @@ interface ClientOption {
   id: string;
   name: string;
   whatsapp?: string | null;
+  // Usado só por NovaLocacaoModal, pra decidir se oferece "cobrar taxa de
+  // reserva agora": parceiro nunca paga, é a mesma regra do gatilho do
+  // banco (calendar_events_definir_taxa).
+  parceiro?: boolean | null;
 }
 
 interface CategoryOption {
@@ -79,7 +83,7 @@ export default function QuickActionsButton({
   async function openMenu() {
     setMenuOpen(true);
     const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
-      supabase.from("clients").select("id, name, whatsapp").order("name"),
+      supabase.from("clients").select("id, name, whatsapp, parceiro").order("name"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
       supabase.from("equipments").select("id, code, name").order("code"),
     ]);
