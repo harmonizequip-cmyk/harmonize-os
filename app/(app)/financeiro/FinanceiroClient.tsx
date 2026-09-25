@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/format";
+import type { Periodo } from "@/lib/period";
+import FiltroBarra from "@/components/FiltroBarra";
+import { exportarCsv } from "@/lib/exportar-csv";
 import NovoLancamentoModal from "./NovoLancamentoModal";
 import EditarLancamentoModal from "./EditarLancamentoModal";
 
@@ -48,24 +51,50 @@ export default function FinanceiroClient({
   initialTransactions,
   categories,
   clients,
+  periodo,
+  atingiuTeto,
 }: {
   initialTransactions: TransactionRow[];
   categories: CategoryRow[];
   clients: ClientOption[];
+  periodo: Periodo;
+  atingiuTeto: boolean;
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TransactionRow | null>(null);
-  const [typeFilter, setTypeFilter] = useState<"todos" | "entrada" | "saida">("todos");
-  const [search, setSearch] = useState("");
 
-  const filtered = useMemo(() => {
-    return initialTransactions.filter((t) => {
-      if (typeFilter !== "todos" && t.type !== typeFilter) return false;
-      if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    });
-  }, [initialTransactions, typeFilter, search]);
+  // A filtragem inteira mora na consulta do servidor agora, então o que
+  // chega aqui já é o conjunto final. Os totais saem dessas mesmas
+  // linhas, de propósito: total calculado por outro caminho é como o
+  // faturamento passou a divergir em R$ 39.581,97.
+  const totais = useMemo(() => {
+    let entradas = 0;
+    let saidas = 0;
+    for (const t of initialTransactions) {
+      if (t.type === "entrada") entradas += Number(t.amount);
+      else saidas += Number(t.amount);
+    }
+    return { entradas, saidas, resultado: entradas - saidas };
+  }, [initialTransactions]);
+
+  function baixarCsv() {
+    exportarCsv(
+      initialTransactions,
+      [
+        { titulo: "Data", valor: (t) => formatDate(t.date) },
+        { titulo: "Tipo", valor: (t) => (t.type === "entrada" ? "Entrada" : "Saída") },
+        { titulo: "Categoria", valor: (t) => t.categories?.name ?? "" },
+        { titulo: "Descrição", valor: (t) => t.description },
+        { titulo: "Cliente", valor: (t) => t.clients?.name ?? "" },
+        { titulo: "Valor", valor: (t) => Number(t.amount) },
+        { titulo: "Pagamento", valor: (t) => PAYMENT_LABELS[t.payment_method] ?? t.payment_method },
+        { titulo: "Teste", valor: (t) => (t.is_test ? "sim" : "") },
+      ],
+      "financeiro",
+      periodo.rotulo
+    );
+  }
 
   function handleCreated() {
     setModalOpen(false);
@@ -84,29 +113,92 @@ export default function FinanceiroClient({
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {(["todos", "entrada", "saida"] as const).map((key) => (
+      <FiltroBarra
+        periodoPadrao="mes"
+        rotuloPeriodo={periodo.rotulo}
+        contagem={{
+          mostrando: initialTransactions.length,
+          rotulo: initialTransactions.length === 1 ? "lançamento" : "lançamentos",
+        }}
+        campos={[
+          {
+            chave: "tipo",
+            rotuloVazio: "Entradas e saídas",
+            opcoes: [
+              { valor: "entrada", label: "Só entradas" },
+              { valor: "saida", label: "Só saídas" },
+            ],
+          },
+          {
+            chave: "categoria",
+            rotuloVazio: "Todas as categorias",
+            opcoes: categories.map((c) => ({
+              valor: c.id,
+              label: `${c.name} (${c.type === "entrada" ? "entrada" : "saída"})`,
+            })),
+          },
+          {
+            chave: "pagamento",
+            rotuloVazio: "Toda forma de pagamento",
+            opcoes: Object.entries(PAYMENT_LABELS).map(([valor, label]) => ({ valor, label })),
+          },
+          {
+            chave: "cliente",
+            rotuloVazio: "Todos os clientes",
+            opcoes: clients.map((c) => ({ valor: c.id, label: c.name })),
+          },
+        ]}
+        buscaPlaceholder="Buscar na descrição..."
+        acoes={
           <button
-            key={key}
-            onClick={() => setTypeFilter(key)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-              typeFilter === key ? "bg-brand-teal text-white" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+            type="button"
+            onClick={baixarCsv}
+            disabled={initialTransactions.length === 0}
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Exportar CSV
+          </button>
+        }
+      />
+
+      {atingiuTeto && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
+          Este período tem mais lançamentos do que a tela carrega de uma vez, então os totais abaixo
+          estão incompletos. Escolha um período menor.
+        </div>
+      )}
+
+      {/* Os totais são do que está filtrado, não do mês inteiro nem de
+          sempre. Dizer isso na tela evita ler "Resultado" como o caixa
+          da empresa quando há um filtro de categoria ligado. */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Entradas</p>
+          <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
+            {formatCurrency(totais.entradas)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Saídas</p>
+          <p className="mt-0.5 text-sm font-semibold text-brand-pink sm:text-base">
+            {formatCurrency(totais.saidas)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Resultado</p>
+          <p
+            className={`mt-0.5 text-sm font-semibold sm:text-base ${
+              totais.resultado >= 0 ? "text-brand-teal" : "text-brand-pink"
             }`}
           >
-            {key === "todos" ? "Todos" : key === "entrada" ? "Entradas" : "Saídas"}
-          </button>
-        ))}
-        <input
-          placeholder="Buscar descrição..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="ml-auto rounded-full border border-neutral-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-teal"
-        />
+            {formatCurrency(totais.resultado)}
+          </p>
+        </div>
       </div>
 
       {/* Celular: lista de cartões empilhados */}
       <div className="space-y-2 sm:hidden">
-        {filtered.map((t) => (
+        {initialTransactions.map((t) => (
           <div
             key={t.id}
             onClick={() => setEditing(t)}
@@ -145,9 +237,9 @@ export default function FinanceiroClient({
             </div>
           </div>
         ))}
-        {filtered.length === 0 && (
+        {initialTransactions.length === 0 && (
           <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
-            Nenhum lançamento encontrado.
+            Nenhum lançamento em {periodo.rotulo}.
           </div>
         )}
       </div>
@@ -166,7 +258,7 @@ export default function FinanceiroClient({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((t) => (
+            {initialTransactions.map((t) => (
               <tr
                 key={t.id}
                 onClick={() => setEditing(t)}
@@ -206,10 +298,10 @@ export default function FinanceiroClient({
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {initialTransactions.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
-                  Nenhum lançamento encontrado.
+                  Nenhum lançamento em {periodo.rotulo}.
                 </td>
               </tr>
             )}
