@@ -37,6 +37,7 @@ export default function ReservarHiproModal({
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(defaultDate ?? (() => new Date().toISOString().slice(0, 10))());
   const [notes, setNotes] = useState("");
+  const [isMentoria, setIsMentoria] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +67,7 @@ export default function ReservarHiproModal({
       date_end: eventDate,
       status: "pre_reserva",
       notes: notes || null,
+      is_mentoria: isMentoria,
     });
 
     setSaving(false);
@@ -144,6 +146,19 @@ export default function ReservarHiproModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
+
+          {/* Só destaque visual na Agenda (ver EVENT_META em
+              AgendaClient.tsx) — continua reservando o equipamento
+              normalmente, com a mesma proteção contra duplo-agendamento. */}
+          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+            <input
+              type="checkbox"
+              checked={isMentoria}
+              onChange={(e) => setIsMentoria(e.target.checked)}
+              className="h-4 w-4 rounded border-neutral-300 text-brand-teal focus:ring-brand-teal dark:border-neutral-700"
+            />
+            Esta reserva é para mentoria
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
