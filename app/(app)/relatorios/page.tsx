@@ -60,7 +60,7 @@ export default async function RelatoriosPage({
       .select("shots, calculated_value")
       .gte("event_date", periodo.inicio)
       .lte("event_date", periodo.fim),
-    supabase.from("clients").select("id, name, origem, stage").eq("is_test", false),
+    supabase.from("clients").select("id, name, origem, stage, is_client").eq("is_test", false),
     supabase
       .from("transactions_contabilizaveis")
       .select("amount, client_id, categories(name), clients(name)")
@@ -146,7 +146,10 @@ export default async function RelatoriosPage({
     const origem = c.origem?.trim() || "Não informado";
     const cur = origemMap.get(origem) ?? { total: 0, convertidos: 0 };
     cur.total += 1;
-    if (c.stage === "cliente") cur.convertidos += 1;
+    // is_client, não stage: stage é só a etapa atual do funil, e um
+    // cliente já convertido pode estar de volta em "Agendamento" numa
+    // segunda locação sem deixar de ser cliente (ver leva F).
+    if (c.is_client) cur.convertidos += 1;
     origemMap.set(origem, cur);
   }
   const origemBreakdown = Array.from(origemMap.entries())
