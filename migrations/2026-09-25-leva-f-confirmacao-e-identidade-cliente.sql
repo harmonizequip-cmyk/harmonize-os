@@ -130,6 +130,11 @@ create trigger trg_clients_marcar_is_client
 -- 5) Nova ação no histórico, para o "pedir confirmação" ficar
 -- registrado como qualquer outra mudança de estado do agendamento.
 -- ------------------------------------------------------------
+-- A lista abaixo é a definição real de produção (conferida via
+-- pg_get_constraintdef antes de escrever esta versão, depois que a
+-- primeira tentativa falhou por eu ter chutado o conjunto de valores
+-- em vez de checar) mais o único valor novo desta leva,
+-- 'pedido_confirmacao_enviado'. Nenhum valor em uso foi removido.
 alter table public.movimentacoes drop constraint if exists movimentacoes_acao_check;
 alter table public.movimentacoes add constraint movimentacoes_acao_check
   check (acao in (
@@ -138,6 +143,7 @@ alter table public.movimentacoes add constraint movimentacoes_acao_check
     'realizado', 'realizacao_desfeita',
     'pago', 'pagamento_desfeito',
     'taxa_paga', 'taxa_perdida', 'taxa_isenta',
+    'taxa_pendente',
     'pedido_confirmacao_enviado'
   ));
 
