@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
-import FinalizarReservaModal from "./FinalizarReservaModal";
+import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
@@ -26,11 +26,11 @@ interface EventToEdit {
   notes?: string | null;
   clients?: { name: string; whatsapp?: string | null } | null;
   // Estado atual da taxa deste agendamento (nao_aplica/pendente/paga/
-  // perdida), repassado direto para FinalizarReservaModal decidir o que
-  // oferecer — ver o comentário em ReservationToFinalize.
+  // perdida), repassado direto para a CalculadoraLocacaoModal (mode
+  // "finalize") decidir o que oferecer.
   taxa_status?: string | null;
   // Reserva de HIPRO 1/2 marcada como mentoria (leva K) — muda o texto
-  // desta tela e faz FinalizarReservaModal cobrar por paciente modelo
+  // desta tela e faz a CalculadoraLocacaoModal cobrar por paciente modelo
   // em vez de por disparo (leva M/N).
   is_mentoria?: boolean;
 }
@@ -91,22 +91,25 @@ export default function EditarEventoModal({
   if (isPendingReservation) {
     if (showFinalize) {
       return (
-        <FinalizarReservaModal
-          reservation={{
-            id: event.id,
-            clientId: event.client_id ?? "",
-            clientName: event.clients?.name ?? "Cliente",
-            clientWhatsapp: event.clients?.whatsapp ?? null,
-            taxaStatus: event.taxa_status,
-            equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
-            eventDate: event.date_start,
+        <CalculadoraLocacaoModal
+          mode={{
+            kind: "finalize",
+            reservation: {
+              id: event.id,
+              clientId: event.client_id ?? "",
+              clientName: event.clients?.name ?? "Cliente",
+              clientWhatsapp: event.clients?.whatsapp ?? null,
+              taxaStatus: event.taxa_status,
+              equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
+              eventDate: event.date_start,
+            },
+            isMentoria: event.is_mentoria ?? false,
           }}
-          isMentoria={event.is_mentoria ?? false}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
           mentoriaPricing={mentoriaPricing}
           onClose={() => setShowFinalize(false)}
-          onFinalized={onSaved}
+          onDone={onSaved}
         />
       );
     }
