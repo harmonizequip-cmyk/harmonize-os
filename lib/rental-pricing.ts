@@ -48,6 +48,60 @@ export const DEFAULT_PRICING: PricingConfig = {
 // de settings.reservation_fee. Prefira sempre passar o valor real.
 export const RESERVATION_FEE = 250.0;
 
+// ------------------------------------------------------------
+// Mentoria: cobrança por PACIENTE MODELO, não por disparo — modelo de
+// preço totalmente diferente do HIPRO Day acima. Confirmado em
+// 25/09/2026: R$1.500,00 por paciente modelo quando o pagamento é
+// parcelado no crédito (até 10x), ou R$1.200,00 por paciente modelo em
+// qualquer outra forma de pagamento ("à vista"). A quantidade de
+// pacientes modelo por mentoria varia (normalmente 1, já aconteceu até
+// 3), por isso o valor escala com essa quantidade em vez de ser fixo.
+// Configurável em `settings` (mentoria_valor_avista/
+// mentoria_valor_parcelado) — ver lib/settings.ts; as constantes abaixo
+// só servem de fallback, igual DEFAULT_PRICING acima.
+// ------------------------------------------------------------
+
+export interface MentoriaPricingConfig {
+  valorAvista: number; // por paciente modelo, em qualquer forma de pagamento exceto crédito parcelado
+  valorParcelado: number; // por paciente modelo, quando payment_method = "credito" (parcelado até 10x)
+}
+
+export const DEFAULT_MENTORIA_PRICING: MentoriaPricingConfig = {
+  valorAvista: 1200.0,
+  valorParcelado: 1500.0,
+};
+
+export interface MentoriaPricingBreakdown {
+  patientCount: number;
+  unitValue: number;
+  totalValue: number;
+  isParcelado: boolean;
+  config: MentoriaPricingConfig;
+}
+
+export class MentoriaPricingError extends Error {}
+
+/**
+ * Calcula o valor de uma mentoria a partir da quantidade de pacientes
+ * modelo e da forma de pagamento escolhida. "credito" usa o valor
+ * parcelado (até 10x); qualquer outra forma de pagamento usa o valor à
+ * vista. Lança MentoriaPricingError se a quantidade for inválida.
+ */
+export function calculateMentoriaValue(
+  patientCount: number,
+  paymentMethod: string,
+  config: MentoriaPricingConfig = DEFAULT_MENTORIA_PRICING
+): MentoriaPricingBreakdown {
+  if (!Number.isFinite(patientCount) || patientCount <= 0) {
+    throw new MentoriaPricingError("Quantidade de pacientes modelo deve ser um número positivo.");
+  }
+  const isParcelado = paymentMethod === "credito";
+  const unitValue = isParcelado ? config.valorParcelado : config.valorAvista;
+  const totalValue = round2(unitValue * patientCount);
+
+  return { patientCount, unitValue, totalValue, isParcelado, config };
+}
+
 export interface RentalPricingBreakdown {
   shots: number;
   flatPackagePortion: number; // disparos cobertos pelo pacote fixo
