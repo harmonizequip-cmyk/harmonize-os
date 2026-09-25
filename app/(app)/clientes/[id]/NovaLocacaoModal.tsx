@@ -12,6 +12,7 @@ import {
   type ReservationFeeStatus,
 } from "@/lib/rental-summary";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { hojeLocal } from "@/lib/period";
 
 interface PendingReservation {
   id: string;
@@ -22,14 +23,16 @@ interface PendingReservation {
 
 // Lista de clientes usada só quando o modal abre sem cliente fixo (menu
 // "+" global). Além de id/nome (o que o ClientPicker precisa), carrega
-// whatsapp e o status da taxa de reserva, pra pré-selecionar "já paga" ou
-// "cobrar agora" assim que a pessoa escolhe o cliente (Pedido 3 da
-// auditoria). Cliente cadastrado na hora pelo próprio picker entra sem
-// esses dois campos, o formulário cai no padrão de qualquer jeito.
+// whatsapp e se o cliente é parceiro — parceiro nunca paga taxa de
+// reserva, é a mesma regra que o gatilho do banco usa (ver
+// calendar_events_definir_taxa). Cliente cadastrado na hora pelo próprio
+// picker entra sem esses campos, o formulário cai no padrão de qualquer
+// jeito (não parceiro).
 interface ClientWithExtras {
   id: string;
   name: string;
   whatsapp?: string | null;
+  parceiro?: boolean | null;
 }
 
 const PAYMENT_METHODS = [
@@ -58,6 +61,7 @@ export default function NovaLocacaoModal({
   clientId,
   clientName,
   clientWhatsapp,
+  clientParceiro,
   clients,
   equipments,
   pricingConfig,
@@ -71,6 +75,7 @@ export default function NovaLocacaoModal({
   clientId?: string;
   clientName?: string;
   clientWhatsapp?: string | null;
+  clientParceiro?: boolean | null;
   clients?: ClientWithExtras[];
   equipments: EquipmentOption[];
   // Config de preço vinda de settings (ver lib/settings.ts). Se não
@@ -83,27 +88,18 @@ export default function NovaLocacaoModal({
 }) {
   const supabase = createClient();
   const fee = reservationFee ?? RESERVATION_FEE;
-  const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
-    { value: "nao_aplica", label: "Não se aplica" },
-    { value: "ja_paga", label: "Já foi paga (creditar no total)" },
-    { value: "cobrar_agora", label: `Cobrar agora (${formatCurrency(fee)})` },
-  ];
 
   const isFixedClient = !!clientId;
   const [localClientList, setLocalClientList] = useState<ClientWithExtras[]>(clients ?? []);
   const [pickedClientId, setPickedClientId] = useState("");
   const pickedClient = localClientList.find((c) => c.id === pickedClientId);
-  // A partir daqui o formulário inteiro usa esses quatro "active*" em vez
-  // dos props crus, então funciona igual nos dois modos: cliente fixo (vem
+  // A partir daqui o formulário inteiro usa esses "active*" em vez dos
+  // props crus, então funciona igual nos dois modos: cliente fixo (vem
   // pronto) ou escolhido no picker (muda em runtime).
   const activeClientId = isFixedClient ? clientId! : pickedClientId;
   const activeClientName = isFixedClient ? clientName ?? "" : pickedClient?.name ?? "";
   const activeClientWhatsapp = isFixedClient ? clientWhatsapp : pickedClient?.whatsapp ?? null;
-  // A taxa deixou de morar no cliente. Este modal ainda tem o seletor
-  // próprio ("já foi paga", "cobrar agora"), então o padrão aqui é não
-  // aplicar nada por conta própria: creditar taxa sozinho a partir de um
-  // campo que não é mais a verdade seria descontar dinheiro sem base.
-  const activeClientFeeStatus: string = "nao_aplica";
+  const activeClientParceiro = isFixedClient ? !!clientParceiro : !!pickedClient?.parceiro;
 
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -121,7 +117,11 @@ export default function NovaLocacaoModal({
   // porcentagem (0-100) sobre o valor dos disparos (pricing.totalValue),
   // convertida pra reais em discountNumber logo abaixo.
   const [discountType, setDiscountType] = useState<"valor" | "percentual">("valor");
-  const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>("nao_aplica");
+  // Cobrar a taxa agora só faz sentido quando ela nasceria pendente
+  // sozinha (feeWouldApply, calculado abaixo): data futura e cliente que
+  // não é parceiro, a mesma regra do gatilho calendar_events_definir_taxa
+  // no banco. Fora disso a taxa é nao_aplica e nem aparece esta opção.
+  const [chargeFeeNow, setChargeFeeNow] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,21 +166,13 @@ export default function NovaLocacaoModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeClientId]);
 
-  // Pedido 3 da auditoria: se o cliente já está com a taxa de reserva paga
-  // ou pendente, pré-seleciona a opção certa e abre a seção de extras
-  // sozinha (M5), em vez de depender de lembrar de marcar isso manualmente.
-  // Roda de novo sempre que o cliente ativo muda (troca no picker).
-  useEffect(() => {
-    if (!activeClientId) return;
-    if (activeClientFeeStatus === "pago") {
-      setReservationFeeStatus("ja_paga");
-      setShowExtras(true);
-    } else if (activeClientFeeStatus === "pendente") {
-      setReservationFeeStatus("cobrar_agora");
-      setShowExtras(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeClientId]);
+  // A taxa de reserva nasce pendente sozinha (pelo gatilho do banco)
+  // quando a data é futura e o cliente não é parceiro — a mesma conta
+  // feita em definir_taxa_ao_criar_evento. Fora disso, create_rental já
+  // grava nao_aplica e não há o que cobrar agora. Isto decide só se a
+  // opção de cobrar aparece na tela; quem decide de verdade é o banco.
+  const feeWouldApply = !activeClientParceiro && eventDate > hojeLocal();
+  const reservationFeeStatus: ReservationFeeStatus = feeWouldApply && chargeFeeNow ? "cobrar_agora" : "nao_aplica";
 
   const initialNumber = Number(initialCount.replace(/\D/g, ""));
   const finalNumber = Number(finalCount.replace(/\D/g, ""));
@@ -318,39 +310,34 @@ export default function NovaLocacaoModal({
       return;
     }
 
-    // Taxa de reserva cobrada agora vira uma transação própria, separada da
-    // locação, para ficar categorizada como "Taxa de reserva" no financeiro.
+    // Taxa de reserva cobrada agora passa pela mesma função que os botões
+    // de status usam na ficha do cliente (definir_taxa_agendamento): ela
+    // cria o lançamento próprio, categorizado como "Taxa de reserva" e
+    // separado da locação, e grava taxa_status/taxa_transaction_id no
+    // agendamento. Antes disto era um insert solto em transactions, que
+    // fazia o financeiro mostrar a taxa como recebida mas deixava o
+    // agendamento (Agenda, ficha do cliente) mostrando "pendente" para
+    // sempre — os dois lugares discordavam.
     if (reservationFeeStatus === "cobrar_agora") {
-      const { data: category } = await supabase
-        .from("categories")
+      const { data: eventRow } = await supabase
+        .from("calendar_events")
         .select("id")
-        .eq("type", "entrada")
-        .ilike("name", "Taxa%")
+        .eq("rental_id", rentalId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (category) {
-        const { error: feeError } = await supabase.from("transactions").insert({
-          type: "entrada",
-          category_id: category.id,
-          description: `Taxa de reserva - ${activeClientName}`,
-          amount: fee,
-          payment_method: paymentMethod,
-          date: eventDate,
-          scope: "harmonize",
-          client_id: activeClientId,
-          rental_id: rentalId,
+      if (eventRow) {
+        const { error: feeError } = await supabase.rpc("definir_taxa_agendamento", {
+          p_event_id: eventRow.id,
+          p_status: "paga",
+          p_payment_method: paymentMethod,
         });
         if (feeError) {
-          setWarning("A locação foi salva, mas a taxa de reserva não foi registrada automaticamente. Adicione manualmente em Financeiro.");
+          setWarning("A locação foi salva, mas a taxa de reserva não foi registrada automaticamente. Marque como paga na ficha do cliente.");
         }
       } else {
-        setWarning("A locação foi salva, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
+        setWarning("A locação foi salva, mas não encontrei o agendamento para registrar a taxa automaticamente.");
       }
-      // As duas gravações que ficavam aqui, marcando a taxa do CLIENTE
-      // como paga ou consumida, saíram: o campo era um por cliente e a
-      // taxa é por data reservada. Quem carrega esse estado agora é o
-      // agendamento, e quem o muda é definir_taxa_agendamento.
     }
 
     setSaving(false);
@@ -444,19 +431,6 @@ export default function NovaLocacaoModal({
               onChange={setPickedClientId}
               onClientCreated={(c) => setLocalClientList((prev) => [...prev, c])}
             />
-          </div>
-        )}
-
-        {activeClientFeeStatus === "pago" && (
-          <div className="mb-4 rounded-xl border border-brand-teal/30 bg-brand-teal/10 p-3 text-xs text-brand-teal">
-            💳 {activeClientName || "Este cliente"} já pagou a taxa de reserva ({formatCurrency(fee)}). A opção "Já foi
-            paga" abaixo já está marcada para descontar do total.
-          </div>
-        )}
-        {activeClientFeeStatus === "pendente" && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
-            💳 {activeClientName || "Este cliente"} está com a taxa de reserva pendente. A opção "Cobrar agora" abaixo
-            já está marcada.
           </div>
         )}
 
@@ -630,20 +604,23 @@ export default function NovaLocacaoModal({
                 )}
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva (R$ 250)</label>
-                <select
-                  value={reservationFeeStatus}
-                  onChange={(e) => setReservationFeeStatus(e.target.value as ReservationFeeStatus)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                >
-                  {RESERVATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {feeWouldApply && (
+                <div>
+                  <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                    <input
+                      type="checkbox"
+                      checked={chargeFeeNow}
+                      onChange={(e) => setChargeFeeNow(e.target.checked)}
+                      className="h-4 w-4 rounded border-neutral-300"
+                    />
+                    Cobrar taxa de reserva agora ({formatCurrency(fee)})
+                  </label>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Data futura de cliente que não é parceiro: a taxa já nasce pendente sozinha ao salvar. Marque aqui
+                    só se for cobrar na hora, em vez de deixar pendente para depois.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

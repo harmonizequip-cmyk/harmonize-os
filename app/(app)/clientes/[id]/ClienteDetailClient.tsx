@@ -338,6 +338,7 @@ export default function ClienteDetailClient({
           clientId={client.id}
           clientName={client.name}
           clientWhatsapp={client.whatsapp}
+          clientParceiro={client.parceiro}
           equipments={equipments}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
