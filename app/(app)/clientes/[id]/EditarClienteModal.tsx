@@ -14,6 +14,8 @@ interface Client {
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
+  treatment?: string | null;
+  display_name?: string | null;
 }
 
 export default function EditarClienteModal({
@@ -27,6 +29,11 @@ export default function EditarClienteModal({
 }) {
   const supabase = createClient();
   const [name, setName] = useState(client.name);
+  // Tratamento + Nome de exibição alimentam as mensagens automáticas
+  // (ex: pedido de confirmação por WhatsApp) em vez do campo "Nome"
+  // acima, que em cadastros antigos pode vir com tudo misturado.
+  const [treatment, setTreatment] = useState<"" | "Dr." | "Dra.">((client.treatment as "Dr." | "Dra." | null) ?? "");
+  const [displayName, setDisplayName] = useState(client.display_name ?? "");
   const [clinicName, setClinicName] = useState(client.clinic_name ?? "");
   const [whatsapp, setWhatsapp] = useState(client.whatsapp ?? "");
   const [email, setEmail] = useState(client.email ?? "");
@@ -49,6 +56,8 @@ export default function EditarClienteModal({
       .from("clients")
       .update({
         name: toUpperTrim(name),
+        treatment: treatment || null,
+        display_name: displayName.trim() || null,
         clinic_name: toUpperOrNull(clinicName),
         whatsapp: whatsapp || null,
         email: email || null,
@@ -83,6 +92,32 @@ export default function EditarClienteModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
+          <div className="grid grid-cols-[auto_1fr] gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tratamento</label>
+              <select
+                value={treatment}
+                onChange={(e) => setTreatment(e.target.value as typeof treatment)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              >
+                <option value="">-</option>
+                <option value="Dr.">Dr.</option>
+                <option value="Dra.">Dra.</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome de exibição</label>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Ex: Camila Lima"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+            </div>
+          </div>
+          <p className="-mt-2 text-[11px] text-neutral-400">
+            Usados nas mensagens ao cliente (ex: pedido de confirmação no WhatsApp). Sem os dois, a mensagem usa uma saudação genérica.
+          </p>
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Clínica / Empresa</label>
             <input
