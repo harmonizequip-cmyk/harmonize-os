@@ -205,17 +205,10 @@ export default function FinalizarReservaModal({
       } else {
         setWarning("A locação foi finalizada, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
       }
-      // B2 da auditoria: cobrar a taxa aqui nunca marcava o cliente como
-      // pago, então ele ficava "taxa pendente" pra sempre mesmo já tendo
-      // pago, e o Relatórios continuava somando ele na taxa a receber.
-      if (reservation.clientId) {
-        await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", reservation.clientId);
-      }
-    } else if (reservationFeeStatus === "ja_paga" && reservation.clientId) {
-      // B3 da auditoria: creditar a taxa aqui não consumia o crédito, então
-      // o mesmo valor podia ser descontado de novo na próxima locação do
-      // mesmo cliente, sem nenhum aviso.
-      await supabase.from("clients").update({ reservation_fee_status: "nao_aplica" }).eq("id", reservation.clientId);
+      // As duas gravações que ficavam aqui, marcando a taxa do CLIENTE
+      // como paga ou consumida, saíram: o campo era um por cliente e a
+      // taxa é por data reservada. Quem carrega esse estado agora é o
+      // agendamento, e quem o muda é definir_taxa_agendamento.
     }
 
     setSaving(false);

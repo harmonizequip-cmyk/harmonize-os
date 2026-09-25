@@ -24,7 +24,7 @@ interface EventToEdit {
   equipment_id?: string | null;
   rental_id: string | null;
   notes?: string | null;
-  clients?: { name: string; whatsapp?: string | null; reservation_fee_status?: string | null } | null;
+  clients?: { name: string; whatsapp?: string | null } | null;
 }
 
 export default function EditarEventoModal({
@@ -87,7 +87,6 @@ export default function EditarEventoModal({
             clientId: event.client_id ?? "",
             clientName: event.clients?.name ?? "Cliente",
             clientWhatsapp: event.clients?.whatsapp ?? null,
-            clientReservationFeeStatus: event.clients?.reservation_fee_status ?? undefined,
             equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
             eventDate: event.date_start,
           }}
