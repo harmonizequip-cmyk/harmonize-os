@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
-import type { PricingConfig } from "@/lib/rental-pricing";
+import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
 import ReservarHiproModal from "./ReservarHiproModal";
@@ -62,6 +62,20 @@ interface EventRow {
   // reserva. Independente de calendar_events.confirmed: pedir e
   // confirmar são ações diferentes (ver os dois botões em renderCard).
   confirmation_message_sent_at?: string | null;
+  // Reserva de HIPRO 1/2 marcada como mentoria (leva K): não muda
+  // event_type nem equipment_id, só liga o destaque visual abaixo.
+  is_mentoria?: boolean;
+}
+
+// Centraliza o destaque visual: reserva de equipamento marcada como
+// mentoria usa a mesma cor/etiqueta do event_type 'mentoria' avulso,
+// mas sem perder qual equipamento é (o rótulo normal continua junto).
+function eventMeta(e: EventRow) {
+  const base = EVENT_META[e.event_type] ?? { label: e.event_type, dot: "bg-neutral-400" };
+  if (e.is_mentoria && (e.event_type === "hipro_1" || e.event_type === "hipro_2")) {
+    return { label: `${base.label} · Mentoria`, dot: EVENT_META.mentoria.dot };
+  }
+  return base;
 }
 
 interface ClientOption {
@@ -100,12 +114,14 @@ export default function AgendaClient({
   equipments,
   pricingConfig,
   reservationFee,
+  mentoriaPricing,
 }: {
   initialEvents: EventRow[];
   clients: ClientOption[];
   equipments: EquipmentOption[];
   pricingConfig?: PricingConfig;
   reservationFee?: number;
+  mentoriaPricing?: MentoriaPricingConfig;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -231,7 +247,7 @@ export default function AgendaClient({
       [
         { titulo: "Data", valor: (e) => formatDate(e.date_start) },
         { titulo: "Título", valor: (e) => e.title },
-        { titulo: "Tipo", valor: (e) => EVENT_META[e.event_type]?.label ?? e.event_type },
+        { titulo: "Tipo", valor: (e) => eventMeta(e).label },
         { titulo: "Cliente", valor: (e) => e.clients?.name ?? "" },
         { titulo: "Confirmado", valor: (e) => (e.confirmed ? "Sim" : "Não") },
         { titulo: "Valor", valor: (e) => e.value ?? "" },
@@ -321,7 +337,7 @@ export default function AgendaClient({
   }
 
   function renderCard(e: EventRow) {
-    const meta = EVENT_META[e.event_type] ?? { label: e.event_type, dot: "bg-neutral-400" };
+    const meta = eventMeta(e);
     const isPending = !e.rental_id && !!e.equipment_id && e.status === "pre_reserva";
     return (
       <div
@@ -554,7 +570,7 @@ export default function AgendaClient({
                       <span
                         key={i}
                         className={`h-1 w-1 rounded-full ${
-                          selected ? "bg-white" : EVENT_META[e.event_type]?.dot ?? "bg-neutral-400"
+                          selected ? "bg-white" : eventMeta(e).dot
                         }`}
                       />
                     ))}
@@ -637,6 +653,7 @@ export default function AgendaClient({
           clients={clients}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
+          mentoriaPricing={mentoriaPricing}
           onClose={() => setEditingEvent(null)}
           onSaved={() => {
             setEditingEvent(null);
