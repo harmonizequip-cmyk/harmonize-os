@@ -197,8 +197,8 @@ export default function EditarEventoModal({
         >
           <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{event.title}</h2>
           <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
-            Este evento veio de uma locação HIPRO. Para editar data, equipamento, disparos ou valor, isso é feito na
-            própria locação, para manter o financeiro e a agenda sincronizados.
+            Este evento veio de uma locação HIPRO. Para editar cliente, data, equipamento, disparos ou valor, isso é
+            feito na própria locação (na ficha do cliente), para manter o financeiro e a agenda sincronizados.
           </p>
           <div className="flex gap-2">
             <button
