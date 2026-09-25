@@ -15,6 +15,7 @@ import {
   Package,
   BarChart3,
   History,
+  Receipt,
   Settings,
 } from "lucide-react";
 
@@ -34,6 +35,9 @@ const MAIN_ITEMS = [
 const MORE_ITEMS = [
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
+  // Histórico de locações realizadas: os FATOS. Fica ao lado de
+  // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
+  { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
   { href: "/movimentacoes", label: "Movimentações", icon: History, module: "configuracoes" },

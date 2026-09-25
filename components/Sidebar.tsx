@@ -15,6 +15,7 @@ import {
   Package,
   BarChart3,
   History,
+  Receipt,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -26,6 +27,9 @@ const NAV_ITEMS = [
   { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
   { href: "/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
+  // Histórico de locações realizadas: os FATOS. Fica ao lado de
+  // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
+  { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
   // Histórico de movimentações: fica no módulo de configurações porque é
