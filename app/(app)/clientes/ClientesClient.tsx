@@ -7,6 +7,14 @@ import NovoClienteModal from "./NovoClienteModal";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 
+const ETAPAS: Record<string, string> = {
+  lead: "Lead",
+  contato: "Contato",
+  nutricao: "Nutrição",
+  qualificado: "Qualificado",
+  agendado: "Agendamento",
+};
+
 interface ClientRow {
   id: string;
   name: string;
@@ -18,6 +26,9 @@ interface ClientRow {
   taxasPagas: number;
   valorPendente: number;
   data_evento: string | null;
+  // Onde a pessoa está no funil AGORA. Não decide mais se ela aparece
+  // nesta lista, só aparece como aviso quando ela está em negociação.
+  stage?: string;
   stats: { count: number; total: number; lastDate: string | null };
   nextEvent: { date_start: string; confirmed: boolean } | null;
 }
@@ -103,6 +114,16 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
                 </div>
               </div>
             </Link>
+
+            {/* Cliente que voltou para o funil continua na lista, porque
+                quem alugou uma vez é cliente para sempre. A etiqueta diz
+                onde ele está agora, para a presença dele aqui não parecer
+                incoerente com o quadro do funil. */}
+            {c.stage && c.stage !== "cliente" && (
+              <p className="mt-2 w-fit rounded-full bg-brand-blue/10 px-2 py-1 text-[11px] font-medium text-brand-blue">
+                Em negociação · {ETAPAS[c.stage] ?? c.stage}
+              </p>
+            )}
 
             {(c.nextEvent || c.taxasPendentes > 0 || c.taxasPagas > 0) && (
               <div className="mt-2 flex flex-wrap gap-1.5">
