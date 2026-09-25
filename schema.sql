@@ -1200,7 +1200,6 @@ end;
 $$;
 
 grant execute on function public.preview_exclusao to authenticated;
-
 -- Cascata de uma locação: quebra os ciclos de chave estrangeira (com a
 -- transação, com a taxa) antes de apagar, na ordem que o banco permite.
 create or replace function public.excluir_locacao_cascata(p_rental_id uuid)
@@ -2610,4 +2609,76 @@ select
   coalesce(sum(coalesce(ev.taxa_valor, public.valor_taxa_atual()))
            filter (where ev.taxa_status = 'pendente'), 0) as valor_pendente,
   coalesce(sum(coalesce(ev.taxa_valor, public.valor_taxa_atual()))
-          
+           filter (where ev.taxa_status = 'paga'), 0)     as valor_pago,
+  min(ev.date_start) filter (where ev.taxa_status = 'pendente')  as proxima_pendente
+from public.clients c
+left join public.calendar_events ev
+  on ev.client_id = c.id
+ and ev.status <> 'cancelada'
+ and ev.equipment_id is not null
+group by c.id;
+
+comment on view public.clientes_taxas is
+  'Resumo por cliente das taxas de compromisso que estão nos agendamentos. Substitui clients.reservation_fee_status, que guardava uma taxa só por cliente quando cada data reservada tem a sua.';
+
+grant select on public.clientes_taxas to authenticated;
+
+-- Locações realizadas e ainda não pagas, já com o crédito da taxa
+-- abatido — a lista de cobrança, e não entra em faturamento nenhum.
+create or replace view public.locacoes_a_receber
+with (security_invoker = true) as
+select
+  r.id,
+  r.client_id,
+  c.name as cliente,
+  r.event_date,
+  r.calculated_value,
+  coalesce((
+    select sum(ev.taxa_valor) from calendar_events ev
+     where ev.rental_id = r.id and ev.taxa_status = 'paga'
+  ), 0) as credito_taxa,
+  greatest(r.calculated_value - coalesce((
+    select sum(ev.taxa_valor) from calendar_events ev
+     where ev.rental_id = r.id and ev.taxa_status = 'paga'
+  ), 0), 0) as valor_a_receber
+from rentals r
+left join clients c on c.id = r.client_id
+where r.status = 'realizada'
+  and r.pago = false
+  and r.is_test = false;
+
+comment on view public.locacoes_a_receber is
+  'Locações que aconteceram e ainda não foram pagas, já com o crédito da taxa abatido. É a lista de cobrança, e não entra em faturamento nenhum.';
+
+grant select on public.locacoes_a_receber to authenticated;
+
+-- ============================================================
+-- ÍNDICES DE PERFORMANCE (leva J)
+-- ============================================================
+create index calendar_events_date_start_idx on public.calendar_events(date_start);
+create index transactions_date_scope_idx on public.transactions(date, scope);
+create index transactions_client_id_idx on public.transactions(client_id);
+create index rentals_client_id_idx on public.rentals(client_id);
+create index calendar_events_client_id_idx on public.calendar_events(client_id);
+
+-- ============================================================
+-- TAGS AUTOMÁTICAS (usadas pelo fluxo de follow-up/reagendamento)
+-- ============================================================
+insert into tags (name, color, is_automatic) values
+  ('Follow-up 1', '#7EC8E3', true),
+  ('Follow-up 2', '#7EC8E3', true),
+  ('Follow-up 3', '#B8A0D0', true),
+  ('Follow-up 4', '#B8A0D0', true),
+  ('Follow-up 5', '#E8789A', true),
+  ('Reagendamento', '#d85f83', true)
+on conflict (name) do nothing;
+
+-- ============================================================
+-- Depois de criar seu usuário em Authentication > Users,
+-- rode isto trocando o e-mail, para virar admin com acesso total:
+-- ============================================================
+-- update profiles set is_admin = true,
+--   permissions = '{"dashboard":true,"financeiro":true,"clientes":true,
+--     "agenda":true,"equipamentos":true,"relatorios":true,
+--     "exportacao":true,"configuracoes":true}'::jsonb
+-- where email = 'seu-email@exemplo.com';
