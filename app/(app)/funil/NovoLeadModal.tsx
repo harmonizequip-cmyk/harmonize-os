@@ -22,6 +22,12 @@ export default function NovoLeadModal({
 }) {
   const supabase = createClient();
   const [name, setName] = useState("");
+  // Tratamento + Nome de exibição alimentam as mensagens automáticas
+  // (ex: pedido de confirmação por WhatsApp) em vez do campo "Nome"
+  // acima. Um lead pode virar cliente mais tarde sem nunca ter passado
+  // por aqui de novo, então já vale coletar isso desde a entrada.
+  const [treatment, setTreatment] = useState<"" | "Dr." | "Dra.">("");
+  const [displayName, setDisplayName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
@@ -40,6 +46,8 @@ export default function NovoLeadModal({
     setError(null);
     const { error } = await supabase.from("clients").insert({
       name: toUpperTrim(name),
+      treatment: treatment || null,
+      display_name: displayName.trim() || null,
       whatsapp: whatsapp || null,
       city: toUpperOrNull(city),
       address: toUpperOrNull(address),
@@ -73,6 +81,32 @@ export default function NovoLeadModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
+          <div className="grid grid-cols-[auto_1fr] gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tratamento</label>
+              <select
+                value={treatment}
+                onChange={(e) => setTreatment(e.target.value as typeof treatment)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              >
+                <option value="">-</option>
+                <option value="Dr.">Dr.</option>
+                <option value="Dra.">Dra.</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome de exibição</label>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Ex: Camila Lima"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+            </div>
+          </div>
+          <p className="-mt-2 text-[11px] text-neutral-400">
+            Usados nas mensagens ao cliente. Sem os dois, a mensagem usa uma saudação genérica.
+          </p>
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">WhatsApp</label>
             <input
