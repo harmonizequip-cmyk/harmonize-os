@@ -25,6 +25,10 @@ interface EventToEdit {
   rental_id: string | null;
   notes?: string | null;
   clients?: { name: string; whatsapp?: string | null } | null;
+  // Estado atual da taxa deste agendamento (nao_aplica/pendente/paga/
+  // perdida), repassado direto para FinalizarReservaModal decidir o que
+  // oferecer — ver o comentário em ReservationToFinalize.
+  taxa_status?: string | null;
 }
 
 export default function EditarEventoModal({
@@ -87,6 +91,7 @@ export default function EditarEventoModal({
             clientId: event.client_id ?? "",
             clientName: event.clients?.name ?? "Cliente",
             clientWhatsapp: event.clients?.whatsapp ?? null,
+            taxaStatus: event.taxa_status,
             equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
             eventDate: event.date_start,
           }}

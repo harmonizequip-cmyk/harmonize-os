@@ -20,17 +20,16 @@ const PAYMENT_METHODS = [
   { value: "outros", label: "Outros" },
 ];
 
-const RESERVATION_OPTIONS_BASE: { value: ReservationFeeStatus; label: string }[] = [
-  { value: "nao_aplica", label: "Não se aplica" },
-  { value: "ja_paga", label: "Já foi paga (creditar no total)" },
-];
-
 export interface ReservationToFinalize {
   id: string; // id do calendar_events
   clientId: string;
   clientName: string;
   clientWhatsapp?: string | null;
-  clientReservationFeeStatus?: string;
+  // Estado ATUAL da taxa deste agendamento (calendar_events.taxa_status:
+  // nao_aplica/pendente/paga/perdida). Nasceu sozinho ao criar a pré-reserva
+  // (ver definir_taxa_ao_criar_evento) ou foi mudado pelos botões de status
+  // na ficha do cliente — é a fonte da verdade, não um campo do cliente.
+  taxaStatus?: string | null;
   equipmentName: string;
   eventDate: string; // date_start, YYYY-MM-DD
 }
@@ -57,18 +56,19 @@ export default function FinalizarReservaModal({
 }) {
   const supabase = createClient();
   const fee = reservationFee ?? RESERVATION_FEE;
-  const RESERVATION_OPTIONS: { value: ReservationFeeStatus; label: string }[] = [
-    ...RESERVATION_OPTIONS_BASE,
-    { value: "cobrar_agora", label: `Cobrar agora (${formatCurrency(fee)})` },
-  ];
+  // taxa_status é a fonte da verdade deste agendamento específico, não um
+  // campo do cliente. "paga" só é possível se alguém já marcou como paga
+  // pela ficha do cliente antes de finalizar — nesse caso o valor já virou
+  // um lançamento próprio e só falta creditar contra o total desta locação.
+  const feeIsPaid = reservation.taxaStatus === "paga";
+  const feePending = reservation.taxaStatus === "pendente";
+
   const [initialCount, setInitialCount] = useState("");
   const [finalCount, setFinalCount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [notes, setNotes] = useState("");
 
-  const [showExtras, setShowExtras] = useState(
-    reservation.clientReservationFeeStatus === "pago" || reservation.clientReservationFeeStatus === "pendente"
-  );
+  const [showExtras, setShowExtras] = useState(feeIsPaid || feePending);
   const [additionalDescription, setAdditionalDescription] = useState("");
   const [additionalValue, setAdditionalValue] = useState("");
   const [discountDescription, setDiscountDescription] = useState("");
@@ -77,16 +77,15 @@ export default function FinalizarReservaModal({
   // porcentagem (0-100) sobre o valor dos disparos (pricing.totalValue),
   // convertida pra reais em discountNumber logo abaixo.
   const [discountType, setDiscountType] = useState<"valor" | "percentual">("valor");
-  // Pedido 3 da auditoria: se o cliente já está com a taxa paga ou pendente
-  // (visto na ficha dele), o formulário já abre com a opção certa marcada
-  // e a seção de extras já aberta (M5), em vez de depender de lembrar.
-  const [reservationFeeStatus, setReservationFeeStatus] = useState<ReservationFeeStatus>(
-    reservation.clientReservationFeeStatus === "pago"
-      ? "ja_paga"
-      : reservation.clientReservationFeeStatus === "pendente"
-      ? "cobrar_agora"
-      : "nao_aplica"
-  );
+  // Só existe decisão a tomar quando a taxa está pendente: cobrar agora ou
+  // deixar pendente pra depois. Paga já é fato consumado (credita sozinha)
+  // e nao_aplica/perdida não têm o que oferecer aqui.
+  const [chargeFeeNow, setChargeFeeNow] = useState(false);
+  const reservationFeeStatus: ReservationFeeStatus = feeIsPaid
+    ? "ja_paga"
+    : feePending && chargeFeeNow
+    ? "cobrar_agora"
+    : "nao_aplica";
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +163,7 @@ export default function FinalizarReservaModal({
     setError(null);
     setWarning(null);
 
-    const { data: rentalId, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
+    const { error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
       p_calendar_event_id: reservation.id,
       p_shots: shots,
       p_calculated_value: totals.rentalTransactionAmount,
@@ -178,37 +177,23 @@ export default function FinalizarReservaModal({
       return;
     }
 
+    // Cobrar agora passa pela mesma função que os botões de status usam na
+    // ficha do cliente: definir_taxa_agendamento cria o lançamento próprio
+    // (categoria "Taxa de reserva", separado da locação) e grava
+    // taxa_status/taxa_transaction_id no próprio agendamento — que aqui já
+    // temos o id direto (reservation.id), sem precisar procurar. Antes
+    // disto era um insert solto em transactions, que fazia o financeiro
+    // mostrar a taxa como recebida mas deixava o agendamento mostrando
+    // "pendente" para sempre.
     if (reservationFeeStatus === "cobrar_agora") {
-      const { data: category } = await supabase
-        .from("categories")
-        .select("id")
-        .eq("type", "entrada")
-        .ilike("name", "Taxa%")
-        .limit(1)
-        .single();
-
-      if (category) {
-        const { error: feeError } = await supabase.from("transactions").insert({
-          type: "entrada",
-          category_id: category.id,
-          description: `Taxa de reserva - ${reservation.clientName}`,
-          amount: fee,
-          payment_method: paymentMethod,
-          date: reservation.eventDate,
-          scope: "harmonize",
-          client_id: reservation.clientId,
-          rental_id: rentalId,
-        });
-        if (feeError) {
-          setWarning("A locação foi finalizada, mas a taxa de reserva não foi registrada automaticamente. Adicione manualmente em Financeiro.");
-        }
-      } else {
-        setWarning("A locação foi finalizada, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
+      const { error: feeError } = await supabase.rpc("definir_taxa_agendamento", {
+        p_event_id: reservation.id,
+        p_status: "paga",
+        p_payment_method: paymentMethod,
+      });
+      if (feeError) {
+        setWarning("A locação foi finalizada, mas a taxa de reserva não foi registrada automaticamente. Marque como paga na ficha do cliente.");
       }
-      // As duas gravações que ficavam aqui, marcando a taxa do CLIENTE
-      // como paga ou consumida, saíram: o campo era um por cliente e a
-      // taxa é por data reservada. Quem carrega esse estado agora é o
-      // agendamento, e quem o muda é definir_taxa_agendamento.
     }
 
     setSaving(false);
@@ -294,16 +279,16 @@ export default function FinalizarReservaModal({
           {reservation.equipmentName} · {formatDate(reservation.eventDate)} · {reservation.clientName}
         </p>
 
-        {reservation.clientReservationFeeStatus === "pago" && (
+        {feeIsPaid && (
           <div className="mb-4 rounded-xl border border-brand-teal/30 bg-brand-teal/10 p-3 text-xs text-brand-teal">
-            💳 {reservation.clientName} já pagou a taxa de reserva ({formatCurrency(fee)}). A opção "Já foi paga"
-            abaixo já está marcada para descontar do total.
+            💳 A taxa de reserva desta data ({formatCurrency(fee)}) já foi paga. Ela entra como crédito no total
+            abaixo.
           </div>
         )}
-        {reservation.clientReservationFeeStatus === "pendente" && (
+        {feePending && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
-            💳 {reservation.clientName} está com a taxa de reserva pendente. A opção "Cobrar agora" abaixo já está
-            marcada.
+            💳 A taxa de reserva desta data está pendente. Marque "Cobrar taxa de reserva agora" abaixo se for cobrar
+            junto com esta finalização.
           </div>
         )}
 
@@ -431,20 +416,27 @@ export default function FinalizarReservaModal({
                 )}
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva (R$ 250)</label>
-                <select
-                  value={reservationFeeStatus}
-                  onChange={(e) => setReservationFeeStatus(e.target.value as ReservationFeeStatus)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                >
-                  {RESERVATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {feeIsPaid && (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Taxa de reserva já paga ({formatCurrency(fee)}): entra como crédito no total a pagar agora.
+                </p>
+              )}
+              {feePending && (
+                <div>
+                  <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                    <input
+                      type="checkbox"
+                      checked={chargeFeeNow}
+                      onChange={(e) => setChargeFeeNow(e.target.checked)}
+                      className="h-4 w-4 rounded border-neutral-300"
+                    />
+                    Cobrar taxa de reserva agora ({formatCurrency(fee)})
+                  </label>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Deixe desmarcado para manter a taxa pendente e cobrar depois pela ficha do cliente.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

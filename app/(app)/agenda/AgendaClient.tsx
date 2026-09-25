@@ -47,6 +47,7 @@ interface EventRow {
   clients?: { name: string; whatsapp?: string | null } | null;
   rental_id: string | null;
   notes: string | null;
+  taxa_status?: string | null;
 }
 
 interface ClientOption {
