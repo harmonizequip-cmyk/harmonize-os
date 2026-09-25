@@ -339,7 +339,7 @@ export default function CalculadoraLocacaoModal({
   // 1 = integral, 2+ = parcial.
   // ------------------------------------------------------------
   const [pagamentos, setPagamentos] = useState<PagamentoLinha[]>([
-    { id: newId("pag"), forma: "pix", valor: 0, pixConta: "harmonize", data: hojeLocal() },
+    { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() },
   ]);
   const primeiraFormaPagamento = pagamentos[0]?.forma ?? "";
 
@@ -347,7 +347,7 @@ export default function CalculadoraLocacaoModal({
     setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
   function addPagamento() {
-    setPagamentos((prev) => [...prev, { id: newId("pag"), forma: "pix", valor: 0, pixConta: "harmonize", data: hojeLocal() }]);
+    setPagamentos((prev) => [...prev, { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() }]);
   }
   function removePagamento(id: string) {
     setPagamentos((prev) => prev.filter((p) => p.id !== id));
@@ -374,7 +374,10 @@ export default function CalculadoraLocacaoModal({
 
   function preencherValorTotal(id: string) {
     if (!resumo) return;
-    updatePagamento(id, { valor: resumo.totalAPagarAgora });
+    updatePagamento(id, {
+      valor: resumo.totalAPagarAgora,
+      valorTexto: resumo.totalAPagarAgora > 0 ? String(resumo.totalAPagarAgora).replace(".", ",") : "",
+    });
   }
 
   const somaPagamentos = useMemo(() => Math.round(pagamentos.reduce((acc, p) => acc + (p.valor || 0), 0) * 100) / 100, [pagamentos]);
@@ -1273,8 +1276,11 @@ export default function CalculadoraLocacaoModal({
                         <div className="flex gap-1">
                           <input
                             inputMode="decimal"
-                            value={p.valor || ""}
-                            onChange={(e) => updatePagamento(p.id, { valor: parseDecimal(e.target.value) })}
+                            value={p.valorTexto}
+                            onChange={(e) => {
+                              const texto = e.target.value;
+                              updatePagamento(p.id, { valorTexto: texto, valor: parseDecimal(texto) });
+                            }}
                             placeholder="R$ 0,00"
                             className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                           />
