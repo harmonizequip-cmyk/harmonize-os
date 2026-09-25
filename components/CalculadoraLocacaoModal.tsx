@@ -204,6 +204,32 @@ export default function CalculadoraLocacaoModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeClientId, mode.kind]);
 
+  // Vincular a uma pré-reserva pendente em vez de criar uma locação do
+  // zero: evita a duplicidade na raiz (uma reserva vira um registro só,
+  // nunca dois brigando entre si) em vez de só avisar e deixar por conta
+  // de quem está usando lembrar de ir na Agenda. Ao vincular, data e
+  // equipamento passam a ser os da própria pré-reserva (ela já é a fonte
+  // da verdade) — por isso ficam travados enquanto o vínculo existir.
+  const [linkedReservationId, setLinkedReservationId] = useState<string | null>(null);
+  const linkedReservation = pendingReservations.find((r) => r.id === linkedReservationId) ?? null;
+
+  function handleLinkReservation(r: PendingReservation) {
+    setLinkedReservationId(r.id);
+    if (r.equipment_id) setEquipmentId(r.equipment_id);
+    setEventDate(r.date_start);
+  }
+  function handleUnlinkReservation() {
+    setLinkedReservationId(null);
+  }
+  // Se o cliente mudar (ou a pré-reserva escolhida sumir da lista por
+  // qualquer motivo), o vínculo não faz mais sentido sozinho.
+  useEffect(() => {
+    if (linkedReservationId && !pendingReservations.some((r) => r.id === linkedReservationId)) {
+      setLinkedReservationId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReservations]);
+
   // ------------------------------------------------------------
   // Contagem do equipamento (ou pacientes modelo, em mentoria)
   // ------------------------------------------------------------
@@ -313,7 +339,7 @@ export default function CalculadoraLocacaoModal({
   // 1 = integral, 2+ = parcial.
   // ------------------------------------------------------------
   const [pagamentos, setPagamentos] = useState<PagamentoLinha[]>([
-    { id: newId("pag"), forma: "pix", valor: 0, pixConta: "harmonize" },
+    { id: newId("pag"), forma: "pix", valor: 0, pixConta: "harmonize", data: hojeLocal() },
   ]);
   const primeiraFormaPagamento = pagamentos[0]?.forma ?? "";
 
@@ -321,7 +347,7 @@ export default function CalculadoraLocacaoModal({
     setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
   function addPagamento() {
-    setPagamentos((prev) => [...prev, { id: newId("pag"), forma: "pix", valor: 0, pixConta: "harmonize" }]);
+    setPagamentos((prev) => [...prev, { id: newId("pag"), forma: "pix", valor: 0, pixConta: "harmonize", data: hojeLocal() }]);
   }
   function removePagamento(id: string) {
     setPagamentos((prev) => prev.filter((p) => p.id !== id));
@@ -467,9 +493,29 @@ export default function CalculadoraLocacaoModal({
     const primeiraPixConta = pagamentos.find((p) => p.valor > 0 && p.forma === "pix")?.pixConta || null;
 
     let rentalId: string | null = null;
-    let eventIdParaTaxa: string | null = mode.kind === "finalize" ? mode.reservation.id : null;
+    let eventIdParaTaxa: string | null =
+      mode.kind === "finalize" ? mode.reservation.id : linkedReservationId;
 
-    if (mode.kind === "create") {
+    if (mode.kind === "create" && linkedReservationId) {
+      // Vinculado a uma pré-reserva já existente: finaliza ELA em vez de
+      // criar uma locação do zero, exatamente como o fluxo "Finalizar"
+      // da Agenda faz — uma reserva continua sendo um registro só.
+      const { data, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
+        p_calendar_event_id: linkedReservationId,
+        p_shots: shots,
+        p_calculated_value: resumo.valorLocacao,
+        p_payment_method: primeiraForma,
+        p_notes: notes || null,
+        p_pix_conta: primeiraPixConta,
+        p_pago: false,
+      });
+      if (rpcError) {
+        setSaving(false);
+        setError("Não foi possível finalizar a reserva vinculada. Tente novamente.");
+        return;
+      }
+      rentalId = data as string;
+    } else if (mode.kind === "create") {
       const { data, error: rpcError } = await supabase.rpc("create_rental", {
         p_client_id: activeClientId,
         p_equipment_id: equipmentId,
@@ -488,7 +534,7 @@ export default function CalculadoraLocacaoModal({
           const matchingPending = pendingReservations.find((r) => r.equipment_id === equipmentId && r.date_start === eventDate);
           setError(
             matchingPending
-              ? `⚠️ ${activeClientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Abra essa reserva na Agenda e use "Finalizar" nela em vez de criar uma locação nova aqui.`
+              ? `⚠️ ${activeClientName} já tem uma pré-reserva pendente no ${equipmentName} nesse dia. Use o botão "usar em vez de criar nova" acima, ou abra essa reserva na Agenda e use "Finalizar" nela.`
               : `⚠️ O ${equipmentName} já está reservado neste período.`
           );
         } else {
@@ -564,7 +610,10 @@ export default function CalculadoraLocacaoModal({
         p_rental_id: rentalId,
         p_forma: p.forma,
         p_valor: p.valor,
-        p_data: eventDate,
+        // Data em que o pagamento entrou de fato, não a data do HIPRO —
+        // são registros diferentes por design (rentals.event_date de um
+        // lado, esta data por outro).
+        p_data: p.data || eventDate,
         p_pix_conta: p.forma === "pix" ? p.pixConta || null : null,
         p_notes: null,
       });
@@ -806,22 +855,44 @@ export default function CalculadoraLocacaoModal({
           </div>
         )}
 
-        {pendingReservations.length > 0 && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+        {pendingReservations.length > 0 && !linkedReservationId && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/10 dark:text-amber-400">
             <p className="font-medium">
-              {activeClientName} já tem {pendingReservations.length > 1 ? "pré-reservas pendentes" : "uma pré-reserva pendente"}:
+              ⚠️ {activeClientName} já tem {pendingReservations.length > 1 ? "pré-reservas pendentes" : "uma pré-reserva pendente"}. Antes de continuar, confira se não é a mesma reserva:
             </p>
-            <ul className="mt-1 space-y-0.5">
+            <ul className="mt-2 space-y-2">
               {pendingReservations.map((r) => (
-                <li key={r.id}>
-                  {r.equipmentName} · {formatDate(r.date_start)} ·{" "}
-                  <Link href={`/agenda?date=${r.date_start}`} className="underline underline-offset-2">
-                    abrir na Agenda
-                  </Link>
+                <li key={r.id} className="rounded-lg border border-amber-200 bg-white/60 p-2 dark:border-amber-900/40 dark:bg-neutral-900/30">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      {r.equipmentName} · {formatDate(r.date_start)}
+                    </span>
+                    <Link href={`/agenda?date=${r.date_start}`} className="whitespace-nowrap underline underline-offset-2">
+                      abrir na Agenda
+                    </Link>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleLinkReservation(r)}
+                    className="mt-1.5 w-full rounded-lg bg-amber-600 py-1.5 text-center text-xs font-medium text-white"
+                  >
+                    É esta mesma reserva → usar em vez de criar nova
+                  </button>
                 </li>
               ))}
             </ul>
-            <p className="mt-1">Para lançar os disparos de uma dessas, use "Finalizar" nela, em vez de criar uma locação nova aqui.</p>
+            <p className="mt-2">Se for mesmo uma locação diferente (outro dia, outro motivo), pode ignorar e seguir normalmente.</p>
+          </div>
+        )}
+
+        {linkedReservationId && linkedReservation && (
+          <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-brand-teal/40 bg-brand-teal/10 p-3 text-xs text-brand-teal">
+            <span>
+              🔗 Vinculado à pré-reserva de {linkedReservation.equipmentName} em {formatDate(linkedReservation.date_start)} — não vai criar registro duplicado.
+            </span>
+            <button type="button" onClick={handleUnlinkReservation} className="whitespace-nowrap underline underline-offset-2">
+              desvincular
+            </button>
           </div>
         )}
 
@@ -844,7 +915,8 @@ export default function CalculadoraLocacaoModal({
                 <select
                   value={equipmentId}
                   onChange={(e) => setEquipmentId(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  disabled={!!linkedReservationId}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 >
                   {equipmentsList.map((eq) => (
                     <option key={eq.id} value={eq.id}>
@@ -859,9 +931,15 @@ export default function CalculadoraLocacaoModal({
                   type="date"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  disabled={!!linkedReservationId}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                 />
               </div>
+              {linkedReservationId && (
+                <p className="col-span-2 -mt-1 text-[11px] text-neutral-400">
+                  Equipamento e data vieram da pré-reserva vinculada. Clique em "desvincular" acima para escolher outros.
+                </p>
+              )}
             </div>
           )}
 
@@ -1224,6 +1302,17 @@ export default function CalculadoraLocacaoModal({
                           ))}
                         </select>
                       )}
+                      <div className="mt-2">
+                        <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                          Data em que caiu/recebeu (não precisa ser o dia do HIPRO)
+                        </label>
+                        <input
+                          type="date"
+                          value={p.data}
+                          onChange={(e) => updatePagamento(p.id, { data: e.target.value })}
+                          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                        />
+                      </div>
                     </div>
                   ))}
                   <div className="flex gap-2">
