@@ -9,16 +9,16 @@ import NovoLeadModal from "@/app/(app)/funil/NovoLeadModal";
 import NovoLancamentoModal from "@/app/(app)/financeiro/NovoLancamentoModal";
 import NovoEventoModal from "@/app/(app)/agenda/NovoEventoModal";
 import ReservarHiproModal from "@/app/(app)/agenda/ReservarHiproModal";
-import NovaLocacaoModal from "@/app/(app)/clientes/[id]/NovaLocacaoModal";
+import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import type { PricingConfig } from "@/lib/rental-pricing";
 
 interface ClientOption {
   id: string;
   name: string;
   whatsapp?: string | null;
-  // Usado só por NovaLocacaoModal, pra decidir se oferece "cobrar taxa de
-  // reserva agora": parceiro nunca paga, é a mesma regra do gatilho do
-  // banco (calendar_events_definir_taxa).
+  // Usado só pela CalculadoraLocacaoModal (mode "create"), pra decidir se
+  // oferece "cobrar taxa de reserva agora": parceiro nunca paga, é a
+  // mesma regra do gatilho do banco (calendar_events_definir_taxa).
   parceiro?: boolean | null;
 }
 
@@ -174,13 +174,12 @@ export default function QuickActionsButton({
         />
       )}
       {activeModal === "locacao_disparos" && (
-        <NovaLocacaoModal
-          clients={clients}
-          equipments={equipments}
+        <CalculadoraLocacaoModal
+          mode={{ kind: "create", clients, equipments }}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
           onClose={() => setActiveModal(null)}
-          onCreated={handleCreated}
+          onDone={handleCreated}
         />
       )}
     </>
