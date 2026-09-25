@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
+import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
@@ -63,7 +64,15 @@ export interface LeadRow {
   taxasPendentes: number;
   taxasPagas: number;
   valorPendente: number;
-  nextEvent: { date_start: string; confirmed: boolean } | null;
+  // id e confirmation_message_sent_at entraram com a leva F, para o botão
+  // "Pedir confirmação no WhatsApp" (igual à Agenda) sempre operar na
+  // reserva exata, nunca por client_id+data.
+  nextEvent: {
+    id: string;
+    date_start: string;
+    confirmed: boolean;
+    confirmation_message_sent_at: string | null;
+  } | null;
 }
 
 export interface TaskRow {
@@ -75,6 +84,17 @@ export interface TaskRow {
   follow_up_number: number | null;
   title: string;
   due_date: string;
+}
+
+function formatDiaMes(iso: string) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Abre o link do WhatsApp numa aba nova (mesmo helper de AgendaClient.tsx).
+function openInNewTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.href = url;
 }
 
 export default function FunilClient({
@@ -100,6 +120,13 @@ export default function FunilClient({
   const [tasksAlertOpen, setTasksAlertOpen] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  // Estado do modal "Pedir confirmação no WhatsApp", mesmo padrão da
+  // Agenda (ver AgendaClient.tsx): guarda o lead inteiro, nunca só um id
+  // solto, para o modal sempre mostrar os dados exatos do lead clicado.
+  const [pedidoLead, setPedidoLead] = useState<LeadRow | null>(null);
+  const [pedidoMessage, setPedidoMessage] = useState("");
+  const [pedidoCadastroIncompleto, setPedidoCadastroIncompleto] = useState(false);
+  const [pedidoEnviando, setPedidoEnviando] = useState(false);
   const alertsRef = useRef<HTMLDivElement>(null);
   const [alertsHeight, setAlertsHeight] = useState(0);
 
@@ -230,16 +257,57 @@ export default function FunilClient({
     moveToStage(lead.id, STAGES[idx + 1].key);
   }
 
+  // "Confirmar": só muda o status, via a mesma RPC confirmar_agendamento
+  // da Agenda (fica no histórico), sempre pelo id exato da reserva —
+  // nunca por client_id+data, que antes era como esta função operava.
   async function toggleConfirmed(lead: LeadRow) {
     if (!lead.nextEvent) return;
-    await supabase
-      .from("calendar_events")
-      .update({ confirmed: !lead.nextEvent.confirmed })
-      .eq("client_id", lead.id)
-      .eq("date_start", lead.nextEvent.date_start);
+    const { error } = await supabase.rpc("confirmar_agendamento", {
+      p_event_id: lead.nextEvent.id,
+      p_confirmado: !lead.nextEvent.confirmed,
+    });
+    if (error) {
+      window.alert("Não foi possível atualizar a confirmação. Tente novamente.");
+      return;
+    }
     router.refresh();
   }
 
+  // "Pedir confirmação no WhatsApp": mesmo padrão da Agenda — abre o
+  // modal com os dados do "lead" recebido por parâmetro, nunca confirma
+  // sozinho, nunca mexe em calendar_events.confirmed.
+  function handlePedirConfirmacao(lead: LeadRow) {
+    if (!lead.nextEvent) return;
+    const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
+      treatment: lead.treatment,
+      displayName: lead.display_name,
+      dateStart: lead.nextEvent.date_start,
+    });
+    setPedidoLead(lead);
+    setPedidoMessage(message);
+    setPedidoCadastroIncompleto(cadastroIncompleto);
+  }
+
+  async function confirmarEnvioPedido() {
+    if (!pedidoLead?.nextEvent) return;
+    const link = buildWhatsAppLink(pedidoLead.whatsapp, pedidoMessage);
+    if (!link) {
+      window.alert("Este cliente não tem WhatsApp cadastrado.");
+      return;
+    }
+    setPedidoEnviando(true);
+    const { error } = await supabase.rpc("registrar_pedido_confirmacao", {
+      p_event_id: pedidoLead.nextEvent.id,
+    });
+    setPedidoEnviando(false);
+    if (error) {
+      window.alert("Não foi possível registrar o envio. Tente novamente.");
+      return;
+    }
+    openInNewTab(link);
+    setPedidoLead(null);
+    router.refresh();
+  }
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -295,19 +363,35 @@ export default function FunilClient({
                 {pendingConfirmationLeads.map((lead) => (
                   <div
                     key={lead.id}
-                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
+                    className="rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
                   >
-                    <div>
-                      <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
-                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                        {formatDate(lead.nextEvent!.date_start)}
-                      </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                          {formatDate(lead.nextEvent!.date_start)}
+                        </p>
+                        {/* Rastreio de envio por reserva, mesmo padrão da
+                            Agenda (ver AgendaClient.tsx) — "pedir" e
+                            "confirmar" são ações independentes aqui também. */}
+                        <p className="text-[10px] text-neutral-400">
+                          {lead.nextEvent!.confirmation_message_sent_at
+                            ? `✓ mensagem enviada em ${formatDiaMes(lead.nextEvent!.confirmation_message_sent_at)}`
+                            : "sem pedido de confirmação enviado ainda"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleConfirmed(lead)}
+                        className="flex-shrink-0 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal"
+                      >
+                        Confirmar
+                      </button>
                     </div>
                     <button
-                      onClick={() => toggleConfirmed(lead)}
-                      className="flex-shrink-0 rounded-lg bg-brand-teal/10 px-2.5 py-1.5 text-xs font-medium text-brand-teal"
+                      onClick={() => handlePedirConfirmacao(lead)}
+                      className="mt-1.5 w-full rounded-lg border border-brand-teal/40 py-1 text-[11px] font-medium text-brand-teal hover:bg-brand-teal/5"
                     >
-                      Confirmar
+                      💬 Pedir confirmação no WhatsApp
                     </button>
                   </div>
                 ))}
@@ -542,6 +626,59 @@ export default function FunilClient({
             router.refresh();
           }}
         />
+      )}
+
+      {/* Mesmo modal de "Pedir confirmação no WhatsApp" da Agenda (ver
+          AgendaClient.tsx), reaproveitando a mesma buildPedidoConfirmacaoMessage. */}
+      {pedidoLead && (
+        <div
+          className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setPedidoLead(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+              Pedir confirmação no WhatsApp
+            </h2>
+            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+              {pedidoLead.name} · {pedidoLead.nextEvent ? formatDate(pedidoLead.nextEvent.date_start) : ""}
+            </p>
+
+            {pedidoCadastroIncompleto && (
+              <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                ⚠️ Cadastro incompleto: falta Tratamento e/ou Nome de exibição deste cliente. Por enquanto a
+                mensagem vai com saudação genérica — preencha esses campos no cadastro do cliente para
+                personalizar.
+              </p>
+            )}
+
+            <textarea
+              value={pedidoMessage}
+              onChange={(e) => setPedidoMessage(e.target.value)}
+              rows={4}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPedidoLead(null)}
+                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              >
+                Agora não
+              </button>
+              <button
+                type="button"
+                disabled={pedidoEnviando}
+                onClick={confirmarEnvioPedido}
+                className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-center text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+              >
+                {pedidoEnviando ? "Enviando..." : "Enviar no WhatsApp"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
