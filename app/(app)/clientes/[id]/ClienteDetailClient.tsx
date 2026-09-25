@@ -9,6 +9,7 @@ import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
 import ReservarHiproModal from "../../agenda/ReservarHiproModal";
+import HistoricoClienteSection from "./HistoricoClienteSection";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -335,6 +336,8 @@ export default function ClienteDetailClient({
         </table>
       </div>
 
+      <HistoricoClienteSection clientId={client.id} />
+
       {modalOpen && (
         <CalculadoraLocacaoModal
           mode={{
@@ -371,6 +374,12 @@ export default function ClienteDetailClient({
             setEditClientOpen(false);
             router.refresh();
           }}
+          onDeleted={() => {
+            // O registro deixou de existir: router.refresh() quebraria
+            // esta página (ela busca este cliente no servidor). Sai pra
+            // lista em vez de tentar recarregar aqui.
+            router.push("/clientes");
+          }}
         />
       )}
 
@@ -379,6 +388,8 @@ export default function ClienteDetailClient({
           rental={editingRental}
           equipments={equipments}
           pricingConfig={pricingConfig}
+          currentClientId={client.id}
+          currentClientName={client.name}
           onClose={() => setEditingRental(null)}
           onSaved={() => {
             setEditingRental(null);
