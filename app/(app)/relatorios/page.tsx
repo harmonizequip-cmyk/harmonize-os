@@ -36,7 +36,7 @@ export default async function RelatoriosPage() {
     // O que foi lançado em modo teste continua visível na tela de dados
     // de teste, que é quem lê a tabela crua de propósito.
     supabase.from("rentals_contabilizaveis").select("shots, calculated_value"),
-    supabase.from("clients").select("id, name, origem, stage, reservation_fee_status").eq("is_test", false),
+    supabase.from("clients").select("id, name, origem, stage").eq("is_test", false),
     supabase
       .from("transactions_contabilizaveis")
       .select("amount, client_id, categories(name), clients(name)")
@@ -71,9 +71,29 @@ export default async function RelatoriosPage() {
     ? (rentals ?? []).filter((r) => r.shots >= nearMissThreshold && r.shots <= cliff.peakShots)
     : [];
 
-  // ---- 2) Taxa de reserva pendente ----
-  const pendingFeeClients = (clients ?? []).filter((c) => c.reservation_fee_status === "pendente");
-  const pendingFeeTotal = pendingFeeClients.length * settings.reservationFee;
+  // ---- 2) Taxa de compromisso pendente ----
+  // Vem da view clientes_taxas, que soma as taxas que estão nos
+  // agendamentos. Antes esta conta era "quantos clientes estão marcados
+  // como pendentes, vezes R$ 250", o que só acertava por acidente: um
+  // cliente com três datas reservadas devia três taxas e entrava na
+  // conta como uma. Agora o valor é a soma real do que está em aberto.
+  const { data: taxasEmAberto } = await supabase
+    .from("clientes_taxas")
+    .select("client_id, taxas_pendentes, valor_pendente")
+    .gt("taxas_pendentes", 0);
+
+  const nomePorId = new Map((clients ?? []).map((c: any) => [c.id, c.name as string]));
+  const pendingFeeClients = (taxasEmAberto ?? [])
+    .map((t: any) => ({
+      name: nomePorId.get(t.client_id) ?? "",
+      taxas: Number(t.taxas_pendentes),
+      valor: Number(t.valor_pendente),
+    }))
+    // Cliente de teste não está em `clients`, então cai fora aqui.
+    .filter((t) => t.name)
+    .sort((a, b) => b.valor - a.valor);
+
+  const pendingFeeTotal = pendingFeeClients.reduce((soma, t) => soma + t.valor, 0);
 
   // ---- 3) Concentração de receita ----
   const revenueByClient = new Map<string, { name: string; total: number }>();
@@ -152,7 +172,9 @@ export default async function RelatoriosPage() {
       nearMissThreshold={nearMissThreshold}
       pendingFeeCount={pendingFeeClients.length}
       pendingFeeTotal={pendingFeeTotal}
-      pendingFeeNames={pendingFeeClients.slice(0, 15).map((c) => c.name)}
+      pendingFeeNames={pendingFeeClients
+        .slice(0, 15)
+        .map((c) => (c.taxas > 1 ? `${c.name} (${c.taxas} datas)` : c.name))}
       totalRevenue={totalRevenue}
       topClients={topClients}
       top3Share={top3Share}
