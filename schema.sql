@@ -907,3 +907,1281 @@ as $$
     'rental_payments',  (select count(*) from public.rental_payments  where is_test)
   );
 $$;
+create or replace function public.purge_test_data()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_result jsonb;
+  v_clients_kept int;
+  v_deleted jsonb;
+begin
+  perform public.require_admin();
+
+  update public.rentals          set transaction_id = null
+    where transaction_id in (select id from public.transactions where is_test);
+  update public.mentoring_events set transaction_id = null
+    where transaction_id in (select id from public.transactions where is_test);
+  update public.calendar_events  set rental_id = null
+    where rental_id in (select id from public.rentals where is_test);
+  update public.calendar_events  set mentoring_id = null
+    where mentoring_id in (select id from public.mentoring_events where is_test);
+  update public.transactions     set rental_id = null
+    where rental_id in (select id from public.rentals where is_test);
+  update public.transactions     set mentoring_id = null
+    where mentoring_id in (select id from public.mentoring_events where is_test);
+  update public.mentoring_events set calendar_event_id = null
+    where calendar_event_id in (select id from public.calendar_events where is_test);
+
+  with
+    d_tasks as (
+      delete from public.tasks where is_test returning 1
+    ),
+    d_transactions as (
+      delete from public.transactions where is_test returning 1
+    ),
+    d_calendar as (
+      delete from public.calendar_events where is_test returning 1
+    ),
+    d_mentoring as (
+      delete from public.mentoring_events where is_test returning 1
+    ),
+    d_rentals as (
+      delete from public.rentals where is_test returning 1
+    )
+  select jsonb_build_object(
+    'tasks',            (select count(*) from d_tasks),
+    'transactions',     (select count(*) from d_transactions),
+    'calendar_events',  (select count(*) from d_calendar),
+    'mentoring_events', (select count(*) from d_mentoring),
+    'rentals',          (select count(*) from d_rentals)
+  ) into v_deleted;
+
+  select count(*) into v_clients_kept
+  from public.clients c
+  where c.is_test
+    and (
+      exists (select 1 from public.transactions    t where t.client_id = c.id)
+      or exists (select 1 from public.rentals      r where r.client_id = c.id)
+      or exists (select 1 from public.calendar_events e where e.client_id = c.id)
+    );
+
+  delete from public.client_tags
+  where client_id in (
+    select c.id from public.clients c
+    where c.is_test
+      and not exists (select 1 from public.transactions    t where t.client_id = c.id)
+      and not exists (select 1 from public.rentals         r where r.client_id = c.id)
+      and not exists (select 1 from public.calendar_events e where e.client_id = c.id)
+  );
+
+  with d_clients as (
+    delete from public.clients c
+    where c.is_test
+      and not exists (select 1 from public.transactions    t where t.client_id = c.id)
+      and not exists (select 1 from public.rentals         r where r.client_id = c.id)
+      and not exists (select 1 from public.calendar_events e where e.client_id = c.id)
+    returning 1
+  )
+  select v_deleted || jsonb_build_object(
+    'clients',              (select count(*) from d_clients),
+    'clientes_preservados', v_clients_kept
+  ) into v_result;
+
+  return v_result;
+end;
+$$;
+
+-- ============================================================
+-- HISTÓRICO / AUDITORIA: funções de apoio
+-- ============================================================
+
+-- Dinheiro no formato brasileiro. O to_char do Postgres usa os
+-- separadores do locale do servidor (americano no Supabase), então a
+-- troca abaixo inverte ponto e vírgula com um marcador temporário.
+create or replace function public.formatar_reais(p_valor numeric)
+returns text
+language sql
+immutable
+as $$
+  select 'R$ ' || replace(replace(replace(
+           to_char(coalesce(p_valor, 0), 'FM999,999,990.00'),
+           ',', '#'), '.', ','), '#', '.');
+$$;
+
+-- Escreve no histórico. usuario_nome é resolvido e gravado na hora, não
+-- por referência, para o histórico continuar legível mesmo depois que o
+-- perfil for removido.
+create or replace function public.registrar_movimentacao(
+  p_acao text,
+  p_entidade text,
+  p_entidade_id uuid,
+  p_descricao text,
+  p_detalhes jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nome text;
+begin
+  select name into v_nome from public.profiles where id = auth.uid();
+
+  insert into public.movimentacoes (
+    usuario_id, usuario_nome, acao, entidade, entidade_id, descricao, detalhes
+  )
+  values (
+    auth.uid(),
+    coalesce(nullif(trim(v_nome), ''), 'Usuário desconhecido'),
+    p_acao,
+    p_entidade,
+    p_entidade_id,
+    p_descricao,
+    coalesce(p_detalhes, '{}'::jsonb)
+  );
+end;
+$$;
+
+-- Descreve um registro em uma linha legível, usada para o histórico
+-- continuar fazendo sentido depois que o registro descrito não existe mais.
+create or replace function public.descrever_registro(
+  p_table text,
+  p_id uuid
+)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_texto text;
+begin
+  if p_table = 'rentals' then
+    select 'Locação ' || coalesce(e.name, 'equipamento') ||
+           ' de ' || coalesce(c.name, 'cliente') ||
+           ' em ' || to_char(r.event_date, 'DD/MM/YYYY') ||
+           ', ' || public.formatar_reais(r.calculated_value) ||
+           ' (' || r.shots || ' disparos)'
+      into v_texto
+      from rentals r
+      left join clients c on c.id = r.client_id
+      left join equipments e on e.id = r.equipment_id
+     where r.id = p_id;
+
+  elsif p_table = 'transactions' then
+    select 'Lançamento ' || t.type || ' "' || coalesce(t.description, 'sem descrição') || '"' ||
+           ', ' || public.formatar_reais(t.amount) ||
+           ' em ' || to_char(t.date, 'DD/MM/YYYY')
+      into v_texto
+      from transactions t
+     where t.id = p_id;
+
+  elsif p_table = 'calendar_events' then
+    select 'Evento "' || coalesce(ev.title, 'sem título') || '"' ||
+           coalesce(' de ' || c.name, '') ||
+           ' em ' || to_char(ev.date_start, 'DD/MM/YYYY')
+      into v_texto
+      from calendar_events ev
+      left join clients c on c.id = ev.client_id
+     where ev.id = p_id;
+
+  elsif p_table = 'clients' then
+    select 'Cliente ' || coalesce(c.name, 'sem nome') ||
+           coalesce(' (' || c.clinic_name || ')', '')
+      into v_texto
+      from clients c
+     where c.id = p_id;
+
+  elsif p_table = 'tasks' then
+    select 'Tarefa "' || coalesce(tk.title, 'sem título') || '"' ||
+           coalesce(' de ' || c.name, '')
+      into v_texto
+      from tasks tk
+      left join clients c on c.id = tk.client_id
+     where tk.id = p_id;
+
+  elsif p_table = 'mentoring_events' then
+    select 'Mentoria de ' || coalesce(m.mentee_name, 'sem nome') ||
+           ' em ' || to_char(m.date, 'DD/MM/YYYY') ||
+           ', ' || public.formatar_reais(m.value)
+      into v_texto
+      from mentoring_events m
+     where m.id = p_id;
+  end if;
+
+  return coalesce(v_texto, p_table || ' ' || coalesce(p_id::text, '?'));
+end;
+$$;
+
+-- Prevê o que uma exclusão vai levar junto, incluindo taxa de
+-- compromisso (que vive num lançamento sem rental_id, de propósito —
+-- ver comentário da própria função na migration leva-c3a).
+create or replace function public.preview_exclusao(
+  p_table text,
+  p_id uuid
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_mentoria_id uuid;
+  v_evento_taxa uuid;
+  v_locacoes int := 0;
+  v_lancamentos int := 0;
+  v_eventos int := 0;
+  v_tarefas int := 0;
+  v_taxas int := 0;
+  v_valor_taxas numeric := 0;
+  v_valor_locacoes numeric := 0;
+  v_valor_lancamentos numeric := 0;
+  v_itens text[] := '{}';
+  v_aviso text := null;
+  v_alvo text;
+begin
+  perform public.require_admin();
+
+  v_alvo := public.descrever_registro(p_table, p_id);
+
+  if p_table = 'rentals' then
+    v_locacoes := 1;
+    select coalesce(calculated_value, 0) into v_valor_locacoes
+      from rentals where id = p_id;
+    select count(*), coalesce(sum(amount), 0) into v_lancamentos, v_valor_lancamentos
+      from transactions where rental_id = p_id;
+    select count(*) into v_eventos from calendar_events where rental_id = p_id;
+    select count(*), coalesce(sum(t.amount), 0) into v_taxas, v_valor_taxas
+      from calendar_events ev
+      join transactions t on t.id = ev.taxa_transaction_id
+     where ev.rental_id = p_id;
+
+  elsif p_table = 'transactions' then
+    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+      from transactions where id = p_id;
+
+    if v_rental_id is not null then
+      return public.preview_exclusao('rentals', v_rental_id)
+             || jsonb_build_object('aviso',
+                'Este lançamento pertence a uma locação. Apagar vai apagar a locação inteira, junto com o evento da agenda.');
+    elsif v_mentoria_id is not null then
+      return public.preview_exclusao('mentoring_events', v_mentoria_id)
+             || jsonb_build_object('aviso',
+                'Este lançamento pertence a uma mentoria. Apagar vai apagar a mentoria inteira.');
+    end if;
+
+    select id into v_evento_taxa from calendar_events where taxa_transaction_id = p_id limit 1;
+
+    v_lancamentos := 1;
+    select coalesce(amount, 0) into v_valor_lancamentos from transactions where id = p_id;
+
+    if v_evento_taxa is not null then
+      v_aviso := 'Este lançamento é a taxa de compromisso de um agendamento. Apagar vai deixar a taxa daquele agendamento como pendente de novo.';
+    end if;
+
+  elsif p_table = 'calendar_events' then
+    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+      from calendar_events where id = p_id;
+
+    if v_rental_id is not null then
+      return public.preview_exclusao('rentals', v_rental_id)
+             || jsonb_build_object('aviso',
+                'Este evento pertence a uma locação. Apagar vai apagar a locação inteira, junto com o lançamento financeiro.');
+    elsif v_mentoria_id is not null then
+      return public.preview_exclusao('mentoring_events', v_mentoria_id)
+             || jsonb_build_object('aviso',
+                'Este evento pertence a uma mentoria. Apagar vai apagar a mentoria inteira.');
+    end if;
+
+    v_eventos := 1;
+    select count(*), coalesce(sum(t.amount), 0) into v_taxas, v_valor_taxas
+      from calendar_events ev
+      join transactions t on t.id = ev.taxa_transaction_id
+     where ev.id = p_id;
+
+  elsif p_table = 'mentoring_events' then
+    select count(*), coalesce(sum(amount), 0) into v_lancamentos, v_valor_lancamentos
+      from transactions
+     where mentoring_id = p_id
+        or id = (select transaction_id from mentoring_events where id = p_id);
+    select count(*) into v_eventos
+      from calendar_events
+     where mentoring_id = p_id
+        or id = (select calendar_event_id from mentoring_events where id = p_id);
+
+  elsif p_table = 'clients' then
+    select count(*), coalesce(sum(calculated_value), 0) into v_locacoes, v_valor_locacoes
+      from rentals where client_id = p_id;
+    select count(*) into v_eventos from calendar_events where client_id = p_id;
+    select count(*) into v_tarefas from tasks where client_id = p_id;
+    select count(*), coalesce(sum(amount), 0) into v_lancamentos, v_valor_lancamentos
+      from transactions
+     where client_id = p_id
+        or rental_id in (select id from rentals where client_id = p_id);
+    select count(*), coalesce(sum(t.amount), 0) into v_taxas, v_valor_taxas
+      from calendar_events ev
+      join transactions t on t.id = ev.taxa_transaction_id
+     where ev.client_id = p_id
+       and coalesce(t.client_id, '00000000-0000-0000-0000-000000000000'::uuid) <> p_id
+       and t.rental_id is null;
+
+  elsif p_table = 'tasks' then
+    v_tarefas := 1;
+
+  else
+    raise exception 'Tabela não permitida: %', p_table;
+  end if;
+
+  v_lancamentos := v_lancamentos + coalesce(v_taxas, 0);
+  v_valor_lancamentos := coalesce(v_valor_lancamentos, 0) + coalesce(v_valor_taxas, 0);
+
+  if v_locacoes > 0 then
+    v_itens := v_itens || (v_locacoes || (case when v_locacoes = 1 then ' locação' else ' locações' end));
+  end if;
+  if v_eventos > 0 then
+    v_itens := v_itens || (v_eventos || (case when v_eventos = 1 then ' evento da agenda' else ' eventos da agenda' end));
+  end if;
+  if v_lancamentos > 0 then
+    v_itens := v_itens || (v_lancamentos || (case when v_lancamentos = 1 then ' lançamento financeiro' else ' lançamentos financeiros' end));
+  end if;
+  if v_taxas > 0 then
+    v_itens := v_itens || ('incluindo ' || public.formatar_reais(v_valor_taxas) || ' de taxa de compromisso');
+  end if;
+  if v_tarefas > 0 then
+    v_itens := v_itens || (v_tarefas || (case when v_tarefas = 1 then ' tarefa' else ' tarefas' end));
+  end if;
+
+  return jsonb_build_object(
+    'tabela', p_table,
+    'id', p_id,
+    'alvo', v_alvo,
+    'locacoes', v_locacoes,
+    'eventos', v_eventos,
+    'lancamentos', v_lancamentos,
+    'tarefas', v_tarefas,
+    'taxas', v_taxas,
+    'valor_taxas', round(coalesce(v_valor_taxas, 0), 2),
+    'valor_locacoes', round(coalesce(v_valor_locacoes, 0), 2),
+    'valor_lancamentos', round(coalesce(v_valor_lancamentos, 0), 2),
+    'itens', to_jsonb(v_itens),
+    'aviso', v_aviso
+  );
+end;
+$$;
+
+grant execute on function public.preview_exclusao to authenticated;
+-- Cascata de uma locação: quebra os ciclos de chave estrangeira (com a
+-- transação, com a taxa) antes de apagar, na ordem que o banco permite.
+create or replace function public.excluir_locacao_cascata(p_rental_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_taxas uuid[];
+begin
+  update rentals set transaction_id = null where id = p_rental_id;
+
+  select array_agg(taxa_transaction_id) into v_taxas
+    from calendar_events
+   where rental_id = p_rental_id and taxa_transaction_id is not null;
+
+  update calendar_events set taxa_transaction_id = null where rental_id = p_rental_id;
+
+  update mentoring_events set calendar_event_id = null
+   where calendar_event_id in (select id from calendar_events where rental_id = p_rental_id);
+  update mentoring_events set transaction_id = null
+   where transaction_id in (select id from transactions where rental_id = p_rental_id);
+
+  delete from calendar_events where rental_id = p_rental_id;
+  delete from transactions    where rental_id = p_rental_id;
+  if v_taxas is not null then
+    delete from transactions where id = any(v_taxas);
+  end if;
+  delete from rentals where id = p_rental_id;
+end;
+$$;
+
+-- Cascata de uma mentoria.
+create or replace function public.excluir_mentoria_cascata(p_mentoria_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_evento_id uuid;
+  v_transacao_id uuid;
+begin
+  select calendar_event_id, transaction_id into v_evento_id, v_transacao_id
+    from mentoring_events where id = p_mentoria_id;
+
+  update mentoring_events set calendar_event_id = null, transaction_id = null
+   where id = p_mentoria_id;
+  update calendar_events set mentoring_id = null where mentoring_id = p_mentoria_id;
+  update transactions    set mentoring_id = null where mentoring_id = p_mentoria_id;
+
+  delete from calendar_events where id = v_evento_id;
+  delete from transactions    where id = v_transacao_id;
+  delete from mentoring_events where id = p_mentoria_id;
+end;
+$$;
+
+-- A exclusão em si: cascata real, só admin, com registro no histórico.
+-- Trata a taxa de compromisso nos três casos em que ela pode aparecer:
+-- apagar o lançamento dela sozinho (volta a pendente), apagar o
+-- agendamento (o lançamento vai junto), ou apagar o cliente (idem, em
+-- lote).
+create or replace function public.delete_record_forever(
+  p_table text,
+  p_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_descricao text;
+  v_detalhes jsonb;
+  v_rental_id uuid;
+  v_mentoria_id uuid;
+  v_evento_taxa uuid;
+  v_taxas uuid[];
+begin
+  perform public.require_admin();
+
+  v_descricao := public.descrever_registro(p_table, p_id);
+  v_detalhes  := public.preview_exclusao(p_table, p_id);
+
+  if p_table = 'rentals' then
+    perform public.excluir_locacao_cascata(p_id);
+
+  elsif p_table = 'transactions' then
+    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+      from transactions where id = p_id;
+
+    if v_rental_id is not null then
+      perform public.excluir_locacao_cascata(v_rental_id);
+    elsif v_mentoria_id is not null then
+      perform public.excluir_mentoria_cascata(v_mentoria_id);
+    else
+      select id into v_evento_taxa from calendar_events where taxa_transaction_id = p_id limit 1;
+      if v_evento_taxa is not null then
+        update calendar_events
+           set taxa_transaction_id = null,
+               taxa_status = 'pendente',
+               taxa_valor = coalesce(taxa_valor, public.valor_taxa_atual())
+         where id = v_evento_taxa;
+      end if;
+
+      update rentals          set transaction_id = null where transaction_id = p_id;
+      update mentoring_events set transaction_id = null where transaction_id = p_id;
+      delete from transactions where id = p_id;
+    end if;
+
+  elsif p_table = 'calendar_events' then
+    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+      from calendar_events where id = p_id;
+
+    if v_rental_id is not null then
+      perform public.excluir_locacao_cascata(v_rental_id);
+    elsif v_mentoria_id is not null then
+      perform public.excluir_mentoria_cascata(v_mentoria_id);
+    else
+      update mentoring_events set calendar_event_id = null where calendar_event_id = p_id;
+      select taxa_transaction_id into v_evento_taxa from calendar_events where id = p_id;
+      update calendar_events set taxa_transaction_id = null where id = p_id;
+      delete from calendar_events where id = p_id;
+      if v_evento_taxa is not null then
+        delete from transactions where id = v_evento_taxa;
+      end if;
+    end if;
+
+  elsif p_table = 'mentoring_events' then
+    perform public.excluir_mentoria_cascata(p_id);
+
+  elsif p_table = 'tasks' then
+    delete from tasks where id = p_id;
+
+  elsif p_table = 'clients' then
+    update rentals set transaction_id = null where client_id = p_id;
+
+    update mentoring_events set calendar_event_id = null
+     where calendar_event_id in (select id from calendar_events where client_id = p_id);
+    update mentoring_events set transaction_id = null
+     where transaction_id in (
+       select id from transactions
+        where client_id = p_id
+           or rental_id in (select id from rentals where client_id = p_id)
+     );
+
+    select array_agg(taxa_transaction_id) into v_taxas
+      from calendar_events
+     where client_id = p_id and taxa_transaction_id is not null;
+
+    update calendar_events set taxa_transaction_id = null where client_id = p_id;
+
+    delete from calendar_events where client_id = p_id;
+    delete from transactions
+     where client_id = p_id
+        or rental_id in (select id from rentals where client_id = p_id)
+        or id = any(coalesce(v_taxas, '{}'::uuid[]));
+    delete from rentals     where client_id = p_id;
+    delete from client_tags where client_id = p_id;
+    delete from tasks       where client_id = p_id;
+    delete from clients     where id = p_id;
+
+  else
+    raise exception 'Tabela não permitida: %', p_table;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'excluido', p_table, p_id, v_descricao, v_detalhes
+  );
+end;
+$$;
+
+-- ============================================================
+-- CICLO DE STATUS DO AGENDAMENTO
+-- ============================================================
+create or replace function public.confirmar_agendamento(
+  p_event_id uuid,
+  p_confirmado boolean default true
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status event_status_type;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+
+  select status into v_status from calendar_events where id = p_event_id;
+
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado. Reative-o antes de confirmar.';
+  end if;
+
+  update calendar_events set confirmed = p_confirmado where id = p_event_id;
+
+  perform public.registrar_movimentacao(
+    case when p_confirmado then 'confirmado' else 'desconfirmado' end,
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    '{}'::jsonb
+  );
+end;
+$$;
+
+grant execute on function public.confirmar_agendamento to authenticated;
+
+-- Reagendar: tira da data antiga e põe na nova. Move a locação vinculada
+-- junto (e o lançamento financeiro, se existir), para agenda e
+-- financeiro não divergirem. A checagem amigável roda antes da
+-- constraint de exclusão (rede de segurança final), para a mensagem
+-- dizer de quem é a data em vez do código cru do Postgres.
+create or replace function public.reagendar_agendamento(
+  p_event_id uuid,
+  p_nova_data date
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_data_antiga date;
+  v_equipment_id uuid;
+  v_rental_id uuid;
+  v_status event_status_type;
+  v_ocupante text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para reagendar.';
+  end if;
+
+  select date_start, equipment_id, rental_id, status
+    into v_data_antiga, v_equipment_id, v_rental_id, v_status
+    from calendar_events where id = p_event_id;
+
+  if v_data_antiga is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado e não pode ser reagendado.';
+  end if;
+  if p_nova_data = v_data_antiga then
+    raise exception 'A data nova é igual à atual.';
+  end if;
+
+  if v_equipment_id is not null then
+    select coalesce(c.name, ev.title) into v_ocupante
+      from calendar_events ev
+      left join clients c on c.id = ev.client_id
+     where ev.equipment_id = v_equipment_id
+       and ev.status <> 'cancelada'
+       and ev.id <> p_event_id
+       and daterange(ev.date_start, ev.date_end, '[]') && daterange(p_nova_data, p_nova_data, '[]')
+     limit 1;
+
+    if v_ocupante is not null then
+      raise exception 'O equipamento já está reservado em % para %.',
+        to_char(p_nova_data, 'DD/MM/YYYY'), v_ocupante;
+    end if;
+  end if;
+
+  update calendar_events
+     set date_start = p_nova_data,
+         date_end   = p_nova_data
+   where id = p_event_id;
+
+  if v_rental_id is not null then
+    update rentals
+       set event_date = p_nova_data,
+           rescheduled = true
+     where id = v_rental_id;
+
+    update transactions
+       set date = p_nova_data
+     where rental_id = v_rental_id;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'reagendado', 'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object(
+      'data_antiga', to_char(v_data_antiga, 'DD/MM/YYYY'),
+      'data_nova',   to_char(p_nova_data, 'DD/MM/YYYY')
+    )
+  );
+
+exception
+  when exclusion_violation then
+    raise exception 'O equipamento já está reservado em %.', to_char(p_nova_data, 'DD/MM/YYYY');
+end;
+$$;
+
+grant execute on function public.reagendar_agendamento to authenticated;
+
+-- Marcar como realizado (o procedimento aconteceu) e desfazer. Não diz
+-- nada sobre pagamento — ver marcar_locacao_paga/rentals.pago, é essa a
+-- separação que permite uma locação ficar "a receber".
+create or replace function public.marcar_realizada(
+  p_rental_id uuid,
+  p_realizada boolean default true
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status event_status_type;
+  v_data date;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+
+  select status, event_date into v_status, v_data from rentals where id = p_rental_id;
+
+  if v_status is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta locação está cancelada.';
+  end if;
+
+  if p_realizada and v_data > current_date then
+    raise exception 'Esta locação é do dia %. Não dá para marcar como realizada antes de acontecer.',
+      to_char(v_data, 'DD/MM/YYYY');
+  end if;
+
+  update rentals
+     set status = case when p_realizada then 'realizada' else 'confirmada' end::event_status_type
+   where id = p_rental_id;
+
+  update calendar_events
+     set status = case when p_realizada then 'realizada' else 'confirmada' end::event_status_type
+   where rental_id = p_rental_id;
+
+  perform public.registrar_movimentacao(
+    case when p_realizada then 'realizado' else 'realizacao_desfeita' end,
+    'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('status_novo', case when p_realizada then 'realizada' else 'confirmada' end)
+  );
+end;
+$$;
+
+grant execute on function public.marcar_realizada to authenticated;
+
+-- Cancelar um agendamento. Recusa se a locação vinculada já foi paga
+-- (desfaça o pagamento antes, para o caixa não ficar com receita de
+-- algo cancelado). Taxa paga vira perdida: o valor fica com a casa e
+-- não gera crédito. Guarda o status de antes do cancelamento dentro do
+-- próprio registro de movimentação (status_anterior), para
+-- reativar_agendamento saber para onde voltar (leva E parte 2).
+create or replace function public.cancelar_agendamento(
+  p_event_id uuid,
+  p_motivo text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_status event_status_type;
+  v_taxa text;
+  v_descricao text;
+  v_pago boolean;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para cancelar agendamentos.';
+  end if;
+
+  select rental_id, status, taxa_status into v_rental_id, v_status, v_taxa
+    from calendar_events where id = p_event_id;
+
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento já está cancelado.';
+  end if;
+
+  if v_rental_id is not null then
+    select pago into v_pago from rentals where id = v_rental_id;
+    if v_pago then
+      raise exception 'Esta locação já foi paga. Desfaça o pagamento antes de cancelar, para o caixa não ficar com receita de algo cancelado.';
+    end if;
+  end if;
+
+  v_descricao := public.descrever_registro('calendar_events', p_event_id);
+
+  update calendar_events set status = 'cancelada' where id = p_event_id;
+  if v_rental_id is not null then
+    update rentals set status = 'cancelada' where id = v_rental_id;
+  end if;
+
+  if v_taxa = 'paga' then
+    update calendar_events set taxa_status = 'perdida' where id = p_event_id;
+    perform public.registrar_movimentacao(
+      'taxa_perdida', 'calendar_events', p_event_id, v_descricao,
+      jsonb_build_object('motivo', 'agendamento cancelado após a taxa ter sido paga')
+    );
+  end if;
+
+  -- Leva O: taxa perdida deixa de contar como crédito, então o saldo da
+  -- locação (se houver) precisa ser recalculado.
+  if v_rental_id is not null then
+    perform public.recalcular_pagamento_locacao(v_rental_id);
+  end if;
+
+  perform public.registrar_movimentacao(
+    'cancelado', 'calendar_events', p_event_id, v_descricao,
+    jsonb_build_object(
+      'motivo', coalesce(nullif(trim(p_motivo), ''), 'não informado'),
+      'taxa', coalesce(v_taxa, 'nao_aplica'),
+      'status_anterior', v_status
+    )
+  );
+end;
+$$;
+
+grant execute on function public.cancelar_agendamento to authenticated;
+
+-- Reativar um agendamento cancelado. Devolve o status de antes do
+-- cancelamento (lido da movimentação mais recente, leva E parte 2) em
+-- vez de sempre 'confirmada' — um agendamento já realizado que foi
+-- cancelado por engano volta a 'realizada', não regride no tempo. Só
+-- devolve a taxa perdida para paga se o lançamento dela ainda existir.
+create or replace function public.reativar_agendamento(p_event_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_equipment_id uuid;
+  v_data date;
+  v_ocupante text;
+  v_taxa text;
+  v_taxa_transacao uuid;
+  v_status_anterior event_status_type;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para reativar agendamentos.';
+  end if;
+
+  select rental_id, equipment_id, date_start, taxa_status, taxa_transaction_id
+    into v_rental_id, v_equipment_id, v_data, v_taxa, v_taxa_transacao
+    from calendar_events where id = p_event_id and status = 'cancelada';
+
+  if v_data is null then
+    raise exception 'Agendamento não encontrado ou não está cancelado.';
+  end if;
+
+  if v_equipment_id is not null then
+    select coalesce(c.name, ev.title) into v_ocupante
+      from calendar_events ev
+      left join clients c on c.id = ev.client_id
+     where ev.equipment_id = v_equipment_id
+       and ev.status <> 'cancelada'
+       and ev.id <> p_event_id
+       and daterange(ev.date_start, ev.date_end, '[]') && daterange(v_data, v_data, '[]')
+     limit 1;
+
+    if v_ocupante is not null then
+      raise exception 'Não dá para reativar: o equipamento já foi reservado em % para %. Reagende para outra data.',
+        to_char(v_data, 'DD/MM/YYYY'), v_ocupante;
+    end if;
+  end if;
+
+  select (detalhes->>'status_anterior')::event_status_type
+    into v_status_anterior
+    from movimentacoes
+   where entidade = 'calendar_events' and entidade_id = p_event_id and acao = 'cancelado'
+   order by ocorrido_em desc
+   limit 1;
+
+  if v_status_anterior is null or v_status_anterior = 'cancelada' then
+    v_status_anterior := 'confirmada';
+  end if;
+
+  update calendar_events set status = v_status_anterior, confirmed = false where id = p_event_id;
+  if v_rental_id is not null then
+    update rentals set status = v_status_anterior where id = v_rental_id;
+  end if;
+
+  if v_taxa = 'perdida' and v_taxa_transacao is not null then
+    update calendar_events set taxa_status = 'paga' where id = p_event_id;
+    perform public.registrar_movimentacao(
+      'taxa_paga', 'calendar_events', p_event_id,
+      public.descrever_registro('calendar_events', p_event_id),
+      jsonb_build_object('motivo', 'agendamento reativado; a taxa paga volta a valer como crédito')
+    );
+  end if;
+
+  -- Leva O: taxa que voltou a valer como crédito muda o saldo da locação.
+  if v_rental_id is not null then
+    perform public.recalcular_pagamento_locacao(v_rental_id);
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('acao_detalhada', 'agendamento reativado', 'status_restaurado', v_status_anterior)
+  );
+end;
+$$;
+
+grant execute on function public.reativar_agendamento to authenticated;
+
+-- Agendamentos de um cliente, para a ficha do lead: tudo que a tela
+-- precisa para desenhar os botões, numa função só.
+create or replace function public.agendamentos_do_cliente(p_client_id uuid)
+returns table (
+  event_id uuid,
+  rental_id uuid,
+  equipamento text,
+  data date,
+  status text,
+  confirmado boolean,
+  valor numeric,
+  disparos integer,
+  situacao text,
+  taxa_status text,
+  taxa_valor numeric,
+  pago boolean,
+  pago_em date
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    ev.id,
+    ev.rental_id,
+    coalesce(eq.name, ev.title),
+    ev.date_start,
+    ev.status::text,
+    ev.confirmed,
+    coalesce(r.calculated_value, ev.value),
+    r.shots,
+    case
+      when ev.status = 'cancelada'  then 'cancelado'
+      when ev.status = 'realizada'  then 'realizado'
+      when ev.confirmed             then 'confirmado'
+      else 'agendado'
+    end,
+    ev.taxa_status,
+    ev.taxa_valor,
+    coalesce(r.pago, false),
+    r.pago_em
+  from calendar_events ev
+  left join equipments eq on eq.id = ev.equipment_id
+  left join rentals r on r.id = ev.rental_id
+  where ev.client_id = p_client_id
+  order by ev.date_start desc;
+$$;
+
+grant execute on function public.agendamentos_do_cliente to authenticated;
+
+-- ============================================================
+-- TAXA DE COMPROMISSO
+-- ============================================================
+
+-- Valor da taxa configurado (settings.reservation_fee, com fallback).
+create or replace function public.valor_taxa_atual()
+returns numeric
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select reservation_fee from settings where id = true), 250.00);
+$$;
+
+-- Definir a taxa de um agendamento. Marcar como paga cria o lançamento
+-- da taxa. Voltar para pendente ou nao_aplica apaga esse lançamento,
+-- porque dinheiro que não entrou não pode ficar no caixa. Perdida
+-- mantém o lançamento de propósito: o cliente pagou, cancelou, e o
+-- valor é seu.
+create or replace function public.definir_taxa_agendamento(
+  p_event_id uuid,
+  p_status text,
+  p_payment_method payment_method_type default 'pix'
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status_atual text;
+  v_transacao_id uuid;
+  v_client_id uuid;
+  v_client_name text;
+  v_data date;
+  v_categoria uuid;
+  v_valor numeric;
+  v_rental_id uuid;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar a taxa.';
+  end if;
+
+  if p_status not in ('nao_aplica', 'pendente', 'paga', 'perdida') then
+    raise exception 'Estado de taxa inválido: %', p_status;
+  end if;
+
+  select ev.taxa_status, ev.taxa_transaction_id, ev.client_id, ev.date_start, c.name, ev.rental_id
+    into v_status_atual, v_transacao_id, v_client_id, v_data, v_client_name, v_rental_id
+    from calendar_events ev
+    left join clients c on c.id = ev.client_id
+   where ev.id = p_event_id;
+
+  if v_data is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if p_status = 'perdida' and v_status_atual <> 'paga' then
+    raise exception 'Só faz sentido marcar como perdida uma taxa que estava paga.';
+  end if;
+
+  v_valor := public.valor_taxa_atual();
+
+  if p_status = 'paga' and v_transacao_id is null then
+    select id into v_categoria
+      from categories
+     where type = 'entrada' and name ilike 'Taxa%'
+     limit 1;
+
+    insert into transactions (
+      type, category_id, description, amount, payment_method, date, scope, client_id, created_by
+    )
+    values (
+      'entrada', v_categoria,
+      'Taxa de compromisso - ' || coalesce(v_client_name, 'cliente'),
+      v_valor, p_payment_method, v_data, 'harmonize', v_client_id, auth.uid()
+    )
+    returning id into v_transacao_id;
+
+  elsif p_status in ('nao_aplica', 'pendente') and v_transacao_id is not null then
+    update calendar_events set taxa_transaction_id = null where id = p_event_id;
+    delete from transactions where id = v_transacao_id;
+    v_transacao_id := null;
+  end if;
+
+  update calendar_events
+     set taxa_status = p_status,
+         taxa_valor = case when p_status in ('paga', 'perdida', 'pendente') then v_valor else null end,
+         taxa_transaction_id = v_transacao_id
+   where id = p_event_id;
+
+  -- Leva O: crédito de taxa mudou, o saldo da locação (se houver) precisa
+  -- ser recalculado — pago/pago_em nunca são setados direto por fora daqui.
+  if v_rental_id is not null then
+    perform public.recalcular_pagamento_locacao(v_rental_id);
+  end if;
+
+  perform public.registrar_movimentacao(
+    case p_status
+      when 'paga'     then 'taxa_paga'
+      when 'perdida'  then 'taxa_perdida'
+      when 'pendente' then 'taxa_pendente'
+      else 'taxa_isenta'
+    end,
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('taxa_status', p_status, 'taxa_valor', v_valor)
+  );
+end;
+$$;
+
+grant execute on function public.definir_taxa_agendamento to authenticated;
+
+-- ============================================================
+-- PAGAMENTOS MÚLTIPLOS/PARCIAIS (leva O)
+--
+-- Antes, "pago" era um interruptor que cada função ligava/desligava na
+-- mão. Isso quebrava assim que existisse mais de um pagamento por
+-- locação (parcelas, formas diferentes), e também não reagia se a taxa
+-- de reserva fosse marcada paga DEPOIS da locação já estar quitada.
+-- Agora cada pagamento de uma locação é uma linha própria em
+-- rental_payments (ver tabela, logo após "rentals"), e rentals.pago/
+-- pago_em são só a FOTO do que a soma dessas linhas diz — recalculada
+-- por recalcular_pagamento_locacao() sempre que rental_payments muda
+-- (trigger) ou que o crédito de taxa muda (definir_taxa_agendamento,
+-- cancelar_agendamento, reativar_agendamento, acima). Nunca setados
+-- diretamente por fora dela.
+-- ============================================================
+create or replace function public.recalcular_pagamento_locacao(p_rental_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_valor numeric;
+  v_credito numeric;
+  v_pago_total numeric;
+  v_saldo numeric;
+  v_ultima_data date;
+begin
+  select calculated_value into v_valor from rentals where id = p_rental_id;
+  if v_valor is null then
+    return; -- locação já não existe mais (apagada em cascata); nada a fazer.
+  end if;
+
+  select coalesce(sum(ev.taxa_valor), 0) into v_credito
+    from calendar_events ev
+   where ev.rental_id = p_rental_id and ev.taxa_status = 'paga';
+
+  select coalesce(sum(valor), 0), max(data) into v_pago_total, v_ultima_data
+    from rental_payments where rental_id = p_rental_id;
+
+  v_saldo := round(v_valor - v_credito - v_pago_total, 2);
+
+  update rentals
+     set pago = (v_saldo <= 0),
+         pago_em = case when v_saldo <= 0 then v_ultima_data else null end
+   where id = p_rental_id;
+end;
+$$;
+
+comment on function public.recalcular_pagamento_locacao(uuid) is
+  'Recalcula rentals.pago/pago_em a partir da soma de rental_payments menos o crédito de taxa de reserva já paga. Uso interno (trigger de rental_payments e funções que mudam o crédito de taxa) — nunca exposta ao app.';
+
+create or replace function public.trg_recalcular_pagamento_locacao()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.recalcular_pagamento_locacao(coalesce(new.rental_id, old.rental_id));
+  return coalesce(new, old);
+end;
+$$;
+
+create trigger rental_payments_recalcula
+  after insert or update or delete on public.rental_payments
+  for each row execute function public.trg_recalcular_pagamento_locacao();
+
+-- Situação de pagamento (aberto/parcial/pago) e saldo, para a tela ler
+-- pronto em vez de recalcular na mão.
+create or replace view public.rentals_situacao_pagamento
+with (security_invoker = true) as
+select
+  r.id as rental_id,
+  r.calculated_value,
+  coalesce((
+    select sum(ev.taxa_valor) from calendar_events ev
+     where ev.rental_id = r.id and ev.taxa_status = 'paga'
+  ), 0) as credito_taxa,
+  coalesce((select sum(rp.valor) from rental_payments rp where rp.rental_id = r.id), 0) as total_pago,
+  greatest(
+    r.calculated_value
+      - coalesce((select sum(ev.taxa_valor) from calendar_events ev where ev.rental_id = r.id and ev.taxa_status = 'paga'), 0)
+      - coalesce((select sum(rp.valor) from rental_payments rp where rp.rental_id = r.id), 0),
+    0
+  ) as saldo,
+  case
+    when coalesce((select sum(rp.valor) from rental_payments rp where rp.rental_id = r.id), 0) = 0 then 'aberto'
+    when r.pago then 'pago'
+    else 'parcial'
+  end as situacao
+from rentals r;
+
+comment on view public.rentals_situacao_pagamento is
+  'Situação de pagamento de cada locação (aberto/parcial/pago) e o saldo, já descontando o crédito de taxa de reserva paga. security_invoker=true: mantém a RLS de rentals para quem consulta.';
+
+grant select on public.rentals_situacao_pagamento to authenticated;
+
+-- Registrar UM pagamento (parcial ou não). Chamar de novo para dividir
+-- entre formas (ex: parte em dinheiro, parte em PIX) ou completar um
+-- saldo em aberto — pago/pago_em se ajustam sozinhos pelo trigger acima.
+create or replace function public.registrar_pagamento_locacao(
+  p_rental_id uuid,
+  p_forma payment_method_type,
+  p_valor numeric,
+  p_data date default current_date,
+  p_pix_conta text default null,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_client_name text;
+  v_status event_status_type;
+  v_categoria uuid;
+  v_transacao_id uuid;
+  v_payment_id uuid;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para registrar pagamentos.';
+  end if;
+  if p_valor <= 0 then
+    raise exception 'O valor do pagamento precisa ser maior que zero.';
+  end if;
+  if p_forma = 'pix' and p_pix_conta is null then
+    raise exception 'Informe em qual conta o PIX caiu.';
+  end if;
+
+  select r.client_id, r.status, c.name into v_client_id, v_status, v_client_name
+    from rentals r
+    left join clients c on c.id = r.client_id
+   where r.id = p_rental_id;
+
+  if v_client_id is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta locação está cancelada. Reative o agendamento antes de registrar o pagamento.';
+  end if;
+
+  select id into v_categoria
+    from categories
+   where type = 'entrada' and is_default = true and name ilike 'Loca%'
+   limit 1;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, notes, created_by
+  )
+  values (
+    'entrada', v_categoria,
+    'Locação HIPRO - ' || coalesce(v_client_name, ''),
+    p_valor, p_forma, p_data, 'harmonize', v_client_id, p_rental_id, p_notes, auth.uid()
+  )
+  returning id into v_transacao_id;
+
+  insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, notes, created_by)
+  values (p_rental_id, p_forma, p_valor, p_data, p_pix_conta, v_transacao_id, p_notes, auth.uid())
+  returning id into v_payment_id;
+
+  perform public.registrar_movimentacao(
+    'pago', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('valor_pago', round(p_valor, 2), 'forma', p_forma::text, 'pix_conta', p_pix_conta)
+  );
+
+  return v_payment_id;
+end;
+$$;
+
+comment on function public.registrar_pagamento_locacao(uuid, payment_method_type, numeric, date, text, text) is
+  'Registra UM pagamento de uma locação (parcial ou não). Chamar de novo para dividir entre formas ou completar um saldo em aberto — rentals.pago/pago_em se ajustam sozinhos pelo trigger de rental_payments.';
+
+grant execute on function public.registrar_pagamento_locacao to authenticated;
+
+create or replace function public.remover_pagamento_locacao(p_payment_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para alterar pagamentos.';
+  end if;
+
+  select rental_id, transaction_id into v_rental_id, v_transaction_id
+    from rental_payments where id = p_payment_id;
+
+  if v_rental_id is null then
+    raise exception 'Pagamento não encontrado.';
+  end if;
+
+  -- rentals.transaction_id é só um atalho para o lançamento principal
+  -- (caminho de tela única, herdado de antes desta leva); se for
+  -- justamente este pagamento, zera ANTES de apagar a transação — senão
+  -- a FK rentals_transaction_id_fkey barra o delete (ela não tem on
+  -- delete cascade, de propósito, para nunca sumir uma transação por
+  -- engano só por causa de outro caminho de exclusão).
+  update rentals set transaction_id = null
+   where id = v_rental_id and transaction_id = v_transaction_id;
+
+  -- Apagar a transação já casca-deleta esta linha de rental_payments
+  -- (transaction_id on delete cascade); o delete abaixo cobre o caso
+  -- raro de um pagamento sem transaction_id.
+  if v_transaction_id is not null then
+    delete from transactions where id = v_transaction_id;
+  end if;
+  delete from rental_payments where id = p_payment_id;
+
+  perform public.registrar_movimentacao(
+    'pagamento_desfeito', 'rentals', v_rental_id,
+    public.descrever_registro('rentals', v_rental_id),
+    jsonb_build_object('pagamento_removido', p_payment_id)
+  );
+end;
+$$;grant execute on function public.remover_pagamento_locacao to authenticated;
