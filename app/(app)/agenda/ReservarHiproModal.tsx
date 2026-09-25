@@ -13,7 +13,8 @@ interface EquipmentOption {
 // Reserva só o equipamento e a data na Agenda (status 'pre_reserva'), sem
 // contagem de disparos e sem lançar nada no financeiro ainda. Quando o
 // procedimento acontecer de verdade, essa mesma pré-reserva é finalizada
-// (ver FinalizarReservaModal), que aí sim cria a locação e a transação.
+// (ver CalculadoraLocacaoModal, mode "finalize"), que aí sim cria a
+// locação e a transação.
 export default function ReservarHiproModal({
   clients,
   equipments,
