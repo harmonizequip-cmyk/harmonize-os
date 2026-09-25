@@ -16,7 +16,6 @@ interface ClientOption {
   id: string;
   name: string;
   whatsapp?: string | null;
-  reservation_fee_status?: string;
 }
 
 interface CategoryOption {
@@ -80,7 +79,7 @@ export default function QuickActionsButton({
   async function openMenu() {
     setMenuOpen(true);
     const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
-      supabase.from("clients").select("id, name, whatsapp, reservation_fee_status").order("name"),
+      supabase.from("clients").select("id, name, whatsapp").order("name"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
       supabase.from("equipments").select("id, code, name").order("code"),
     ]);
