@@ -18,6 +18,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
+import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
 import type { PricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
@@ -44,10 +45,23 @@ interface EventRow {
   value: number | null;
   client_id: string | null;
   equipment_id: string | null;
-  clients?: { name: string; whatsapp?: string | null } | null;
+  clients?: {
+    name: string;
+    whatsapp?: string | null;
+    // Usados só na mensagem de "pedir confirmação" (ver
+    // buildPedidoConfirmacaoMessage), nunca no card em si — o card
+    // continua mostrando clients.name, que pode ter mais coisa
+    // misturada e serve só para a equipe reconhecer o agendamento.
+    treatment?: string | null;
+    display_name?: string | null;
+  } | null;
   rental_id: string | null;
   notes: string | null;
   taxa_status?: string | null;
+  // Quando "Pedir confirmação no WhatsApp" foi clicado para ESTA
+  // reserva. Independente de calendar_events.confirmed: pedir e
+  // confirmar são ações diferentes (ver os dois botões em renderCard).
+  confirmation_message_sent_at?: string | null;
 }
 
 interface ClientOption {
@@ -69,12 +83,8 @@ function parseDate(dateStr: string) {
   return new Date(`${dateStr}T00:00:00`);
 }
 
-function buildConfirmationMessage(event: EventRow) {
-  const meta = EVENT_META[event.event_type] ?? { label: event.event_type };
-  const name = event.clients?.name;
-  return `Oi${name ? `, ${name}` : ""}! Confirmando sua sessão de ${meta.label} para o dia ${formatDate(
-    event.date_start
-  )}. Te espero! 💛`;
+function formatDiaMes(iso: string) {
+  return format(new Date(iso), "dd/MM");
 }
 
 // Abre o link do WhatsApp numa aba nova. Era uma tag de link comum antes,
@@ -108,8 +118,15 @@ export default function AgendaClient({
   const [reservaModalOpen, setReservaModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const [confirmingEvent, setConfirmingEvent] = useState<EventRow | null>(null);
-  const [confirmationMessage, setConfirmationMessage] = useState("");
+  // Estado do modal "Pedir confirmação no WhatsApp". Guarda o evento
+  // inteiro (não só o id) para o modal sempre mostrar os dados exatos
+  // da reserva que foi clicada — nunca de outra reserva da lista nem de
+  // uma seleção anterior (era exatamente esse tipo de mistura que o
+  // pedido descreveu como bug, mesmo sem ter sido reproduzido aqui).
+  const [pedidoEvent, setPedidoEvent] = useState<EventRow | null>(null);
+  const [pedidoMessage, setPedidoMessage] = useState("");
+  const [pedidoCadastroIncompleto, setPedidoCadastroIncompleto] = useState(false);
+  const [pedidoEnviando, setPedidoEnviando] = useState(false);
   const [eventSearch, setEventSearch] = useState("");
   // Aqui o "período" já é o mês que a pessoa está olhando no calendário —
   // trocar de mês É o filtro de período desta tela, então não faz sentido
@@ -232,16 +249,64 @@ export default function AgendaClient({
 
   const selectedDayEvents = eventsByDate.get(selectedDate) ?? [];
 
+  // "Confirmar reserva": SÓ muda o status. Nunca abre WhatsApp, nunca
+  // manda mensagem — é a correção do bug descrito no pedido, onde as
+  // duas coisas aconteciam juntas no mesmo clique. Passa a chamar a
+  // RPC confirmar_agendamento (já usada pela ficha do cliente) em vez
+  // de um update direto, para ficar registrado no histórico como
+  // qualquer outra mudança de status.
   async function toggleConfirmed(event: EventRow) {
     const nextConfirmed = !event.confirmed;
-    await supabase.from("calendar_events").update({ confirmed: nextConfirmed }).eq("id", event.id);
-    router.refresh();
-    // Só oferece a mensagem de aviso quando está confirmando (não ao desfazer),
-    // e só se tiver um WhatsApp cadastrado pra mandar.
-    if (nextConfirmed && event.clients?.whatsapp) {
-      setConfirmingEvent(event);
-      setConfirmationMessage(buildConfirmationMessage(event));
+    const { error } = await supabase.rpc("confirmar_agendamento", {
+      p_event_id: event.id,
+      p_confirmado: nextConfirmed,
+    });
+    if (error) {
+      window.alert("Não foi possível atualizar a confirmação. Tente novamente.");
+      return;
     }
+    router.refresh();
+  }
+
+  // "Pedir confirmação no WhatsApp": abre o modal com os dados desta
+  // reserva especificamente (o "event" recebido por parâmetro, nunca um
+  // estado global ou uma seleção anterior). Só registra o envio e abre
+  // o WhatsApp quando a pessoa de fato confirma no modal — nunca muda
+  // calendar_events.confirmed.
+  function handlePedirConfirmacao(event: EventRow) {
+    const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
+      treatment: event.clients?.treatment,
+      displayName: event.clients?.display_name,
+      dateStart: event.date_start,
+    });
+    setPedidoEvent(event);
+    setPedidoMessage(message);
+    setPedidoCadastroIncompleto(cadastroIncompleto);
+  }
+
+  async function confirmarEnvioPedido() {
+    if (!pedidoEvent) return;
+    const link = buildWhatsAppLink(pedidoEvent.clients?.whatsapp, pedidoMessage);
+    if (!link) {
+      window.alert("Este cliente não tem WhatsApp cadastrado.");
+      return;
+    }
+    setPedidoEnviando(true);
+    // Grava o registro do envio (vinculado ao ID desta reserva) antes de
+    // abrir o WhatsApp, para não perder o registro se a pessoa fechar a
+    // aba antes de voltar. Só isso muda no banco — confirmed continua
+    // como estava.
+    const { error } = await supabase.rpc("registrar_pedido_confirmacao", {
+      p_event_id: pedidoEvent.id,
+    });
+    setPedidoEnviando(false);
+    if (error) {
+      window.alert("Não foi possível registrar o envio. Tente novamente.");
+      return;
+    }
+    openInNewTab(link);
+    setPedidoEvent(null);
+    router.refresh();
   }
 
   function handleCreated() {
@@ -272,8 +337,21 @@ export default function AgendaClient({
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                 {meta.label}
                 {e.clients?.name ? ` · ${e.clients.name}` : ""}
+                {/* "sem disparos ainda" é sobre a contagem de disparos do
+                    HIPRO (preço/procedimento), não tem relação com
+                    mensagem de confirmação — por isso continua igual. */}
                 {isPending ? " · sem disparos ainda" : ""}
               </p>
+              {/* Rastreio do pedido de confirmação, por reserva — nunca
+                  aparece para quem já está confirmado, porque nesse caso
+                  o pedido já cumpriu o papel dele. */}
+              {!e.confirmed && (
+                <p className="mt-0.5 text-[11px] text-neutral-400">
+                  {e.confirmation_message_sent_at
+                    ? `✓ mensagem enviada em ${formatDiaMes(e.confirmation_message_sent_at)}`
+                    : "sem pedido de confirmação enviado ainda"}
+                </p>
+              )}
             </div>
           </div>
           <button
@@ -290,6 +368,21 @@ export default function AgendaClient({
             {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
           </button>
         </div>
+
+        {/* Ação independente da confirmação: manda a mensagem, nunca
+            confirma sozinha (seção 2/3 do pedido). Só faz sentido
+            oferecer enquanto a reserva ainda não está confirmada. */}
+        {!e.confirmed && (
+          <button
+            onClick={(ev) => {
+              ev.stopPropagation();
+              handlePedirConfirmacao(e);
+            }}
+            className="mt-2 w-full rounded-lg border border-brand-teal/40 py-1.5 text-xs font-medium text-brand-teal hover:bg-brand-teal/5"
+          >
+            💬 Pedir confirmação no WhatsApp
+          </button>
+        )}
       </div>
     );
   }
@@ -558,43 +651,51 @@ export default function AgendaClient({
 
       {availabilityOpen && <AvailabilityImageModal mode="agenda" onClose={() => setAvailabilityOpen(false)} />}
 
-      {confirmingEvent && (
+      {pedidoEvent && (
         <div
           className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center"
-          onClick={() => setConfirmingEvent(null)}
+          onClick={() => setPedidoEvent(null)}
         >
           <div
             className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Avisar o cliente?</h2>
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+              Pedir confirmação no WhatsApp
+            </h2>
             <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
-              Confirmado! Já deixei uma mensagem pronta pra avisar {confirmingEvent.clients?.name ?? "o cliente"}.
+              {pedidoEvent.clients?.name ?? "Cliente"} · {formatDate(pedidoEvent.date_start)}
             </p>
+
+            {pedidoCadastroIncompleto && (
+              <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                ⚠️ Cadastro incompleto: falta Tratamento e/ou Nome de exibição deste cliente. Por enquanto a
+                mensagem vai com saudação genérica — preencha esses campos no cadastro do cliente para
+                personalizar.
+              </p>
+            )}
+
             <textarea
-              value={confirmationMessage}
-              onChange={(e) => setConfirmationMessage(e.target.value)}
-              rows={3}
+              value={pedidoMessage}
+              onChange={(e) => setPedidoMessage(e.target.value)}
+              rows={4}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                onClick={() => setConfirmingEvent(null)}
+                onClick={() => setPedidoEvent(null)}
                 className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
               >
                 Agora não
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  const link = buildWhatsAppLink(confirmingEvent.clients?.whatsapp, confirmationMessage);
-                  if (link) openInNewTab(link);
-                  setConfirmingEvent(null);
-                }}
-                className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-center text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+                disabled={pedidoEnviando}
+                onClick={confirmarEnvioPedido}
+                className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-center text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
               >
-                Enviar no WhatsApp
+                {pedidoEnviando ? "Enviando..." : "Enviar no WhatsApp"}
               </button>
             </div>
           </div>
