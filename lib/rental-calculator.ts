@@ -54,6 +54,14 @@ export interface PagamentoLinha {
   id: string;
   forma: string;
   valor: number;
+  // Espelho em texto puro do que a pessoa está digitando no campo de valor
+  // (ex: "4189,8" no meio da digitação de "4189,80"). Existe só para o
+  // <input> não perder a vírgula/centavos em andamento: se o input usasse
+  // `valor` (number) diretamente, cada tecla reformataria o texto exibido
+  // (ponto em vez de vírgula, sem casas decimais em progresso) e digitar
+  // os centavos ficava impossível. `valor` continua sendo a fonte da
+  // verdade pra cálculo/gravação; `valorTexto` é só de exibição.
+  valorTexto: string;
   // Só relevante quando forma === "pix".
   pixConta: PixContaValue | "";
   // Data em que o pagamento entrou de fato (PIX caiu, cartão passou,
