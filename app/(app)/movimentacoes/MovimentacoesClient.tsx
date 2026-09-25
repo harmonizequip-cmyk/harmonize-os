@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { Periodo } from "@/lib/period";
+import FiltroBarra from "@/components/FiltroBarra";
+import { exportarCsv } from "@/lib/exportar-csv";
 
 interface Movimentacao {
   id: string;
@@ -21,6 +24,17 @@ const ACAO_META: Record<string, { label: string; classe: string }> = {
   reagendado: { label: "Reagendado", classe: "bg-brand-blue/10 text-brand-blue" },
   cancelado: { label: "Cancelado", classe: "bg-brand-pink/10 text-brand-pink" },
   excluido: { label: "Excluído", classe: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+  // Sem estes, tudo que a C1 e a C3a passaram a registrar aparecia aqui
+  // como código cru ("realizacao_desfeita"), e o filtro de ação não
+  // oferecia as opções novas.
+  realizado: { label: "Realizado", classe: "bg-brand-blue/10 text-brand-blue" },
+  realizacao_desfeita: { label: "Realizado desfeito", classe: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" },
+  pago: { label: "Pago", classe: "bg-brand-teal/10 text-brand-teal" },
+  pagamento_desfeito: { label: "Pagamento desfeito", classe: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" },
+  taxa_pendente: { label: "Taxa cobrada", classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  taxa_paga: { label: "Taxa recebida", classe: "bg-brand-teal/10 text-brand-teal" },
+  taxa_perdida: { label: "Taxa perdida", classe: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" },
+  taxa_isenta: { label: "Taxa isentada", classe: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" },
 };
 
 const ENTIDADE_LABEL: Record<string, string> = {
@@ -65,41 +79,36 @@ function descreverDetalhes(m: Movimentacao): string | null {
   return null;
 }
 
-export default function MovimentacoesClient({ initialRows }: { initialRows: Movimentacao[] }) {
-  const [de, setDe] = useState("");
-  const [ate, setAte] = useState("");
-  const [acao, setAcao] = useState("");
-  const [entidade, setEntidade] = useState("");
-  const [busca, setBusca] = useState("");
+export default function MovimentacoesClient({
+  initialRows,
+  periodo,
+  atingiuTeto,
+}: {
+  initialRows: Movimentacao[];
+  periodo: Periodo;
+  atingiuTeto: boolean;
+}) {
+  // A filtragem mora toda na consulta do servidor agora. Antes ela
+  // peneirava no navegador em cima das últimas 500 linhas, e este
+  // histórico só cresce: com o tempo, o começo do período sumiria da
+  // tela sem nada avisando.
+  const filtradas = initialRows;
 
-  const filtradas = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    return initialRows.filter((m) => {
-      // O campo de data do filtro é uma data pura (YYYY-MM-DD) e o
-      // ocorrido_em tem hora. Comparar os dez primeiros caracteres
-      // resolve sem precisar montar fuso horário na mão.
-      const dia = m.ocorrido_em.slice(0, 10);
-      if (de && dia < de) return false;
-      if (ate && dia > ate) return false;
-      if (acao && m.acao !== acao) return false;
-      if (entidade && m.entidade !== entidade) return false;
-      if (termo) {
-        const alvo = `${m.descricao} ${m.usuario_nome}`.toLowerCase();
-        if (!alvo.includes(termo)) return false;
-      }
-      return true;
-    });
-  }, [initialRows, de, ate, acao, entidade, busca]);
-
-  function limparFiltros() {
-    setDe("");
-    setAte("");
-    setAcao("");
-    setEntidade("");
-    setBusca("");
+  function baixarCsv() {
+    exportarCsv(
+      filtradas,
+      [
+        { titulo: "Quando", valor: (m) => formatarDataHora(m.ocorrido_em) },
+        { titulo: "Ação", valor: (m) => ACAO_META[m.acao]?.label ?? m.acao },
+        { titulo: "Módulo", valor: (m) => ENTIDADE_LABEL[m.entidade] ?? m.entidade },
+        { titulo: "Descrição", valor: (m) => m.descricao },
+        { titulo: "Detalhe", valor: (m) => descreverDetalhes(m) ?? "" },
+        { titulo: "Autor", valor: (m) => m.usuario_nome },
+      ],
+      "movimentacoes",
+      periodo.rotulo
+    );
   }
-
-  const temFiltro = !!(de || ate || acao || entidade || busca);
 
   return (
     <div className="space-y-4">
@@ -107,86 +116,56 @@ export default function MovimentacoesClient({ initialRows }: { initialRows: Movi
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Movimentações</h1>
         <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
           Tudo que foi criado, editado, confirmado, reagendado, cancelado ou excluído, com data, hora e autor.
-          Este histórico não pode ser editado nem apagado por ninguém.
+          Este histórico não pode ser editado nem apagado por ninguém. Para ver o que aconteceu e
+          quanto valeu, o histórico de{" "}
+          <Link href="/locacoes" className="text-brand-teal underline underline-offset-2">
+            Locações
+          </Link>{" "}
+          é a tela ao lado.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">De</label>
-            <input
-              type="date"
-              value={de}
-              onChange={(e) => setDe(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Até</label>
-            <input
-              type="date"
-              value={ate}
-              onChange={(e) => setAte(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Ação</label>
-            <select
-              value={acao}
-              onChange={(e) => setAcao(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">Todas</option>
-              {Object.entries(ACAO_META).map(([valor, meta]) => (
-                <option key={valor} value={valor}>
-                  {meta.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Módulo</label>
-            <select
-              value={entidade}
-              onChange={(e) => setEntidade(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="">Todos</option>
-              {Object.entries(ENTIDADE_LABEL).map(([valor, label]) => (
-                <option key={valor} value={valor}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Buscar</label>
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Cliente, valor, usuário..."
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </div>
-        </div>
+      <FiltroBarra
+        periodoPadrao="mes"
+        rotuloPeriodo={periodo.rotulo}
+        contagem={{
+          mostrando: filtradas.length,
+          rotulo: filtradas.length === 1 ? "movimentação" : "movimentações",
+        }}
+        campos={[
+          {
+            chave: "acao",
+            rotuloVazio: "Todas as ações",
+            opcoes: Object.entries(ACAO_META).map(([valor, meta]) => ({
+              valor,
+              label: meta.label,
+            })),
+          },
+          {
+            chave: "entidade",
+            rotuloVazio: "Todos os módulos",
+            opcoes: Object.entries(ENTIDADE_LABEL).map(([valor, label]) => ({ valor, label })),
+          },
+        ]}
+        buscaPlaceholder="Buscar na descrição..."
+        acoes={
+          <button
+            type="button"
+            onClick={baixarCsv}
+            disabled={filtradas.length === 0}
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Exportar CSV
+          </button>
+        }
+      />
 
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {filtradas.length} de {initialRows.length}
-            {filtradas.length === 1 ? " movimentação" : " movimentações"}
-          </p>
-          {temFiltro && (
-            <button
-              onClick={limparFiltros}
-              className="text-xs font-medium text-brand-teal underline underline-offset-2"
-            >
-              Limpar filtros
-            </button>
-          )}
+      {atingiuTeto && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
+          Este período tem mais movimentações do que a tela carrega de uma vez. Escolha um período
+          menor para ver o começo dele.
         </div>
-      </div>
+      )}
 
       <div className="space-y-2">
         {filtradas.map((m) => {
@@ -220,9 +199,8 @@ export default function MovimentacoesClient({ initialRows }: { initialRows: Movi
 
         {filtradas.length === 0 && (
           <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
-            {initialRows.length === 0
-              ? "Nenhuma movimentação registrada ainda. A partir de agora, toda exclusão, reagendamento e mudança de status aparece aqui."
-              : "Nenhuma movimentação bate com esses filtros."}
+            Nenhuma movimentação em {periodo.rotulo}. Experimente um período maior, ou limpe os
+            filtros.
           </div>
         )}
       </div>
