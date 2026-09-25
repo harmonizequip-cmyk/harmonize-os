@@ -29,6 +29,8 @@ interface Client {
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
+  treatment?: string | null;
+  display_name?: string | null;
 }
 
 interface RentalRow {
