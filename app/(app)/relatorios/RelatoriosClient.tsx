@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import type { PricingCliff } from "@/lib/pricing-opportunity";
+import type { Periodo } from "@/lib/period";
+import FiltroBarra from "@/components/FiltroBarra";
 
 interface TopClient {
   name: string;
@@ -88,6 +90,7 @@ function Card({
 }
 
 export default function RelatoriosClient({
+  periodo,
   cliff,
   dealsInDeadZoneCount,
   deadZoneTotal,
@@ -105,6 +108,7 @@ export default function RelatoriosClient({
   weekdayBreakdown,
   revenueMix,
 }: {
+  periodo: Periodo;
   cliff: PricingCliff | null;
   dealsInDeadZoneCount: number;
   deadZoneTotal: number;
@@ -145,6 +149,17 @@ export default function RelatoriosClient({
           dos dados reais, atualizado a cada vez que você abre a tela.
         </p>
       </div>
+
+      <FiltroBarra periodoPadrao="ano" rotuloPeriodo={periodo.rotulo} />
+
+      {/* Sem este aviso, um faturamento do mês ao lado de uma taxa de
+          conversão de sempre parece contradição. Dizer qual bloco segue
+          o quê é mais barato do que explicar o número depois. */}
+      <p className="-mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+        Seguem o período escolhido: faturamento, mix de receita, concentração, precificação e padrão
+        de agenda. Não seguem, porque respondem sobre a situação de agora: origem dos leads, funil de
+        follow-up e taxa a receber.
+      </p>
 
       <div className="space-y-3">
         {cliff ? (

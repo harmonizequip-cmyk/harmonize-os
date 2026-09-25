@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import { analyzePricingCliff } from "@/lib/pricing-opportunity";
+import { resolverPeriodo } from "@/lib/period";
 import RelatoriosClient from "./RelatoriosClient";
 
 const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -17,9 +18,28 @@ function oneOf<T>(value: T | T[] | null | undefined): T | null {
 // origem que converte de verdade. Tudo calculado em cima do banco
 // real a cada acesso, nunca hardcoded.
 // ============================================================
-export default async function RelatoriosPage() {
+export default async function RelatoriosPage({
+  searchParams,
+}: {
+  searchParams: { period?: string; from?: string; to?: string };
+}) {
   const supabase = createClient();
   const settings = await fetchSettings(supabase);
+
+  // O padrão é "este ano", e não "este mês": relatório estratégico com
+  // um mês de dados não sustenta conclusão nenhuma. Concentração de
+  // receita em cima de quatro locações diria que um cliente é 60% do
+  // faturamento, o que é ruído, não risco.
+  const periodo = resolverPeriodo(searchParams.period ?? "ano", searchParams.from, searchParams.to);
+
+  // NEM TUDO AQUI SEGUE O PERÍODO, DE PROPÓSITO.
+  // Dinheiro e atividade seguem: faturamento, mix, concentração,
+  // precificação e padrão de agenda respondem "no recorte escolhido".
+  // Estado do mundo não segue: origem dos leads, funil de follow-up e
+  // taxa a receber respondem "agora", e recortá-los por período daria
+  // uma taxa de conversão inventada, já que um lead de janeiro pode
+  // converter em agosto. A tela diz qual é qual, senão os dois números
+  // lado a lado enganam.
 
   const [
     { data: rentals },
@@ -35,20 +55,28 @@ export default async function RelatoriosPage() {
     // linhas: a regra agora mora no banco, igual para todas as telas.
     // O que foi lançado em modo teste continua visível na tela de dados
     // de teste, que é quem lê a tabela crua de propósito.
-    supabase.from("rentals_contabilizaveis").select("shots, calculated_value"),
+    supabase
+      .from("rentals_contabilizaveis")
+      .select("shots, calculated_value")
+      .gte("event_date", periodo.inicio)
+      .lte("event_date", periodo.fim),
     supabase.from("clients").select("id, name, origem, stage").eq("is_test", false),
     supabase
       .from("transactions_contabilizaveis")
       .select("amount, client_id, categories(name), clients(name)")
       .eq("scope", "harmonize")
-      .eq("type", "entrada"),
+      .eq("type", "entrada")
+      .gte("date", periodo.inicio)
+      .lte("date", periodo.fim),
     supabase.from("tags").select("id, name").like("name", "Follow-up %"),
     supabase
       .from("calendar_events")
       .select("date_start")
       .in("event_type", ["hipro_1", "hipro_2"])
       .neq("status", "cancelada")
-      .eq("is_test", false),
+      .eq("is_test", false)
+      .gte("date_start", periodo.inicio)
+      .lte("date_start", periodo.fim),
   ]);
 
   // ---- 1) Degrau de incentivo de volume ----
@@ -165,6 +193,7 @@ export default async function RelatoriosPage() {
 
   return (
     <RelatoriosClient
+      periodo={periodo}
       cliff={cliff}
       dealsInDeadZoneCount={dealsInDeadZone.length}
       deadZoneTotal={deadZoneTotal}
