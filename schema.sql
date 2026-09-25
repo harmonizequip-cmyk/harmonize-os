@@ -879,9 +879,7 @@ begin
     )
     returning 1
   )
-  select count(*) into v_mentoring from u;
-
-  return jsonb_build_object(
+  select count(*) into v_mentoring from u;return jsonb_build_object(
     'transactions',     v_transactions,
     'rentals',          v_rentals,
     'calendar_events',  v_events,
@@ -907,6 +905,7 @@ as $$
     'rental_payments',  (select count(*) from public.rental_payments  where is_test)
   );
 $$;
+
 create or replace function public.purge_test_data()
 returns jsonb
 language plpgsql
@@ -2168,9 +2167,7 @@ begin
   -- delete cascade, de propósito, para nunca sumir uma transação por
   -- engano só por causa de outro caminho de exclusão).
   update rentals set transaction_id = null
-   where id = v_rental_id and transaction_id = v_transaction_id;
-
-  -- Apagar a transação já casca-deleta esta linha de rental_payments
+   where id = v_rental_id and transaction_id = v_transaction_id;-- Apagar a transação já casca-deleta esta linha de rental_payments
   -- (transaction_id on delete cascade); o delete abaixo cobre o caso
   -- raro de um pagamento sem transaction_id.
   if v_transaction_id is not null then
@@ -2185,6 +2182,7 @@ begin
   );
 end;
 $$;grant execute on function public.remover_pagamento_locacao to authenticated;
+
 -- Corrigir um pagamento já lançado (valor digitado errado, forma
 -- trocada, conta PIX errada...), sempre com o antes/depois gravado no
 -- histórico. A tela pede a senha (ou biometria) antes de chamar isto
@@ -3006,7 +3004,7 @@ begin
 end;
 $$;
 
-grant execute on function public.finalize_rental_reservation to authenticated;
+grant execute on function public.finalize_rental_reservation(uuid, integer, numeric, payment_method_type, text, text, boolean) to authenticated;
 
 -- ============================================================
 -- FUNIL: tarefas de contato, tags automáticas, confirmação e
