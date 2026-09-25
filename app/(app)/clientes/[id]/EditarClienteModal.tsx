@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
+import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 
 interface Client {
   id: string;
@@ -22,12 +23,18 @@ export default function EditarClienteModal({
   client,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   client: Client;
   onClose: () => void;
   onSaved: () => void;
+  // Leva P.3: exclusão de lead/cliente. onDeleted navega pra fora desta
+  // página (o registro deixa de existir), diferente de onSaved que só
+  // atualiza a página atual.
+  onDeleted: () => void;
 }) {
   const supabase = createClient();
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [name, setName] = useState(client.name);
   // Tratamento + Nome de exibição alimentam as mensagens automáticas
   // (ex: pedido de confirmação por WhatsApp) em vez do campo "Nome"
@@ -211,6 +218,29 @@ export default function EditarClienteModal({
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
+
+        <button
+          onClick={() => setConfirmarExclusao(true)}
+          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+        >
+          Excluir lead/cliente
+        </button>
+
+        {/* Leva P.3: delete_record_forever bloqueia sozinho (com uma
+            mensagem clara) se este lead/cliente já tiver locação,
+            pagamento ou lançamento financeiro no histórico — nunca
+            cascateia sobre dinheiro de verdade. */}
+        {confirmarExclusao && (
+          <ConfirmarExclusaoModal
+            table="clients"
+            id={client.id}
+            onCancel={() => setConfirmarExclusao(false)}
+            onDeleted={() => {
+              setConfirmarExclusao(false);
+              onDeleted();
+            }}
+          />
+        )}
       </div>
     </div>
   );
