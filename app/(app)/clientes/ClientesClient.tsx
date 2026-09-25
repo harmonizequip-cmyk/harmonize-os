@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
 import { createClient } from "@/lib/supabase/client";
+import type { Periodo } from "@/lib/period";
+import FiltroBarra from "@/components/FiltroBarra";
+import { exportarCsv } from "@/lib/exportar-csv";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 
 const ETAPAS: Record<string, string> = {
@@ -33,21 +36,41 @@ interface ClientRow {
   nextEvent: { date_start: string; confirmed: boolean } | null;
 }
 
-export default function ClientesClient({ initialClients }: { initialClients: ClientRow[] }) {
+export default function ClientesClient({
+  initialClients,
+  cidades,
+  periodo,
+}: {
+  initialClients: ClientRow[];
+  cidades: string[];
+  periodo: Periodo;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [modalOpen, setModalOpen] = useState(false);
-  const [search, setSearch] = useState("");
 
-  const filtered = useMemo(() => {
-    const term = search.toLowerCase();
-    return initialClients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(term) ||
-        (c.clinic_name ?? "").toLowerCase().includes(term) ||
-        (c.city ?? "").toLowerCase().includes(term)
+  // A peneira toda mora na consulta do servidor agora.
+  const filtered = initialClients;
+
+  function baixarCsv() {
+    exportarCsv(
+      filtered,
+      [
+        { titulo: "Cliente", valor: (c) => c.name },
+        { titulo: "Clínica", valor: (c) => c.clinic_name ?? "" },
+        { titulo: "Cidade", valor: (c) => c.city ?? "" },
+        { titulo: "WhatsApp", valor: (c) => c.whatsapp ?? "" },
+        { titulo: "Locações no período", valor: (c) => c.stats.count },
+        { titulo: "Total no período", valor: (c) => c.stats.total },
+        { titulo: "Última reserva", valor: (c) => (c.stats.lastDate ? formatDate(c.stats.lastDate) : "") },
+        { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes },
+        { titulo: "Em aberto", valor: (c) => c.valorPendente },
+        { titulo: "Etapa no funil", valor: (c) => c.stage ?? "" },
+      ],
+      "clientes",
+      periodo.rotulo
     );
-  }, [initialClients, search]);
+  }
 
   function handleCreated() {
     setModalOpen(false);
@@ -75,12 +98,51 @@ export default function ClientesClient({ initialClients }: { initialClients: Cli
         </button>
       </div>
 
-      <input
-        placeholder="Buscar por nome, clínica ou cidade..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+      <FiltroBarra
+        periodoPadrao="ano"
+        rotuloPeriodo={periodo.rotulo}
+        contagem={{
+          mostrando: filtered.length,
+          rotulo: filtered.length === 1 ? "cliente" : "clientes",
+        }}
+        campos={[
+          {
+            chave: "situacao",
+            rotuloVazio: "Todos os clientes",
+            opcoes: [
+              { valor: "no_periodo", label: "Alugaram no período" },
+              { valor: "taxa_pendente", label: "Com taxa pendente" },
+              { valor: "com_agendamento", label: "Com agendamento futuro" },
+              { valor: "sem_locacao", label: "Nunca alugaram" },
+            ],
+          },
+          {
+            chave: "cidade",
+            rotuloVazio: "Todas as cidades",
+            opcoes: cidades.map((c) => ({ valor: c, label: c })),
+          },
+        ]}
+        buscaPlaceholder="Buscar por nome, clínica ou cidade..."
+        acoes={
+          <button
+            type="button"
+            onClick={baixarCsv}
+            disabled={filtered.length === 0}
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Exportar CSV
+          </button>
+        }
       />
+
+      {/* O período mede, não esconde: a lista traz todo mundo, e as
+          colunas de Locações e Total contam só o recorte escolhido. Sem
+          esta linha, um cliente antigo aparecendo com zero locações
+          pareceria erro de cadastro. */}
+      <p className="-mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+        Locações e Total contam {periodo.rotulo}. A lista mostra todos os clientes, inclusive quem
+        não alugou nesse recorte.
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((c) => (

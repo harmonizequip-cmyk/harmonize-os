@@ -1,9 +1,28 @@
 import { createClient } from "@/lib/supabase/server";
-import { hojeLocal } from "@/lib/period";
+import { hojeLocal, resolverPeriodo } from "@/lib/period";
 import ClientesClient from "./ClientesClient";
 
-export default async function ClientesPage() {
+export default async function ClientesPage({
+  searchParams,
+}: {
+  searchParams: {
+    period?: string;
+    from?: string;
+    to?: string;
+    cidade?: string;
+    situacao?: string;
+    q?: string;
+  };
+}) {
   const supabase = createClient();
+
+  // AQUI O PERÍODO NÃO ESCONDE CLIENTE, ELE MEDE.
+  // Cadastro é estado, não atividade: sumir com quem não alugou neste
+  // mês seria desfazer na tela o que acabamos de consertar no dado, que
+  // é "uma vez cliente, sempre cliente". Então o período decide o que as
+  // colunas Locações e Total contam, e a lista continua inteira. Quem
+  // quiser só quem rodou no recorte escolhe isso na situação.
+  const periodo = resolverPeriodo(searchParams.period ?? "ano", searchParams.from, searchParams.to);
 
   // Antes esta consulta filtrava stage = 'cliente', e era isso que fazia
   // um cliente SUMIR daqui ao ser movido para "Agendamento" no funil. O
@@ -25,7 +44,16 @@ export default async function ClientesPage() {
   // tinha: locação cancelada entrava no total faturado de cada cliente.
   const { data: rentals } = await supabase
     .from("rentals_contabilizaveis")
-    .select("client_id, calculated_value, event_date");
+    .select("client_id, calculated_value, event_date")
+    .gte("event_date", periodo.inicio)
+    .lte("event_date", periodo.fim);
+
+  // A contagem de sempre vem separada, para a lista poder mostrar quem
+  // já foi cliente mesmo quando o período escolhido não tem nada dele.
+  const { data: rentalsDeSempre } = await supabase
+    .from("rentals_contabilizaveis")
+    .select("client_id");
+  const jaAlugou = new Set((rentalsDeSempre ?? []).map((r: any) => r.client_id));
 
   // hojeLocal em vez de toISOString: o segundo devolve a data em UTC, e
   // à noite fazia o "próximo evento" pular o dia seguinte.
@@ -62,8 +90,14 @@ export default async function ClientesPage() {
     .select("client_id, taxas_pendentes, taxas_pagas, valor_pendente");
   const taxaPorCliente = new Map((taxas ?? []).map((t: any) => [t.client_id, t]));
 
+  const cidades = Array.from(
+    new Set((clients ?? []).map((c: any) => c.city).filter(Boolean) as string[])
+  ).sort();
+
+  const termo = searchParams.q?.trim().toLowerCase();
+
   const clientsWithStats = (clients ?? [])
-    .filter((c: any) => c.stage === "cliente" || statsByClient.has(c.id))
+    .filter((c: any) => c.stage === "cliente" || jaAlugou.has(c.id))
     .map((c: any) => {
     const t: any = taxaPorCliente.get(c.id);
     return {
@@ -74,7 +108,32 @@ export default async function ClientesPage() {
       taxasPagas: Number(t?.taxas_pagas ?? 0),
       valorPendente: Number(t?.valor_pendente ?? 0),
     };
-  });
+  })
+    .filter((c: any) => {
+      if (searchParams.cidade && c.city !== searchParams.cidade) return false;
+      if (termo) {
+        const alvo = `${c.name} ${c.clinic_name ?? ""} ${c.city ?? ""}`.toLowerCase();
+        if (!alvo.includes(termo)) return false;
+      }
+      switch (searchParams.situacao) {
+        case "no_periodo":
+          return c.stats.count > 0;
+        case "taxa_pendente":
+          return c.taxasPendentes > 0;
+        case "com_agendamento":
+          return c.nextEvent !== null;
+        case "sem_locacao":
+          return !jaAlugou.has(c.id);
+        default:
+          return true;
+      }
+    });
 
-  return <ClientesClient initialClients={clientsWithStats} />;
+  return (
+    <ClientesClient
+      initialClients={clientsWithStats}
+      cidades={cidades}
+      periodo={periodo}
+    />
+  );
 }
