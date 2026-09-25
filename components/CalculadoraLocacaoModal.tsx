@@ -364,6 +364,66 @@ export default function CalculadoraLocacaoModal({
   const [copied, setCopied] = useState(false);
   const [savedRentalId, setSavedRentalId] = useState<string | null>(null);
 
+  // ------------------------------------------------------------
+  // Preview no WhatsApp (leva P.1): manda o resumo pro cliente conferir
+  // ANTES de salvar/registrar pagamento. O pedido é conseguir enviar os
+  // cálculos, o cliente confirmar, e só depois lançar o(s) pagamento(s)
+  // (que podem vir em formas diferentes) — sem precisar já ter salvo a
+  // locação. Usa o mesmo buildResumoWhatsApp de sempre, só que com os
+  // valores ainda não persistidos; não grava nada no banco.
+  const previewWhatsappText = useMemo(() => {
+    if (!resumo) return null;
+    return buildResumoWhatsApp(
+      {
+        isMentoria,
+        shots,
+        pricing,
+        custoManualPorDisparo,
+        mentoriaPricing: mentoriaCalc,
+        kmIda: kmIdaNumber,
+        itens,
+        reservationFeeStatus,
+        reservationFee: fee,
+        initialCount: initialNumber,
+        finalCount: finalNumber,
+        patientCount: patientCountNumber,
+        clientName: activeClientName,
+        eventDate,
+        pagamentos,
+      },
+      resumo
+    );
+  }, [
+    resumo,
+    isMentoria,
+    shots,
+    pricing,
+    custoManualPorDisparo,
+    mentoriaCalc,
+    kmIdaNumber,
+    itens,
+    reservationFeeStatus,
+    fee,
+    initialNumber,
+    finalNumber,
+    patientCountNumber,
+    activeClientName,
+    eventDate,
+    pagamentos,
+  ]);
+  const previewWhatsappLink = previewWhatsappText ? buildWhatsAppLink(activeClientWhatsapp, previewWhatsappText) : null;
+  const [previewCopied, setPreviewCopied] = useState(false);
+  async function handleCopyPreview() {
+    if (!previewWhatsappText) return;
+    try {
+      await navigator.clipboard.writeText(previewWhatsappText);
+      setPreviewCopied(true);
+      setTimeout(() => setPreviewCopied(false), 2000);
+    } catch {
+      setError("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+    }
+  }
+
   async function handleSave() {
     if (mode.kind === "create" && !activeClientId) {
       setError("Selecione o cliente.");
@@ -1069,6 +1129,30 @@ export default function CalculadoraLocacaoModal({
                   <span className="text-lg font-semibold">{formatCurrency(resumo.totalAPagarAgora)}</span>
                 </div>
               </div>
+
+              {previewWhatsappText && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Envie os cálculos para o cliente conferir antes de registrar o pagamento.</p>
+                  <div className="flex gap-2">
+                    {previewWhatsappLink && (
+                      <button
+                        type="button"
+                        onClick={() => openInNewTab(previewWhatsappLink)}
+                        className="flex-1 rounded-xl bg-brand-teal py-2 text-sm font-medium text-white transition hover:bg-brand-teal-dark"
+                      >
+                        Enviar para conferir no WhatsApp
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCopyPreview}
+                      className="flex-1 rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                    >
+                      {previewCopied ? "Copiado!" : "Copiar texto"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
