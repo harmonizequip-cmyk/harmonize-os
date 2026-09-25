@@ -22,6 +22,22 @@
 -- p_pago é opcional e TRAILING (default true, depois de p_pix_conta),
 -- mesmo padrão já usado para p_pix_conta nesta mesma função: quem já
 -- chama sem ele continua funcionando exatamente igual a antes.
+--
+-- CORREÇÃO DE ACÚMULO DE SOBRECARGA (leva P): toda vez que uma leva
+-- anterior mudou a quantidade de parâmetros desta função (leva O
+-- acrescentou p_pix_conta, virando 5->6 argumentos) usou "create or
+-- replace" sem "drop" antes. No Postgres, "create or replace" só
+-- substitui uma função com a MESMA lista de tipos de parâmetro — com
+-- contagem diferente, ele cria uma sobrecarga (overload) nova, e a
+-- antiga fica esquecida no banco. Isso já deixou duas versões vivas
+-- (5 e 6 argumentos) e, se só fizéssemos "create or replace" de novo
+-- aqui, criaria uma terceira (7 argumentos) — chamada por nome como
+-- "function name is not unique" na hora do GRANT, e um risco real de
+-- ambiguidade nas chamadas do app também. Por isso os drops abaixo
+-- limpam as sobrecargas antigas antes de criar a definitiva.
+drop function if exists public.finalize_rental_reservation(uuid, integer, numeric, payment_method_type, text);
+drop function if exists public.finalize_rental_reservation(uuid, integer, numeric, payment_method_type, text, text);
+
 create or replace function public.finalize_rental_reservation(
   p_calendar_event_id uuid,
   p_shots integer,
@@ -118,4 +134,8 @@ begin
 end;
 $$;
 
-grant execute on function public.finalize_rental_reservation to authenticated;
+-- Assinatura completa no grant (não só o nome): com sobrecargas antigas
+-- já dropadas acima isso já seria único de qualquer forma, mas deixar
+-- explícito evita o mesmo erro se uma leva futura empilhar outra
+-- sobrecarga sem limpar as anteriores.
+grant execute on function public.finalize_rental_reservation(uuid, integer, numeric, payment_method_type, text, text, boolean) to authenticated;
