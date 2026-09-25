@@ -880,6 +880,7 @@ begin
     returning 1
   )
   select count(*) into v_mentoring from u;
+
 return jsonb_build_object(
     'transactions',     v_transactions,
     'rentals',          v_rentals,
@@ -2169,6 +2170,7 @@ begin
   -- engano só por causa de outro caminho de exclusão).
   update rentals set transaction_id = null
    where id = v_rental_id and transaction_id = v_transaction_id;
+
 -- Apagar a transação já casca-deleta esta linha de rental_payments
   -- (transaction_id on delete cascade); o delete abaixo cobre o caso
   -- raro de um pagamento sem transaction_id.
