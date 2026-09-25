@@ -35,7 +35,7 @@ export default async function ClientesPage({
   // o cadastro novo não ficar invisível até a primeira locação.
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, clinic_name, whatsapp, city, address, data_evento, stage")
+    .select("id, name, clinic_name, whatsapp, city, address, data_evento, stage, is_client")
     .eq("is_test", false)
     .order("name");
 
@@ -97,7 +97,12 @@ export default async function ClientesPage({
   const termo = searchParams.q?.trim().toLowerCase();
 
   const clientsWithStats = (clients ?? [])
-    .filter((c: any) => c.stage === "cliente" || jaAlugou.has(c.id))
+    // is_client é a fonte de verdade (leva F: sobrevive a mudança de
+    // etapa no funil). stage === "cliente" e jaAlugou continuam aqui
+    // como rede de segurança para linhas antigas que por algum motivo
+    // não tenham passado pelo backfill, não porque ainda precisem ser
+    // a regra principal.
+    .filter((c: any) => c.is_client || c.stage === "cliente" || jaAlugou.has(c.id))
     .map((c: any) => {
     const t: any = taxaPorCliente.get(c.id);
     return {
@@ -136,4 +141,4 @@ export default async function ClientesPage({
       periodo={periodo}
     />
   );
-}
+}W
