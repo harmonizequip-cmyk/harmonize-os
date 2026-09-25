@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import {
@@ -48,7 +48,12 @@ export interface LeadRow {
   tags: TagOption[];
   origem: string | null;
   notes: string | null;
-  reservation_fee_status: string;
+  parceiro?: boolean;
+  // A taxa não é mais um campo do cliente: cada data reservada tem a
+  // sua, e estes três números vêm da view clientes_taxas.
+  taxasPendentes: number;
+  taxasPagas: number;
+  valorPendente: number;
   nextEvent: { date_start: string; confirmed: boolean } | null;
 }
 
@@ -200,10 +205,6 @@ export default function FunilClient({
     router.refresh();
   }
 
-  async function markFeePaid(lead: LeadRow) {
-    await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", lead.id);
-    router.refresh();
-  }
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -439,7 +440,6 @@ export default function FunilClient({
                     isDragging={activeId === lead.id}
                     onOpen={() => setSelected(lead)}
                     onToggleConfirmed={() => toggleConfirmed(lead)}
-                    onMarkFeePaid={() => markFeePaid(lead)}
                     onAvancar={() => avancarEtapa(lead)}
                   />
                 ))}
@@ -518,7 +518,6 @@ function LeadCard({
   isDragging,
   onOpen,
   onToggleConfirmed,
-  onMarkFeePaid,
   onAvancar,
 }: {
   lead: LeadRow;
@@ -526,7 +525,6 @@ function LeadCard({
   isDragging: boolean;
   onOpen: () => void;
   onToggleConfirmed: () => void;
-  onMarkFeePaid: () => void;
   onAvancar: () => void;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
@@ -551,7 +549,6 @@ function LeadCard({
         lead={lead}
         stage={stage}
         onToggleConfirmed={onToggleConfirmed}
-        onMarkFeePaid={onMarkFeePaid}
         onAvancar={onAvancar}
       />
     </div>
@@ -566,14 +563,12 @@ function LeadCardContent({
   stage,
   floating,
   onToggleConfirmed,
-  onMarkFeePaid,
   onAvancar,
 }: {
   lead: LeadRow;
   stage: (typeof STAGES)[number];
   floating?: boolean;
   onToggleConfirmed?: () => void;
-  onMarkFeePaid?: () => void;
   onAvancar?: () => void;
 }) {
   return (
@@ -607,20 +602,19 @@ function LeadCardContent({
         )
       )}
 
-      {lead.reservation_fee_status === "pendente" && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onMarkFeePaid?.();
-          }}
-          className="mt-1 block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-        >
-          💳 Taxa pendente
-        </button>
+      {/* Etiqueta, não botão. Com várias datas reservadas, "marcar paga"
+          daqui não diria qual delas, e era exatamente essa ambiguidade que
+          o campo antigo no cliente escondia. Abrir o card leva aos botões
+          por agendamento, que é onde a pergunta tem resposta. */}
+      {lead.taxasPendentes > 0 && (
+        <span className="mt-1 block w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+          💳 {lead.taxasPendentes === 1 ? "Taxa pendente" : `${lead.taxasPendentes} taxas pendentes`}
+          {lead.valorPendente > 0 ? ` · ${formatCurrency(lead.valorPendente)}` : ""}
+        </span>
       )}
-      {lead.reservation_fee_status === "pago" && (
+      {lead.taxasPendentes === 0 && lead.taxasPagas > 0 && (
         <span className="mt-1 block w-fit rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-medium text-brand-teal">
-          💳 Taxa paga
+          💳 {lead.taxasPagas === 1 ? "Taxa paga" : `${lead.taxasPagas} taxas pagas`}
         </span>
       )}
 

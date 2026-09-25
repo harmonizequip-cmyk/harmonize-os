@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { hojeLocal } from "@/lib/period";
 import FunilClient from "./FunilClient";
 
 export default async function FunilPage() {
@@ -7,7 +8,7 @@ export default async function FunilPage() {
   const { data: clients } = await supabase
     .from("clients")
     .select(
-      "id, name, city, address, whatsapp, stage, data_evento, origem, notes, reservation_fee_status, client_tags(tags(id, name, color))"
+      "id, name, city, address, whatsapp, stage, data_evento, origem, notes, parceiro, client_tags(tags(id, name, color))"
     )
     .order("created_at", { ascending: false });
 
@@ -32,7 +33,9 @@ export default async function FunilPage() {
     due_date: t.due_date,
   }));
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // Data de hoje no calendário de Brasília. Com o toISOString() que estava
+  // aqui antes, às 21h o "próximo evento" do card já pulava o dia seguinte.
+  const todayStr = hojeLocal();
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
     .select("client_id, date_start, confirmed")
@@ -48,11 +51,27 @@ export default async function FunilPage() {
     }
   }
 
-  const clientsWithEvents = (clients ?? []).map((c: any) => ({
-    ...c,
-    tags: (c.client_tags ?? []).map((ct: any) => ct.tags).filter(Boolean),
-    nextEvent: nextEventByClient.get(c.id) ?? null,
-  }));
+  // A taxa não mora mais no cliente, e sim em cada agendamento: quem
+  // reserva cinco datas deve cinco taxas. A view clientes_taxas é quem
+  // resume isso, para esta tela e as outras lerem a mesma conta.
+  const { data: taxas } = await supabase
+    .from("clientes_taxas")
+    .select("client_id, taxas_pendentes, taxas_pagas, valor_pendente, proxima_pendente");
+
+  const taxaPorCliente = new Map<string, any>();
+  for (const t of taxas ?? []) taxaPorCliente.set(t.client_id, t);
+
+  const clientsWithEvents = (clients ?? []).map((c: any) => {
+    const t = taxaPorCliente.get(c.id);
+    return {
+      ...c,
+      tags: (c.client_tags ?? []).map((ct: any) => ct.tags).filter(Boolean),
+      nextEvent: nextEventByClient.get(c.id) ?? null,
+      taxasPendentes: Number(t?.taxas_pendentes ?? 0),
+      taxasPagas: Number(t?.taxas_pagas ?? 0),
+      valorPendente: Number(t?.valor_pendente ?? 0),
+    };
+  });
 
   return <FunilClient initialClients={clientsWithEvents} allTags={allTags ?? []} initialTasks={initialTasks} />;
 }

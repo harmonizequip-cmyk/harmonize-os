@@ -33,7 +33,7 @@ export default function LeadCardModal({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(lead.tags.map((t) => t.id));
   const [newTagName, setNewTagName] = useState("");
   const [notes, setNotes] = useState(lead.notes ?? "");
-  const [reservationFeeStatus, setReservationFeeStatus] = useState(lead.reservation_fee_status);
+  const [parceiro, setParceiro] = useState(lead.parceiro ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
@@ -73,7 +73,7 @@ export default function LeadCardModal({
         city: toUpperOrNull(city),
         address: toUpperOrNull(address),
         notes: notes || null,
-        reservation_fee_status: reservationFeeStatus,
+        parceiro,
       })
       .eq("id", lead.id);
 
@@ -204,18 +204,26 @@ export default function LeadCardModal({
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva</label>
-            <select
-              value={reservationFeeStatus}
-              onChange={(e) => setReservationFeeStatus(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="nao_aplica">Não se aplica</option>
-              <option value="pendente">Pendente</option>
-              <option value="pago">Paga</option>
-            </select>
-          </div>
+          {/* O campo "Taxa de reserva" saiu daqui. Ele guardava UMA taxa
+              por cliente, e quem reserva cinco datas deve cinco taxas: a
+              taxa de cada agendamento fica na lista de Agendamentos, logo
+              abaixo. O que continua sendo do cliente é ser parceiro, que
+              é uma característica da relação e não de uma data. */}
+          <label className="flex items-start gap-2.5 rounded-lg border border-neutral-300 p-3 dark:border-neutral-700">
+            <input
+              type="checkbox"
+              checked={parceiro}
+              onChange={(e) => setParceiro(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-teal"
+            />
+            <span className="text-xs text-neutral-600 dark:text-neutral-400">
+              <span className="block text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                Parceiro
+              </span>
+              Reserva data sem pagar a taxa de compromisso. Os agendamentos deste cliente nascem
+              isentos, sem ninguém precisar lembrar disso a cada reserva.
+            </span>
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

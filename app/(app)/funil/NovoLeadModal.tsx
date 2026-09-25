@@ -25,7 +25,7 @@ export default function NovoLeadModal({
   const [address, setAddress] = useState("");
   const [origem, setOrigem] = useState("indicacao");
   const [notes, setNotes] = useState("");
-  const [chargeReservationFee, setChargeReservationFee] = useState(false);
+  const [parceiro, setParceiro] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +44,7 @@ export default function NovoLeadModal({
       origem,
       notes: notes || null,
       stage: "lead",
-      reservation_fee_status: chargeReservationFee ? "pendente" : "nao_aplica",
+      parceiro,
     });
     setSaving(false);
     if (error) {
@@ -126,14 +126,18 @@ export default function NovoLeadModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
+          {/* Era "Cobrar taxa de reserva (R$ 250)". Cobrar deixou de ser
+              decisão do cadastro: a taxa nasce pendente sozinha quando uma
+              data futura é reservada, porque é a data que ela garante. O
+              que se decide aqui é o contrário, quem não paga. */}
           <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
             <input
               type="checkbox"
-              checked={chargeReservationFee}
-              onChange={(e) => setChargeReservationFee(e.target.checked)}
+              checked={parceiro}
+              onChange={(e) => setParceiro(e.target.checked)}
               className="h-4 w-4 rounded border-neutral-300"
             />
-            Cobrar taxa de reserva (R$ 250)
+            Parceiro: reserva data sem pagar a taxa
           </label>
         </div>
 
