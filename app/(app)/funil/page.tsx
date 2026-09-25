@@ -38,16 +38,28 @@ export default async function FunilPage() {
   const todayStr = hojeLocal();
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
-    .select("client_id, date_start, confirmed")
+    .select("id, client_id, date_start, confirmed, confirmation_message_sent_at")
     .neq("status", "cancelada")
     .not("client_id", "is", null)
     .gte("date_start", todayStr)
     .order("date_start", { ascending: true });
 
-  const nextEventByClient = new Map<string, { date_start: string; confirmed: boolean }>();
+  // id e confirmation_message_sent_at entraram junto com a leva F, para o
+  // Funil poder usar exatamente o mesmo fluxo de "pedir confirmação no
+  // WhatsApp" / "confirmar reserva" da Agenda (ver FunilClient.tsx),
+  // sempre pelo id exato da reserva.
+  const nextEventByClient = new Map<
+    string,
+    { id: string; date_start: string; confirmed: boolean; confirmation_message_sent_at: string | null }
+  >();
   for (const e of upcomingEvents ?? []) {
     if (!nextEventByClient.has(e.client_id)) {
-      nextEventByClient.set(e.client_id, { date_start: e.date_start, confirmed: e.confirmed });
+      nextEventByClient.set(e.client_id, {
+        id: e.id,
+        date_start: e.date_start,
+        confirmed: e.confirmed,
+        confirmation_message_sent_at: e.confirmation_message_sent_at ?? null,
+      });
     }
   }
 
