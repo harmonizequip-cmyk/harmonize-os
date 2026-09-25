@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 import type { PricingConfig } from "@/lib/rental-pricing";
-import NovaLocacaoModal from "./NovaLocacaoModal";
+import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
 import ReservarHiproModal from "../../agenda/ReservarHiproModal";
@@ -336,16 +336,19 @@ export default function ClienteDetailClient({
       </div>
 
       {modalOpen && (
-        <NovaLocacaoModal
-          clientId={client.id}
-          clientName={client.name}
-          clientWhatsapp={client.whatsapp}
-          clientParceiro={client.parceiro}
-          equipments={equipments}
+        <CalculadoraLocacaoModal
+          mode={{
+            kind: "create",
+            clientId: client.id,
+            clientName: client.name,
+            clientWhatsapp: client.whatsapp,
+            clientParceiro: client.parceiro,
+            equipments,
+          }}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
           onClose={() => setModalOpen(false)}
-          onCreated={handleCreated}
+          onDone={handleCreated}
         />
       )}
 
