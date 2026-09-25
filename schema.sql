@@ -2185,3 +2185,1214 @@ begin
   );
 end;
 $$;grant execute on function public.remover_pagamento_locacao to authenticated;
+-- Corrigir um pagamento já lançado (valor digitado errado, forma
+-- trocada, conta PIX errada...), sempre com o antes/depois gravado no
+-- histórico. A tela pede a senha (ou biometria) antes de chamar isto
+-- (leva da calculadora); aqui só garante a permissão de módulo e a
+-- auditoria.
+create or replace function public.editar_pagamento_locacao(
+  p_payment_id uuid,
+  p_forma payment_method_type default null,
+  p_valor numeric default null,
+  p_data date default null,
+  p_pix_conta text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_old jsonb;
+  v_forma payment_method_type;
+  v_valor numeric;
+  v_data date;
+  v_pix_conta text;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para editar pagamentos.';
+  end if;
+
+  select rental_id, transaction_id, forma, valor, data, pix_conta
+    into v_rental_id, v_transaction_id, v_forma, v_valor, v_data, v_pix_conta
+    from rental_payments where id = p_payment_id;
+
+  if v_rental_id is null then
+    raise exception 'Pagamento não encontrado.';
+  end if;
+
+  v_old := jsonb_build_object('forma', v_forma, 'valor', v_valor, 'data', v_data, 'pix_conta', v_pix_conta);
+
+  v_forma := coalesce(p_forma, v_forma);
+  v_valor := coalesce(p_valor, v_valor);
+  v_data := coalesce(p_data, v_data);
+  v_pix_conta := case when v_forma = 'pix' then coalesce(p_pix_conta, v_pix_conta) else null end;
+
+  if v_valor <= 0 then
+    raise exception 'O valor do pagamento precisa ser maior que zero.';
+  end if;
+  if v_forma = 'pix' and v_pix_conta is null then
+    raise exception 'Informe em qual conta o PIX caiu.';
+  end if;
+
+  update rental_payments
+     set forma = v_forma, valor = v_valor, data = v_data, pix_conta = v_pix_conta
+   where id = p_payment_id;
+
+  if v_transaction_id is not null then
+    update transactions
+       set amount = v_valor, payment_method = v_forma, date = v_data
+     where id = v_transaction_id;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', v_rental_id,
+    public.descrever_registro('rentals', v_rental_id),
+    jsonb_build_object(
+      'acao_detalhada', 'pagamento corrigido',
+      'pagamento_id', p_payment_id,
+      'antes', v_old,
+      'depois', jsonb_build_object('forma', v_forma, 'valor', v_valor, 'data', v_data, 'pix_conta', v_pix_conta)
+    )
+  );
+end;
+$$;
+
+grant execute on function public.editar_pagamento_locacao to authenticated;
+
+-- Correção genérica de QUALQUER outro lançamento (despesa, taxa,
+-- lançamento avulso do Financeiro...) que não seja um pagamento de
+-- locação — esses usam editar_pagamento_locacao acima, para o valor do
+-- pagamento e o saldo da locação nunca desencontrarem.
+create or replace function public.editar_transacao(
+  p_transaction_id uuid,
+  p_description text default null,
+  p_amount numeric default null,
+  p_payment_method payment_method_type default null,
+  p_date date default null,
+  p_category_id uuid default null,
+  p_notes text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_scope scope_type;
+  v_created_by uuid;
+  v_old jsonb;
+begin
+  select scope, created_by into v_scope, v_created_by from transactions where id = p_transaction_id;
+  if v_scope is null then
+    raise exception 'Lançamento não encontrado.';
+  end if;
+
+  if exists (select 1 from rental_payments where transaction_id = p_transaction_id) then
+    raise exception 'Este lançamento é um pagamento de locação. Use a correção de pagamento, para o valor e o saldo da locação não desencontrarem.';
+  end if;
+
+  if v_scope = 'harmonize' and not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para editar lançamentos.';
+  end if;
+  if v_scope = 'pessoal' and v_created_by is distinct from auth.uid() then
+    raise exception 'Sem permissão para editar este lançamento pessoal.';
+  end if;
+  if p_amount is not null and p_amount <= 0 then
+    raise exception 'O valor precisa ser maior que zero.';
+  end if;
+
+  select to_jsonb(t) into v_old from transactions t where t.id = p_transaction_id;
+
+  update transactions
+     set description = coalesce(p_description, description),
+         amount = coalesce(p_amount, amount),
+         payment_method = coalesce(p_payment_method, payment_method),
+         date = coalesce(p_date, date),
+         category_id = coalesce(p_category_id, category_id),
+         notes = coalesce(p_notes, notes)
+   where id = p_transaction_id;
+
+  perform public.registrar_movimentacao(
+    'editado', 'transactions', p_transaction_id,
+    public.descrever_registro('transactions', p_transaction_id),
+    jsonb_build_object('antes', v_old)
+  );
+end;
+$$;
+
+grant execute on function public.editar_transacao to authenticated;
+
+-- Despesa ligada a uma locação (combustível, hospedagem, alimentação,
+-- insumos daquele atendimento específico). É só um atalho: grava um
+-- lançamento de saída comum, com rental_id preenchido, para
+-- rentals_lucro (mais abaixo) conseguir somar.
+create or replace function public.registrar_despesa_locacao(
+  p_rental_id uuid,
+  p_category_id uuid,
+  p_amount numeric,
+  p_payment_method payment_method_type,
+  p_date date default current_date,
+  p_description text default null,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_transaction_id uuid;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para lançar despesas.';
+  end if;
+  if p_amount <= 0 then
+    raise exception 'O valor da despesa precisa ser maior que zero.';
+  end if;
+
+  select client_id into v_client_id from rentals where id = p_rental_id;
+  if v_client_id is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, notes, created_by
+  )
+  values (
+    'saida', p_category_id, coalesce(nullif(trim(p_description), ''), 'Despesa da locação'),
+    p_amount, p_payment_method, p_date, 'harmonize', v_client_id, p_rental_id, p_notes, auth.uid()
+  )
+  returning id into v_transaction_id;
+
+  perform public.registrar_movimentacao(
+    'criado', 'transactions', v_transaction_id,
+    public.descrever_registro('transactions', v_transaction_id),
+    jsonb_build_object('acao_detalhada', 'despesa ligada à locação', 'rental_id', p_rental_id)
+  );
+
+  return v_transaction_id;
+end;
+$$;
+
+grant execute on function public.registrar_despesa_locacao to authenticated;
+
+-- Deslocamento e custo por disparo negociado: gravam só o que a tela já
+-- calculou (arredondamento de km, cálculo do valor por disparo
+-- negociado é lógica de tela, entra na leva da calculadora).
+create or replace function public.definir_deslocamento_locacao(
+  p_rental_id uuid,
+  p_km_ida numeric,
+  p_valor_deslocamento numeric
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+  if p_valor_deslocamento is not null and p_valor_deslocamento < 0 then
+    raise exception 'O valor de deslocamento não pode ser negativo.';
+  end if;
+
+  update rentals
+     set km_ida = p_km_ida,
+         valor_deslocamento = coalesce(p_valor_deslocamento, 0)
+   where id = p_rental_id;
+
+  if not found then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('acao_detalhada', 'deslocamento definido', 'km_ida', p_km_ida, 'valor_deslocamento', p_valor_deslocamento)
+  );
+end;
+$$;
+
+grant execute on function public.definir_deslocamento_locacao to authenticated;
+
+create or replace function public.definir_custo_disparo_manual_locacao(
+  p_rental_id uuid,
+  p_custo_disparo_manual numeric
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+  if p_custo_disparo_manual is not null and p_custo_disparo_manual <= 0 then
+    raise exception 'O custo por disparo precisa ser maior que zero.';
+  end if;
+
+  update rentals set custo_disparo_manual = p_custo_disparo_manual where id = p_rental_id;
+
+  if not found then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('acao_detalhada', 'custo por disparo negociado definido', 'custo_disparo_manual', p_custo_disparo_manual)
+  );
+end;
+$$;
+
+grant execute on function public.definir_custo_disparo_manual_locacao to authenticated;
+
+-- Lucro por locação e por cliente: para a leva do Financeiro consumir
+-- pronto, sem recalcular na tela.
+create or replace view public.rentals_lucro
+with (security_invoker = true) as
+select
+  r.id as rental_id,
+  r.client_id,
+  c.name as cliente,
+  r.event_date,
+  r.calculated_value,
+  r.valor_deslocamento,
+  coalesce((select sum(rp.valor) from rental_payments rp where rp.rental_id = r.id), 0) as total_pago,
+  coalesce((select sum(t.amount) from transactions t where t.rental_id = r.id and t.type = 'saida'), 0) as total_despesas,
+  r.calculated_value - coalesce((select sum(t.amount) from transactions t where t.rental_id = r.id and t.type = 'saida'), 0) as lucro_liquido
+from rentals r
+left join clients c on c.id = r.client_id
+where r.status <> 'cancelada' and r.is_test = false;
+
+comment on view public.rentals_lucro is
+  'Lucro líquido por locação: valor cobrado menos as despesas (saídas) ligadas a ela via transactions.rental_id. Não desconta a taxa de reserva (já é abatida do valor a receber, não é despesa do atendimento). Ignora locação cancelada e teste.';
+
+grant select on public.rentals_lucro to authenticated;
+
+create or replace view public.clientes_lucro
+with (security_invoker = true) as
+select
+  client_id,
+  cliente,
+  count(*) as locacoes,
+  sum(calculated_value) as faturado,
+  sum(total_pago) as recebido,
+  sum(total_despesas) as despesas,
+  sum(lucro_liquido) as lucro_liquido
+from rentals_lucro
+where client_id is not null
+group by client_id, cliente;
+
+comment on view public.clientes_lucro is
+  'Resumo de lucro líquido por cliente, somando as locações não canceladas e não teste de rentals_lucro.';
+
+grant select on public.clientes_lucro to authenticated;
+
+-- ------------------------------------------------------------
+-- COMPATIBILIDADE: marcar_locacao_paga / desfazer_pagamento_locacao
+-- continuam com a MESMA assinatura e o MESMO comportamento visível
+-- (marcam a locação inteira como paga de uma vez, com uma forma só),
+-- porque a tela atual ainda chama exatamente isso. Por baixo, agora
+-- também escrevem/apagam em rental_payments, para o histórico já
+-- nascer no formato novo. Pagamento PIX feito por este caminho entra
+-- com pix_conta = 'harmonize' (conta principal do negócio), já que a
+-- tela atual não pergunta qual conta — a calculadora nova (próxima
+-- leva) pergunta e passa a conta certa via registrar_pagamento_locacao.
+-- ------------------------------------------------------------
+create or replace function public.marcar_locacao_paga(
+  p_rental_id uuid,
+  p_payment_method payment_method_type default null,
+  p_data date default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_pago boolean;
+  v_valor numeric;
+  v_client_id uuid;
+  v_client_name text;
+  v_event_date date;
+  v_forma payment_method_type;
+  v_status event_status_type;
+  v_categoria uuid;
+  v_credito numeric := 0;
+  v_valor_lancamento numeric;
+  v_transacao_id uuid;
+  v_pix_conta text;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para registrar pagamentos.';
+  end if;
+
+  select r.pago, r.calculated_value, r.client_id, r.event_date, r.payment_method, r.status, c.name
+    into v_pago, v_valor, v_client_id, v_event_date, v_forma, v_status, v_client_name
+    from rentals r
+    left join clients c on c.id = r.client_id
+   where r.id = p_rental_id;
+
+  if v_valor is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if v_pago then
+    raise exception 'Esta locação já está marcada como paga.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta locação está cancelada. Reative o agendamento antes de registrar o pagamento, para o caixa não receber dinheiro de algo cancelado.';
+  end if;
+
+  select coalesce(sum(ev.taxa_valor), 0) into v_credito
+    from calendar_events ev
+   where ev.rental_id = p_rental_id and ev.taxa_status = 'paga';
+
+  v_valor_lancamento := greatest(v_valor - v_credito, 0);
+  v_forma := coalesce(p_payment_method, v_forma);
+  v_pix_conta := case when v_forma = 'pix' then 'harmonize' else null end;
+
+  select id into v_categoria
+    from categories
+   where type = 'entrada' and is_default = true and name ilike 'Loca%'
+   limit 1;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, created_by
+  )
+  values (
+    'entrada', v_categoria,
+    'Locação HIPRO - ' || coalesce(v_client_name, ''),
+    v_valor_lancamento, v_forma, coalesce(p_data, current_date), 'harmonize',
+    v_client_id, p_rental_id, auth.uid()
+  )
+  returning id into v_transacao_id;
+
+  insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
+  values (p_rental_id, v_forma, v_valor_lancamento, coalesce(p_data, current_date), v_pix_conta, v_transacao_id, auth.uid());
+
+  update rentals
+     set payment_method = v_forma,
+         transaction_id = v_transacao_id
+   where id = p_rental_id;
+  -- pago / pago_em: recalculados sozinhos pelo trigger de rental_payments.
+
+  perform public.registrar_movimentacao(
+    'pago', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object(
+      'valor_locacao',  round(v_valor, 2),
+      'credito_taxa',   round(v_credito, 2),
+      'valor_recebido', round(v_valor_lancamento, 2),
+      'forma',          v_forma::text
+    )
+  );
+end;
+$$;
+
+grant execute on function public.marcar_locacao_paga to authenticated;
+
+-- Desfazer o pagamento: apaga o(s) lançamento(s) e volta a locação para
+-- não paga. Existe porque marcar pago por engano acontece. Desfaz TODOS
+-- os pagamentos desta locação (mesmo comportamento de sempre desta
+-- função); para desfazer um pagamento específico dentre vários, usar
+-- remover_pagamento_locacao.
+create or replace function public.desfazer_pagamento_locacao(p_rental_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_pago boolean;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para alterar pagamentos.';
+  end if;
+
+  select pago into v_pago from rentals where id = p_rental_id;
+  if v_pago is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if not v_pago then
+    raise exception 'Esta locação não está marcada como paga.';
+  end if;
+
+  -- rentals.transaction_id precisa ser zerado ANTES de apagar as
+  -- transações: ele referencia uma delas, e a FK rentals_transaction_id_fkey
+  -- não tem on delete cascade (de propósito — só rental_payments tem).
+  update rentals set transaction_id = null where id = p_rental_id;
+
+  delete from transactions
+   where id in (select transaction_id from rental_payments where rental_id = p_rental_id and transaction_id is not null);
+  delete from rental_payments where rental_id = p_rental_id;
+  -- pago / pago_em voltam sozinhos a false/null: a soma zerou.
+
+  perform public.registrar_movimentacao(
+    'pagamento_desfeito', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    '{}'::jsonb
+  );
+end;
+$$;
+
+grant execute on function public.desfazer_pagamento_locacao to authenticated;
+
+-- Faz a taxa de compromisso nascer pendente sozinha: evento de
+-- equipamento, para data futura, de cliente que não é parceiro, nasce
+-- com a taxa pendente no valor configurado — por qualquer caminho que
+-- crie o evento (create_rental, "Reservar HIPRO Day", ou uma futura
+-- tela), não só pelas funções que já gravam a taxa explicitamente.
+-- current_date seria UTC no servidor; a comparação usa o fuso de
+-- Brasília para uma reserva feita à noite não nascer sem taxa por
+-- engano de fuso.
+create or replace function public.definir_taxa_ao_criar_evento()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_parceiro boolean;
+begin
+  if new.taxa_status is distinct from 'nao_aplica' then
+    return new;
+  end if;
+
+  if new.equipment_id is null then
+    return new;
+  end if;
+
+  if new.date_start <= (now() at time zone 'America/Sao_Paulo')::date then
+    return new;
+  end if;
+
+  select parceiro into v_parceiro from clients where id = new.client_id;
+  if coalesce(v_parceiro, false) then
+    return new;
+  end if;
+
+  new.taxa_status := 'pendente';
+  new.taxa_valor := public.valor_taxa_atual();
+  return new;
+end;
+$$;
+
+create trigger calendar_events_definir_taxa
+  before insert on public.calendar_events
+  for each row execute function public.definir_taxa_ao_criar_evento();
+
+comment on function public.definir_taxa_ao_criar_evento is
+  'Faz a taxa de compromisso nascer pendente em reserva de equipamento para data futura de cliente que não é parceiro, por qualquer caminho que crie o evento.';
+
+-- ============================================================
+-- FUNÇÕES PRINCIPAIS: create_rental, update_rental,
+-- finalize_rental_reservation
+-- ============================================================
+
+-- Cria a locação, a entrada financeira (se p_pago) e o evento de agenda
+-- em uma única operação atômica. Se o equipamento já estiver reservado
+-- no período (no_equipment_double_booking), a função inteira é revertida.
+-- p_pago=false nasce sem lançamento financeiro: o dinheiro só entra
+-- quando marcar_locacao_paga/registrar_pagamento_locacao for chamada
+-- (locação "a receber"). p_pix_conta (leva O) é opcional e trailing —
+-- quem já chama sem ele continua funcionando igual (pix cai na conta
+-- 'harmonize' por padrão).
+create or replace function public.create_rental(
+  p_client_id uuid,
+  p_equipment_id uuid,
+  p_event_date date,
+  p_shots integer,
+  p_calculated_value numeric,
+  p_payment_method payment_method_type,
+  p_notes text default null,
+  p_pago boolean default true,
+  p_pix_conta text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_category_id uuid;
+  v_equipment_code equipment_code_type;
+  v_client_name text;
+  v_created_by uuid := auth.uid();
+  v_parceiro boolean;
+  v_taxa_status text;
+  v_taxa_valor numeric;
+  v_pix_conta text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para criar locações';
+  end if;
+
+  select code into v_equipment_code from equipments where id = p_equipment_id;
+  select name, parceiro into v_client_name, v_parceiro from clients where id = p_client_id;
+  select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
+
+  if v_category_id is null then
+    raise exception 'Categoria "Locação" não encontrada (foi renomeada ou removida?). Ajuste o cadastro de categorias antes de criar a locação.';
+  end if;
+
+  insert into rentals (client_id, equipment_id, event_date, shots, calculated_value, payment_method, notes, created_by)
+  values (p_client_id, p_equipment_id, p_event_date, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by)
+  returning id into v_rental_id;
+
+  if p_pago then
+    v_pix_conta := case when p_payment_method = 'pix' then coalesce(p_pix_conta, 'harmonize') else null end;
+
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, created_by)
+    values ('entrada', v_category_id, 'Locação HIPRO - ' || coalesce(v_client_name, ''), p_calculated_value, p_payment_method, p_event_date, 'harmonize', p_client_id, v_rental_id, v_created_by)
+    returning id into v_transaction_id;
+
+    insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
+    values (v_rental_id, p_payment_method, p_calculated_value, p_event_date, v_pix_conta, v_transaction_id, v_created_by);
+
+    update rentals set transaction_id = v_transaction_id where id = v_rental_id;
+    -- pago / pago_em: preenchidos automaticamente pelo trigger de rental_payments.
+  end if;
+
+  -- Taxa de compromisso inicial: pendente só quando há data futura a
+  -- garantir e o cliente não é parceiro. definir_taxa_agendamento muda o
+  -- estado depois.
+  if coalesce(v_parceiro, false) or p_event_date <= current_date then
+    v_taxa_status := 'nao_aplica';
+    v_taxa_valor  := null;
+  else
+    v_taxa_status := 'pendente';
+    v_taxa_valor  := public.valor_taxa_atual();
+  end if;
+
+  insert into calendar_events (event_type, title, client_id, equipment_id, date_start, date_end, status, value, rental_id, created_by, taxa_status, taxa_valor)
+  values (v_equipment_code::text::calendar_event_type, 'Locação - ' || coalesce(v_client_name, ''), p_client_id, p_equipment_id, p_event_date, p_event_date, 'confirmada', p_calculated_value, v_rental_id, v_created_by,
+          v_taxa_status, v_taxa_valor);
+
+  update clients set stage = 'cliente' where id = p_client_id and stage <> 'cliente';
+
+  return v_rental_id;
+end;
+$$;
+
+grant execute on function public.create_rental to authenticated;
+
+-- Edita uma locação já existente e mantém a transação financeira e o
+-- evento de agenda vinculados em sincronia. Falha alto se o id não
+-- existir (leva J), em vez de rodar até o fim sem afetar nada.
+create or replace function public.update_rental(
+  p_rental_id uuid,
+  p_equipment_id uuid,
+  p_event_date date,
+  p_shots integer,
+  p_calculated_value numeric,
+  p_payment_method payment_method_type,
+  p_status event_status_type,
+  p_notes text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_transaction_id uuid;
+  v_client_id uuid;
+  v_old_date date;
+  v_old_status event_status_type;
+  v_old_value numeric;
+  v_descricao text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para editar locações';
+  end if;
+
+  select transaction_id, client_id, event_date, status, calculated_value
+    into v_transaction_id, v_client_id, v_old_date, v_old_status, v_old_value
+    from rentals where id = p_rental_id;
+
+  if v_client_id is null then
+    raise exception 'Locação não encontrada (id %).', p_rental_id;
+  end if;
+
+  update rentals
+  set equipment_id = p_equipment_id,
+      event_date = p_event_date,
+      shots = p_shots,
+      calculated_value = p_calculated_value,
+      payment_method = p_payment_method,
+      status = p_status,
+      notes = p_notes,
+      rescheduled = rescheduled or (v_old_date is not null and v_old_date <> p_event_date)
+  where id = p_rental_id;
+
+  if v_transaction_id is not null then
+    update transactions
+    set amount = p_calculated_value,
+        date = p_event_date,
+        payment_method = p_payment_method
+    where id = v_transaction_id;
+  end if;
+
+  update calendar_events
+  set equipment_id = p_equipment_id,
+      date_start = p_event_date,
+      date_end = p_event_date,
+      value = p_calculated_value,
+      status = p_status
+  where rental_id = p_rental_id;
+
+  v_descricao := public.descrever_registro('rentals', p_rental_id);
+
+  if v_old_date is distinct from p_event_date then
+    perform public.registrar_movimentacao(
+      'reagendado', 'rentals', p_rental_id, v_descricao,
+      jsonb_build_object(
+        'data_antiga', to_char(v_old_date, 'DD/MM/YYYY'),
+        'data_nova',   to_char(p_event_date, 'DD/MM/YYYY')
+      )
+    );
+  elsif v_old_status is distinct from p_status then
+    perform public.registrar_movimentacao(
+      case p_status
+        when 'cancelada' then 'cancelado'
+        when 'confirmada' then 'confirmado'
+        else 'editado'
+      end,
+      'rentals', p_rental_id, v_descricao,
+      jsonb_build_object(
+        'status_antigo', v_old_status::text,
+        'status_novo',   p_status::text
+      )
+    );
+  elsif v_old_value is distinct from p_calculated_value then
+    perform public.registrar_movimentacao(
+      'editado', 'rentals', p_rental_id, v_descricao,
+      jsonb_build_object(
+        'valor_antigo', round(coalesce(v_old_value, 0), 2),
+        'valor_novo',   round(coalesce(p_calculated_value, 0), 2)
+      )
+    );
+  end if;
+end;
+$$;
+
+grant execute on function public.update_rental to authenticated;
+
+-- Converte uma pré-reserva de HIPRO (evento de agenda criado sem
+-- disparos, status 'pre_reserva', sem rental_id) em uma locação de
+-- verdade — ou, se is_mentoria estiver marcado na própria reserva
+-- (lido direto de calendar_events, não de um parâmetro), numa mentoria:
+-- mesmo fluxo, mas categoria "Mentoria" em vez de "Locação" e descrição
+-- do lançamento diferente. p_shots é a quantidade de disparos numa
+-- locação normal, ou de pacientes modelo numa mentoria; p_calculated_value
+-- já vem calculado pelo front nos dois casos. p_pix_conta (leva O) é
+-- opcional e trailing, mesmo padrão de create_rental.
+--
+-- BUG CORRIGIDO NA LEVA O: esta função criava a transação e marcava
+-- rentals.transaction_id, mas nunca marcava rentals.pago = true — a
+-- locação ficava com o dinheiro já lançado no caixa, mas aparecendo
+-- como "não paga" pra sempre (entrava errado em locacoes_a_receber
+-- assim que "Marcar como realizada" era clicado). Agora, ao gravar
+-- também em rental_payments, pago/pago_em são preenchidos sozinhos pelo
+-- trigger, sem precisar de nenhuma ação extra.
+-- p_pago (leva P) é opcional e trailing, depois de p_pix_conta: quem já
+-- chama sem ele continua funcionando igual (nasce pago no ato, como
+-- sempre foi). false nasce sem lançamento financeiro, igual create_rental
+-- — o dinheiro só entra quando registrar_pagamento_locacao for chamada,
+-- permitindo finalizar uma pré-reserva "a receber" ou com pagamento
+-- parcial (zero, um ou vários pagamentos, mesmo caminho usado por
+-- create_rental na calculadora unificada).
+create or replace function public.finalize_rental_reservation(
+  p_calendar_event_id uuid,
+  p_shots integer,
+  p_calculated_value numeric,
+  p_payment_method payment_method_type,
+  p_notes text default null,
+  p_pix_conta text default null,
+  p_pago boolean default true
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_category_id uuid;
+  v_client_id uuid;
+  v_equipment_id uuid;
+  v_event_date date;
+  v_client_name text;
+  v_is_mentoria boolean;
+  v_created_by uuid := auth.uid();
+  v_pix_conta text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para finalizar locações';
+  end if;
+
+  select client_id, equipment_id, date_start, is_mentoria
+    into v_client_id, v_equipment_id, v_event_date, v_is_mentoria
+  from calendar_events
+  where id = p_calendar_event_id and rental_id is null and status = 'pre_reserva';
+
+  if v_client_id is null then
+    raise exception 'Reserva não encontrada, já finalizada, ou sem cliente vinculado.';
+  end if;
+  if v_equipment_id is null then
+    raise exception 'Esta reserva não está vinculada a um equipamento HIPRO.';
+  end if;
+
+  select name into v_client_name from clients where id = v_client_id;
+
+  if coalesce(v_is_mentoria, false) then
+    select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Mentoria%' limit 1;
+    if v_category_id is null then
+      raise exception 'Categoria "Mentoria" não encontrada (foi renomeada ou removida?). Ajuste o cadastro de categorias antes de finalizar a mentoria.';
+    end if;
+  else
+    select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
+    if v_category_id is null then
+      raise exception 'Categoria "Locação" não encontrada (foi renomeada ou removida?). Ajuste o cadastro de categorias antes de finalizar a reserva.';
+    end if;
+  end if;
+
+  insert into rentals (client_id, equipment_id, event_date, shots, calculated_value, payment_method, notes, created_by)
+  values (v_client_id, v_equipment_id, v_event_date, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by)
+  returning id into v_rental_id;
+
+  if p_pago then
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, created_by)
+    values (
+      'entrada',
+      v_category_id,
+      (case when coalesce(v_is_mentoria, false) then 'Mentoria HIPRO - ' else 'Locação HIPRO - ' end) || coalesce(v_client_name, ''),
+      p_calculated_value, p_payment_method, v_event_date, 'harmonize', v_client_id, v_rental_id, v_created_by
+    )
+    returning id into v_transaction_id;
+
+    v_pix_conta := case when p_payment_method = 'pix' then coalesce(p_pix_conta, 'harmonize') else null end;
+
+    insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
+    values (v_rental_id, p_payment_method, p_calculated_value, v_event_date, v_pix_conta, v_transaction_id, v_created_by);
+
+    update rentals set transaction_id = v_transaction_id where id = v_rental_id;
+    -- pago / pago_em: preenchidos automaticamente pelo trigger de
+    -- rental_payments (ver nota da leva O sobre o bug corrigido aqui).
+  end if;
+
+  update calendar_events
+  set status = 'confirmada',
+      value = p_calculated_value,
+      rental_id = v_rental_id,
+      notes = coalesce(p_notes, notes)
+  where id = p_calendar_event_id;
+
+  update clients set stage = 'cliente' where id = v_client_id and stage <> 'cliente';
+
+  return v_rental_id;
+end;
+$$;
+
+grant execute on function public.finalize_rental_reservation to authenticated;
+
+-- ============================================================
+-- FUNIL: tarefas de contato, tags automáticas, confirmação e
+-- identidade do cliente
+-- ============================================================
+
+-- Ao entrar em "Tentativa de contato", cria a tarefa inicial ("já
+-- entrou em contato?"), se ainda não existir uma pendente.
+create or replace function public.handle_client_enter_contato()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.stage = 'contato' and (tg_op = 'INSERT' or old.stage is distinct from new.stage) then
+    if not exists (
+      select 1 from tasks
+      where client_id = new.id and status = 'pendente' and type = 'contato_inicial'
+    ) then
+      insert into tasks (client_id, type, title, due_date)
+      values (new.id, 'contato_inicial', 'Fazer o primeiro contato com ' || new.name, current_date);
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_client_enter_contato
+  after insert or update of stage on clients
+  for each row execute function public.handle_client_enter_contato();
+
+-- Registra a resposta de uma tarefa de contato. A etiqueta de follow-up
+-- anterior é sempre limpa (leva J, item 8) antes de decidir o desfecho —
+-- antes disso, respondeu ou estourar o limite deixavam a etiqueta antiga
+-- grudada, porque o "return" acontecia antes da limpeza. Se não
+-- respondeu, troca pela próxima e cria uma nova tarefa em 2 dias; depois
+-- do Follow-up 5, move o cliente para "Nutrição" em vez de criar mais uma.
+create or replace function public.register_contact_attempt(
+  p_task_id uuid,
+  p_responded boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_client_name text;
+  v_current_followup integer;
+  v_next_followup integer;
+  v_tag_id uuid;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para atualizar tarefas de contato';
+  end if;
+
+  select client_id, follow_up_number into v_client_id, v_current_followup
+  from tasks
+  where id = p_task_id and status = 'pendente';
+
+  if v_client_id is null then
+    raise exception 'Tarefa não encontrada ou já concluída.';
+  end if;
+
+  update tasks
+  set status = 'concluida', completed_at = now()
+  where id = p_task_id;
+
+  delete from client_tags
+  where client_id = v_client_id
+    and tag_id in (select id from tags where name like 'Follow-up %');
+
+  if p_responded then
+    return;
+  end if;
+
+  select name into v_client_name from clients where id = v_client_id;
+  v_next_followup := coalesce(v_current_followup, 0) + 1;
+
+  if v_next_followup > 5 then
+    update clients set stage = 'nutricao' where id = v_client_id;
+    return;
+  end if;
+
+  select id into v_tag_id from tags where name = 'Follow-up ' || v_next_followup;
+  if v_tag_id is not null then
+    insert into client_tags (client_id, tag_id) values (v_client_id, v_tag_id)
+    on conflict do nothing;
+  end if;
+
+  insert into tasks (client_id, type, follow_up_number, title, due_date)
+  values (
+    v_client_id,
+    'followup',
+    v_next_followup,
+    'Confirmar se ' || coalesce(v_client_name, 'o cliente') || ' respondeu (Follow-up ' || v_next_followup || ')',
+    current_date + 2
+  );
+end;
+$$;
+
+grant execute on function public.register_contact_attempt to authenticated;
+
+-- Reagendar um evento na Agenda aplica a etiqueta "Reagendamento" no
+-- cliente (cobre edição direta na Agenda e locações editadas via
+-- update_rental, já que as duas gravam em calendar_events).
+create or replace function public.handle_calendar_event_reschedule()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tag_id uuid;
+begin
+  if new.client_id is not null and old.date_start is distinct from new.date_start then
+    select id into v_tag_id from tags where name = 'Reagendamento';
+    if v_tag_id is not null then
+      insert into client_tags (client_id, tag_id) values (new.client_id, v_tag_id)
+      on conflict do nothing;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_calendar_event_reschedule
+  after update of date_start on calendar_events
+  for each row execute function public.handle_calendar_event_reschedule();
+
+-- Ao agendar uma locação HIPRO (evento de agenda com equipamento e
+-- cliente vinculados), promove o cliente para a etapa "Agendado"
+-- automaticamente. Não regride quem já virou "Cliente".
+create or replace function public.handle_locacao_agendada()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.equipment_id is not null and new.client_id is not null then
+    update clients
+    set stage = 'agendado'
+    where id = new.client_id
+      and stage not in ('agendado', 'cliente');
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_locacao_agendada
+  after insert on calendar_events
+  for each row execute function public.handle_locacao_agendada();
+
+-- Converter para Cliente é uma via de mão única a partir daqui: mover
+-- no funil não desfaz uma conversão. Fica no banco (não em cada tela
+-- que grava clients.stage) porque hoje já são pelo menos três caminhos
+-- de código diferentes que gravam essa coluna.
+create or replace function public.marcar_is_client()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.stage = 'cliente' then
+    new.is_client := true;
+  elsif tg_op = 'UPDATE' then
+    new.is_client := old.is_client;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_clients_marcar_is_client
+  before insert or update of stage on public.clients
+  for each row execute function public.marcar_is_client();
+
+-- Registra que "Pedir confirmação no WhatsApp" foi clicado para esta
+-- reserva. Só grava o timestamp e o histórico — nunca toca em
+-- calendar_events.confirmed. É a contraparte de confirmar_agendamento,
+-- que faz o oposto.
+create or replace function public.registrar_pedido_confirmacao(p_event_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status event_status_type;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+
+  select status into v_status from calendar_events where id = p_event_id;
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado.';
+  end if;
+
+  update calendar_events set confirmation_message_sent_at = now() where id = p_event_id;
+
+  perform public.registrar_movimentacao(
+    'pedido_confirmacao_enviado',
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    '{}'::jsonb
+  );
+end;
+$$;
+
+grant execute on function public.registrar_pedido_confirmacao to authenticated;
+
+-- ============================================================
+-- VIEWS: fonte única de valor contabilizável
+--
+-- Cinco telas somavam valor cada uma com um conjunto diferente de
+-- filtros, e nenhuma excluía locação cancelada (leva A). As views
+-- abaixo são a única fonte de valor contabilizável — as telas leem
+-- delas em vez de ler as tabelas direto, e cancelar uma locação passa a
+-- tirar o valor dela de todos os totais automaticamente, sem apagar
+-- linha nenhuma. security_invoker=true mantém o RLS das tabelas de
+-- origem valendo para quem consulta a view.
+-- ============================================================
+
+create or replace view public.rentals_contabilizaveis
+with (security_invoker = true) as
+select r.*
+from public.rentals r
+where r.status <> 'cancelada'
+  and r.is_test = false
+  and not exists (
+    select 1 from public.clients c
+    where c.id = r.client_id and c.excluir_financeiro
+  );
+
+comment on view public.rentals_contabilizaveis is
+  'Locações que contam como faturamento: exclui canceladas, modo teste, e cliente marcado excluir_financeiro (leva G). Toda soma de valor de locação deve ler daqui, nunca de rentals direto. Atenção: usa select *, então ao adicionar coluna em rentals é preciso rodar este create or replace view de novo para a coluna aparecer.';
+
+create or replace view public.transactions_contabilizaveis
+with (security_invoker = true) as
+select t.*
+from public.transactions t
+where t.is_test = false
+  and (
+    t.client_id is null
+    or not exists (
+      select 1 from public.clients c
+      where c.id = t.client_id and c.excluir_financeiro
+    )
+  )
+  and (
+    t.rental_id is null
+    or exists (
+      select 1
+      from public.rentals r
+      where r.id = t.rental_id
+        and r.status <> 'cancelada'
+    )
+  );
+
+comment on view public.transactions_contabilizaveis is
+  'Lançamentos que contam no caixa: exclui modo teste, lançamentos presos a locação cancelada, e cliente marcado excluir_financeiro (leva G). Financeiro, Dashboard e Relatórios devem ler daqui, nunca de transactions direto. Atenção: usa select *, então ao adicionar coluna em transactions é preciso rodar este create or replace view de novo.';
+
+grant select on public.rentals_contabilizaveis to authenticated;
+grant select on public.transactions_contabilizaveis to authenticated;
+
+-- Resumo por cliente das taxas de compromisso que estão nos
+-- agendamentos (leva C4). Substitui clients.reservation_fee_status, que
+-- guardava uma taxa só por cliente quando cada data reservada tem a sua.
+create or replace view public.clientes_taxas
+with (security_invoker = true) as
+select
+  c.id as client_id,
+  count(*) filter (where ev.taxa_status = 'pendente')            as taxas_pendentes,
+  count(*) filter (where ev.taxa_status = 'paga')                as taxas_pagas,
+  coalesce(sum(coalesce(ev.taxa_valor, public.valor_taxa_atual()))
+           filter (where ev.taxa_status = 'pendente'), 0) as valor_pendente,
+  coalesce(sum(coalesce(ev.taxa_valor, public.valor_taxa_atual()))
+           filter (where ev.taxa_status = 'paga'), 0)     as valor_pago,
+  min(ev.date_start) filter (where ev.taxa_status = 'pendente')  as proxima_pendente
+from public.clients c
+left join public.calendar_events ev
+  on ev.client_id = c.id
+ and ev.status <> 'cancelada'
+ and ev.equipment_id is not null
+group by c.id;
+
+comment on view public.clientes_taxas is
+  'Resumo por cliente das taxas de compromisso que estão nos agendamentos. Substitui clients.reservation_fee_status, que guardava uma taxa só por cliente quando cada data reservada tem a sua.';
+
+grant select on public.clientes_taxas to authenticated;
+
+-- Locações realizadas e ainda não pagas, já com o crédito da taxa
+-- abatido — a lista de cobrança, e não entra em faturamento nenhum.
+create or replace view public.locacoes_a_receber
+with (security_invoker = true) as
+select
+  r.id,
+  r.client_id,
+  c.name as cliente,
+  r.event_date,
+  r.calculated_value,
+  coalesce((
+    select sum(ev.taxa_valor) from calendar_events ev
+     where ev.rental_id = r.id and ev.taxa_status = 'paga'
+  ), 0) as credito_taxa,
+  greatest(r.calculated_value - coalesce((
+    select sum(ev.taxa_valor) from calendar_events ev
+     where ev.rental_id = r.id and ev.taxa_status = 'paga'
+  ), 0), 0) as valor_a_receber
+from rentals r
+left join clients c on c.id = r.client_id
+where r.status = 'realizada'
+  and r.pago = false
+  and r.is_test = false;
+
+comment on view public.locacoes_a_receber is
+  'Locações que aconteceram e ainda não foram pagas, já com o crédito da taxa abatido. É a lista de cobrança, e não entra em faturamento nenhum.';
+
+grant select on public.locacoes_a_receber to authenticated;
+
+-- ============================================================
+-- ÍNDICES DE PERFORMANCE (leva J)
+-- ============================================================
+create index calendar_events_date_start_idx on public.calendar_events(date_start);
+create index transactions_date_scope_idx on public.transactions(date, scope);
+create index transactions_client_id_idx on public.transactions(client_id);
+create index rentals_client_id_idx on public.rentals(client_id);
+create index calendar_events_client_id_idx on public.calendar_events(client_id);
+-- leva O: rental_id em transactions passa a ser consultado o tempo todo
+-- (pagamentos, despesas, rentals_lucro).
+create index if not exists transactions_rental_id_idx on public.transactions(rental_id);
+
+-- ============================================================
+-- BIOMETRIA (passkey/WebAuthn) — leva O
+-- Só a tabela de chaves por aparelho. A verificação da assinatura na
+-- hora de liberar uma edição é lógica de backend Next.js e entra na
+-- leva da tela de edição — aqui é só onde a chave pública de cada
+-- aparelho cadastrado fica guardada.
+-- ============================================================
+create table public.webauthn_credentials (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  credential_id text not null unique,
+  public_key text not null,
+  counter bigint not null default 0,
+  device_label text,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz
+);
+
+comment on table public.webauthn_credentials is
+  'Chaves de biometria (passkey/WebAuthn) cadastradas por aparelho, para liberar a edição de lançamentos sem digitar senha. Guarda só a chave pública de cada aparelho — nunca a biometria em si, que nunca sai do celular.';
+
+create index webauthn_credentials_user_id_idx on public.webauthn_credentials(user_id);
+
+alter table public.webauthn_credentials enable row level security;
+
+create policy "webauthn_credentials_self" on webauthn_credentials for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- ============================================================
+-- TAGS AUTOMÁTICAS (usadas pelo fluxo de follow-up/reagendamento)
+-- ============================================================
+insert into tags (name, color, is_automatic) values
+  ('Follow-up 1', '#7EC8E3', true),
+  ('Follow-up 2', '#7EC8E3', true),
+  ('Follow-up 3', '#B8A0D0', true),
+  ('Follow-up 4', '#B8A0D0', true),
+  ('Follow-up 5', '#E8789A', true),
+  ('Reagendamento', '#d85f83', true)
+on conflict (name) do nothing;
+
+-- ============================================================
+-- Depois de criar seu usuário em Authentication > Users,
+-- rode isto trocando o e-mail, para virar admin com acesso total:
+-- ============================================================
+-- update profiles set is_admin = true,
+--   permissions = '{"dashboard":true,"financeiro":true,"clientes":true,
+--     "agenda":true,"equipamentos":true,"relatorios":true,
+--     "exportacao":true,"configuracoes":true}'::jsonb
+-- where email = 'seu-email@exemplo.com';
