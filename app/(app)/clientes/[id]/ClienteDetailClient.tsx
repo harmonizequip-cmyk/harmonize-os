@@ -28,7 +28,7 @@ interface Client {
   city: string | null;
   address: string | null;
   notes: string | null;
-  reservation_fee_status: string;
+  parceiro?: boolean;
 }
 
 interface RentalRow {
@@ -224,14 +224,12 @@ export default function ClienteDetailClient({
         <span className="rounded-full bg-brand-blue/10 px-3 py-1 font-medium text-brand-blue">
           ↻ {reagendadas} reagendada{reagendadas === 1 ? "" : "s"}
         </span>
-        {client.reservation_fee_status === "pendente" && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-            💳 Taxa de reserva pendente
-          </span>
-        )}
-        {client.reservation_fee_status === "pago" && (
-          <span className="rounded-full bg-brand-teal/10 px-3 py-1 font-medium text-brand-teal">
-            💳 Taxa de reserva paga
+        {/* A taxa de cada data aparece na lista de Agendamentos, abaixo,
+            com os botões para mexer nela. Aqui em cima fica só o que é do
+            cliente: se ele é parceiro e por isso nunca paga. */}
+        {client.parceiro && (
+          <span className="rounded-full bg-brand-blue/10 px-3 py-1 font-medium text-brand-blue">
+            🤝 Parceiro · reserva sem taxa
           </span>
         )}
       </div>
@@ -340,7 +338,6 @@ export default function ClienteDetailClient({
           clientId={client.id}
           clientName={client.name}
           clientWhatsapp={client.whatsapp}
-          clientReservationFeeStatus={client.reservation_fee_status}
           equipments={equipments}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}

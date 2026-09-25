@@ -13,7 +13,7 @@ interface Client {
   city: string | null;
   address: string | null;
   notes: string | null;
-  reservation_fee_status: string;
+  parceiro?: boolean;
 }
 
 export default function EditarClienteModal({
@@ -33,7 +33,7 @@ export default function EditarClienteModal({
   const [city, setCity] = useState(client.city ?? "");
   const [address, setAddress] = useState(client.address ?? "");
   const [notes, setNotes] = useState(client.notes ?? "");
-  const [reservationFeeStatus, setReservationFeeStatus] = useState(client.reservation_fee_status);
+  const [parceiro, setParceiro] = useState(client.parceiro ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export default function EditarClienteModal({
         city: toUpperOrNull(city),
         address: toUpperOrNull(address),
         notes: notes || null,
-        reservation_fee_status: reservationFeeStatus,
+        parceiro,
       })
       .eq("id", client.id);
     setSaving(false);
@@ -140,18 +140,23 @@ export default function EditarClienteModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva</label>
-            <select
-              value={reservationFeeStatus}
-              onChange={(e) => setReservationFeeStatus(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="nao_aplica">Não se aplica</option>
-              <option value="pendente">Pendente</option>
-              <option value="pago">Paga</option>
-            </select>
-          </div>
+          {/* "Taxa de reserva" saiu: era uma taxa por cliente, e cada
+              data reservada tem a sua. A taxa de cada agendamento fica na
+              lista de Agendamentos. Aqui ficou o que é do cliente mesmo. */}
+          <label className="flex items-start gap-2.5 rounded-lg border border-neutral-300 p-3 dark:border-neutral-700">
+            <input
+              type="checkbox"
+              checked={parceiro}
+              onChange={(e) => setParceiro(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-teal"
+            />
+            <span className="text-xs text-neutral-600 dark:text-neutral-400">
+              <span className="block text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                Parceiro
+              </span>
+              Reserva data sem pagar a taxa de compromisso.
+            </span>
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

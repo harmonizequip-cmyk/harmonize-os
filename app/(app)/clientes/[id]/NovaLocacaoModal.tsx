@@ -30,7 +30,6 @@ interface ClientWithExtras {
   id: string;
   name: string;
   whatsapp?: string | null;
-  reservation_fee_status?: string;
 }
 
 const PAYMENT_METHODS = [
@@ -59,7 +58,6 @@ export default function NovaLocacaoModal({
   clientId,
   clientName,
   clientWhatsapp,
-  clientReservationFeeStatus,
   clients,
   equipments,
   pricingConfig,
@@ -73,7 +71,6 @@ export default function NovaLocacaoModal({
   clientId?: string;
   clientName?: string;
   clientWhatsapp?: string | null;
-  clientReservationFeeStatus?: string;
   clients?: ClientWithExtras[];
   equipments: EquipmentOption[];
   // Config de preço vinda de settings (ver lib/settings.ts). Se não
@@ -102,9 +99,11 @@ export default function NovaLocacaoModal({
   const activeClientId = isFixedClient ? clientId! : pickedClientId;
   const activeClientName = isFixedClient ? clientName ?? "" : pickedClient?.name ?? "";
   const activeClientWhatsapp = isFixedClient ? clientWhatsapp : pickedClient?.whatsapp ?? null;
-  const activeClientFeeStatus = isFixedClient
-    ? clientReservationFeeStatus ?? "nao_aplica"
-    : pickedClient?.reservation_fee_status ?? "nao_aplica";
+  // A taxa deixou de morar no cliente. Este modal ainda tem o seletor
+  // próprio ("já foi paga", "cobrar agora"), então o padrão aqui é não
+  // aplicar nada por conta própria: creditar taxa sozinho a partir de um
+  // campo que não é mais a verdade seria descontar dinheiro sem base.
+  const activeClientFeeStatus: string = "nao_aplica";
 
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -348,15 +347,10 @@ export default function NovaLocacaoModal({
       } else {
         setWarning("A locação foi salva, mas não encontrei a categoria 'Taxa de reserva' para registrar automaticamente.");
       }
-      // B2 da auditoria: cobrar a taxa aqui nunca marcava o cliente como
-      // pago, então ele ficava "taxa pendente" pra sempre mesmo já tendo
-      // pago, e o Relatórios continuava somando ele na taxa a receber.
-      await supabase.from("clients").update({ reservation_fee_status: "pago" }).eq("id", activeClientId);
-    } else if (reservationFeeStatus === "ja_paga") {
-      // B3 da auditoria: creditar a taxa aqui não consumia o crédito, então
-      // o mesmo valor podia ser descontado de novo na próxima locação do
-      // mesmo cliente, sem nenhum aviso.
-      await supabase.from("clients").update({ reservation_fee_status: "nao_aplica" }).eq("id", activeClientId);
+      // As duas gravações que ficavam aqui, marcando a taxa do CLIENTE
+      // como paga ou consumida, saíram: o campo era um por cliente e a
+      // taxa é por data reservada. Quem carrega esse estado agora é o
+      // agendamento, e quem o muda é definir_taxa_agendamento.
     }
 
     setSaving(false);
