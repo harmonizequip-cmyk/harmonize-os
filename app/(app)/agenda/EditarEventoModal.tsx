@@ -7,7 +7,7 @@ import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import FinalizarReservaModal from "./FinalizarReservaModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { formatDate } from "@/lib/format";
-import type { PricingConfig } from "@/lib/rental-pricing";
+import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
@@ -29,6 +29,10 @@ interface EventToEdit {
   // perdida), repassado direto para FinalizarReservaModal decidir o que
   // oferecer — ver o comentário em ReservationToFinalize.
   taxa_status?: string | null;
+  // Reserva de HIPRO 1/2 marcada como mentoria (leva K) — muda o texto
+  // desta tela e faz FinalizarReservaModal cobrar por paciente modelo
+  // em vez de por disparo (leva M/N).
+  is_mentoria?: boolean;
 }
 
 export default function EditarEventoModal({
@@ -36,6 +40,7 @@ export default function EditarEventoModal({
   clients,
   pricingConfig,
   reservationFee,
+  mentoriaPricing,
   onClose,
   onSaved,
   onDeleted,
@@ -44,6 +49,7 @@ export default function EditarEventoModal({
   clients: ClientOption[];
   pricingConfig?: PricingConfig;
   reservationFee?: number;
+  mentoriaPricing?: MentoriaPricingConfig;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -95,8 +101,10 @@ export default function EditarEventoModal({
             equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
             eventDate: event.date_start,
           }}
+          isMentoria={event.is_mentoria ?? false}
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
+          mentoriaPricing={mentoriaPricing}
           onClose={() => setShowFinalize(false)}
           onFinalized={onSaved}
         />
@@ -109,12 +117,16 @@ export default function EditarEventoModal({
           className="w-full max-w-md rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Reserva pendente</h2>
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            {event.is_mentoria ? "Mentoria pendente" : "Reserva pendente"}
+          </h2>
           <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
             {EQUIPMENT_LABELS[event.event_type] ?? event.event_type} · {formatDate(event.date_start)}
             {event.clients?.name ? ` · ${event.clients.name}` : ""}
             <br />
-            Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar.
+            {event.is_mentoria
+              ? "Ainda sem cobrança lançada. Finalize com a quantidade de pacientes modelo quando a mentoria acontecer, ou cancele se não for mais rolar."
+              : "Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar."}
           </p>
 
           {cancelError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{cancelError}</p>}
@@ -130,7 +142,7 @@ export default function EditarEventoModal({
               onClick={() => setShowFinalize(true)}
               className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
             >
-              Finalizar com disparos
+              {event.is_mentoria ? "Finalizar mentoria" : "Finalizar com disparos"}
             </button>
           </div>
 
