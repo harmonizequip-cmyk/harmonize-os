@@ -46,11 +46,18 @@ export interface LeadRow {
   address: string | null;
   whatsapp: string | null;
   stage: StageKey;
+  // Independente da etapa: uma vez true, mudar "stage" nunca volta isso
+  // pra false sozinho (é o próprio gatilho do banco que garante isso,
+  // ver migration da leva F). A etapa mostra onde a negociação atual
+  // está; is_client mostra se esse contato já converteu alguma vez.
+  is_client?: boolean;
   data_evento: string | null;
   tags: TagOption[];
   origem: string | null;
   notes: string | null;
   parceiro?: boolean;
+  treatment?: string | null;
+  display_name?: string | null;
   // A taxa não é mais um campo do cliente: cada data reservada tem a
   // sua, e estes três números vêm da view clientes_taxas.
   taxasPendentes: number;
@@ -635,7 +642,18 @@ function LeadCardContent({
           : ""
       }
     >
-      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+        {lead.name}
+        {/* Mostra mesmo fora da coluna "Cliente": é possível (e correto)
+            um cliente já convertido estar temporariamente numa etapa
+            anterior, como "Agendamento" numa segunda locação, sem que
+            isso desfaça a conversão — ver leva F. */}
+        {lead.is_client && stage.key !== "cliente" && (
+          <span className="ml-1.5 rounded-full bg-brand-teal/10 px-1.5 py-0.5 align-middle text-[10px] font-medium text-brand-teal">
+            Cliente
+          </span>
+        )}
+      </p>
       {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
 
       {lead.nextEvent ? (
