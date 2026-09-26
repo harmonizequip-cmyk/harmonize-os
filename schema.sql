@@ -168,13 +168,10 @@ create table public.clients (
   -- direto em "Clientes" entram como 'cliente' (já convertido); leads
   -- criados no Funil entram como 'lead' e avançam a partir daí.
   stage text not null default 'cliente' check (stage in ('lead','contato','nutricao','qualificado','agendado','cliente')),
-  -- Legado: guardava UMA taxa de reserva por cliente. Substituído pela
-  -- view clientes_taxas (leva C4), que lê a taxa por agendamento — um
-  -- cliente que aluga cinco vezes reserva cinco datas e deve cinco
-  -- taxas, e este campo não tinha como representar isso. Ninguém lê
-  -- mais esta coluna; ela continua existindo só porque ainda não foi
-  -- formalmente removida.
-  reservation_fee_status text not null default 'nao_aplica' check (reservation_fee_status in ('nao_aplica', 'pendente', 'pago')),
+  -- reservation_fee_status (guardava UMA taxa de reserva por cliente)
+  -- removida na leva Q: já estava substituída pela view clientes_taxas
+  -- (leva C4), que lê a taxa por agendamento, e nada no código da
+  -- aplicação lia mais esta coluna.
   data_evento date,
   -- Tags vivem em tabelas próprias (ver "tags" e "client_tags" logo
   -- abaixo de equipments), não mais como array nesta tabela.
@@ -507,7 +504,7 @@ create table public.tasks (
   type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup', 'manual')),
   follow_up_number integer,
   title text not null,
-  due_date date not null default current_date,
+  due_date date not null default public.hoje_local(),
   status text not null default 'pendente' check (status in ('pendente', 'concluida')),
   created_at timestamptz not null default now(),
   completed_at timestamptz,
@@ -703,11 +700,28 @@ as $$
 begin
   if not exists (
     select 1 from public.profiles
-    where id = auth.uid() and is_admin
+    where id = auth.uid() and is_admin and active
   ) then
-    raise exception 'Apenas administradores podem executar esta ação.';
+    raise exception 'Apenas administradores ativos podem executar esta ação.';
   end if;
 end;
+$$;
+
+comment on function public.require_admin() is
+  'Porta de entrada das ações de administrador (limpeza de dados de teste, exclusão definitiva). active bloqueia mesmo administrador, igual a has_module_permission (leva H) — antes da leva Q, is_admin bastava mesmo com a conta desativada.';
+
+-- "Hoje" no fuso do negócio, não em UTC. O Supabase roda em UTC:
+-- current_date sozinho já vira amanhã a partir das 21h no horário do
+-- Brasil (UTC-3 o ano todo, sem horário de verão desde 2019). Espelha
+-- lib/period.ts (hojeLocal) do frontend — usar esta função em vez de
+-- current_date sempre que o valor representa a data de hoje para quem
+-- está usando o sistema (leva Q).
+create or replace function public.hoje_local()
+returns date
+language sql
+stable
+as $$
+  select (now() at time zone 'America/Sao_Paulo')::date;
 $$;
 
 -- Herança automática da chave geral (settings.test_mode): se quem
@@ -770,7 +784,7 @@ create table public.rental_payments (
   rental_id uuid not null references public.rentals(id) on delete cascade,
   forma payment_method_type not null,
   valor numeric(12,2) not null check (valor > 0),
-  data date not null default current_date,
+  data date not null default public.hoje_local(),
   -- Só preenchido quando forma = 'pix': em qual conta o dinheiro caiu.
   -- Lista fechada de propósito (são as três contas reais do negócio);
   -- se um dia entrar uma quarta conta, é uma migration de uma linha.
@@ -823,7 +837,7 @@ as $$
 begin
   perform public.require_admin();
 
-  if p_table not in ('clients','transactions','rentals','calendar_events','mentoring_events','tasks') then
+  if p_table not in ('clients','transactions','rentals','calendar_events','mentoring_events','tasks','rental_payments') then
     raise exception 'Tabela não permitida: %', p_table;
   end if;
 
@@ -925,6 +939,8 @@ begin
     where transaction_id in (select id from public.transactions where is_test);
   update public.mentoring_events set transaction_id = null
     where transaction_id in (select id from public.transactions where is_test);
+  update public.calendar_events  set taxa_transaction_id = null
+    where taxa_transaction_id in (select id from public.transactions where is_test);
   update public.calendar_events  set rental_id = null
     where rental_id in (select id from public.rentals where is_test);
   update public.calendar_events  set mentoring_id = null
@@ -1609,7 +1625,7 @@ begin
     raise exception 'Esta locação está cancelada.';
   end if;
 
-  if p_realizada and v_data > current_date then
+  if p_realizada and v_data > public.hoje_local() then
     raise exception 'Esta locação é do dia %. Não dá para marcar como realizada antes de acontecer.',
       to_char(v_data, 'DD/MM/YYYY');
   end if;
@@ -2067,7 +2083,7 @@ create or replace function public.registrar_pagamento_locacao(
   p_rental_id uuid,
   p_forma payment_method_type,
   p_valor numeric,
-  p_data date default current_date,
+  p_data date default public.hoje_local(),
   p_pix_conta text default null,
   p_notes text default null
 )
@@ -2336,7 +2352,7 @@ create or replace function public.registrar_despesa_locacao(
   p_category_id uuid,
   p_amount numeric,
   p_payment_method payment_method_type,
-  p_date date default current_date,
+  p_date date default public.hoje_local(),
   p_description text default null,
   p_notes text default null
 )
@@ -2573,13 +2589,13 @@ begin
   values (
     'entrada', v_categoria,
     'Locação HIPRO - ' || coalesce(v_client_name, ''),
-    v_valor_lancamento, v_forma, coalesce(p_data, current_date), 'harmonize',
+    v_valor_lancamento, v_forma, coalesce(p_data, public.hoje_local()), 'harmonize',
     v_client_id, p_rental_id, auth.uid()
   )
   returning id into v_transacao_id;
 
   insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
-  values (p_rental_id, v_forma, v_valor_lancamento, coalesce(p_data, current_date), v_pix_conta, v_transacao_id, auth.uid());
+  values (p_rental_id, v_forma, v_valor_lancamento, coalesce(p_data, public.hoje_local()), v_pix_conta, v_transacao_id, auth.uid());
 
   update rentals
      set payment_method = v_forma,
@@ -2653,8 +2669,8 @@ grant execute on function public.desfazer_pagamento_locacao to authenticated;
 -- com a taxa pendente no valor configurado — por qualquer caminho que
 -- crie o evento (create_rental, "Reservar HIPRO Day", ou uma futura
 -- tela), não só pelas funções que já gravam a taxa explicitamente.
--- current_date seria UTC no servidor; a comparação usa o fuso de
--- Brasília para uma reserva feita à noite não nascer sem taxa por
+-- current_date seria UTC no servidor; a comparação usa hoje_local()
+-- (leva Q) para uma reserva feita à noite não nascer sem taxa por
 -- engano de fuso.
 create or replace function public.definir_taxa_ao_criar_evento()
 returns trigger
@@ -2673,7 +2689,7 @@ begin
     return new;
   end if;
 
-  if new.date_start <= (now() at time zone 'America/Sao_Paulo')::date then
+  if new.date_start <= public.hoje_local() then
     return new;
   end if;
 
@@ -2769,7 +2785,7 @@ begin
   -- Taxa de compromisso inicial: pendente só quando há data futura a
   -- garantir e o cliente não é parceiro. definir_taxa_agendamento muda o
   -- estado depois.
-  if coalesce(v_parceiro, false) or p_event_date <= current_date then
+  if coalesce(v_parceiro, false) or p_event_date <= public.hoje_local() then
     v_taxa_status := 'nao_aplica';
     v_taxa_valor  := null;
   else
@@ -3105,7 +3121,7 @@ begin
       where client_id = new.id and status = 'pendente' and type = 'contato_inicial'
     ) then
       insert into tasks (client_id, type, title, due_date)
-      values (new.id, 'contato_inicial', 'Fazer o primeiro contato com ' || new.name, current_date);
+      values (new.id, 'contato_inicial', 'Fazer o primeiro contato com ' || new.name, public.hoje_local());
     end if;
   end if;
   return new;
@@ -3182,7 +3198,7 @@ begin
     'followup',
     v_next_followup,
     'Confirmar se ' || coalesce(v_client_name, 'o cliente') || ' respondeu (Follow-up ' || v_next_followup || ')',
-    current_date + 2
+    public.hoje_local() + 2
   );
 end;
 $$;
