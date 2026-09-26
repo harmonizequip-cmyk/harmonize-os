@@ -65,7 +65,6 @@ export default function EditarEventoModal({
   const [showFinalize, setShowFinalize] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const [eventType, setEventType] = useState(event.event_type === "hipro_1" || event.event_type === "hipro_2" ? "outros" : event.event_type);
   const [title, setTitle] = useState(event.title);
   const [localClients, setLocalClients] = useState(clients);
   const [clientId, setClientId] = useState(event.client_id ?? "");
@@ -169,10 +168,14 @@ export default function EditarEventoModal({
     if (!window.confirm("Salvar essas alterações no evento?")) return;
     setSaving(true);
     setError(null);
+    // Não altera event_type aqui: este ramo é só para evento genérico
+    // sem equipamento ("outros" daqui em diante, ou um "mentoria" antigo
+    // já existente antes desta trava). Mentoria nova sempre passa por
+    // "Reservar HIPRO" (ver NovoEventoModal e ReservarHiproModal) para
+    // manter o bloqueio de agenda pela constraint no_equipment_double_booking.
     const { error } = await supabase
       .from("calendar_events")
       .update({
-        event_type: eventType,
         title: title.trim(),
         client_id: clientId || null,
         date_start: dateStart,
@@ -230,18 +233,6 @@ export default function EditarEventoModal({
         <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar evento</h2>
 
         <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tipo</label>
-            <select
-              value={eventType}
-              onChange={(e) => setEventType(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              <option value="mentoria">Mentoria</option>
-              <option value="outros">Outro</option>
-            </select>
-          </div>
-
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Título</label>
             <input
