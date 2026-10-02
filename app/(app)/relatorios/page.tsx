@@ -123,10 +123,16 @@ export default async function RelatoriosPage({
 
   const pendingFeeTotal = pendingFeeClients.reduce((soma, t) => soma + t.valor, 0);
 
+  // Ajuda de custo de deslocamento (leva AC) entra no financeiro, mas não é
+  // faturamento: fica fora de total, concentração e mix de receita.
+  const entradasFaturamento = (entradas ?? []).filter(
+    (t) => !(oneOf<{ name: string }>(t.categories as any)?.name ?? "").toLowerCase().startsWith("deslocamento")
+  );
+
   // ---- 3) Concentração de receita ----
   const revenueByClient = new Map<string, { name: string; total: number }>();
   let totalRevenue = 0;
-  for (const t of entradas ?? []) {
+  for (const t of entradasFaturamento) {
     totalRevenue += Number(t.amount);
     if (!t.client_id) continue;
     const clientName = oneOf<{ name: string }>(t.clients as any)?.name ?? "Sem nome";
@@ -186,7 +192,7 @@ export default async function RelatoriosPage({
 
   // ---- 7) Mix de receita por categoria ----
   const categoryMap = new Map<string, number>();
-  for (const t of entradas ?? []) {
+  for (const t of entradasFaturamento) {
     const categoryName = oneOf<{ name: string }>(t.categories as any)?.name ?? "Outros";
     categoryMap.set(categoryName, (categoryMap.get(categoryName) ?? 0) + Number(t.amount));
   }
