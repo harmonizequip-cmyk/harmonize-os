@@ -291,7 +291,13 @@ create table public.settings (
   -- R$1.500/paciente quando o pagamento é parcelado no crédito (até
   -- 10x), ou R$1.200/paciente em qualquer outra forma de pagamento.
   mentoria_valor_avista numeric(10,2) not null default 1200.00,
-  mentoria_valor_parcelado numeric(10,2) not null default 1500.00
+  mentoria_valor_parcelado numeric(10,2) not null default 1500.00,
+  -- Funil de clientes: dias sem locação até cair em "Reativar" e intervalo
+  -- da tarefa automática de recontato.
+  dias_ate_reativar integer not null default 45,
+  recontato_intervalo_dias integer not null default 10,
+  constraint settings_automacao_dias_check
+    check (dias_ate_reativar between 1 and 3650 and recontato_intervalo_dias between 1 and 365)
 );
 
 comment on column public.settings.mentoria_valor_avista is
@@ -4306,3 +4312,27 @@ on conflict (name) do nothing;
 --     "agenda":true,"equipamentos":true,"relatorios":true,
 --     "exportacao":true,"configuracoes":true}'::jsonb
 -- where email = 'seu-email@exemplo.com';
+
+-- ============================================================
+-- FUNIL DE CLIENTES, PARTE 1: última locação por cliente
+-- (a etapa Reativar/Pré-reserva/Agendamento/Cliente é calculada na tela)
+-- ============================================================
+comment on column public.settings.dias_ate_reativar is
+  'Dias sem locação concluída para o cliente sair da etapa "Cliente" e cair em "Reativar" no funil de clientes. Padrão 45.';
+comment on column public.settings.recontato_intervalo_dias is
+  'Intervalo, em dias, da tarefa automática de recontato de clientes nas etapas Cliente e Reativar. Padrão 10. Usado pela rotina de tarefas (Parte 2 do funil).';
+
+create or replace view public.clientes_ultima_locacao
+with (security_invoker = true) as
+select
+  r.client_id,
+  max(r.event_date) as ultima_locacao
+from public.rentals r
+where r.status <> 'cancelada'
+  and r.event_date <= public.hoje_local()
+group by r.client_id;
+
+comment on view public.clientes_ultima_locacao is
+  'Data da última locação já ocorrida (não cancelada) de cada cliente. Base da etapa Cliente/Reativar no funil.';
+
+grant select on public.clientes_ultima_locacao to authenticated;
