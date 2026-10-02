@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
-import { resolvePeriod, hojeLocal } from "@/lib/period";
+import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
@@ -140,6 +140,45 @@ export default async function DashboardPage({
 
   const saldoByRentalId = new Map((situacoes ?? []).map((s) => [s.rental_id, Number(s.saldo)]));
 
+  // Ocupação por equipamento: dias com agendamento (locação ou pré-reserva
+  // não cancelada) sobre dias disponíveis. Disponível = segunda a sábado,
+  // a mesma regra do radar (domingo não é dia útil), mais os domingos que
+  // tiveram agendamento, para a conta nunca passar de 100%. Com o filtro
+  // em um dia só ("hoje"), um percentual de um dia não diz nada, então o
+  // recorte vira o mês corrente.
+  const umDiaSo = fromStr === toStr;
+  const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
+  const ocupFim = umDiaSo ? ultimoDiaDoMes(todayStr) : toStr;
+  const { data: eventosOcupacao } = await supabase
+    .from("calendar_events")
+    .select("equipment_id, date_start, date_end")
+    .eq("is_test", false)
+    .neq("status", "cancelada")
+    .not("equipment_id", "is", null)
+    .lte("date_start", ocupFim)
+    .gte("date_end", ocupInicio);
+
+  const diasDoRecorte: string[] = [];
+  for (let d = ocupInicio; d <= ocupFim && diasDoRecorte.length < 400; d = somarDias(d, 1)) diasDoRecorte.push(d);
+  const ehDomingo = (iso: string) => new Date(`${iso}T12:00:00Z`).getUTCDay() === 0;
+
+  const ocupadosPorEquip = new Map<string, Set<string>>();
+  for (const ev of eventosOcupacao ?? []) {
+    const set = ocupadosPorEquip.get(ev.equipment_id as string) ?? new Set<string>();
+    const ini = (ev.date_start as string) < ocupInicio ? ocupInicio : (ev.date_start as string);
+    const fim = (ev.date_end as string) > ocupFim ? ocupFim : (ev.date_end as string);
+    for (let d = ini; d <= fim && set.size < 400; d = somarDias(d, 1)) set.add(d);
+    ocupadosPorEquip.set(ev.equipment_id as string, set);
+  }
+  const ocupacaoDe = (equipmentId: string) => {
+    const ocupados = ocupadosPorEquip.get(equipmentId) ?? new Set<string>();
+    const disponiveis = diasDoRecorte.filter((d) => !ehDomingo(d) || ocupados.has(d)).length;
+    return { ocupados: ocupados.size, disponiveis, pct: disponiveis > 0 ? ocupados.size / disponiveis : 0 };
+  };
+  const rotuloOcupacao = umDiaSo
+    ? "no mês corrente"
+    : `de ${ocupInicio.split("-").reverse().join("/")} a ${ocupFim.split("-").reverse().join("/")}`;
+
   const in7Str = somaDias(7).toISOString().slice(0, 10);
   const { count: pendingConfirmations } = await supabase
     .from("calendar_events")
@@ -256,11 +295,18 @@ export default async function DashboardPage({
       locacoes: eqRentals.length,
       receita: eqRentals.reduce((sum, r) => sum + Number(r.calculated_value), 0),
       pendente: eqRentals.reduce((sum, r) => sum + (saldoByRentalId.get(r.id) ?? 0), 0),
+      ocupacao: ocupacaoDe(eq.id),
     };
   });
 
   // Query string do período atual, repassada para a página de detalhe do
   // equipamento, para que ela mantenha o mesmo filtro de datas do Dashboard.
+  const ocupacaoGeral = equipmentSummary.reduce(
+    (acc, eq) => ({ ocupados: acc.ocupados + eq.ocupacao.ocupados, disponiveis: acc.disponiveis + eq.ocupacao.disponiveis }),
+    { ocupados: 0, disponiveis: 0 }
+  );
+  const ocupacaoGeralPct = ocupacaoGeral.disponiveis > 0 ? ocupacaoGeral.ocupados / ocupacaoGeral.disponiveis : 0;
+
   const periodQuery = new URLSearchParams({ from: fromStr, to: toStr }).toString();
 
   return (
@@ -312,7 +358,16 @@ export default async function DashboardPage({
 
       {equipmentSummary.length > 0 && (
         <div>
-          <p className="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Equipamentos</p>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Equipamentos</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Ocupação geral {rotuloOcupacao}:{" "}
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                {Math.round(ocupacaoGeralPct * 100)}%
+              </span>{" "}
+              ({ocupacaoGeral.ocupados} de {ocupacaoGeral.disponiveis} dias-máquina)
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {equipmentSummary.map((eq) => (
               <Link
@@ -328,6 +383,20 @@ export default async function DashboardPage({
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   {eq.locacoes} {eq.locacoes === 1 ? "locação" : "locações"} no período
                 </p>
+                <div className="mt-2">
+                  <div className="flex items-baseline justify-between text-xs text-neutral-500 dark:text-neutral-400">
+                    <span>Ocupação</span>
+                    <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                      {Math.round(eq.ocupacao.pct * 100)}% · {eq.ocupacao.ocupados} de {eq.ocupacao.disponiveis} dias
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                    <div
+                      className="h-full rounded-full bg-brand-teal"
+                      style={{ width: `${Math.min(100, Math.round(eq.ocupacao.pct * 100))}%` }}
+                    />
+                  </div>
+                </div>
                 {eq.pendente > 0 && (
                   <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
                     Pendente: {formatCurrency(eq.pendente)}
