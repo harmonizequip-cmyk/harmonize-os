@@ -309,7 +309,7 @@ insert into settings (id) values (true);
 
 -- ------------------------------------------------------------
 -- TAGS: tabela própria com cor. is_automatic fica reservado para tags
--- aplicadas automaticamente por gatilho (follow-up, reagendamento).
+-- aplicadas automaticamente por gatilho (follow-up).
 -- ------------------------------------------------------------
 create table public.tags (
   id uuid primary key default gen_random_uuid(),
@@ -3997,33 +3997,6 @@ $$;
 
 grant execute on function public.desfazer_conclusao_tarefa to authenticated;
 
--- Reagendar um evento na Agenda aplica a etiqueta "Reagendamento" no
--- cliente (cobre edição direta na Agenda e locações editadas via
--- update_rental, já que as duas gravam em calendar_events).
-create or replace function public.handle_calendar_event_reschedule()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_tag_id uuid;
-begin
-  if new.client_id is not null and old.date_start is distinct from new.date_start then
-    select id into v_tag_id from tags where name = 'Reagendamento';
-    if v_tag_id is not null then
-      insert into client_tags (client_id, tag_id) values (new.client_id, v_tag_id)
-      on conflict do nothing;
-    end if;
-  end if;
-  return new;
-end;
-$$;
-
-create trigger trg_calendar_event_reschedule
-  after update of date_start on calendar_events
-  for each row execute function public.handle_calendar_event_reschedule();
-
 -- calendar_events passa a ser a fonte de verdade de quando/status de
 -- uma locação (leva R): ao mudar data ou status do evento vinculado a
 -- uma locação, rentals é atualizado junto automaticamente, em vez de
@@ -4292,15 +4265,14 @@ create policy "webauthn_credentials_self" on webauthn_credentials for all
   with check (user_id = auth.uid());
 
 -- ============================================================
--- TAGS AUTOMÁTICAS (usadas pelo fluxo de follow-up/reagendamento)
+-- TAGS AUTOMÁTICAS (usadas pelo fluxo de follow-up)
 -- ============================================================
 insert into tags (name, color, is_automatic) values
   ('Follow-up 1', '#7EC8E3', true),
   ('Follow-up 2', '#7EC8E3', true),
   ('Follow-up 3', '#B8A0D0', true),
   ('Follow-up 4', '#B8A0D0', true),
-  ('Follow-up 5', '#E8789A', true),
-  ('Reagendamento', '#d85f83', true)
+  ('Follow-up 5', '#E8789A', true)
 on conflict (name) do nothing;
 
 -- ============================================================
