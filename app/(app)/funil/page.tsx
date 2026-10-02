@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { hojeLocal } from "@/lib/period";
+import { fetchSettings } from "@/lib/settings";
+import { etapaDoCliente } from "@/lib/funil-clientes";
 import FunilClient from "./FunilClient";
 
 export default async function FunilPage() {
@@ -38,7 +40,7 @@ export default async function FunilPage() {
   const todayStr = hojeLocal();
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
-    .select("id, client_id, date_start, confirmed, confirmation_message_sent_at")
+    .select("id, client_id, date_start, confirmed, confirmation_message_sent_at, equipment_id, taxa_status, is_mentoria")
     .neq("status", "cancelada")
     .not("client_id", "is", null)
     .gte("date_start", todayStr)
@@ -73,10 +75,36 @@ export default async function FunilPage() {
   const taxaPorCliente = new Map<string, any>();
   for (const t of taxas ?? []) taxaPorCliente.set(t.client_id, t);
 
+  // Etapa do funil de clientes (Reativar / Pré-reserva / Agendamento /
+  // Cliente): calculada aqui, não gravada. Só conta reserva de equipamento
+  // que não seja mentoria, igual à regra da taxa de reserva.
+  const settings = await fetchSettings(supabase);
+  const { data: ultimas } = await supabase.from("clientes_ultima_locacao").select("client_id, ultima_locacao");
+  const ultimaPorCliente = new Map<string, string>();
+  for (const u of ultimas ?? []) ultimaPorCliente.set(u.client_id, u.ultima_locacao);
+
+  const reservasPorCliente = new Map<string, { taxa_status: string }[]>();
+  for (const e of upcomingEvents ?? []) {
+    if (!e.equipment_id || e.is_mentoria) continue;
+    const lista = reservasPorCliente.get(e.client_id) ?? [];
+    lista.push({ taxa_status: e.taxa_status });
+    reservasPorCliente.set(e.client_id, lista);
+  }
+
   const clientsWithEvents = (clients ?? []).map((c: any) => {
     const t = taxaPorCliente.get(c.id);
+    const ultimaLocacao = ultimaPorCliente.get(c.id) ?? null;
     return {
       ...c,
+      ultimaLocacao,
+      clientStage: c.is_client
+        ? etapaDoCliente({
+            reservas: reservasPorCliente.get(c.id) ?? [],
+            ultimaLocacao,
+            hoje: todayStr,
+            diasAteReativar: settings.diasAteReativar,
+          })
+        : null,
       tags: (c.client_tags ?? []).map((ct: any) => ct.tags).filter(Boolean),
       nextEvent: nextEventByClient.get(c.id) ?? null,
       taxasPendentes: Number(t?.taxas_pendentes ?? 0),

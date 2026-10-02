@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { STAGES, type LeadRow, type TagOption } from "./FunilClient";
+import { LEAD_STAGES, type LeadRow, type TagOption } from "./FunilClient";
+import { CLIENT_STAGES } from "@/lib/funil-clientes";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress, toUpperOrNull } from "@/lib/format";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import NovaTarefaModal from "./NovaTarefaModal";
@@ -95,6 +96,29 @@ export default function LeadCardModal({
     setNewTagName("");
   }
 
+  // Conversão manual: para quem já é cliente de antes do sistema (ou não
+  // aluga há tempos) e por isso não tem locação registrada aqui. O gatilho
+  // do banco liga is_client quando a etapa vira "cliente", e a partir daí
+  // o contato aparece na aba Clientes, na etapa calculada (em geral
+  // Reativar, por não ter locação recente).
+  async function handleConverterEmCliente() {
+    if (
+      !window.confirm(
+        `Mover ${lead.name} para o funil de clientes? Ele sai da aba Leads e essa mudança não é desfeita por aqui.`
+      )
+    )
+      return;
+    setSaving(true);
+    setError(null);
+    const { error: convError } = await supabase.from("clients").update({ stage: "cliente" }).eq("id", lead.id);
+    setSaving(false);
+    if (convError) {
+      setError("Não foi possível mover para clientes. Tente novamente.");
+      return;
+    }
+    onSaved();
+  }
+
   async function handleSave() {
     if (!window.confirm("Salvar essas alterações?")) return;
     setSaving(true);
@@ -103,7 +127,8 @@ export default function LeadCardModal({
     const { error: updateError } = await supabase
       .from("clients")
       .update({
-        stage,
+        // Etapa de cliente é automática: só lead grava etapa por aqui.
+        ...(lead.is_client ? {} : { stage }),
         data_evento: dataEvento || null,
         city: toUpperOrNull(city),
         address: toUpperOrNull(address),
@@ -159,17 +184,34 @@ export default function LeadCardModal({
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Etapa</label>
-            <select
-              value={stage}
-              onChange={(e) => setStage(e.target.value as typeof stage)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-            >
-              {STAGES.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            {lead.is_client ? (
+              <p className="rounded-lg bg-neutral-100 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                {CLIENT_STAGES.find((s) => s.key === lead.clientStage)?.label ?? "Cliente"}
+                <span className="ml-1.5 text-xs text-neutral-400">(automática)</span>
+              </p>
+            ) : (
+              <select
+                value={stage}
+                onChange={(e) => setStage(e.target.value as typeof stage)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              >
+                {LEAD_STAGES.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {!lead.is_client && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleConverterEmCliente}
+                className="mt-2 w-full rounded-lg border border-brand-teal/40 py-1.5 text-xs font-medium text-brand-teal hover:bg-brand-teal/5 disabled:opacity-50"
+              >
+                Já é cliente: mover para o funil de clientes
+              </button>
+            )}
           </div>
 
           <div>

@@ -24,6 +24,7 @@ import {
 } from "@dnd-kit/core";
 
 import { hojeLocal } from "@/lib/period";
+import { CLIENT_STAGES, type ClientStageKey } from "@/lib/funil-clientes";
 export const STAGES = [
   { key: "lead", label: "Novo contato", dot: "bg-neutral-400" },
   { key: "contato", label: "Tentativa de contato", dot: "bg-brand-blue" },
@@ -34,6 +35,13 @@ export const STAGES = [
 ] as const;
 
 export type StageKey = (typeof STAGES)[number]["key"];
+
+// Funil de leads: termina em "Agendamento". Quem fecha uma locação vira
+// cliente (is_client) e passa a aparecer só no funil de clientes.
+export const LEAD_STAGES = STAGES.filter((s) => s.key !== "cliente");
+
+type ColunaFunil = { key: string; label: string; dot: string };
+type Aba = "leads" | "clientes";
 
 export interface TagOption {
   id: string;
@@ -49,6 +57,9 @@ export interface LeadRow {
   whatsapp: string | null;
   stage: StageKey;
   is_client?: boolean;
+  // Etapa calculada do funil de clientes (null para quem ainda é lead).
+  clientStage?: ClientStageKey | null;
+  ultimaLocacao?: string | null;
   data_evento: string | null;
   tags: TagOption[];
   origem: string | null;
@@ -101,6 +112,7 @@ export default function FunilClient({
   const [leads, setLeads] = useState(initialClients);
   const [tasks, setTasks] = useState(initialTasks);
   const [selected, setSelected] = useState<LeadRow | null>(null);
+  const [aba, setAba] = useState<Aba>("leads");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [origemFilter, setOrigemFilter] = useState<string | null>(null);
@@ -156,15 +168,23 @@ export default function FunilClient({
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
 
+  const totalLeads = useMemo(() => leads.filter((l) => !l.is_client).length, [leads]);
+  const totalClientes = leads.length - totalLeads;
+  const colunas: readonly ColunaFunil[] = aba === "leads" ? LEAD_STAGES : CLIENT_STAGES;
+  const etapaDe = (c: LeadRow): string => (c.is_client ? c.clientStage ?? "reativar" : c.stage);
+  const rotuloEtapa = (c: LeadRow) =>
+    (c.is_client ? CLIENT_STAGES : STAGES).find((s) => s.key === etapaDe(c))?.label ?? etapaDe(c);
+
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
     return leads.filter(
       (c) =>
+        (aba === "clientes" ? !!c.is_client : !c.is_client) &&
         (c.name.toLowerCase().includes(term) || (c.city ?? "").toLowerCase().includes(term)) &&
         (!tagFilter || c.tags.some((t) => t.id === tagFilter)) &&
         (!origemFilter || c.origem === origemFilter)
     );
-  }, [leads, search, tagFilter, origemFilter]);
+  }, [leads, aba, search, tagFilter, origemFilter]);
 
   const origemLabel = (valor: string | null) => ORIGENS.find((o) => o.value === valor)?.label ?? valor ?? "";
 
@@ -174,14 +194,14 @@ export default function FunilClient({
       [
         { titulo: "Nome", valor: (c) => c.name },
         { titulo: "Cidade", valor: (c) => c.city ?? "" },
-        { titulo: "Etapa", valor: (c) => STAGES.find((s) => s.key === c.stage)?.label ?? c.stage },
+        { titulo: "Etapa", valor: (c) => rotuloEtapa(c) },
         { titulo: "Origem", valor: (c) => origemLabel(c.origem) },
         { titulo: "Tags", valor: (c) => c.tags.map((t) => t.name).join(", ") },
         { titulo: "Próximo evento", valor: (c) => (c.nextEvent ? formatDate(c.nextEvent.date_start) : "") },
         { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes },
         { titulo: "Em aberto", valor: (c) => c.valorPendente },
       ],
-      "funil"
+      aba === "clientes" ? "funil-clientes" : "funil-leads"
     );
   }
 
@@ -199,9 +219,9 @@ export default function FunilClient({
   }
 
   async function avancarEtapa(lead: LeadRow) {
-    const idx = STAGES.findIndex((s) => s.key === lead.stage);
-    if (idx === -1 || idx === STAGES.length - 1) return;
-    moveToStage(lead.id, STAGES[idx + 1].key);
+    const idx = LEAD_STAGES.findIndex((s) => s.key === lead.stage);
+    if (idx === -1 || idx === LEAD_STAGES.length - 1) return;
+    moveToStage(lead.id, LEAD_STAGES[idx + 1].key);
   }
 
   async function toggleConfirmed(lead: LeadRow) {
@@ -260,7 +280,8 @@ export default function FunilClient({
     if (!over) return;
     const lead = leads.find((l) => l.id === active.id);
     const newStage = over.id as StageKey;
-    if (lead && lead.stage !== newStage) {
+    // Só lead muda de etapa na mão; a etapa do cliente é automática.
+    if (lead && !lead.is_client && LEAD_STAGES.some((s) => s.key === newStage) && lead.stage !== newStage) {
       moveToStage(lead.id, newStage);
     }
   }
@@ -268,6 +289,28 @@ export default function FunilClient({
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
+
+      <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/60 sm:w-fit">
+        {(
+          [
+            { key: "leads", label: "Leads", total: totalLeads },
+            { key: "clientes", label: "Clientes", total: totalClientes },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setAba(t.key)}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition sm:flex-none ${
+              aba === t.key
+                ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
+                : "text-neutral-500 dark:text-neutral-400"
+            }`}
+          >
+            {t.label} <span className="ml-1 text-xs text-neutral-400">{t.total}</span>
+          </button>
+        ))}
+      </div>
 
       <div className="sticky top-0 z-20 -mx-4 space-y-2 bg-neutral-50 px-4 pb-2 pt-2 dark:bg-neutral-950 md:static md:mx-0 md:space-y-4 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
         {pendingConfirmationLeads.length > 0 && (
@@ -464,14 +507,25 @@ export default function FunilClient({
 
       {(search.trim() || tagFilter || origemFilter) && (
         <p className="text-xs text-neutral-400">
-          Mostrando {filtered.length} de {leads.length} leads com esse filtro.
+          Mostrando {filtered.length} de {aba === "clientes" ? totalClientes : totalLeads}{" "}
+          {aba === "clientes" ? "clientes" : "leads"} com esse filtro.
         </p>
       )}
 
-      <p className="text-xs text-neutral-400">
-        <span className="sm:hidden">Arraste os cards para o lado para mudar de etapa, ou role a tela para ver as outras colunas.</span>
-        <span className="hidden sm:inline">Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.</span>
-      </p>
+      {aba === "leads" ? (
+        <p className="text-xs text-neutral-400">
+          <span className="sm:hidden">Arraste os cards para o lado para mudar de etapa, ou role a tela para ver as outras colunas.</span>
+          <span className="hidden sm:inline">Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.</span>{" "}
+          Ao fechar a locação, o lead passa sozinho para a aba Clientes; quem já é cliente antigo pode ser movido
+          pelo botão dentro do card.
+        </p>
+      ) : (
+        <p className="text-xs text-neutral-400">
+          As etapas dos clientes mudam sozinhas: reserva com taxa pendente fica em Pré-reserva, com taxa paga ou
+          isenta vai para Agendamento, locação concluída fica em Cliente e, depois do prazo sem nova locação, cai
+          em Reativar.
+        </p>
+      )}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div
@@ -479,9 +533,9 @@ export default function FunilClient({
             activeId ? "" : "snap-x snap-proximity"
           }`}
         >
-          {STAGES.map((stage) => {
+          {colunas.map((stage) => {
             const stageLeads = filtered
-              .filter((c) => c.stage === stage.key)
+              .filter((c) => etapaDe(c) === stage.key)
               .sort((a, b) => {
                 // Quem tem data de agendamento vem antes de quem não tem, e
                 // entre os que têm, o mais próximo (menor data) vem primeiro.
@@ -495,13 +549,14 @@ export default function FunilClient({
                 return dataA.localeCompare(dataB);
               });
             return (
-              <FunilColumn key={stage.key} stage={stage} count={stageLeads.length}>
+              <FunilColumn key={stage.key} stage={stage} count={stageLeads.length} droppable={aba === "leads"}>
                 {stageLeads.map((lead) => (
                   <LeadCard
                     key={lead.id}
                     lead={lead}
                     stage={stage}
                     isDragging={activeId === lead.id}
+                    arrastavel={aba === "leads"}
                     onOpen={() => setSelected(lead)}
                     onToggleConfirmed={() => toggleConfirmed(lead)}
                     onAvancar={() => avancarEtapa(lead)}
@@ -519,7 +574,7 @@ export default function FunilClient({
           {activeLead ? (
             <LeadCardContent
               lead={activeLead}
-              stage={STAGES.find((s) => s.key === activeLead.stage)!}
+              stage={STAGES.find((s) => s.key === activeLead.stage) ?? STAGES[0]}
               floating
             />
           ) : null}
@@ -598,13 +653,15 @@ export default function FunilClient({
 function FunilColumn({
   stage,
   count,
+  droppable,
   children,
 }: {
-  stage: (typeof STAGES)[number];
+  stage: ColunaFunil;
   count: number;
+  droppable: boolean;
   children: React.ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.key });
+  const { setNodeRef, isOver } = useDroppable({ id: stage.key, disabled: !droppable });
 
   return (
     <div
@@ -627,18 +684,20 @@ function LeadCard({
   lead,
   stage,
   isDragging,
+  arrastavel,
   onOpen,
   onToggleConfirmed,
   onAvancar,
 }: {
   lead: LeadRow;
-  stage: (typeof STAGES)[number];
+  stage: ColunaFunil;
   isDragging: boolean;
+  arrastavel: boolean;
   onOpen: () => void;
   onToggleConfirmed: () => void;
   onAvancar: () => void;
 }) {
-  const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
+  const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id, disabled: !arrastavel });
 
   return (
     <div
@@ -646,7 +705,9 @@ function LeadCard({
       {...listeners}
       {...attributes}
       onClick={onOpen}
-      className={`cursor-grab rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand active:cursor-grabbing dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
+      className={`${
+        arrastavel ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      } rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
         isDragging ? "opacity-30" : ""
       }`}
     >
@@ -668,7 +729,7 @@ function LeadCardContent({
   onAvancar,
 }: {
   lead: LeadRow;
-  stage: (typeof STAGES)[number];
+  stage: ColunaFunil;
   floating?: boolean;
   onToggleConfirmed?: () => void;
   onAvancar?: () => void;
@@ -683,11 +744,6 @@ function LeadCardContent({
     >
       <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
         {lead.name}
-        {lead.is_client && stage.key !== "cliente" && (
-          <span className="ml-1.5 rounded-full bg-brand-teal/10 px-1.5 py-0.5 align-middle text-[10px] font-medium text-brand-teal">
-            Cliente
-          </span>
-        )}
       </p>
       {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
 
@@ -709,6 +765,12 @@ function LeadCardContent({
         lead.data_evento && (
           <p className="mt-1 text-xs text-neutral-400">📅 {formatDate(lead.data_evento)} (previsto)</p>
         )
+      )}
+
+      {lead.is_client && (stage.key === "cliente" || stage.key === "reativar") && (
+        <p className="mt-1 text-[11px] text-neutral-400">
+          {lead.ultimaLocacao ? `Última locação: ${formatDate(lead.ultimaLocacao)}` : "Sem locação registrada"}
+        </p>
       )}
 
       {lead.taxasPendentes > 0 && (
@@ -736,7 +798,7 @@ function LeadCardContent({
           ))}
         </div>
       )}
-      {stage.key !== "cliente" && (
+      {!lead.is_client && stage.key !== "agendado" && (
         <button
           onClick={(e) => {
             e.stopPropagation();
