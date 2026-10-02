@@ -8,6 +8,11 @@ import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
 
+// Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
+// máxima. Ficam aqui, juntas, para mudar num lugar só.
+const META_MIN = 25;
+const META_MAX = 30;
+
 function formatWeekdayDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
   const s = format(d, "EEE, dd 'de' MMM", { locale: ptBR });
@@ -48,17 +53,8 @@ export default async function DashboardPage({
     .select("type, amount")
     .eq("scope", "harmonize");
 
-  const { count: rentalsCount } = await supabase
-    .from("rentals")
-    .select("id", { count: "exact", head: true })
-    .eq("is_test", false)
-    .gte("event_date", fromStr)
-    .lte("event_date", toStr);
-
-  // Divisor do ticket médio. Precisa sair da view, senão dividiríamos uma
-  // receita que já exclui cancelada por uma contagem que inclui, e o
-  // ticket sairia menor do que é de verdade. O card "Locações" acima
-  // continua mostrando rentalsCount, que é o total do período.
+  // Contagem de locações do período, sem cancelada nem teste (as canceladas
+  // têm card próprio). Serve ao card "Locações" e de divisor do ticket médio.
   const { count: billableRentalsCount } = await supabase
     .from("rentals_contabilizaveis")
     .select("id", { count: "exact", head: true })
@@ -146,6 +142,34 @@ export default async function DashboardPage({
   // tiveram agendamento, para a conta nunca passar de 100%. Com o filtro
   // em um dia só ("hoje"), um percentual de um dia não diz nada, então o
   // recorte vira o mês corrente.
+  // Meta do mês: sempre o mês corrente, independente do filtro de período.
+  const mesInicio = primeiroDiaDoMes(todayStr);
+  const mesFim = ultimoDiaDoMes(todayStr);
+  const [{ count: locacoesMesCount }, { count: preReservasMesCount }] = await Promise.all([
+    supabase
+      .from("rentals_contabilizaveis")
+      .select("id", { count: "exact", head: true })
+      .gte("event_date", mesInicio)
+      .lte("event_date", mesFim),
+    supabase
+      .from("calendar_events")
+      .select("id", { count: "exact", head: true })
+      .eq("is_test", false)
+      .eq("status", "pre_reserva")
+      .is("rental_id", null)
+      .gte("date_start", mesInicio)
+      .lte("date_start", mesFim),
+  ]);
+  const locMes = locacoesMesCount ?? 0;
+  const preMes = preReservasMesCount ?? 0;
+  const metaStatus =
+    locMes > META_MAX
+      ? { texto: "Acima da meta máxima", cor: "text-brand-teal" }
+      : locMes >= META_MIN
+        ? { texto: "Dentro da meta", cor: "text-brand-teal" }
+        : { texto: `Faltam ${META_MIN - locMes} para a meta`, cor: "text-amber-600 dark:text-amber-400" };
+  const metaEscala = Math.max(META_MAX + 5, locMes + preMes);
+
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
   const ocupFim = umDiaSo ? ultimoDiaDoMes(todayStr) : toStr;
@@ -275,7 +299,12 @@ export default async function DashboardPage({
     0
   );
 
-  const ticketMedio = billableRentalsCount && billableRentalsCount > 0 ? entradas / billableRentalsCount : 0;
+  // Ticket médio = valor das locações do período dividido pelo número de
+  // locações contabilizáveis (sem cancelada nem teste). Antes dividia todas
+  // as entradas de caixa (taxa de reserva, mentoria, ajuda de custo,
+  // recebimento de locações de outros períodos), o que inflava o número.
+  const valorLocacoesPeriodo = (equipmentRentals ?? []).reduce((sum, r) => sum + Number(r.calculated_value), 0);
+  const ticketMedio = billableRentalsCount && billableRentalsCount > 0 ? valorLocacoesPeriodo / billableRentalsCount : 0;
 
   const cards = [
     { label: "Saldo", value: saldoTotal },
@@ -327,6 +356,41 @@ export default async function DashboardPage({
 
       <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
 
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            Meta do mês: {META_MIN} a {META_MAX} locações (máxima: acima de {META_MAX})
+          </p>
+          <p className={`text-xs font-semibold ${metaStatus.cor}`}>{metaStatus.texto}</p>
+        </div>
+        <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          {locMes} {locMes === 1 ? "locação" : "locações"} no mês
+          {preMes > 0 && (
+            <span className="ml-2 text-xs font-normal text-neutral-500 dark:text-neutral-400">
+              + {preMes} {preMes === 1 ? "pré-reserva" : "pré-reservas"} ainda sem disparos
+            </span>
+          )}
+        </p>
+        <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+          <div
+            className="absolute inset-y-0 left-0 bg-brand-teal"
+            style={{ width: `${Math.min(100, (locMes / metaEscala) * 100)}%` }}
+          />
+          <div
+            className="absolute inset-y-0 bg-brand-blue/50"
+            style={{
+              left: `${Math.min(100, (locMes / metaEscala) * 100)}%`,
+              width: `${Math.max(0, Math.min(100, ((locMes + preMes) / metaEscala) * 100) - Math.min(100, (locMes / metaEscala) * 100))}%`,
+            }}
+          />
+          <div className="absolute inset-y-0 w-px bg-neutral-500" style={{ left: `${(META_MIN / metaEscala) * 100}%` }} />
+          <div className="absolute inset-y-0 w-px bg-neutral-500" style={{ left: `${(META_MAX / metaEscala) * 100}%` }} />
+        </div>
+        <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+          Traços na barra: {META_MIN} e {META_MAX}. A parte azul são pré-reservas do mês que ainda podem virar locação.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((card) => (
           <div key={card.label} className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
@@ -336,7 +400,7 @@ export default async function DashboardPage({
         ))}
         <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{rentalsCount ?? 0}</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{billableRentalsCount ?? 0}</p>
         </div>
         <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
