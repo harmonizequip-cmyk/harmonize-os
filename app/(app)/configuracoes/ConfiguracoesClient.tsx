@@ -50,6 +50,13 @@ export default function ConfiguracoesClient({
   const [mentoriaValorAvista, setMentoriaValorAvista] = useState(String(initialSettings.mentoriaPricing.valorAvista));
   const [mentoriaValorParcelado, setMentoriaValorParcelado] = useState(String(initialSettings.mentoriaPricing.valorParcelado));
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // ---- Automações ----
+  const [diasAteReativar, setDiasAteReativar] = useState(String(initialSettings.diasAteReativar));
+  const [recontatoIntervalo, setRecontatoIntervalo] = useState(String(initialSettings.recontatoIntervaloDias));
+  const [savingAuto, setSavingAuto] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
+  const [autoSaved, setAutoSaved] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -107,6 +114,41 @@ export default function ConfiguracoesClient({
     }
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 2500);
+    router.refresh();
+  }
+
+  async function handleSaveAutomacoes() {
+    const dias = Math.round(n(diasAteReativar));
+    const intervalo = Math.round(n(recontatoIntervalo));
+    if (!Number.isFinite(dias) || !Number.isFinite(intervalo) || dias < 1 || intervalo < 1 || intervalo > 365) {
+      setAutoError("Informe números inteiros a partir de 1 (intervalo de no máximo 365 dias).");
+      return;
+    }
+    setSavingAuto(true);
+    setAutoError(null);
+    setAutoSaved(false);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error } = await supabase
+      .from("settings")
+      .update({
+        dias_ate_reativar: dias,
+        recontato_intervalo_dias: intervalo,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      })
+      .eq("id", true);
+
+    setSavingAuto(false);
+    if (error) {
+      setAutoError("Não foi possível salvar. Tente novamente.");
+      return;
+    }
+    setAutoSaved(true);
+    setTimeout(() => setAutoSaved(false), 2500);
     router.refresh();
   }
 
@@ -278,6 +320,57 @@ export default function ConfiguracoesClient({
           className="mt-4 rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
         >
           {savingSettings ? "Salvando..." : "Salvar preços"}
+        </button>
+      </div>
+
+      {/* ---- Automações ---- */}
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <h2 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Automações</h2>
+        <p className="mb-4 text-xs text-neutral-400">
+          Regras que o sistema aplica sozinho no funil de clientes.
+        </p>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Dias sem locação até ir para Reativar
+            </label>
+            <input
+              inputMode="numeric"
+              value={diasAteReativar}
+              onChange={(e) => setDiasAteReativar(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+            <p className="mt-1 text-[11px] text-neutral-400">
+              Contados a partir da data da última locação concluída. Quem tem reserva futura não cai em Reativar.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Intervalo da tarefa de recontato (dias)
+            </label>
+            <input
+              inputMode="numeric"
+              value={recontatoIntervalo}
+              onChange={(e) => setRecontatoIntervalo(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+            <p className="mt-1 text-[11px] text-neutral-400">
+              Usado pela tarefa automática de contato nas etapas Cliente e Reativar (entra na próxima etapa da
+              implantação).
+            </p>
+          </div>
+        </div>
+
+        {autoError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{autoError}</p>}
+        {autoSaved && <p className="mt-3 text-sm text-brand-teal">Salvo ✓</p>}
+
+        <button
+          onClick={handleSaveAutomacoes}
+          disabled={savingAuto}
+          className="mt-4 rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+        >
+          {savingAuto ? "Salvando..." : "Salvar automações"}
         </button>
       </div>
 
