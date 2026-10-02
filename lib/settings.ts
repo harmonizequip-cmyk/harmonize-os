@@ -12,6 +12,8 @@ export interface AppSettings {
   reservationFee: number;
   inactiveDaysThreshold: number;
   mentoriaPricing: MentoriaPricingConfig;
+  diasAteReativar: number;
+  recontatoIntervaloDias: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -19,6 +21,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reservationFee: RESERVATION_FEE,
   inactiveDaysThreshold: 60,
   mentoriaPricing: DEFAULT_MENTORIA_PRICING,
+  diasAteReativar: 45,
+  recontatoIntervaloDias: 10,
 };
 
 /**
@@ -33,7 +37,7 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
   const { data, error } = await supabase
     .from("settings")
     .select(
-      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado"
+      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias"
     )
     .eq("id", true)
     .single();
@@ -57,5 +61,7 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
       valorAvista: Number(data.mentoria_valor_avista),
       valorParcelado: Number(data.mentoria_valor_parcelado),
     },
+    diasAteReativar: data.dias_ate_reativar ?? 45,
+    recontatoIntervaloDias: data.recontato_intervalo_dias ?? 10,
   };
 }
