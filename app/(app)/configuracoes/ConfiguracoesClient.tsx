@@ -55,6 +55,12 @@ export default function ConfiguracoesClient({
   const [diasAteReativar, setDiasAteReativar] = useState(String(initialSettings.diasAteReativar));
   const [recontatoIntervalo, setRecontatoIntervalo] = useState(String(initialSettings.recontatoIntervaloDias));
   const [recontatoAtivo, setRecontatoAtivo] = useState(initialSettings.recontatoAutomatico);
+  const [confAtiva, setConfAtiva] = useState(initialSettings.tarefaConfirmacaoAtiva);
+  const [confDias, setConfDias] = useState(String(initialSettings.diasAntesConfirmacao));
+  const [posAtiva, setPosAtiva] = useState(initialSettings.tarefaPosLocacaoAtiva);
+  const [posDias, setPosDias] = useState(String(initialSettings.diasPosLocacao));
+  const [taxaAtiva, setTaxaAtiva] = useState(initialSettings.tarefaTaxaAtiva);
+  const [taxaDias, setTaxaDias] = useState(String(initialSettings.diasCobrancaTaxa));
   const [savingAuto, setSavingAuto] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
   const [autoSaved, setAutoSaved] = useState(false);
@@ -121,8 +127,18 @@ export default function ConfiguracoesClient({
   async function handleSaveAutomacoes() {
     const dias = Math.round(n(diasAteReativar));
     const intervalo = Math.round(n(recontatoIntervalo));
+    const cDias = Math.round(n(confDias));
+    const pDias = Math.round(n(posDias));
+    const tDias = Math.round(n(taxaDias));
     if (!Number.isFinite(dias) || !Number.isFinite(intervalo) || dias < 1 || intervalo < 1 || intervalo > 365) {
       setAutoError("Informe números inteiros a partir de 1 (intervalo de no máximo 365 dias).");
+      return;
+    }
+    if (
+      ![cDias, pDias, tDias].every(Number.isFinite) ||
+      cDias < 0 || cDias > 30 || pDias < 0 || pDias > 30 || tDias < 1 || tDias > 30
+    ) {
+      setAutoError("Os prazos das tarefas da agenda vão de 0 a 30 dias (a cobrança da taxa, de 1 a 30).");
       return;
     }
     setSavingAuto(true);
@@ -139,6 +155,12 @@ export default function ConfiguracoesClient({
         dias_ate_reativar: dias,
         recontato_intervalo_dias: intervalo,
         recontato_automatico: recontatoAtivo,
+        tarefa_confirmacao_ativa: confAtiva,
+        dias_antes_confirmacao: cDias,
+        tarefa_pos_locacao_ativa: posAtiva,
+        dias_pos_locacao: pDias,
+        tarefa_taxa_ativa: taxaAtiva,
+        dias_cobranca_taxa: tDias,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       })
@@ -377,6 +399,58 @@ export default function ConfiguracoesClient({
               Intervalo entre uma tarefa concluída e o vencimento da próxima.
             </p>
           </div>
+        </div>
+
+        <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          Tarefas da agenda
+        </h3>
+        <div className="space-y-3">
+          {[
+            {
+              ativa: confAtiva,
+              setAtiva: setConfAtiva,
+              dias: confDias,
+              setDias: setConfDias,
+              titulo: "Confirmar presença",
+              descricao: "dias antes do agendamento ainda não confirmado",
+            },
+            {
+              ativa: posAtiva,
+              setAtiva: setPosAtiva,
+              dias: posDias,
+              setDias: setPosDias,
+              titulo: "Contato pós-locação",
+              descricao: "dias depois da locação (só das últimas duas semanas)",
+            },
+            {
+              ativa: taxaAtiva,
+              setAtiva: setTaxaAtiva,
+              dias: taxaDias,
+              setDias: setTaxaDias,
+              titulo: "Cobrar taxa de reserva",
+              descricao: "dias com a taxa pendente, contados da criação da reserva",
+            },
+          ].map((t) => (
+            <div key={t.titulo} className="flex items-center gap-3 rounded-xl border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+              <input
+                type="checkbox"
+                checked={t.ativa}
+                onChange={(e) => t.setAtiva(e.target.checked)}
+                className="h-4 w-4 flex-shrink-0 rounded border-neutral-300"
+                aria-label={t.titulo}
+              />
+              <span className="min-w-0 flex-1 text-sm text-neutral-800 dark:text-neutral-200">
+                {t.titulo}
+                <span className="block text-[11px] text-neutral-400">{t.descricao}</span>
+              </span>
+              <input
+                inputMode="numeric"
+                value={t.dias}
+                onChange={(e) => t.setDias(e.target.value)}
+                className="w-16 flex-shrink-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-center text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+            </div>
+          ))}
         </div>
 
         {autoError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{autoError}</p>}
