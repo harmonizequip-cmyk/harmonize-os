@@ -21,6 +21,8 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
+import { hojeLocal } from "@/lib/period";
+import { taxaVencida } from "@/lib/taxa";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
@@ -70,6 +72,7 @@ interface EventRow {
   rental_id: string | null;
   notes: string | null;
   taxa_status?: string | null;
+  created_at?: string | null;
   // Quando "Pedir confirmação no WhatsApp" foi clicado para ESTA
   // reserva. Independente de calendar_events.confirmed: pedir e
   // confirmar são ações diferentes (ver os dois botões em renderCard).
@@ -167,6 +170,7 @@ export default function AgendaClient({
   pricingConfig,
   reservationFee,
   mentoriaPricing,
+  diasTaxa = 3,
 }: {
   initialEvents: EventRow[];
   clients: ClientOption[];
@@ -174,6 +178,7 @@ export default function AgendaClient({
   pricingConfig?: PricingConfig;
   reservationFee?: number;
   mentoriaPricing?: MentoriaPricingConfig;
+  diasTaxa?: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -407,6 +412,11 @@ export default function AgendaClient({
                 {ehPreReserva(e) && (
                   <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                     Pré-reserva
+                  </span>
+                )}
+                {ehPreReserva(e) && taxaVencida(e.created_at, hojeLocal(), diasTaxa) && (
+                  <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                    Taxa vencida
                   </span>
                 )}
                 {e.clients?.name ? ` · ${e.clients.name}` : ""}
