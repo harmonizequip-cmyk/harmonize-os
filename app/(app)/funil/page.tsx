@@ -20,6 +20,8 @@ export default async function FunilPage() {
   // pendente de cada um antes de listar as tarefas. Se falhar, a tela
   // continua funcionando com o que já existe.
   await supabase.rpc("gerar_tarefas_recontato");
+  // Tarefas da agenda: confirmação, pós-locação e cobrança da taxa.
+  await supabase.rpc("gerar_tarefas_agenda");
 
   const { data: tasks } = await supabase
     .from("tasks")
