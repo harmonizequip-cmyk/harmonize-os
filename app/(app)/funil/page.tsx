@@ -11,7 +11,7 @@ export default async function FunilPage() {
   const { data: clients } = await supabase
     .from("clients")
     .select(
-      "id, name, city, address, whatsapp, stage, is_client, data_evento, origem, notes, parceiro, treatment, display_name, client_tags(tags(id, name, color))"
+      "id, name, city, address, whatsapp, stage, is_client, data_evento, origem, indicado_por, notes, parceiro, treatment, display_name, client_tags(tags(id, name, color))"
     )
     .order("created_at", { ascending: false });
 
