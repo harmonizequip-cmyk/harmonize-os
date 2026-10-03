@@ -75,8 +75,21 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
     .eq("rescheduled", true)
     .is("rental_id", null);
 
+  // Item 7: quem indicou este cliente e quem ele já indicou.
+  const { data: indicador } = client.indicado_por
+    ? await supabase.from("clients").select("id, name").eq("id", client.indicado_por).maybeSingle()
+    : { data: null };
+  const { data: indicados } = await supabase
+    .from("clients")
+    .select("id, name")
+    .eq("indicado_por", params.id)
+    .eq("is_test", false)
+    .order("name");
+
   return (
     <ClienteDetailClient
+      indicador={indicador ?? null}
+      indicados={indicados ?? []}
       client={client}
       rentals={normalizedRentals}
       preReservas={normalizedPreReservas}
