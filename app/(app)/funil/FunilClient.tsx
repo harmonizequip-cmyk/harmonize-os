@@ -69,6 +69,7 @@ export interface LeadRow {
   treatment?: string | null;
   display_name?: string | null;
   taxasPendentes: number;
+  taxasVencidas?: number;
   taxasPagas: number;
   valorPendente: number;
   nextEvent: {
@@ -861,8 +862,15 @@ function LeadCardContent({
       )}
 
       {lead.taxasPendentes > 0 && (
-        <span className="mt-1 block w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+        <span
+          className={`mt-1 block w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            (lead.taxasVencidas ?? 0) > 0
+              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          }`}
+        >
           💳 {lead.taxasPendentes === 1 ? "Taxa pendente" : `${lead.taxasPendentes} taxas pendentes`}
+          {(lead.taxasVencidas ?? 0) > 0 ? " · vencida" : ""}
           {lead.valorPendente > 0 ? ` · ${formatCurrency(lead.valorPendente)}` : ""}
         </span>
       )}
