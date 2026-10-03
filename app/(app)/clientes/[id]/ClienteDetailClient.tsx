@@ -32,6 +32,7 @@ interface Client {
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
+  indicado_por?: string | null;
   treatment?: string | null;
   display_name?: string | null;
   // Leva W/X: documento e dados alternativos usados na geração do
@@ -94,6 +95,8 @@ function openInNewTab(url: string) {
 }
 
 export default function ClienteDetailClient({
+  indicador,
+  indicados,
   client,
   rentals,
   preReservas,
@@ -104,6 +107,9 @@ export default function ClienteDetailClient({
   reservationFee,
   reagendadasPreReservaCount,
 }: {
+  // Item 7: quem indicou este cliente e a lista de quem ele indicou.
+  indicador: { id: string; name: string } | null;
+  indicados: { id: string; name: string }[];
   client: Client;
   rentals: RentalRow[];
   // Leva Y: agendamentos futuros ainda sem disparos ("Agendar sem
@@ -199,6 +205,34 @@ export default function ClienteDetailClient({
         <div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Endereço</p>
           <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.address ?? "-"}</p>
+        </div>
+        <div className="col-span-2 sm:col-span-4">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Indicação</p>
+          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">
+            {indicador ? (
+              <>
+                Indicado por{" "}
+                <Link href={`/clientes/${indicador.id}`} className="text-brand-teal underline underline-offset-2">
+                  {indicador.name}
+                </Link>
+              </>
+            ) : (
+              "Sem indicação registrada"
+            )}
+            {indicados.length > 0 && (
+              <>
+                {" · "}Indicou {indicados.length} {indicados.length === 1 ? "cliente" : "clientes"}:{" "}
+                {indicados.map((i, idx) => (
+                  <span key={i.id}>
+                    {idx > 0 && ", "}
+                    <Link href={`/clientes/${i.id}`} className="text-brand-teal underline underline-offset-2">
+                      {i.name}
+                    </Link>
+                  </span>
+                ))}
+              </>
+            )}
+          </p>
         </div>
         <div className="col-span-2 sm:col-span-4">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Observação</p>

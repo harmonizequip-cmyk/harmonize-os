@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
+import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 
 interface Client {
   id: string;
@@ -15,6 +16,7 @@ interface Client {
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
+  indicado_por?: string | null;
   treatment?: string | null;
   display_name?: string | null;
   // Leva W: CPF/CNPJ do contratante, usado na geração do contrato de locação.
@@ -66,6 +68,7 @@ export default function EditarClienteModal({
   );
   const [notes, setNotes] = useState(client.notes ?? "");
   const [parceiro, setParceiro] = useState(client.parceiro ?? false);
+  const [indicadoPor, setIndicadoPor] = useState<string | null>(client.indicado_por ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +96,7 @@ export default function EditarClienteModal({
         contrato_endereco: contratoEndereco.trim() || null,
         notes: notes || null,
         parceiro,
+        indicado_por: indicadoPor,
       })
       .eq("id", client.id);
     setSaving(false);
@@ -245,6 +249,8 @@ export default function EditarClienteModal({
               </div>
             </div>
           )}
+
+          <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} excludeId={client.id} />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
