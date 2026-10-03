@@ -54,6 +54,7 @@ export default function ConfiguracoesClient({
   // ---- Automações ----
   const [diasAteReativar, setDiasAteReativar] = useState(String(initialSettings.diasAteReativar));
   const [recontatoIntervalo, setRecontatoIntervalo] = useState(String(initialSettings.recontatoIntervaloDias));
+  const [recontatoAtivo, setRecontatoAtivo] = useState(initialSettings.recontatoAutomatico);
   const [savingAuto, setSavingAuto] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
   const [autoSaved, setAutoSaved] = useState(false);
@@ -137,6 +138,7 @@ export default function ConfiguracoesClient({
       .update({
         dias_ate_reativar: dias,
         recontato_intervalo_dias: intervalo,
+        recontato_automatico: recontatoAtivo,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       })
@@ -330,6 +332,22 @@ export default function ConfiguracoesClient({
           Regras que o sistema aplica sozinho no funil de clientes.
         </p>
 
+        <label className="mb-4 flex items-start gap-2 text-sm text-neutral-800 dark:text-neutral-200">
+          <input
+            type="checkbox"
+            checked={recontatoAtivo}
+            onChange={(e) => setRecontatoAtivo(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-neutral-300"
+          />
+          <span>
+            Criar tarefa de recontato automaticamente
+            <span className="block text-[11px] text-neutral-400">
+              Uma tarefa pendente por cliente nas etapas Cliente e Reativar, que se repete no intervalo abaixo até o
+              cliente ter uma reserva (Pré-reserva ou Agendamento). Não gera nada com o modo teste ligado.
+            </span>
+          </span>
+        </label>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
@@ -356,8 +374,7 @@ export default function ConfiguracoesClient({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
             <p className="mt-1 text-[11px] text-neutral-400">
-              Usado pela tarefa automática de contato nas etapas Cliente e Reativar (entra na próxima etapa da
-              implantação).
+              Intervalo entre uma tarefa concluída e o vencimento da próxima.
             </p>
           </div>
         </div>
