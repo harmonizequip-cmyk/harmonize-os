@@ -296,6 +296,7 @@ create table public.settings (
   -- da tarefa automática de recontato.
   dias_ate_reativar integer not null default 45,
   recontato_intervalo_dias integer not null default 10,
+  recontato_automatico boolean not null default true,
   constraint settings_automacao_dias_check
     check (dias_ate_reativar between 1 and 3650 and recontato_intervalo_dias between 1 and 365)
 );
@@ -640,7 +641,7 @@ create table public.expense_limits (
 create table public.tasks (
   id uuid primary key default gen_random_uuid(),
   client_id uuid references clients(id) on delete cascade,
-  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup', 'manual')),
+  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup', 'manual', 'recontato')),
   follow_up_number integer,
   title text not null,
   due_date date not null default public.hoje_local(),
@@ -652,6 +653,9 @@ create table public.tasks (
 
 create index tasks_client_id_idx on tasks(client_id);
 create index tasks_status_due_date_idx on tasks(status, due_date);
+-- Recontato automático: no máximo uma tarefa pendente por cliente.
+create unique index tasks_recontato_pendente_uniq on tasks(client_id)
+  where type = 'recontato' and status = 'pendente';
 
 -- ------------------------------------------------------------
 -- MOVIMENTAÇÕES: histórico de quem fez o quê e quando. usuario_nome e
@@ -3986,6 +3990,13 @@ begin
     end if;
   end if;
 
+  -- Recontato automático: só pode haver uma pendente por cliente. Se a
+  -- rotina já gerou a próxima, a reaberta toma o lugar dela.
+  if v_type = 'recontato' and v_client_id is not null then
+    delete from tasks
+     where client_id = v_client_id and type = 'recontato' and status = 'pendente' and id <> p_task_id;
+  end if;
+
   update tasks set status = 'pendente', completed_at = null where id = p_task_id;
 
   perform public.registrar_movimentacao(
@@ -4308,3 +4319,84 @@ comment on view public.clientes_ultima_locacao is
   'Data da última locação já ocorrida (não cancelada) de cada cliente. Base da etapa Cliente/Reativar no funil.';
 
 grant select on public.clientes_ultima_locacao to authenticated;
+
+-- ============================================================
+-- FUNIL DE CLIENTES, PARTE 2: tarefa automática de recontato
+--
+-- Chamada ao abrir Funil e Tarefas (não há agendador no projeto). Para
+-- cada cliente que não tem reserva futura (ou seja, está em Cliente ou
+-- Reativar), mantém UMA tarefa pendente de recontato, vencendo
+-- `recontato_intervalo_dias` depois da referência mais recente entre a
+-- última locação concluída, o último recontato concluído e o cadastro.
+-- Quem passa a ter reserva (Pré-reserva ou Agendamento) perde a tarefa
+-- pendente. Não gera nada com a automação desligada ou em modo teste.
+-- ============================================================
+create or replace function public.gerar_tarefas_recontato()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ativo boolean;
+  v_intervalo integer;
+  v_teste boolean;
+  v_hoje date := public.hoje_local();
+  v_criadas integer := 0;
+begin
+  if auth.uid() is null then
+    return 0;
+  end if;
+
+  select recontato_automatico, recontato_intervalo_dias, test_mode
+    into v_ativo, v_intervalo, v_teste
+    from settings where id;
+
+  if not coalesce(v_ativo, false) or coalesce(v_teste, false) then
+    return 0;
+  end if;
+
+  delete from tasks t
+   where t.type = 'recontato' and t.status = 'pendente'
+     and exists (
+       select 1 from calendar_events ev
+        where ev.client_id = t.client_id
+          and ev.status <> 'cancelada'
+          and ev.equipment_id is not null
+          and not ev.is_mentoria
+          and ev.date_start >= v_hoje
+     );
+
+  insert into tasks (client_id, type, title, due_date)
+  select c.id, 'recontato', 'Recontato com o cliente',
+         greatest(
+           coalesce((select max(r.event_date) from rentals r
+                      where r.client_id = c.id and r.status <> 'cancelada' and r.event_date <= v_hoje),
+                    date '0001-01-01'),
+           coalesce((select max((t.completed_at at time zone 'America/Sao_Paulo')::date) from tasks t
+                      where t.client_id = c.id and t.type = 'recontato' and t.status = 'concluida'),
+                    date '0001-01-01'),
+           (c.created_at at time zone 'America/Sao_Paulo')::date
+         ) + v_intervalo
+    from clients c
+   where c.is_client
+     and not c.is_test
+     and not exists (
+       select 1 from calendar_events ev
+        where ev.client_id = c.id
+          and ev.status <> 'cancelada'
+          and ev.equipment_id is not null
+          and not ev.is_mentoria
+          and ev.date_start >= v_hoje
+     )
+     and not exists (
+       select 1 from tasks t where t.client_id = c.id and t.type = 'recontato' and t.status = 'pendente'
+     )
+  on conflict do nothing;
+
+  get diagnostics v_criadas = row_count;
+  return v_criadas;
+end;
+$$;
+
+grant execute on function public.gerar_tarefas_recontato to authenticated;
