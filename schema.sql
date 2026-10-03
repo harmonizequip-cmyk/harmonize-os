@@ -184,6 +184,9 @@ create table public.clients (
   -- Parceiro conhecido: reserva data sem pagar a taxa de compromisso.
   -- Agendamentos deste cliente nascem com taxa_status = nao_aplica.
   parceiro boolean not null default false,
+  -- Item 7: cliente que indicou este cadastro (opcional). Só registro por
+  -- enquanto; o benefício ao indicador ainda será definido.
+  indicado_por uuid references public.clients(id) on delete set null,
   -- true = nunca conta como faturamento (rentals_contabilizaveis /
   -- transactions_contabilizaveis), mesmo sem ser cadastro de teste. Para
   -- uso interno que nunca gera receita de verdade (ex: LASER DREAM JP,
@@ -210,6 +213,12 @@ create table public.clients (
   contrato_nome text,
   contrato_endereco text
 );
+
+alter table public.clients
+  add constraint clients_indicado_por_nao_proprio check (indicado_por is null or indicado_por <> id);
+create index clients_indicado_por_idx on public.clients (indicado_por) where indicado_por is not null;
+comment on column public.clients.indicado_por is
+  'Cliente que indicou este cadastro (opcional). Base para contar indicações e, no futuro, conceder benefício (item 7).';
 
 comment on column public.clients.document is
   'CPF ou CNPJ do contratante, texto livre sem validação rígida de formato (leva W). Usado como padrão na geração do contrato de locação e na NF-e (leva X) — editável a cada geração sem alterar o cadastro.';
