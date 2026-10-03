@@ -17,6 +17,10 @@ function mapTask(t: any) {
 export default async function TarefasPage() {
   const supabase = createClient();
 
+  // Mesma rotina do Funil: garante o recontato pendente de cada cliente
+  // sem reserva antes de listar.
+  await supabase.rpc("gerar_tarefas_recontato");
+
   const [{ data: pendentes }, { data: concluidas }] = await Promise.all([
     supabase
       .from("tasks")
