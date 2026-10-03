@@ -82,10 +82,28 @@ interface EventRow {
 // Centraliza o destaque visual: reserva de equipamento marcada como
 // mentoria usa a mesma cor/etiqueta do event_type 'mentoria' avulso,
 // mas sem perder qual equipamento é (o rótulo normal continua junto).
+// Pré-reserva = reserva de HIPRO (não mentoria) cuja taxa de reserva ainda
+// está pendente, a mesma regra da etapa "Pré-reserva" do funil de clientes.
+// Taxa paga ou isenta (parceiro) já é agendamento e usa a cor normal.
+function ehPreReserva(e: EventRow) {
+  return !!e.equipment_id && !e.is_mentoria && e.taxa_status === "pendente";
+}
+
+// Mesma cor do equipamento, em tom claro (hex com 40% de opacidade), para
+// ainda dar para distinguir HIPRO 1 de HIPRO 2 enquanto a data é só
+// pré-reserva. As classes do pontinho são literais para o Tailwind gerar.
+const DOT_CLARO: Record<string, string> = {
+  hipro_1: "bg-brand-teal/40",
+  hipro_2: "bg-brand-pink/40",
+};
+
 function eventMeta(e: EventRow) {
   const base = EVENT_META[e.event_type] ?? { label: e.event_type, dot: "bg-neutral-400", hex: "#a3a3a3" };
   if (e.is_mentoria && (e.event_type === "hipro_1" || e.event_type === "hipro_2")) {
     return { label: `${base.label} · Mentoria`, dot: EVENT_META.mentoria.dot, hex: EVENT_META.mentoria.hex };
+  }
+  if (ehPreReserva(e) && DOT_CLARO[e.event_type]) {
+    return { ...base, dot: DOT_CLARO[e.event_type], hex: `${base.hex}66` };
   }
   return base;
 }
@@ -386,6 +404,11 @@ export default function AgendaClient({
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{e.title}</p>
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                 {meta.label}
+                {ehPreReserva(e) && (
+                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Pré-reserva
+                  </span>
+                )}
                 {e.clients?.name ? ` · ${e.clients.name}` : ""}
                 {/* "sem disparos ainda" é sobre a contagem de disparos do
                     HIPRO (preço/procedimento), não tem relação com
@@ -634,6 +657,11 @@ export default function AgendaClient({
           })}
         </div>
       </div>
+
+      <p className="text-[11px] text-neutral-400">
+        Anel claro no dia = pré-reserva (taxa de reserva pendente). Anel com a cor cheia = agendamento (taxa paga ou
+        isenta).
+      </p>
 
       <div>
         <div className="mb-2 flex items-center justify-between">
