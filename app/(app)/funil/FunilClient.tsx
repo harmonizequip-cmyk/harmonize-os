@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Bell, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
@@ -41,6 +41,7 @@ export type StageKey = (typeof STAGES)[number]["key"];
 export const LEAD_STAGES = STAGES.filter((s) => s.key !== "cliente");
 
 type ColunaFunil = { key: string; label: string; dot: string };
+type TarefaDoContato = { qtd: number; maisAntiga: string };
 type Aba = "leads" | "clientes";
 
 export interface TagOption {
@@ -204,6 +205,24 @@ export default function FunilClient({
       aba === "clientes" ? "funil-clientes" : "funil-leads"
     );
   }
+
+  // Tarefas pendentes agrupadas por contato: quantas são e a data da mais
+  // antiga. Alimenta o sino de cada etapa e a ordem dos cards. Vem de
+  // `tasks`, que perde a tarefa assim que ela é concluída, então o sino e
+  // a posição do card se atualizam na hora.
+  const tarefasPorContato = useMemo(() => {
+    const m = new Map<string, TarefaDoContato>();
+    for (const t of tasks) {
+      if (!t.client_id) continue;
+      const cur = m.get(t.client_id);
+      if (!cur) m.set(t.client_id, { qtd: 1, maisAntiga: t.due_date });
+      else {
+        cur.qtd += 1;
+        if (t.due_date < cur.maisAntiga) cur.maisAntiga = t.due_date;
+      }
+    }
+    return m;
+  }, [tasks]);
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
@@ -537,6 +556,14 @@ export default function FunilClient({
             const stageLeads = filtered
               .filter((c) => etapaDe(c) === stage.key)
               .sort((a, b) => {
+                // Primeiro a tarefa pendente mais antiga (a mais atrasada
+                // no topo); quem concluiu as tarefas, ou não tem nenhuma,
+                // desce. Empate ou ausência de tarefa cai na regra abaixo.
+                const ta = tarefasPorContato.get(a.id);
+                const tb = tarefasPorContato.get(b.id);
+                if (ta && !tb) return -1;
+                if (!ta && tb) return 1;
+                if (ta && tb && ta.maisAntiga !== tb.maisAntiga) return ta.maisAntiga.localeCompare(tb.maisAntiga);
                 // Quem tem data de agendamento vem antes de quem não tem, e
                 // entre os que têm, o mais próximo (menor data) vem primeiro.
                 // Usa nextEvent (reserva já no calendário) e, na falta dela,
@@ -548,8 +575,26 @@ export default function FunilClient({
                 if (!dataB) return -1;
                 return dataA.localeCompare(dataB);
               });
+            // Sino da etapa: tarefas pendentes dos contatos que estão nela
+            // agora (sem considerar a busca e os filtros de tela).
+            let sinoTotal = 0;
+            let sinoAtrasadas = 0;
+            for (const c of leads) {
+              if (!!c.is_client !== (aba === "clientes") || etapaDe(c) !== stage.key) continue;
+              const t = tarefasPorContato.get(c.id);
+              if (!t) continue;
+              sinoTotal += t.qtd;
+              if (t.maisAntiga < hojeLocal()) sinoAtrasadas += 1;
+            }
             return (
-              <FunilColumn key={stage.key} stage={stage} count={stageLeads.length} droppable={aba === "leads"}>
+              <FunilColumn
+                key={stage.key}
+                stage={stage}
+                count={stageLeads.length}
+                droppable={aba === "leads"}
+                sinoTotal={sinoTotal}
+                sinoAtrasadas={sinoAtrasadas}
+              >
                 {stageLeads.map((lead) => (
                   <LeadCard
                     key={lead.id}
@@ -557,6 +602,7 @@ export default function FunilClient({
                     stage={stage}
                     isDragging={activeId === lead.id}
                     arrastavel={aba === "leads"}
+                    tarefa={tarefasPorContato.get(lead.id) ?? null}
                     onOpen={() => setSelected(lead)}
                     onToggleConfirmed={() => toggleConfirmed(lead)}
                     onAvancar={() => avancarEtapa(lead)}
@@ -654,11 +700,15 @@ function FunilColumn({
   stage,
   count,
   droppable,
+  sinoTotal,
+  sinoAtrasadas,
   children,
 }: {
   stage: ColunaFunil;
   count: number;
   droppable: boolean;
+  sinoTotal: number;
+  sinoAtrasadas: number;
   children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.key, disabled: !droppable });
@@ -673,6 +723,24 @@ function FunilColumn({
       <div className="mb-3 flex items-center gap-2 px-1">
         <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
         <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{stage.label}</p>
+        <span
+          title={
+            sinoTotal === 0
+              ? "Nenhuma tarefa pendente nesta etapa"
+              : `${sinoTotal} ${sinoTotal === 1 ? "tarefa pendente" : "tarefas pendentes"} nesta etapa` +
+                (sinoAtrasadas > 0 ? `, ${sinoAtrasadas} ${sinoAtrasadas === 1 ? "contato atrasado" : "contatos atrasados"}` : "")
+          }
+          className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
+            sinoTotal === 0
+              ? "text-neutral-300 dark:text-neutral-600"
+              : sinoAtrasadas > 0
+              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+              : "bg-brand-blue/10 text-brand-blue"
+          }`}
+        >
+          <Bell size={12} strokeWidth={2} />
+          {sinoTotal}
+        </span>
         <span className="ml-auto text-xs text-neutral-400">{count}</span>
       </div>
       <div className="space-y-2">{children}</div>
@@ -685,6 +753,7 @@ function LeadCard({
   stage,
   isDragging,
   arrastavel,
+  tarefa,
   onOpen,
   onToggleConfirmed,
   onAvancar,
@@ -693,6 +762,7 @@ function LeadCard({
   stage: ColunaFunil;
   isDragging: boolean;
   arrastavel: boolean;
+  tarefa: TarefaDoContato | null;
   onOpen: () => void;
   onToggleConfirmed: () => void;
   onAvancar: () => void;
@@ -714,6 +784,7 @@ function LeadCard({
       <LeadCardContent
         lead={lead}
         stage={stage}
+        tarefa={tarefa}
         onToggleConfirmed={onToggleConfirmed}
         onAvancar={onAvancar}
       />
@@ -725,12 +796,14 @@ function LeadCardContent({
   lead,
   stage,
   floating,
+  tarefa,
   onToggleConfirmed,
   onAvancar,
 }: {
   lead: LeadRow;
   stage: ColunaFunil;
   floating?: boolean;
+  tarefa?: TarefaDoContato | null;
   onToggleConfirmed?: () => void;
   onAvancar?: () => void;
 }) {
@@ -746,6 +819,20 @@ function LeadCardContent({
         {lead.name}
       </p>
       {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
+
+      {tarefa && (
+        <span
+          className={`mt-1 flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            tarefa.maisAntiga < hojeLocal()
+              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+              : "bg-brand-blue/10 text-brand-blue"
+          }`}
+        >
+          <Bell size={11} strokeWidth={2} />
+          {tarefa.qtd === 1 ? "1 tarefa" : `${tarefa.qtd} tarefas`} · {formatDate(tarefa.maisAntiga)}
+          {tarefa.maisAntiga < hojeLocal() ? " · atrasada" : ""}
+        </span>
+      )}
 
       {lead.nextEvent ? (
         <button
