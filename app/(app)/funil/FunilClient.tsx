@@ -83,7 +83,7 @@ export interface TaskRow {
   id: string;
   client_id: string | null;
   client_name: string | null;
-  type: "contato_inicial" | "followup" | "manual" | "recontato";
+  type: "contato_inicial" | "followup" | "manual" | "recontato" | "confirmacao" | "pos_locacao" | "cobranca_taxa";
   follow_up_number: number | null;
   title: string;
   due_date: string;
@@ -440,7 +440,7 @@ export default function FunilClient({
                     </button>
                     {expanded && (
                       <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
-                        {task.type === "manual" || task.type === "recontato" ? (
+                        {task.type !== "contato_inicial" && task.type !== "followup" ? (
                           <button
                             disabled={busy}
                             onClick={() => completeManualTask(task.id)}
