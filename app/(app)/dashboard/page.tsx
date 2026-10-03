@@ -4,6 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
+import { fetchSettings } from "@/lib/settings";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
@@ -169,6 +170,20 @@ export default async function DashboardPage({
         ? { texto: "Dentro da meta", cor: "text-brand-teal" }
         : { texto: `Faltam ${META_MIN - locMes} para a meta`, cor: "text-amber-600 dark:text-amber-400" };
   const metaEscala = Math.max(META_MAX + 5, locMes + preMes);
+
+  // Reservas de HIPRO com a taxa pendente além do prazo de cobrança
+  // (settings.dias_cobranca_taxa) e data ainda por vir. Só aviso, sempre
+  // sobre o presente, independente do filtro de período.
+  const { diasCobrancaTaxa } = await fetchSettings(supabase);
+  const { count: taxasVencidasCount } = await supabase
+    .from("calendar_events")
+    .select("id", { count: "exact", head: true })
+    .eq("is_test", false)
+    .eq("taxa_status", "pendente")
+    .neq("status", "cancelada")
+    .not("equipment_id", "is", null)
+    .gte("date_start", todayStr)
+    .lte("created_at", `${somarDias(todayStr, -diasCobrancaTaxa)}T23:59:59.999-03:00`);
 
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
@@ -351,6 +366,16 @@ export default async function DashboardPage({
           className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
         >
           ⚠️ {pendingConfirmations} {pendingConfirmations === 1 ? "evento precisa" : "eventos precisam"} de confirmação nos próximos 7 dias →
+        </Link>
+      )}
+
+      {!!taxasVencidasCount && taxasVencidasCount > 0 && (
+        <Link
+          href="/agenda"
+          className="block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
+        >
+          💳 {taxasVencidasCount} {taxasVencidasCount === 1 ? "reserva está" : "reservas estão"} com a taxa vencida (mais de{" "}
+          {diasCobrancaTaxa} dias sem pagar) →
         </Link>
       )}
 
