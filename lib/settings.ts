@@ -15,6 +15,12 @@ export interface AppSettings {
   diasAteReativar: number;
   recontatoIntervaloDias: number;
   recontatoAutomatico: boolean;
+  tarefaConfirmacaoAtiva: boolean;
+  diasAntesConfirmacao: number;
+  tarefaPosLocacaoAtiva: boolean;
+  diasPosLocacao: number;
+  tarefaTaxaAtiva: boolean;
+  diasCobrancaTaxa: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -25,6 +31,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   diasAteReativar: 45,
   recontatoIntervaloDias: 10,
   recontatoAutomatico: true,
+  tarefaConfirmacaoAtiva: true,
+  diasAntesConfirmacao: 2,
+  tarefaPosLocacaoAtiva: true,
+  diasPosLocacao: 1,
+  tarefaTaxaAtiva: true,
+  diasCobrancaTaxa: 3,
 };
 
 /**
@@ -39,7 +51,7 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
   const { data, error } = await supabase
     .from("settings")
     .select(
-      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias, recontato_automatico"
+      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias, recontato_automatico, tarefa_confirmacao_ativa, dias_antes_confirmacao, tarefa_pos_locacao_ativa, dias_pos_locacao, tarefa_taxa_ativa, dias_cobranca_taxa"
     )
     .eq("id", true)
     .single();
@@ -66,5 +78,11 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
     diasAteReativar: data.dias_ate_reativar ?? 45,
     recontatoIntervaloDias: data.recontato_intervalo_dias ?? 10,
     recontatoAutomatico: data.recontato_automatico ?? true,
+    tarefaConfirmacaoAtiva: data.tarefa_confirmacao_ativa ?? true,
+    diasAntesConfirmacao: data.dias_antes_confirmacao ?? 2,
+    tarefaPosLocacaoAtiva: data.tarefa_pos_locacao_ativa ?? true,
+    diasPosLocacao: data.dias_pos_locacao ?? 1,
+    tarefaTaxaAtiva: data.tarefa_taxa_ativa ?? true,
+    diasCobrancaTaxa: data.dias_cobranca_taxa ?? 3,
   };
 }
