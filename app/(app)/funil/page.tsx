@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hojeLocal } from "@/lib/period";
 import { fetchSettings } from "@/lib/settings";
 import { etapaDoCliente } from "@/lib/funil-clientes";
+import { taxaVencida } from "@/lib/taxa";
 import FunilClient from "./FunilClient";
 
 export default async function FunilPage() {
@@ -47,7 +48,7 @@ export default async function FunilPage() {
   const todayStr = hojeLocal();
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
-    .select("id, client_id, date_start, confirmed, confirmation_message_sent_at, equipment_id, taxa_status, is_mentoria")
+    .select("id, client_id, date_start, confirmed, confirmation_message_sent_at, equipment_id, taxa_status, is_mentoria, created_at")
     .neq("status", "cancelada")
     .not("client_id", "is", null)
     .gte("date_start", todayStr)
@@ -98,6 +99,15 @@ export default async function FunilPage() {
     reservasPorCliente.set(e.client_id, lista);
   }
 
+  // Reservas com a taxa vencida por cliente (pendente além do prazo de
+  // cobrança), só para o aviso no card.
+  const vencidasPorCliente = new Map<string, number>();
+  for (const e of upcomingEvents ?? []) {
+    if (!e.equipment_id || e.is_mentoria || e.taxa_status !== "pendente") continue;
+    if (!taxaVencida(e.created_at, todayStr, settings.diasCobrancaTaxa)) continue;
+    vencidasPorCliente.set(e.client_id, (vencidasPorCliente.get(e.client_id) ?? 0) + 1);
+  }
+
   const clientsWithEvents = (clients ?? []).map((c: any) => {
     const t = taxaPorCliente.get(c.id);
     const ultimaLocacao = ultimaPorCliente.get(c.id) ?? null;
@@ -114,6 +124,7 @@ export default async function FunilPage() {
         : null,
       tags: (c.client_tags ?? []).map((ct: any) => ct.tags).filter(Boolean),
       nextEvent: nextEventByClient.get(c.id) ?? null,
+      taxasVencidas: vencidasPorCliente.get(c.id) ?? 0,
       taxasPendentes: Number(t?.taxas_pendentes ?? 0),
       taxasPagas: Number(t?.taxas_pagas ?? 0),
       valorPendente: Number(t?.valor_pendente ?? 0),
