@@ -16,6 +16,11 @@ export default async function FunilPage() {
 
   const { data: allTags } = await supabase.from("tags").select("id, name, color").order("name");
 
+  // Rotina automática de recontato (clientes sem reserva): gera a tarefa
+  // pendente de cada um antes de listar as tarefas. Se falhar, a tela
+  // continua funcionando com o que já existe.
+  await supabase.rpc("gerar_tarefas_recontato");
+
   const { data: tasks } = await supabase
     .from("tasks")
     .select("id, client_id, type, follow_up_number, title, due_date, clients(name)")
