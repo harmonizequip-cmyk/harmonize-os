@@ -10,6 +10,7 @@ import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import AgendamentosDoCliente from "@/components/AgendamentosDoCliente";
+import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 
 import { hojeLocal } from "@/lib/period";
 const QUICK_COLOR = "#3DBFB8";
@@ -36,6 +37,9 @@ export default function LeadCardModal({
   const [newTagName, setNewTagName] = useState("");
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [parceiro, setParceiro] = useState(lead.parceiro ?? false);
+  const [indicadoPor, setIndicadoPor] = useState<string | null>(
+    (lead as LeadRow & { indicado_por?: string | null }).indicado_por ?? null
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
@@ -134,6 +138,7 @@ export default function LeadCardModal({
         address: toUpperOrNull(address),
         notes: notes || null,
         parceiro,
+        indicado_por: indicadoPor,
       })
       .eq("id", lead.id);
 
@@ -284,6 +289,8 @@ export default function LeadCardModal({
               </button>
             </div>
           </div>
+
+          <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} excludeId={lead.id} />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>

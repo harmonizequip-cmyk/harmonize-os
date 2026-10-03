@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
 // Exportado para o filtro do Funil usar a mesma lista, em vez de duplicar
@@ -32,6 +33,7 @@ export default function NovoLeadModal({
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [origem, setOrigem] = useState("indicacao");
+  const [indicadoPor, setIndicadoPor] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [parceiro, setParceiro] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,6 +54,7 @@ export default function NovoLeadModal({
       city: toUpperOrNull(city),
       address: toUpperOrNull(address),
       origem,
+      indicado_por: origem === "indicacao" ? indicadoPor : null,
       notes: notes || null,
       stage: "lead",
       parceiro,
@@ -153,6 +156,7 @@ export default function NovoLeadModal({
               ))}
             </select>
           </div>
+          {origem === "indicacao" && <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} />}
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
             <textarea
