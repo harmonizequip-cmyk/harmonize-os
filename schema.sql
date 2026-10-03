@@ -297,6 +297,17 @@ create table public.settings (
   dias_ate_reativar integer not null default 45,
   recontato_intervalo_dias integer not null default 10,
   recontato_automatico boolean not null default true,
+  -- Item 2: tarefas automáticas da agenda.
+  tarefa_confirmacao_ativa boolean not null default true,
+  dias_antes_confirmacao integer not null default 2,
+  tarefa_pos_locacao_ativa boolean not null default true,
+  dias_pos_locacao integer not null default 1,
+  tarefa_taxa_ativa boolean not null default true,
+  dias_cobranca_taxa integer not null default 3,
+  constraint settings_tarefas_agenda_check
+    check (dias_antes_confirmacao between 0 and 30
+       and dias_pos_locacao between 0 and 30
+       and dias_cobranca_taxa between 1 and 30),
   constraint settings_automacao_dias_check
     check (dias_ate_reativar between 1 and 3650 and recontato_intervalo_dias between 1 and 365)
 );
@@ -641,19 +652,25 @@ create table public.expense_limits (
 create table public.tasks (
   id uuid primary key default gen_random_uuid(),
   client_id uuid references clients(id) on delete cascade,
-  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup', 'manual', 'recontato')),
+  type text not null default 'contato_inicial' check (type in ('contato_inicial', 'followup', 'manual', 'recontato', 'confirmacao', 'pos_locacao', 'cobranca_taxa')),
   follow_up_number integer,
   title text not null,
   due_date date not null default public.hoje_local(),
   status text not null default 'pendente' check (status in ('pendente', 'concluida')),
   created_at timestamptz not null default now(),
   completed_at timestamptz,
-  is_test boolean not null default false
+  is_test boolean not null default false,
+  -- Tarefas automáticas da agenda (confirmação, pós-locação, cobrança de
+  -- taxa) apontam para o agendamento que as originou.
+  event_id uuid references calendar_events(id) on delete cascade
 );
 
 create index tasks_client_id_idx on tasks(client_id);
 create index tasks_status_due_date_idx on tasks(status, due_date);
 -- Recontato automático: no máximo uma tarefa pendente por cliente.
+-- Uma tarefa automática por agendamento e tipo, para sempre.
+create unique index tasks_evento_tipo_uniq on tasks(event_id, type)
+  where event_id is not null;
 create unique index tasks_recontato_pendente_uniq on tasks(client_id)
   where type = 'recontato' and status = 'pendente';
 
@@ -4400,3 +4417,108 @@ end;
 $$;
 
 grant execute on function public.gerar_tarefas_recontato to authenticated;
+
+-- ============================================================
+-- ITEM 2: tarefas automáticas da agenda (confirmação, pós-locação,
+-- cobrança da taxa). Chamada ao abrir Funil e Tarefas.
+-- ============================================================
+create or replace function public.gerar_tarefas_agenda()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  s settings%rowtype;
+  v_hoje date := public.hoje_local();
+  v_total integer := 0;
+  v_n integer;
+begin
+  if auth.uid() is null then
+    return 0;
+  end if;
+
+  select * into s from settings where id;
+  if not found or coalesce(s.test_mode, false) then
+    return 0;
+  end if;
+
+  -- 1) Confirmar presença: X dias antes de agendamento não confirmado.
+  if s.tarefa_confirmacao_ativa then
+    delete from tasks t
+     using calendar_events ev
+     where t.event_id = ev.id and t.type = 'confirmacao' and t.status = 'pendente'
+       and (ev.confirmed or ev.status = 'cancelada' or ev.date_start < v_hoje
+            or ev.date_start - s.dias_antes_confirmacao > v_hoje);
+
+    insert into tasks (client_id, type, title, due_date, event_id)
+    select ev.client_id, 'confirmacao',
+           'Confirmar presença de ' || to_char(ev.date_start, 'DD/MM'),
+           greatest(ev.date_start - s.dias_antes_confirmacao, v_hoje), ev.id
+      from calendar_events ev
+      join clients c on c.id = ev.client_id
+     where ev.equipment_id is not null
+       and ev.status <> 'cancelada'
+       and not ev.confirmed
+       and not ev.is_test and not c.is_test
+       and ev.date_start >= v_hoje
+       and ev.date_start - s.dias_antes_confirmacao <= v_hoje
+    on conflict do nothing;
+    get diagnostics v_n = row_count;
+    v_total := v_total + v_n;
+  end if;
+
+  -- 2) Pós-locação: X dias depois da locação (janela de 14 dias para trás,
+  --    para a primeira execução não despejar o histórico antigo).
+  if s.tarefa_pos_locacao_ativa then
+    delete from tasks t
+     using calendar_events ev
+     where t.event_id = ev.id and t.type = 'pos_locacao' and t.status = 'pendente'
+       and (ev.status = 'cancelada' or ev.no_show);
+
+    insert into tasks (client_id, type, title, due_date, event_id)
+    select ev.client_id, 'pos_locacao',
+           'Pós-locação de ' || to_char(ev.date_start, 'DD/MM'),
+           ev.date_start + s.dias_pos_locacao, ev.id
+      from calendar_events ev
+      join clients c on c.id = ev.client_id
+     where ev.rental_id is not null
+       and not ev.is_mentoria
+       and ev.status <> 'cancelada'
+       and not ev.no_show
+       and not ev.is_test and not c.is_test
+       and ev.date_start + s.dias_pos_locacao <= v_hoje
+       and ev.date_start >= v_hoje - 14
+    on conflict do nothing;
+    get diagnostics v_n = row_count;
+    v_total := v_total + v_n;
+  end if;
+
+  -- 3) Cobrar taxa de reserva: pendente há X dias desde que a reserva foi criada.
+  if s.tarefa_taxa_ativa then
+    delete from tasks t
+     using calendar_events ev
+     where t.event_id = ev.id and t.type = 'cobranca_taxa' and t.status = 'pendente'
+       and (ev.taxa_status <> 'pendente' or ev.status = 'cancelada' or ev.date_start < v_hoje);
+
+    insert into tasks (client_id, type, title, due_date, event_id)
+    select ev.client_id, 'cobranca_taxa',
+           'Cobrar taxa de reserva (' || to_char(ev.date_start, 'DD/MM') || ')',
+           (ev.created_at at time zone 'America/Sao_Paulo')::date + s.dias_cobranca_taxa, ev.id
+      from calendar_events ev
+      join clients c on c.id = ev.client_id
+     where ev.taxa_status = 'pendente'
+       and ev.status <> 'cancelada'
+       and not ev.is_test and not c.is_test
+       and ev.date_start >= v_hoje
+       and (ev.created_at at time zone 'America/Sao_Paulo')::date + s.dias_cobranca_taxa <= v_hoje
+    on conflict do nothing;
+    get diagnostics v_n = row_count;
+    v_total := v_total + v_n;
+  end if;
+
+  return v_total;
+end;
+$$;
+
+grant execute on function public.gerar_tarefas_agenda to authenticated;
