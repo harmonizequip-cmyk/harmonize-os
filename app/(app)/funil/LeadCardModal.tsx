@@ -409,6 +409,8 @@ export default function LeadCardModal({
         <AvailabilityImageModal
           mode="funil"
           clientName={lead.name}
+          treatment={lead.treatment}
+          displayName={lead.display_name}
           whatsapp={lead.whatsapp}
           onClose={() => setAvailabilityOpen(false)}
         />
