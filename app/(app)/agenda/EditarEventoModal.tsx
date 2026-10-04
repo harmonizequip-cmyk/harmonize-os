@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
+import DespesasDaReserva from "@/components/DespesasDaReserva";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
 import { formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
@@ -528,6 +529,8 @@ export default function EditarEventoModal({
                   <p className="mt-2 text-xs text-red-600 dark:text-red-400">{deslocamentoReservaError}</p>
                 )}
               </div>
+
+              <DespesasDaReserva eventId={event.id} clientId={event.client_id} dataEvento={event.date_start} />
 
               {contratoError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{contratoError}</p>}
 
