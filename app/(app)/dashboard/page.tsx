@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import { fetchSettings } from "@/lib/settings";
+import { buscarPendencias } from "@/lib/pendencias";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
@@ -184,6 +185,11 @@ export default async function DashboardPage({
     .not("equipment_id", "is", null)
     .gte("date_start", todayStr)
     .lte("created_at", `${somarDias(todayStr, -diasCobrancaTaxa)}T23:59:59.999-03:00`);
+
+  // Quem está devendo: total geral de hoje, independente do filtro de
+  // período (dívida é estado atual, não movimento do período). Mesma conta
+  // da tela de Pendências.
+  const pendencias = await buscarPendencias(supabase, todayStr);
 
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
@@ -378,6 +384,22 @@ export default async function DashboardPage({
           {diasCobrancaTaxa} dias sem pagar) →
         </Link>
       )}
+
+      <Link
+        href="/pendencias"
+        className="flex items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal dark:border-neutral-800/60 dark:bg-neutral-900/55"
+      >
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber (pendências)</p>
+          <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(pendencias.total)}</p>
+        </div>
+        <p className="text-right text-xs text-neutral-500 dark:text-neutral-400">
+          {pendencias.clientes.length === 0
+            ? "Ninguém devendo"
+            : `${pendencias.clientes.length} ${pendencias.clientes.length === 1 ? "cliente devendo" : "clientes devendo"} · mais antigo há ${pendencias.maiorAtraso} ${pendencias.maiorAtraso === 1 ? "dia" : "dias"}`}{" "}
+          →
+        </p>
+      </Link>
 
       <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
 
