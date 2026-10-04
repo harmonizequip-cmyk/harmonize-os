@@ -16,6 +16,7 @@ import {
   BarChart3,
   History,
   Receipt,
+  HandCoins,
   FileText,
   Settings,
 } from "lucide-react";
@@ -39,6 +40,8 @@ const MORE_ITEMS = [
   // Histórico de locações realizadas: os FATOS. Fica ao lado de
   // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
   { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
+  // Quem está devendo e quanto (o total também aparece no Dashboard).
+  { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
   // Controle dos contratos de locação já emitidos (leva X).
   { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
