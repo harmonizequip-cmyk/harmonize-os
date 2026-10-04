@@ -3,13 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
-import { buildCobrancaMessage } from "@/lib/cobranca";
+import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarCsv } from "@/lib/exportar-csv";
-import type { Pendencias, PendenciaLocacao } from "@/lib/pendencias";
+import type { Pendencias, PendenciaLocacao, TaxaVencida } from "@/lib/pendencias";
 
 type Ordem = "valor" | "atraso";
 
-export default function PendenciasClient({ pendencias }: { pendencias: Pendencias }) {
+export default function PendenciasClient({
+  pendencias,
+  taxas,
+  diasCobrancaTaxa,
+}: {
+  pendencias: Pendencias;
+  taxas: TaxaVencida[];
+  diasCobrancaTaxa: number;
+}) {
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("valor");
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
@@ -68,6 +76,65 @@ export default function PendenciasClient({ pendencias }: { pendencias: Pendencia
           Exportar CSV
         </button>
       </div>
+
+      {taxas.length > 0 && (
+        <div id="taxas" className="scroll-mt-4 space-y-2 rounded-2xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-900/10">
+          <div>
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+              Taxas de reserva vencidas ({taxas.length})
+            </p>
+            <p className="text-xs text-red-700/80 dark:text-red-400/80">
+              Reservas com a taxa sem pagar há mais de {diasCobrancaTaxa} dias e data ainda por vir.
+            </p>
+          </div>
+          {taxas.map((t) => {
+            const whatsapp = buildWhatsAppLink(
+              t.whatsapp,
+              buildCobrancaTaxaMessage({
+                name: t.cliente,
+                treatment: t.treatment,
+                displayName: t.displayName,
+                dataEvento: t.dataEvento,
+                valor: t.valor,
+              })
+            );
+            return (
+              <div key={t.eventId} className="rounded-xl bg-white/70 p-2.5 dark:bg-neutral-900/55">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {t.cliente}
+                  </p>
+                  {t.valor > 0 && (
+                    <p className="text-sm font-semibold text-red-700 dark:text-red-400">{formatCurrency(t.valor)}</p>
+                  )}
+                </div>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Reserva para {formatDate(t.dataEvento)} · taxa sem pagar há {t.diasSemPagar}{" "}
+                  {t.diasSemPagar === 1 ? "dia" : "dias"}
+                </p>
+                <div className="mt-2 flex gap-2">
+                  {whatsapp && (
+                    <a
+                      href={whatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 rounded-lg border border-brand-teal py-1.5 text-center text-xs font-medium text-brand-teal"
+                    >
+                      Cobrar taxa no WhatsApp
+                    </a>
+                  )}
+                  <Link
+                    href="/agenda"
+                    className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  >
+                    Abrir na agenda
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className={`${card} col-span-2 sm:col-span-1`}>
