@@ -28,6 +28,9 @@ interface Locacao {
   status: string;
   pago: boolean;
   pago_em: string | null;
+  // Quanto ainda falta receber, já descontando pagamentos parciais e taxa
+  // de reserva paga (view rentals_situacao_pagamento).
+  saldo: number;
   rescheduled: boolean;
   client_id: string;
   clients?: { name: string } | null;
@@ -51,6 +54,12 @@ function situacao(r: Locacao): { label: string; classe: string } {
   if (r.pago) {
     return { label: "Paga", classe: "bg-brand-teal/10 text-brand-teal" };
   }
+  if (r.status === "realizada" && r.saldo < Number(r.calculated_value)) {
+    return {
+      label: "Parcial",
+      classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    };
+  }
   if (r.status === "realizada") {
     return {
       label: "A receber",
@@ -73,6 +82,10 @@ export default function LocacoesClient({
   periodo: Periodo;
   atingiuTeto: boolean;
 }) {
+  // "A receber" soma o saldo das locações já realizadas (o mesmo critério da
+  // tela de Pendências), e "Recebido" soma o que de fato entrou: valor menos
+  // saldo. Locação futura com sinal pago conta em "Recebido" e não em
+  // "A receber", porque ainda não aconteceu.
   // Três totais em vez de um. "Faturado" somando tudo seria mentira:
   // cancelada não é receita, e realizada sem pagamento é dinheiro que
   // ainda não entrou. Separar é o que faz o número poder ser usado.
@@ -88,8 +101,9 @@ export default function LocacoesClient({
         continue;
       }
       disparos += Number(r.shots ?? 0);
-      if (r.pago) recebido += valor;
-      else aReceber += valor;
+      const saldo = Math.min(Math.max(Number(r.saldo ?? 0), 0), valor);
+      recebido += valor - saldo;
+      if (r.status === "realizada") aReceber += saldo;
     }
     return { recebido, aReceber, cancelado, disparos };
   }, [linhas]);
@@ -103,6 +117,7 @@ export default function LocacoesClient({
         { titulo: "Equipamento", valor: (r) => r.equipments?.name ?? "" },
         { titulo: "Disparos", valor: (r) => Number(r.shots ?? 0) },
         { titulo: "Valor", valor: (r) => Number(r.calculated_value) },
+        { titulo: "Saldo", valor: (r) => (r.status === "cancelada" ? 0 : Number(r.saldo ?? 0)) },
         { titulo: "Situação", valor: (r) => situacao(r).label },
         { titulo: "Pago em", valor: (r) => (r.pago_em ? formatDate(r.pago_em) : "") },
         { titulo: "Pagamento", valor: (r) => PAGAMENTOS[r.payment_method] ?? r.payment_method },
@@ -249,6 +264,11 @@ export default function LocacoesClient({
                   {formatCurrency(Number(r.calculated_value))}
                 </span>
               </div>
+              {s.label === "Parcial" && (
+                <p className="mt-1 text-right text-[11px] text-amber-700 dark:text-amber-400">
+                  Falta {formatCurrency(Number(r.saldo))}
+                </p>
+              )}
             </Link>
           );
         })}
@@ -314,6 +334,11 @@ export default function LocacoesClient({
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.classe}`}>
                       {s.label}
                     </span>
+                    {s.label === "Parcial" && (
+                      <span className="ml-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                        falta {formatCurrency(Number(r.saldo))}
+                      </span>
+                    )}
                     {r.pago_em && (
                       <span className="ml-1.5 text-[11px] text-neutral-400">
                         {formatDate(r.pago_em)}

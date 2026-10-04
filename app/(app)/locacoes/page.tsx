@@ -10,6 +10,7 @@ import LocacoesClient from "./LocacoesClient";
 // uma responde "o que houve com este registro", a outra "quanto rodamos
 // neste mês".
 const TETO = 2000;
+const LOTE = 100;
 
 export default async function LocacoesPage({
   searchParams,
@@ -76,6 +77,22 @@ export default async function LocacoesPage({
     clients: Array.isArray(r.clients) ? (r.clients[0] ?? null) : (r.clients ?? null),
     equipments: Array.isArray(r.equipments) ? (r.equipments[0] ?? null) : (r.equipments ?? null),
   }));
+
+  // Saldo de cada locação (valor menos pagamentos e taxa de reserva paga),
+  // da mesma view que a tela de Pendências usa. Assim os dois totais de
+  // "a receber" sempre batem. Em lotes para a URL da consulta não estourar.
+  const saldos = new Map<string, number>();
+  for (let i = 0; i < normalizadas.length; i += LOTE) {
+    const ids = normalizadas.slice(i, i + LOTE).map((r: any) => r.id);
+    const { data: situacoes } = await supabase
+      .from("rentals_situacao_pagamento")
+      .select("rental_id, saldo")
+      .in("rental_id", ids);
+    for (const s of situacoes ?? []) saldos.set(s.rental_id, Number(s.saldo));
+  }
+  for (const r of normalizadas as any[]) {
+    r.saldo = saldos.get(r.id) ?? (r.pago ? 0 : Number(r.calculated_value));
+  }
 
   // A busca por nome é feita aqui, e não na consulta, porque o nome está
   // na tabela de clientes e o PostgREST não filtra por coluna de tabela
