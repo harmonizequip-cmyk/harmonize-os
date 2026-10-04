@@ -138,3 +138,64 @@ export async function buscarPendencias(supabase: SupabaseClient, hoje: string): 
     maiorAtraso: locacoes.reduce((m, l) => Math.max(m, l.diasAtraso), 0),
   };
 }
+
+// ============================================================
+// TAXAS DE RESERVA VENCIDAS
+//
+// Reserva de equipamento com data ainda por vir, taxa pendente e criada
+// há mais dias do que settings.dias_cobranca_taxa. É a mesma regra do
+// aviso vermelho do Dashboard, que agora lê desta função para o número
+// do aviso e a lista da tela de Pendências nunca divergirem.
+// ============================================================
+
+export interface TaxaVencida {
+  eventId: string;
+  clientId: string | null;
+  cliente: string;
+  whatsapp: string | null;
+  treatment: string | null;
+  displayName: string | null;
+  dataEvento: string;
+  valor: number;
+  diasSemPagar: number;
+}
+
+function somarDiasIso(iso: string, dias: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function buscarTaxasVencidas(
+  supabase: SupabaseClient,
+  hoje: string,
+  diasCobrancaTaxa: number
+): Promise<TaxaVencida[]> {
+  const { data } = await supabase
+    .from("calendar_events")
+    .select("id, client_id, date_start, taxa_valor, created_at, clients(name, whatsapp, treatment, display_name)")
+    .eq("is_test", false)
+    .eq("taxa_status", "pendente")
+    .neq("status", "cancelada")
+    .not("equipment_id", "is", null)
+    .gte("date_start", hoje)
+    .lte("created_at", `${somarDiasIso(hoje, -diasCobrancaTaxa)}T23:59:59.999-03:00`)
+    .order("created_at", { ascending: true })
+    .limit(TETO);
+
+  return (data ?? []).map((e: any) => {
+    const c = Array.isArray(e.clients) ? e.clients[0] : e.clients;
+    const criadoEm = new Date(new Date(e.created_at).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    return {
+      eventId: e.id,
+      clientId: e.client_id ?? null,
+      cliente: c?.name ?? "Cliente removido",
+      whatsapp: c?.whatsapp ?? null,
+      treatment: c?.treatment ?? null,
+      displayName: c?.display_name ?? null,
+      dataEvento: e.date_start,
+      valor: Number(e.taxa_valor ?? 0),
+      diasSemPagar: diasEntre(criadoEm, hoje),
+    };
+  });
+}
