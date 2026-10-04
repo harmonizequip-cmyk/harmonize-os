@@ -5,19 +5,17 @@ import Link from "next/link";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarCsv } from "@/lib/exportar-csv";
-import type { Pendencias, PendenciaLocacao, TaxaVencida, LocacaoNaoFinalizada } from "@/lib/pendencias";
+import type { Pendencias, PendenciaLocacao, TaxaVencida } from "@/lib/pendencias";
 
 type Ordem = "valor" | "atraso";
 
 export default function PendenciasClient({
   pendencias,
   taxas,
-  naoFinalizadas,
   diasCobrancaTaxa,
 }: {
   pendencias: Pendencias;
   taxas: TaxaVencida[];
-  naoFinalizadas: LocacaoNaoFinalizada[];
   diasCobrancaTaxa: number;
 }) {
   const [busca, setBusca] = useState("");
@@ -138,51 +136,6 @@ export default function PendenciasClient({
         </div>
       )}
 
-      {naoFinalizadas.length > 0 && (
-        <div id="finalizar" className="scroll-mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-900/10">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-400">
-                Locações para finalizar ({naoFinalizadas.length})
-              </p>
-              <p className="text-xs text-amber-800/80 dark:text-amber-400/80">
-                Já aconteceram e ainda estão como confirmadas. Marque como realizada na Agenda para fechar os
-                disparos e amarrar as despesas.
-              </p>
-            </div>
-            <Link
-              href="/agenda"
-              className="shrink-0 rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-800 dark:text-amber-400"
-            >
-              Abrir agenda
-            </Link>
-          </div>
-          {naoFinalizadas.map((l) => (
-            <Link
-              key={l.rentalId}
-              href={`/clientes/${l.clientId}`}
-              className="flex items-baseline justify-between gap-2 rounded-xl bg-white/70 p-2.5 dark:bg-neutral-900/55"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{l.cliente}</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {formatDate(l.eventDate)}
-                  {l.eventDateEnd && l.eventDateEnd !== l.eventDate ? ` a ${formatDate(l.eventDateEnd)}` : ""} · há{" "}
-                  {l.diasDesde} {l.diasDesde === 1 ? "dia" : "dias"}
-                </p>
-              </div>
-              <p
-                className={`whitespace-nowrap text-xs font-medium ${
-                  l.saldo > 0 ? "text-amber-700 dark:text-amber-400" : "text-brand-teal"
-                }`}
-              >
-                {l.saldo > 0 ? `falta ${formatCurrency(l.saldo)}` : "paga"}
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className={`${card} col-span-2 sm:col-span-1`}>
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Total a receber</p>
@@ -265,6 +218,11 @@ export default function PendenciasClient({
                           {formatDate(l.eventDate)}
                           {l.eventDateEnd && l.eventDateEnd !== l.eventDate ? ` a ${formatDate(l.eventDateEnd)}` : ""}
                           <span className="ml-2 text-neutral-400">há {l.diasAtraso} {l.diasAtraso === 1 ? "dia" : "dias"}</span>
+                          {!l.finalizada && (
+                            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              não finalizada
+                            </span>
+                          )}
                         </span>
                         <span className="text-neutral-500 dark:text-neutral-400">
                           {formatCurrency(l.valor)}
