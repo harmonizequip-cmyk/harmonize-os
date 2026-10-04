@@ -17,6 +17,7 @@ import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/format";
 import { canvasToPngFile, drawAvailabilityImage } from "@/lib/availability-image";
+import { mensagemDatasDisponiveis } from "@/lib/saudacao";
 
 const HOME_CITY_KEY = "harmonize_cidade_base";
 
@@ -24,10 +25,6 @@ function toDateKey(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
-function defaultMessage(clientName?: string) {
-  if (!clientName) return "";
-  return `Oi, ${clientName}! Passando pra avisar as datas que já estão livres na minha agenda. Qualquer uma dessas já dá pra garantir sua sessão 💛`;
-}
 
 /**
  * Calcula quais dias do mês entram como "sugestão automática" de disponível:
@@ -78,11 +75,17 @@ export default function AvailabilityImageModal({
   onClose,
   mode,
   clientName,
+  treatment,
+  displayName,
   whatsapp,
 }: {
   onClose: () => void;
   mode: "agenda" | "funil";
   clientName?: string;
+  // Tratamento e nome de exibição do cadastro, usados na saudação da
+  // mensagem. Sem eles, a saudação é tirada do próprio clientName.
+  treatment?: string | null;
+  displayName?: string | null;
   whatsapp?: string | null;
 }) {
   const supabase = createClient();
@@ -96,7 +99,12 @@ export default function AvailabilityImageModal({
   const [generating, setGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [canvasFile, setCanvasFile] = useState<File | null>(null);
-  const [message, setMessage] = useState(() => defaultMessage(clientName));
+  // Mensagem padrão: saudação só com tratamento e primeiro nome (o campo
+  // "Nome" costuma vir com cidade e equipamento junto) e texto de locação
+  // do HIPRO. Continua editável antes de enviar.
+  const [message, setMessage] = useState(() =>
+    clientName ? mensagemDatasDisponiveis({ name: clientName, treatment, displayName }) : ""
+  );
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [homeCity, setHomeCity] = useState("");
 
