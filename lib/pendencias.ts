@@ -199,3 +199,65 @@ export async function buscarTaxasVencidas(
     };
   });
 }
+
+// ============================================================
+// LOCAÇÕES JÁ ACONTECIDAS E NÃO FINALIZADAS
+//
+// Locação cujo último dia já passou e continua como "confirmada": ninguém
+// marcou como realizada. Algumas já estão pagas e outras ainda têm saldo.
+// Enquanto não forem finalizadas, as despesas da reserva não são
+// amarradas à locação. O aviso do Dashboard e a lista da tela de
+// Pendências leem desta função.
+// ============================================================
+
+export interface LocacaoNaoFinalizada {
+  rentalId: string;
+  clientId: string;
+  cliente: string;
+  eventDate: string;
+  eventDateEnd: string | null;
+  valor: number;
+  saldo: number;
+  diasDesde: number;
+}
+
+export async function buscarNaoFinalizadas(
+  supabase: SupabaseClient,
+  hoje: string
+): Promise<LocacaoNaoFinalizada[]> {
+  const { data } = await supabase
+    .from("rentals")
+    .select("id, client_id, event_date, event_date_end, calculated_value, clients(name)")
+    .eq("is_test", false)
+    .eq("status", "confirmada")
+    .lt("event_date", hoje)
+    .order("event_date", { ascending: true })
+    .limit(TETO);
+
+  const passadas = (data ?? []).filter((r: any) => (r.event_date_end ?? r.event_date) < hoje);
+
+  const saldos = new Map<string, number>();
+  for (let i = 0; i < passadas.length; i += LOTE) {
+    const ids = passadas.slice(i, i + LOTE).map((r: any) => r.id);
+    const { data: situacoes } = await supabase
+      .from("rentals_situacao_pagamento")
+      .select("rental_id, saldo")
+      .in("rental_id", ids);
+    for (const s of situacoes ?? []) saldos.set(s.rental_id, Number(s.saldo));
+  }
+
+  return passadas.map((r: any) => {
+    const c = Array.isArray(r.clients) ? r.clients[0] : r.clients;
+    const fim = r.event_date_end ?? r.event_date;
+    return {
+      rentalId: r.id,
+      clientId: r.client_id,
+      cliente: c?.name ?? "Cliente removido",
+      eventDate: r.event_date,
+      eventDateEnd: r.event_date_end ?? null,
+      valor: Number(r.calculated_value ?? 0),
+      saldo: saldos.get(r.id) ?? Number(r.calculated_value ?? 0),
+      diasDesde: diasEntre(fim, hoje),
+    };
+  });
+}
