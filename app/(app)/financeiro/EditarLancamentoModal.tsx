@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
+import LocacaoDoClienteSelect from "@/components/LocacaoDoClienteSelect";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -33,6 +34,7 @@ interface TransactionToEdit {
   date: string;
   category_id: string | null;
   client_id: string | null;
+  rental_id?: string | null;
 }
 
 export default function EditarLancamentoModal({
@@ -56,6 +58,12 @@ export default function EditarLancamentoModal({
   const [amount, setAmount] = useState(String(transaction.amount));
   const [categoryId, setCategoryId] = useState(transaction.category_id ?? "");
   const [clientId, setClientId] = useState(transaction.client_id ?? "");
+  const [rentalId, setRentalId] = useState<string | null>(transaction.rental_id ?? null);
+  // Entrada que já nasceu presa a uma locação (o valor cobrado, um
+  // pagamento) tem o vínculo controlado pela própria locação: aqui não se
+  // mexe nele. Só despesa escolhe locação por este formulário.
+  const vinculoFixo = transaction.type === "entrada" && !!transaction.rental_id;
+  const podeEscolherLocacao = !vinculoFixo && type === "saida" && !!clientId;
   const [paymentMethod, setPaymentMethod] = useState(transaction.payment_method);
   const [date, setDate] = useState(transaction.date);
   const [saving, setSaving] = useState(false);
@@ -81,6 +89,7 @@ export default function EditarLancamentoModal({
         amount: amountNumber,
         category_id: categoryId || null,
         client_id: clientId || null,
+        ...(vinculoFixo ? {} : { rental_id: podeEscolherLocacao ? rentalId : null }),
         payment_method: paymentMethod,
         date,
       })
@@ -159,7 +168,10 @@ export default function EditarLancamentoModal({
             </label>
             <select
               value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                if (!vinculoFixo) setRentalId(null);
+              }}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
               <option value="">Nenhum</option>
@@ -170,6 +182,16 @@ export default function EditarLancamentoModal({
               ))}
             </select>
           </div>
+          {podeEscolherLocacao && (
+            <LocacaoDoClienteSelect
+              key={clientId}
+              clientId={clientId}
+              value={rentalId}
+              onChange={setRentalId}
+              dataReferencia={date}
+              sugerir={clientId !== (transaction.client_id ?? "")}
+            />
+          )}
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
             <input

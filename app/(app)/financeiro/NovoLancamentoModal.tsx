@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import LocacaoDoClienteSelect from "@/components/LocacaoDoClienteSelect";
 
 import { hojeLocal } from "@/lib/period";
 const PAYMENT_METHODS = [
@@ -41,6 +42,8 @@ export default function NovoLancamentoModal({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [clientId, setClientId] = useState("");
+  // Locação a que a despesa pertence. Só vale para saída com cliente.
+  const [rentalId, setRentalId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [date, setDate] = useState(() => hojeLocal());
   const [notes, setNotes] = useState("");
@@ -63,6 +66,7 @@ export default function NovoLancamentoModal({
       description,
       amount: numericAmount,
       client_id: clientId || null,
+      rental_id: type === "saida" && clientId ? rentalId : null,
       payment_method: paymentMethod,
       date,
       notes: notes || null,
@@ -151,7 +155,10 @@ export default function NovoLancamentoModal({
             </label>
             <select
               value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                setRentalId(null);
+              }}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
               <option value="">Nenhum</option>
@@ -162,6 +169,17 @@ export default function NovoLancamentoModal({
               ))}
             </select>
           </div>
+
+          {type === "saida" && clientId && (
+            <LocacaoDoClienteSelect
+              key={clientId}
+              clientId={clientId}
+              value={rentalId}
+              onChange={setRentalId}
+              dataReferencia={date}
+              sugerir
+            />
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>

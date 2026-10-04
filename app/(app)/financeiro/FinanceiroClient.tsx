@@ -27,6 +27,9 @@ interface TransactionRow {
   date: string;
   category_id: string | null;
   client_id: string | null;
+  // Locação a que o lançamento pertence (despesa da locação, pagamento).
+  rental_id?: string | null;
+  rental_date?: string | null;
   categories?: { name: string } | null;
   clients?: { name: string } | null;
   // Lançamento criado com o modo teste ligado. Continua aparecendo aqui
@@ -45,6 +48,18 @@ interface CategoryRow {
 interface ClientOption {
   id: string;
   name: string;
+}
+
+// Marca o vínculo com a locação. Despesa de cliente sem locação fica em
+// âmbar, porque é ela que não entra no lucro de locação nenhuma.
+function vinculoLocacao(t: TransactionRow) {
+  if (t.rental_date) {
+    return <span className="ml-1 text-xs font-normal text-neutral-400">· locação {formatDate(t.rental_date)}</span>;
+  }
+  if (t.type === "saida" && t.client_id && !t.rental_id) {
+    return <span className="ml-1 text-xs font-normal text-amber-600 dark:text-amber-400">· sem locação</span>;
+  }
+  return null;
 }
 
 export default function FinanceiroClient({
@@ -87,6 +102,7 @@ export default function FinanceiroClient({
         { titulo: "Categoria", valor: (t) => t.categories?.name ?? "" },
         { titulo: "Descrição", valor: (t) => t.description },
         { titulo: "Cliente", valor: (t) => t.clients?.name ?? "" },
+        { titulo: "Locação", valor: (t) => (t.rental_date ? formatDate(t.rental_date) : "") },
         { titulo: "Valor", valor: (t) => Number(t.amount) },
         { titulo: "Pagamento", valor: (t) => PAYMENT_LABELS[t.payment_method] ?? t.payment_method },
         { titulo: "Teste", valor: (t) => (t.is_test ? "sim" : "") },
@@ -217,6 +233,7 @@ export default function FinanceiroClient({
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
                   {t.clients?.name ? ` · ${t.clients.name}` : ""}
+                  {vinculoLocacao(t)}
                 </p>
               </div>
               <span
@@ -285,6 +302,7 @@ export default function FinanceiroClient({
                   {t.clients?.name && (
                     <span className="ml-1 text-xs font-normal text-neutral-400">· {t.clients.name}</span>
                   )}
+                  {vinculoLocacao(t)}
                 </td>
                 <td
                   className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
