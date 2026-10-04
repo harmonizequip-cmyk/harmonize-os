@@ -27,8 +27,11 @@ export function buildPedidoConfirmacaoMessage(params: {
     return { message: "Olá! 😊", cadastroIncompleto: true };
   }
 
+  // Só o primeiro nome na saudação ("Dra. Camila", não "Dra. Camila Lima").
+  const primeiroNome = displayName.split(/\s+/)[0];
+
   const message =
-    `Olá, ${treatment} ${displayName}! 😊\n\n` +
+    `Olá, ${treatment} ${primeiroNome}! 😊\n\n` +
     `Passando para lembrar que seu HIPRO day está chegando: ${formatDate(params.dateStart)}.\n\n` +
     `Já estamos organizando tudo por aqui para mais um dia de sucesso. 🚀`;
   return { message, cadastroIncompleto: false };

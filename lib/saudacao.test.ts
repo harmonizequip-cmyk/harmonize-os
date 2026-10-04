@@ -28,4 +28,9 @@ describe("saudação curta", () => {
     expect(m).toContain("locação do HIPRO");
     expect(m).not.toContain("sessão");
   });
+
+  it("mensagem de datas usa 'seus pacientes' para Dr. e 'suas pacientes' para Dra.", () => {
+    expect(mensagemDatasDisponiveis({ treatment: "Dr.", displayName: "Rogério" })).toContain("seus pacientes");
+    expect(mensagemDatasDisponiveis({ treatment: "Dra.", displayName: "Simone" })).toContain("suas pacientes");
+  });
 });

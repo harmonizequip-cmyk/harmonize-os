@@ -11,7 +11,7 @@ describe("buildPedidoConfirmacaoMessage", () => {
       dateStart: "2026-10-01",
     });
     expect(cadastroIncompleto).toBe(false);
-    expect(message).toContain("Olá, Dra. Camila Lima! 😊");
+    expect(message).toContain("Olá, Dra. Camila! 😊");
     expect(message).toContain("01/10/2026");
     expect(message).toContain("Já estamos organizando tudo por aqui");
   });

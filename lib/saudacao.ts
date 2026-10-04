@@ -72,11 +72,13 @@ export function mensagemDatasDisponiveis(params: {
   treatment?: string | null;
   displayName?: string | null;
 }): string {
+  const { tratamento } = tratamentoEPrimeiroNome(params);
+  const pacientes = tratamento === "Dr." ? "seus pacientes" : "suas pacientes";
   return (
     `${saudacaoCurta(params)}\n` +
     `Tudo bem? ☺️\n\n` +
     `Passando para te atualizar sobre as datas disponíveis para a locação do HIPRO. ✨\n\n` +
-    `Se você já está planejando atender suas pacientes, esse é um bom momento para escolher a data que melhor se encaixa na sua agenda e começar a organizar seus atendimentos com antecedência.\n\n` +
+    `Se você já está planejando atender ${pacientes}, esse é um bom momento para escolher a data que melhor se encaixa na sua agenda e começar a organizar seus atendimentos com antecedência.\n\n` +
     `Vou te enviar as datas disponíveis para você avaliar e garantir sua reserva antes que sejam preenchidas. 📅`
   );
 }
