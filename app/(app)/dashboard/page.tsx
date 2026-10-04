@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import { fetchSettings } from "@/lib/settings";
-import { buscarPendencias, buscarTaxasVencidas } from "@/lib/pendencias";
+import { buscarPendencias, buscarTaxasVencidas, buscarNaoFinalizadas } from "@/lib/pendencias";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
@@ -182,16 +182,7 @@ export default async function DashboardPage({
   // Locações que já passaram (último dia anterior a hoje) e continuam como
   // "confirmada": ninguém marcou como realizada. Enquanto isso não
   // acontece, as despesas da reserva não são amarradas à locação.
-  const { data: confirmadasPassadas } = await supabase
-    .from("rentals")
-    .select("id, event_date, event_date_end")
-    .eq("is_test", false)
-    .eq("status", "confirmada")
-    .lt("event_date", todayStr)
-    .limit(500);
-  const naoFinalizadasCount = (confirmadasPassadas ?? []).filter(
-    (r: any) => (r.event_date_end ?? r.event_date) < todayStr
-  ).length;
+  const naoFinalizadasCount = (await buscarNaoFinalizadas(supabase, todayStr)).length;
 
   // Quem está devendo: total geral de hoje, independente do filtro de
   // período (dívida é estado atual, não movimento do período). Mesma conta
@@ -384,7 +375,7 @@ export default async function DashboardPage({
 
       {naoFinalizadasCount > 0 && (
         <Link
-          href="/agenda"
+          href="/pendencias#finalizar"
           className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
         >
           🏁 {naoFinalizadasCount} {naoFinalizadasCount === 1 ? "locação já aconteceu e não foi finalizada" : "locações já aconteceram e não foram finalizadas"}: marque como realizada para fechar os disparos e amarrar as despesas →
