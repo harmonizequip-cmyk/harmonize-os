@@ -30,6 +30,9 @@ interface TransactionRow {
   // Locação a que o lançamento pertence (despesa da locação, pagamento).
   rental_id?: string | null;
   rental_date?: string | null;
+  // Reserva ainda sem disparos a que a despesa pertence.
+  calendar_event_id?: string | null;
+  reserva_date?: string | null;
   categories?: { name: string } | null;
   clients?: { name: string } | null;
   // Lançamento criado com o modo teste ligado. Continua aparecendo aqui
@@ -56,7 +59,10 @@ function vinculoLocacao(t: TransactionRow) {
   if (t.rental_date) {
     return <span className="ml-1 text-xs font-normal text-neutral-400">· locação {formatDate(t.rental_date)}</span>;
   }
-  if (t.type === "saida" && t.client_id && !t.rental_id) {
+  if (t.reserva_date) {
+    return <span className="ml-1 text-xs font-normal text-neutral-400">· reserva {formatDate(t.reserva_date)}</span>;
+  }
+  if (t.type === "saida" && t.client_id && !t.rental_id && !t.calendar_event_id) {
     return <span className="ml-1 text-xs font-normal text-amber-600 dark:text-amber-400">· sem locação</span>;
   }
   return null;
@@ -102,7 +108,11 @@ export default function FinanceiroClient({
         { titulo: "Categoria", valor: (t) => t.categories?.name ?? "" },
         { titulo: "Descrição", valor: (t) => t.description },
         { titulo: "Cliente", valor: (t) => t.clients?.name ?? "" },
-        { titulo: "Locação", valor: (t) => (t.rental_date ? formatDate(t.rental_date) : "") },
+        {
+          titulo: "Locação",
+          valor: (t) =>
+            t.rental_date ? formatDate(t.rental_date) : t.reserva_date ? `reserva ${formatDate(t.reserva_date)}` : "",
+        },
         { titulo: "Valor", valor: (t) => Number(t.amount) },
         { titulo: "Pagamento", valor: (t) => PAYMENT_LABELS[t.payment_method] ?? t.payment_method },
         { titulo: "Teste", valor: (t) => (t.is_test ? "sim" : "") },

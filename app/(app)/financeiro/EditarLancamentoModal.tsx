@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
-import LocacaoDoClienteSelect from "@/components/LocacaoDoClienteSelect";
+import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -35,6 +35,7 @@ interface TransactionToEdit {
   category_id: string | null;
   client_id: string | null;
   rental_id?: string | null;
+  calendar_event_id?: string | null;
 }
 
 export default function EditarLancamentoModal({
@@ -58,7 +59,12 @@ export default function EditarLancamentoModal({
   const [amount, setAmount] = useState(String(transaction.amount));
   const [categoryId, setCategoryId] = useState(transaction.category_id ?? "");
   const [clientId, setClientId] = useState(transaction.client_id ?? "");
-  const [rentalId, setRentalId] = useState<string | null>(transaction.rental_id ?? null);
+  // Despesa já amarrada a uma locação mostra a locação; a que ainda está
+  // só na reserva mostra a reserva.
+  const [vinculo, setVinculo] = useState<VinculoDespesa>({
+    rentalId: transaction.rental_id ?? null,
+    eventId: transaction.rental_id ? null : (transaction.calendar_event_id ?? null),
+  });
   // Entrada que já nasceu presa a uma locação (o valor cobrado, um
   // pagamento) tem o vínculo controlado pela própria locação: aqui não se
   // mexe nele. Só despesa escolhe locação por este formulário.
@@ -70,7 +76,14 @@ export default function EditarLancamentoModal({
   const [error, setError] = useState<string | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
-  const categoriasDoTipo = categories.filter((c) => c.type === type);
+  // Locação e Mentoria (entrada) são geradas pelo sistema; só aparecem
+  // aqui quando o lançamento já é de uma delas, para não sumir da tela.
+  const categoriasDoTipo = categories.filter(
+    (c) =>
+      c.type === type &&
+      (c.id === transaction.category_id ||
+        !(type === "entrada" && ["locação", "mentoria"].includes(c.name.trim().toLowerCase())))
+  );
 
   async function handleSave() {
     const amountNumber = Number(amount.replace(",", "."));
@@ -89,7 +102,20 @@ export default function EditarLancamentoModal({
         amount: amountNumber,
         category_id: categoryId || null,
         client_id: clientId || null,
-        ...(vinculoFixo ? {} : { rental_id: podeEscolherLocacao ? rentalId : null }),
+        ...(vinculoFixo
+          ? {}
+          : {
+              rental_id: podeEscolherLocacao ? vinculo.rentalId : null,
+              // Mantém a reserva de origem quando a locação não mudou, para
+              // não apagar de onde a despesa veio.
+              calendar_event_id: !podeEscolherLocacao
+                ? null
+                : vinculo.rentalId
+                  ? vinculo.rentalId === transaction.rental_id
+                    ? (transaction.calendar_event_id ?? null)
+                    : null
+                  : vinculo.eventId,
+            }),
         payment_method: paymentMethod,
         date,
       })
@@ -170,7 +196,7 @@ export default function EditarLancamentoModal({
               value={clientId}
               onChange={(e) => {
                 setClientId(e.target.value);
-                if (!vinculoFixo) setRentalId(null);
+                if (!vinculoFixo) setVinculo(SEM_VINCULO);
               }}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
@@ -186,8 +212,8 @@ export default function EditarLancamentoModal({
             <LocacaoDoClienteSelect
               key={clientId}
               clientId={clientId}
-              value={rentalId}
-              onChange={setRentalId}
+              value={vinculo}
+              onChange={setVinculo}
               dataReferencia={date}
               sugerir={clientId !== (transaction.client_id ?? "")}
             />

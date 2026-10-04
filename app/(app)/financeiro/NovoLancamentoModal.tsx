@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import LocacaoDoClienteSelect from "@/components/LocacaoDoClienteSelect";
+import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 
 import { hojeLocal } from "@/lib/period";
 const PAYMENT_METHODS = [
@@ -13,6 +13,10 @@ const PAYMENT_METHODS = [
   { value: "transferencia", label: "Transferência" },
   { value: "outros", label: "Outros" },
 ];
+
+// Categorias de entrada geradas pelo próprio sistema (ver comentário em
+// filteredCategories).
+const CATEGORIAS_AUTOMATICAS = ["locação", "mentoria"];
 
 interface CategoryRow {
   id: string;
@@ -42,15 +46,21 @@ export default function NovoLancamentoModal({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [clientId, setClientId] = useState("");
-  // Locação a que a despesa pertence. Só vale para saída com cliente.
-  const [rentalId, setRentalId] = useState<string | null>(null);
+  // Locação ou reserva a que a despesa pertence. Só vale para saída com cliente.
+  const [vinculo, setVinculo] = useState<VinculoDespesa>(SEM_VINCULO);
   const [paymentMethod, setPaymentMethod] = useState("pix");
   const [date, setDate] = useState(() => hojeLocal());
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const filteredCategories = categories.filter((c) => c.type === type);
+  // Receita de locação e de mentoria não se lança por aqui: ela nasce
+  // sozinha quando a locação ou a mentoria é finalizada, com pagamento e
+  // saldo amarrados. Lançar à mão criaria receita em dobro, fora do
+  // controle de pagamento. Por isso as duas categorias ficam ocultas.
+  const filteredCategories = categories.filter(
+    (c) => c.type === type && !(type === "entrada" && CATEGORIAS_AUTOMATICAS.includes(c.name.trim().toLowerCase()))
+  );
 
   async function handleSave() {
     const numericAmount = Number(amount.replace(",", "."));
@@ -66,7 +76,8 @@ export default function NovoLancamentoModal({
       description,
       amount: numericAmount,
       client_id: clientId || null,
-      rental_id: type === "saida" && clientId ? rentalId : null,
+      rental_id: type === "saida" && clientId ? vinculo.rentalId : null,
+      calendar_event_id: type === "saida" && clientId ? vinculo.eventId : null,
       payment_method: paymentMethod,
       date,
       notes: notes || null,
@@ -157,7 +168,7 @@ export default function NovoLancamentoModal({
               value={clientId}
               onChange={(e) => {
                 setClientId(e.target.value);
-                setRentalId(null);
+                setVinculo(SEM_VINCULO);
               }}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
@@ -174,8 +185,8 @@ export default function NovoLancamentoModal({
             <LocacaoDoClienteSelect
               key={clientId}
               clientId={clientId}
-              value={rentalId}
-              onChange={setRentalId}
+              value={vinculo}
+              onChange={setVinculo}
               dataReferencia={date}
               sugerir
             />
