@@ -35,7 +35,7 @@ export default async function FinanceiroPage({
   let consulta = supabase
     .from("transactions_contabilizaveis")
     .select(
-      "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, is_test, categories(name), clients(name)"
+      "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, calendar_event_id, is_test, categories(name), clients(name)"
     )
     .eq("scope", "harmonize")
     .gte("date", periodo.inicio)
@@ -79,9 +79,23 @@ export default async function FinanceiroPage({
     for (const l of locs ?? []) dataDaLocacao.set(l.id, l.event_date);
   }
 
+  // Mesma coisa para despesa que ainda está só na reserva (sem locação).
+  const eventIds = Array.from(
+    new Set((transactions ?? []).filter((t: any) => !t.rental_id && t.calendar_event_id).map((t: any) => t.calendar_event_id))
+  ) as string[];
+  const dataDaReserva = new Map<string, string>();
+  for (let i = 0; i < eventIds.length; i += 100) {
+    const { data: evs } = await supabase
+      .from("calendar_events")
+      .select("id, date_start")
+      .in("id", eventIds.slice(i, i + 100));
+    for (const e of evs ?? []) dataDaReserva.set(e.id, e.date_start);
+  }
+
   const normalizedTransactions = (transactions ?? []).map((t: any) => ({
     ...t,
     rental_date: t.rental_id ? (dataDaLocacao.get(t.rental_id) ?? null) : null,
+    reserva_date: !t.rental_id && t.calendar_event_id ? (dataDaReserva.get(t.calendar_event_id) ?? null) : null,
     categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
     clients: Array.isArray(t.clients) ? (t.clients[0] ?? null) : (t.clients ?? null),
   }));
