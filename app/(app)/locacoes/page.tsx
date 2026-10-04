@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { resolverPeriodo } from "@/lib/period";
+import { resolverPeriodo, hojeLocal } from "@/lib/period";
 import LocacoesClient from "./LocacoesClient";
 
 // Histórico de locações realizadas (item 4 da auditoria, segunda metade).
@@ -53,7 +53,10 @@ export default async function LocacoesPage({
   // não em "realizada e pago igual a falso".
   switch (searchParams.situacao) {
     case "a_receber":
-      consulta = consulta.eq("status", "realizada").eq("pago", false);
+      // Mesmo critério da tela de Pendências: locação não cancelada e não
+      // paga que já aconteceu, esteja o status como "realizada" ou ainda
+      // como "confirmada" (reserva do dia que ninguém finalizou).
+      consulta = consulta.neq("status", "cancelada").eq("pago", false).lt("event_date", hojeLocal());
       break;
     case "pagas":
       consulta = consulta.eq("pago", true);
@@ -90,8 +93,11 @@ export default async function LocacoesPage({
       .in("rental_id", ids);
     for (const s of situacoes ?? []) saldos.set(s.rental_id, Number(s.saldo));
   }
+  const hoje = hojeLocal();
   for (const r of normalizadas as any[]) {
     r.saldo = saldos.get(r.id) ?? (r.pago ? 0 : Number(r.calculated_value));
+    // Locação de vários dias só vence depois do último dia.
+    r.vencida = (r.event_date_end ?? r.event_date) < hoje;
   }
 
   // A busca por nome é feita aqui, e não na consulta, porque o nome está
@@ -99,9 +105,11 @@ export default async function LocacoesPage({
   // embutida sem transformar a consulta inteira. Como o período já
   // limitou o conjunto, filtrar estas linhas sai de graça.
   const termo = searchParams.q?.trim().toLowerCase();
-  const linhas = termo
+  const porNome = termo
     ? normalizadas.filter((r: any) => (r.clients?.name ?? "").toLowerCase().includes(termo))
     : normalizadas;
+  const linhas =
+    searchParams.situacao === "a_receber" ? porNome.filter((r: any) => r.vencida) : porNome;
 
   return (
     <LocacoesClient

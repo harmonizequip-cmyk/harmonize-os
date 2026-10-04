@@ -31,6 +31,8 @@ interface Locacao {
   // Quanto ainda falta receber, já descontando pagamentos parciais e taxa
   // de reserva paga (view rentals_situacao_pagamento).
   saldo: number;
+  // Já passou do último dia da locação (mesmo critério da tela de Pendências).
+  vencida: boolean;
   rescheduled: boolean;
   client_id: string;
   clients?: { name: string } | null;
@@ -54,13 +56,14 @@ function situacao(r: Locacao): { label: string; classe: string } {
   if (r.pago) {
     return { label: "Paga", classe: "bg-brand-teal/10 text-brand-teal" };
   }
-  if (r.status === "realizada" && r.saldo < Number(r.calculated_value)) {
+  const jaAconteceu = r.status === "realizada" || r.vencida;
+  if (jaAconteceu && r.saldo < Number(r.calculated_value)) {
     return {
       label: "Parcial",
       classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
     };
   }
-  if (r.status === "realizada") {
+  if (jaAconteceu) {
     return {
       label: "A receber",
       classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
@@ -82,8 +85,8 @@ export default function LocacoesClient({
   periodo: Periodo;
   atingiuTeto: boolean;
 }) {
-  // "A receber" soma o saldo das locações já realizadas (o mesmo critério da
-  // tela de Pendências), e "Recebido" soma o que de fato entrou: valor menos
+  // "A receber" soma o saldo das locações que já aconteceram, finalizadas ou não (o
+  // mesmo critério da tela de Pendências), e "Recebido" soma o que de fato entrou: valor menos
   // saldo. Locação futura com sinal pago conta em "Recebido" e não em
   // "A receber", porque ainda não aconteceu.
   // Três totais em vez de um. "Faturado" somando tudo seria mentira:
@@ -103,7 +106,7 @@ export default function LocacoesClient({
       disparos += Number(r.shots ?? 0);
       const saldo = Math.min(Math.max(Number(r.saldo ?? 0), 0), valor);
       recebido += valor - saldo;
-      if (r.status === "realizada") aReceber += saldo;
+      if (r.status === "realizada" || r.vencida) aReceber += saldo;
     }
     return { recebido, aReceber, cancelado, disparos };
   }, [linhas]);
