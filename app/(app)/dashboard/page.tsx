@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import { fetchSettings } from "@/lib/settings";
-import { buscarPendencias } from "@/lib/pendencias";
+import { buscarPendencias, buscarTaxasVencidas } from "@/lib/pendencias";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
@@ -176,15 +176,22 @@ export default async function DashboardPage({
   // (settings.dias_cobranca_taxa) e data ainda por vir. Só aviso, sempre
   // sobre o presente, independente do filtro de período.
   const { diasCobrancaTaxa } = await fetchSettings(supabase);
-  const { count: taxasVencidasCount } = await supabase
-    .from("calendar_events")
-    .select("id", { count: "exact", head: true })
+  const taxasVencidas = await buscarTaxasVencidas(supabase, todayStr, diasCobrancaTaxa);
+  const taxasVencidasCount = taxasVencidas.length;
+
+  // Locações que já passaram (último dia anterior a hoje) e continuam como
+  // "confirmada": ninguém marcou como realizada. Enquanto isso não
+  // acontece, as despesas da reserva não são amarradas à locação.
+  const { data: confirmadasPassadas } = await supabase
+    .from("rentals")
+    .select("id, event_date, event_date_end")
     .eq("is_test", false)
-    .eq("taxa_status", "pendente")
-    .neq("status", "cancelada")
-    .not("equipment_id", "is", null)
-    .gte("date_start", todayStr)
-    .lte("created_at", `${somarDias(todayStr, -diasCobrancaTaxa)}T23:59:59.999-03:00`);
+    .eq("status", "confirmada")
+    .lt("event_date", todayStr)
+    .limit(500);
+  const naoFinalizadasCount = (confirmadasPassadas ?? []).filter(
+    (r: any) => (r.event_date_end ?? r.event_date) < todayStr
+  ).length;
 
   // Quem está devendo: total geral de hoje, independente do filtro de
   // período (dívida é estado atual, não movimento do período). Mesma conta
@@ -375,9 +382,18 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      {!!taxasVencidasCount && taxasVencidasCount > 0 && (
+      {naoFinalizadasCount > 0 && (
         <Link
           href="/agenda"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+        >
+          🏁 {naoFinalizadasCount} {naoFinalizadasCount === 1 ? "locação já aconteceu e não foi finalizada" : "locações já aconteceram e não foram finalizadas"}: marque como realizada para fechar os disparos e amarrar as despesas →
+        </Link>
+      )}
+
+      {!!taxasVencidasCount && taxasVencidasCount > 0 && (
+        <Link
+          href="/pendencias#taxas"
           className="block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
         >
           💳 {taxasVencidasCount} {taxasVencidasCount === 1 ? "reserva está" : "reservas estão"} com a taxa vencida (mais de{" "}
