@@ -1321,6 +1321,7 @@ as $$
 declare
   v_rental_id uuid;
   v_mentoria_id uuid;
+  v_tipo entry_type;
   v_evento_taxa uuid;
   v_locacoes int := 0;
   v_lancamentos int := 0;
@@ -1351,10 +1352,13 @@ begin
      where ev.rental_id = p_id;
 
   elsif p_table = 'transactions' then
-    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+    select rental_id, mentoring_id, type into v_rental_id, v_mentoria_id, v_tipo
       from transactions where id = p_id;
 
-    if v_rental_id is not null then
+    -- Despesa (saída) ligada a uma locação é um lançamento próprio: sai
+    -- sozinha, sem levar a locação junto. Só a ENTRADA da locação (o
+    -- valor cobrado e seus pagamentos) faz a exclusão subir para ela.
+    if v_rental_id is not null and v_tipo <> 'saida' then
       return public.preview_exclusao('rentals', v_rental_id)
              || jsonb_build_object('aviso',
                 'Este lançamento pertence a uma locação. Apagar vai apagar a locação inteira, junto com o evento da agenda.');
@@ -1371,6 +1375,9 @@ begin
 
     if v_evento_taxa is not null then
       v_aviso := 'Este lançamento é a taxa de compromisso de um agendamento. Apagar vai deixar a taxa daquele agendamento como pendente de novo.';
+    end if;
+    if v_rental_id is not null and v_tipo = 'saida' then
+      v_aviso := 'Esta despesa está ligada a uma locação. Apagar remove só a despesa; a locação continua como está.';
     end if;
 
   elsif p_table = 'calendar_events' then
@@ -1541,6 +1548,7 @@ declare
   v_detalhes jsonb;
   v_rental_id uuid;
   v_mentoria_id uuid;
+  v_tipo entry_type;
   v_evento_taxa uuid;
   v_taxas uuid[];
 begin
@@ -1553,10 +1561,12 @@ begin
     perform public.excluir_locacao_cascata(p_id);
 
   elsif p_table = 'transactions' then
-    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+    select rental_id, mentoring_id, type into v_rental_id, v_mentoria_id, v_tipo
       from transactions where id = p_id;
 
-    if v_rental_id is not null then
+    -- Despesa (saída) ligada a uma locação sai sozinha; só a entrada da
+    -- locação leva a locação inteira junto (mesma regra do preview).
+    if v_rental_id is not null and v_tipo <> 'saida' then
       perform public.excluir_locacao_cascata(v_rental_id);
     elsif v_mentoria_id is not null then
       perform public.excluir_mentoria_cascata(v_mentoria_id);
