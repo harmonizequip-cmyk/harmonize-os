@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { calcularResumoLocacao, type ResumoLocacaoInput } from "./rental-calculator";
+import { calcularResumoLocacao, descontarTaxaDosPagamentos, type ResumoLocacaoInput } from "./rental-calculator";
 
 function entrada(extra: Partial<ResumoLocacaoInput>): ResumoLocacaoInput {
   return {
     isMentoria: false,
     shots: 100,
-    pricing: { totalValue: 2000 } as any,
+    pricing: { totalValue: 2500 } as any,
     custoManualPorDisparo: null,
     mentoriaPricing: null,
     kmIda: 0,
@@ -19,27 +19,27 @@ function entrada(extra: Partial<ResumoLocacaoInput>): ResumoLocacaoInput {
 describe("resumo da locação e taxa de reserva", () => {
   it("sem taxa: bruto, valor da locação e total a pagar são o mesmo valor", () => {
     const r = calcularResumoLocacao(entrada({}));
-    expect(r.valorBruto).toBe(2000);
-    expect(r.valorLocacao).toBe(2000);
-    expect(r.totalAPagarAgora).toBe(2000);
+    expect(r.valorBruto).toBe(2500);
+    expect(r.valorLocacao).toBe(2500);
+    expect(r.totalAPagarAgora).toBe(2500);
   });
 
   it("taxa já paga: grava o bruto (o banco desconta a taxa), mas o cliente paga bruto menos a taxa", () => {
     const r = calcularResumoLocacao(entrada({ reservationFeeStatus: "ja_paga" }));
-    expect(r.valorBruto).toBe(2000);
+    expect(r.valorBruto).toBe(2500);
     expect(r.creditoTaxa).toBe(250);
-    expect(r.valorLocacao).toBe(1750);
-    expect(r.totalAPagarAgora).toBe(1750);
+    expect(r.valorLocacao).toBe(2250);
+    expect(r.totalAPagarAgora).toBe(2250);
     // Conta do banco: saldo = valor gravado - taxa paga - pagamentos.
-    const saldoNoBanco = r.valorBruto - r.creditoTaxa;
-    expect(saldoNoBanco).toBe(r.totalAPagarAgora);
+    expect(r.valorBruto - r.creditoTaxa).toBe(r.totalAPagarAgora);
   });
 
-  it("taxa cobrada agora: bruto não muda e o total a pagar soma a taxa", () => {
+  it("taxa cobrada agora vira crédito: o total continua sendo o bruto, com a taxa dentro dele", () => {
     const r = calcularResumoLocacao(entrada({ reservationFeeStatus: "cobrar_agora" }));
-    expect(r.valorBruto).toBe(2000);
-    expect(r.valorLocacao).toBe(2000);
-    expect(r.totalAPagarAgora).toBe(2250);
+    expect(r.valorBruto).toBe(2500);
+    expect(r.taxaACobrarAgora).toBe(250);
+    expect(r.valorLocacao).toBe(2250);
+    expect(r.totalAPagarAgora).toBe(2500);
   });
 
   it("deslocamento e ajustes entram no bruto", () => {
@@ -53,7 +53,42 @@ describe("resumo da locação e taxa de reserva", () => {
         reservationFeeStatus: "ja_paga",
       })
     );
-    expect(r.valorBruto).toBe(2000 + 100 + 100 - 50);
+    expect(r.valorBruto).toBe(2500 + 100 + 100 - 50);
     expect(r.valorLocacao).toBe(r.valorBruto - 250);
+  });
+});
+
+describe("taxa cobrada agora junto com a locação", () => {
+  it("um pagamento só: tira a taxa e sobra o valor da locação", () => {
+    const r = descontarTaxaDosPagamentos([{ valor: 2500, forma: "pix" }], 250);
+    expect(r.linhas).toEqual([{ valor: 2250, forma: "pix" }]);
+    expect(r.taxaNaoCoberta).toBe(0);
+  });
+
+  it("vários pagamentos: a taxa sai das primeiras linhas, na ordem", () => {
+    const r = descontarTaxaDosPagamentos(
+      [
+        { valor: 100, forma: "pix" },
+        { valor: 150, forma: "dinheiro" },
+        { valor: 2250, forma: "credito" },
+      ],
+      250
+    );
+    expect(r.linhas).toEqual([{ valor: 2250, forma: "credito" }]);
+    expect(r.taxaNaoCoberta).toBe(0);
+  });
+
+  it("pagamento menor que a taxa: nada vai para a locação e informa o que faltou", () => {
+    const r = descontarTaxaDosPagamentos([{ valor: 200, forma: "pix" }], 250);
+    expect(r.linhas).toEqual([]);
+    expect(r.taxaNaoCoberta).toBe(50);
+  });
+
+  it("o que vai para a locação fecha exatamente com o saldo que o banco enxerga", () => {
+    const resumo = calcularResumoLocacao(entrada({ reservationFeeStatus: "cobrar_agora" }));
+    const r = descontarTaxaDosPagamentos([{ valor: resumo.totalAPagarAgora }], resumo.taxaACobrarAgora);
+    const registrado = r.linhas.reduce((s, l) => s + l.valor, 0);
+    // Banco: saldo = valor gravado (bruto) - taxa paga - pagamentos.
+    expect(resumo.valorBruto - resumo.taxaACobrarAgora - registrado).toBe(0);
   });
 });

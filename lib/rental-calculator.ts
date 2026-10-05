@@ -116,7 +116,12 @@ export interface ResumoLocacao {
   valorDeslocamento: number;
   totalItensMais: number;
   totalItensMenos: number;
+  // Taxa de reserva já paga antes (abate o que falta cobrar).
   creditoTaxa: number;
+  // Taxa de reserva paga junto com a locação, agora. Regra do dono: ela vira
+  // crédito, ou seja, faz parte do valor da locação e não vem em cima. O total
+  // a pagar continua sendo o valor bruto; a taxa é só a parte dele que entra
+  // como lançamento próprio.
   taxaACobrarAgora: number;
   // O que vira o `calculated_value` da locação (rentals.calculated_value):
   // o valor BRUTO, sem descontar a taxa de reserva. O banco desconta a taxa
@@ -124,12 +129,36 @@ export interface ResumoLocacao {
   // - taxa paga - pagamentos), então gravar o valor já líquido descontaria
   // a taxa duas vezes.
   valorBruto: number;
-  // O que o cliente deve pela locação em si: bruto menos o crédito da taxa
-  // já paga. Só para exibição e para o total a pagar.
+  // O que o cliente deve pela locação em si, fora a taxa: bruto menos a taxa
+  // (já paga ou cobrada agora). Vira pagamento de locação (rental_payments).
   valorLocacao: number;
-  // valorLocacao + taxaACobrarAgora (a taxa entra como transação própria,
-  // separada de rental_payments — ver comentário no componente).
+  // valorLocacao + taxaACobrarAgora. Com taxa já paga é bruto menos a taxa;
+  // com taxa cobrada agora é o bruto inteiro (a taxa vai dentro dele).
   totalAPagarAgora: number;
+}
+
+/**
+ * "Cobrar taxa de reserva agora": o cliente paga o total de uma vez, mas a
+ * taxa vira lançamento próprio (definir_taxa_agendamento) e já entra no banco
+ * como crédito da locação. Os pagamentos lançados na locação precisam então
+ * valer só o que passa da taxa, senão o banco recusa por passar do saldo. A
+ * taxa sai das primeiras linhas, na ordem em que foram digitadas. Devolve as
+ * linhas para registrar na locação e quanto da taxa não foi coberto.
+ */
+export function descontarTaxaDosPagamentos<T extends { valor: number }>(
+  pagamentos: T[],
+  taxa: number
+): { linhas: T[]; taxaNaoCoberta: number } {
+  let restante = round2(Math.max(0, taxa));
+  const linhas: T[] = [];
+  for (const p of pagamentos) {
+    if (!(p.valor > 0)) continue;
+    const abate = Math.min(restante, p.valor);
+    restante = round2(restante - abate);
+    const valor = round2(p.valor - abate);
+    if (valor > 0) linhas.push({ ...p, valor });
+  }
+  return { linhas, taxaNaoCoberta: restante };
 }
 
 export function calcularResumoLocacao(input: ResumoLocacaoInput): ResumoLocacao {
@@ -157,7 +186,7 @@ export function calcularResumoLocacao(input: ResumoLocacaoInput): ResumoLocacao 
 
   const bruto = subtotalProduto + valorDeslocamento + totalItensMais - totalItensMenos;
   const valorBruto = Math.max(0, round2(bruto));
-  const valorLocacao = Math.max(0, round2(bruto - creditoTaxa));
+  const valorLocacao = Math.max(0, round2(bruto - creditoTaxa - taxaACobrarAgora));
   const totalAPagarAgora = round2(valorLocacao + taxaACobrarAgora);
 
   return {
@@ -279,7 +308,7 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
   if (resumo.taxaACobrarAgora > 0) {
     linhas.push("");
     linhas.push("💳 *TAXA DE RESERVA*");
-    linhas.push(`  • A pagar agora: + ${fmtMoney(resumo.taxaACobrarAgora)}`);
+    linhas.push(`  • Paga agora: ${fmtMoney(resumo.taxaACobrarAgora)} (já faz parte do valor da locação, entra como crédito)`);
   }
 
   linhas.push("");

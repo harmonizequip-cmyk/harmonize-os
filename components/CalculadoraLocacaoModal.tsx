@@ -49,6 +49,7 @@ import {
   PAYMENT_LABELS,
   PIX_CONTAS,
   RESERVATION_FEE,
+  descontarTaxaDosPagamentos,
   type ItemAjuste,
   type PagamentoLinha,
   type PixContaValue,
@@ -637,6 +638,7 @@ export default function CalculadoraLocacaoModal({
       if (e2) avisos.push("o deslocamento não foi salvo automaticamente");
     }
 
+    let taxaRegistrada = false;
     if (reservationFeeStatus === "cobrar_agora") {
       if (!eventIdParaTaxa) {
         const { data: eventRow } = await supabase.from("calendar_events").select("id").eq("rental_id", rentalId).limit(1).maybeSingle();
@@ -649,12 +651,26 @@ export default function CalculadoraLocacaoModal({
           p_payment_method: primeiraForma,
         });
         if (e3) avisos.push("a taxa de reserva não foi registrada automaticamente (marque como paga na ficha do cliente)");
+        else taxaRegistrada = true;
       } else {
         avisos.push("não encontrei o agendamento para registrar a taxa automaticamente");
       }
     }
 
-    for (const p of pagamentos) {
+    // Com a taxa cobrada agora, ela já virou lançamento próprio e crédito da
+    // locação: dos valores recebidos, só o que passa dela é pagamento da locação.
+    let pagamentosDaLocacao = pagamentos;
+    if (taxaRegistrada) {
+      const { linhas, taxaNaoCoberta } = descontarTaxaDosPagamentos(pagamentos, fee);
+      pagamentosDaLocacao = linhas;
+      if (taxaNaoCoberta > 0) {
+        avisos.push(
+          `o valor recebido (${formatCurrency(somaPagamentos)}) é menor que a taxa de reserva (${formatCurrency(fee)}), então nada foi lançado como pagamento da locação`
+        );
+      }
+    }
+
+    for (const p of pagamentosDaLocacao) {
       if (p.valor <= 0) continue;
       const { error: ePag } = await supabase.rpc("registrar_pagamento_locacao", {
         p_rental_id: rentalId,
