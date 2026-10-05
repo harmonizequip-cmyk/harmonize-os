@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { hojeLocal } from "@/lib/period";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -34,16 +35,24 @@ export default function TaxaRecebidaBotao({
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [forma, setForma] = useState("pix");
+  // Dia em que o dinheiro entrou (a taxa entra no caixa nesse dia, não na data
+  // da reserva nem do fechamento dos disparos).
+  const [data, setData] = useState(hojeLocal());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function confirmar() {
+    if (!data) {
+      setErro("Informe o dia em que o dinheiro entrou.");
+      return;
+    }
     setSalvando(true);
     setErro(null);
     const { error } = await supabase.rpc("definir_taxa_agendamento", {
       p_event_id: eventId,
       p_status: "paga",
       p_payment_method: forma,
+      p_data: data,
     });
     setSalvando(false);
     if (error) {
@@ -61,7 +70,10 @@ export default function TaxaRecebidaBotao({
     return (
       <button
         type="button"
-        onClick={() => setAberto(true)}
+        onClick={() => {
+          setData(hojeLocal());
+          setAberto(true);
+        }}
         className="w-full rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white"
       >
         {rotulo}
@@ -87,6 +99,13 @@ export default function TaxaRecebidaBotao({
             </option>
           ))}
         </select>
+        <input
+          type="date"
+          value={data}
+          onChange={(e) => setData(e.target.value)}
+          aria-label="Dia em que o dinheiro entrou"
+          className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        />
         <button
           type="button"
           disabled={salvando}

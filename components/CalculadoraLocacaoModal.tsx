@@ -101,6 +101,7 @@ interface PendingReservation {
   equipment_id: string | null;
   date_start: string;
   equipmentName: string;
+  contagemInicial: number | null;
 }
 
 interface CategoryOption {
@@ -128,6 +129,8 @@ type CalculadoraLocacaoMode =
         taxaStatus?: string | null;
         equipmentName: string;
         eventDate: string;
+        // Contagem inicial do equipamento guardada na reserva (dia da entrega).
+        contagemInicial?: number | null;
       };
       isMentoria?: boolean;
     };
@@ -196,7 +199,7 @@ export default function CalculadoraLocacaoModal({
     }
     supabase
       .from("calendar_events")
-      .select("id, equipment_id, date_start, equipments(name)")
+      .select("id, equipment_id, date_start, contagem_inicial, equipments(name)")
       .eq("client_id", activeClientId)
       .eq("status", "pre_reserva")
       .is("rental_id", null)
@@ -208,6 +211,7 @@ export default function CalculadoraLocacaoModal({
             equipment_id: r.equipment_id,
             date_start: r.date_start,
             equipmentName: (Array.isArray(r.equipments) ? r.equipments[0] : r.equipments)?.name ?? "equipamento",
+            contagemInicial: r.contagem_inicial != null ? Number(r.contagem_inicial) : null,
           }))
         );
       });
@@ -230,6 +234,9 @@ export default function CalculadoraLocacaoModal({
     setLinkedReservationId(r.id);
     if (r.equipment_id) setEquipmentId(r.equipment_id);
     setEventDate(r.date_start);
+    // Contagem inicial guardada na reserva: já entra preenchida (só se a
+    // pessoa ainda não digitou outra).
+    if (r.contagemInicial != null && !initialCount) setInitialCount(String(r.contagemInicial));
   }
   function handleUnlinkReservation() {
     setLinkedReservationId(null);
@@ -278,7 +285,10 @@ export default function CalculadoraLocacaoModal({
   // ------------------------------------------------------------
   // Contagem do equipamento (ou pacientes modelo, em mentoria)
   // ------------------------------------------------------------
-  const [initialCount, setInitialCount] = useState("");
+  // Reserva com contagem inicial guardada: a calculadora abre com ela
+  // preenchida, só falta digitar a contagem final.
+  const contagemSalvaDaReserva = mode.kind === "finalize" ? (mode.reservation.contagemInicial ?? null) : null;
+  const [initialCount, setInitialCount] = useState(contagemSalvaDaReserva != null ? String(contagemSalvaDaReserva) : "");
   const [finalCount, setFinalCount] = useState("");
   const [patientCount, setPatientCount] = useState("1");
   const [notes, setNotes] = useState("");
@@ -698,6 +708,9 @@ export default function CalculadoraLocacaoModal({
           p_event_id: eventIdParaTaxa,
           p_status: "paga",
           p_payment_method: primeiraForma,
+          // A taxa entra no caixa no dia em que o dinheiro entrou (a data do
+          // primeiro pagamento informado), não na data do evento.
+          p_data: pagamentos.find((p) => p.valor > 0)?.data || hojeLocal(),
         });
         if (e3) avisos.push("a taxa de reserva não foi registrada automaticamente (marque como paga na ficha do cliente)");
         else taxaRegistrada = true;
@@ -1138,6 +1151,16 @@ export default function CalculadoraLocacaoModal({
                 </div>
               </div>
             )}
+            {!isMentoria &&
+              (() => {
+                const salva = contagemSalvaDaReserva ?? linkedReservation?.contagemInicial ?? null;
+                if (salva == null || initialCount !== String(salva)) return null;
+                return (
+                  <p className="mt-2 rounded-lg bg-brand-teal/10 px-3 py-2 text-xs text-brand-teal">
+                    Contagem inicial guardada na reserva ({salva.toLocaleString("pt-BR")}). Falta só digitar a final.
+                  </p>
+                );
+              })()}
             {!isMentoria && contagensInvertidas && (
               <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 As contagens estavam invertidas. Para o cálculo, a menor ({initialNumber.toLocaleString("pt-BR")}) vale

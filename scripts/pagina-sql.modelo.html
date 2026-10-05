@@ -1,0 +1,75 @@
+<title>SQL para o Supabase</title>
+<style>
+:root {
+  /* Tela de celular: três blocos de SQL, um botão Copiar em cada, na ordem de execução. */
+  --bg:#f5f8f7; --fg:#16211f; --muted:#5b6b67; --card:#ffffff; --line:#d6e0dd;
+  --accent:#177d74; --accent-fg:#ffffff; --code-bg:#0f1c1a; --code-fg:#d7ece8; --ok:#177d74; --warn:#9a5b00;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0e1514; --fg:#e3efec; --muted:#93a8a3; --card:#16201e; --line:#26352f;
+    --accent:#4fc4b8; --accent-fg:#06201d; --code-bg:#09100f; --code-fg:#cfe6e1; --ok:#4fc4b8; --warn:#e2a64b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0e1514; --fg:#e3efec; --muted:#93a8a3; --card:#16201e; --line:#26352f;
+  --accent:#4fc4b8; --accent-fg:#06201d; --code-bg:#09100f; --code-fg:#cfe6e1; --ok:#4fc4b8; --warn:#e2a64b; color-scheme: dark;
+}
+body { background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:16px; line-height:1.5; padding-inline:16px; padding-block:20px 40px; }
+main { max-width:720px; margin-inline:auto; display:flex; flex-direction:column; gap:20px; }
+h1 { font-size:1.5rem; line-height:1.2; margin:0; text-wrap:balance; }
+h2 { font-size:1.05rem; margin:0 0 2px; }
+p { margin:0; color:var(--muted); }
+.intro, .script, .verif { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+.intro ol { margin:10px 0 0; padding-left:1.2rem; display:flex; flex-direction:column; gap:6px; }
+.intro li { color:var(--fg); }
+.alerta { margin-top:12px; color:var(--warn); font-size:.92rem; }
+.script header { display:flex; gap:12px; align-items:flex-start; min-width:0; }
+.script header > div { min-width:0; }
+.passo { flex:none; width:32px; height:32px; border-radius:50%; background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; font-weight:700; font-variant-numeric:tabular-nums; }
+.barra { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:14px 0 10px; }
+.copiar { font:inherit; font-weight:600; background:var(--accent); color:var(--accent-fg); border:0; border-radius:10px; padding:12px 18px; min-height:44px; cursor:pointer; }
+.copiar:focus-visible, pre:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.aviso { font-size:.92rem; color:var(--ok); min-width:0; }
+pre { margin:0; background:var(--code-bg); color:var(--code-fg); font-family:var(--mono); font-size:12.5px; line-height:1.5; padding:14px; border-radius:10px; max-height:260px; overflow:auto; white-space:pre; tab-size:2; }
+.verif pre { max-height:none; }
+@media (prefers-reduced-motion: no-preference) { .copiar { transition: filter .15s; } .copiar:active { filter:brightness(.9); } }
+</style>
+<main>
+  <h1>SQL para rodar no Supabase</h1>
+  <section class="intro">
+    <p>{{TOTAL}} script(s), para rodar <strong>um de cada vez, nesta ordem</strong>.</p>
+    <ol>
+      <li>Abra o Supabase, projeto <code>vidnlzbxaxjlmzncqhxw</code>, e vá em <strong>SQL Editor</strong>.</li>
+      <li>Toque em <strong>New query</strong> (consulta nova).</li>
+      <li>Toque em <strong>Copiar SQL 1</strong> abaixo, cole no editor e toque em <strong>Run</strong>.</li>
+      <li>Deve aparecer <em>Success. No rows returned</em>. Se houver mais de um, repita com o seguinte, cada um numa consulta nova.</li>
+    </ol>
+    <p class="alerta">Se aparecer algum erro, não rode os seguintes. Me mande a mensagem exata.</p>
+  </section>
+  
+{{BLOCOS}}
+  {{CONFERENCIA}}
+</main>
+<script>
+(function () {
+  function selecionar(el) {
+    var r = document.createRange(); r.selectNodeContents(el);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  document.querySelectorAll('.copiar').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var el = document.getElementById(b.getAttribute('data-alvo'));
+      var aviso = b.parentNode.querySelector('.aviso');
+      var texto = el.textContent;
+      function ok() { aviso.textContent = 'Copiado. Cole no SQL Editor.'; }
+      function plano() { selecionar(el); aviso.textContent = 'Texto selecionado: use Copiar do celular.'; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(ok, plano);
+      } else { plano(); }
+    });
+  });
+})();
+</script>

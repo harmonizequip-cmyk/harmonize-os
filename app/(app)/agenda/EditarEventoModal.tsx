@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -33,6 +34,8 @@ interface EventToEdit {
   clients?: { name: string; whatsapp?: string | null } | null;
   taxa_status?: string | null;
   is_mentoria?: boolean;
+  contagem_inicial?: number | null;
+  contagem_inicial_em?: string | null;
 }
 
 interface EquipamentoContratoInfo {
@@ -86,10 +89,47 @@ export default function EditarEventoModal({
   onDeleted: () => void;
 }) {
   const supabase = createClient();
+  const router = useRouter();
   const isRentalEvent = !!event.rental_id;
   const isPendingReservation = !isRentalEvent && !!event.equipment_id && (event.status ?? "pre_reserva") === "pre_reserva";
 
   const [showFinalize, setShowFinalize] = useState(false);
+
+  // Contagem inicial do equipamento guardada na reserva (dia da entrega), para
+  // fechar a conta depois só com a contagem final.
+  const [contagemSalva, setContagemSalva] = useState<number | null>(
+    event.contagem_inicial != null ? Number(event.contagem_inicial) : null
+  );
+  const [contagemTexto, setContagemTexto] = useState(
+    event.contagem_inicial != null ? String(event.contagem_inicial) : ""
+  );
+  const [salvandoContagem, setSalvandoContagem] = useState(false);
+  const [contagemErro, setContagemErro] = useState<string | null>(null);
+  const [contagemOk, setContagemOk] = useState<string | null>(null);
+
+  async function salvarContagemInicial(apagar: boolean) {
+    const numero = apagar ? null : Number(contagemTexto.replace(/\D/g, ""));
+    if (!apagar && (!contagemTexto.trim() || !Number.isFinite(numero) || (numero as number) < 0)) {
+      setContagemErro("Digite a contagem inicial do equipamento.");
+      return;
+    }
+    setSalvandoContagem(true);
+    setContagemErro(null);
+    setContagemOk(null);
+    const { error: rpcError } = await supabase.rpc("definir_contagem_inicial_reserva", {
+      p_event_id: event.id,
+      p_contagem: numero,
+    });
+    setSalvandoContagem(false);
+    if (rpcError) {
+      setContagemErro(rpcError.message || "Não foi possível salvar a contagem inicial.");
+      return;
+    }
+    setContagemSalva(numero);
+    if (apagar) setContagemTexto("");
+    setContagemOk(apagar ? "Contagem inicial apagada." : "Contagem inicial salva.");
+    router.refresh();
+  }
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [showCancelForm, setShowCancelForm] = useState(false);
@@ -383,6 +423,7 @@ export default function EditarEventoModal({
               taxaStatus: event.taxa_status,
               equipmentName: EQUIPMENT_LABELS[event.event_type] ?? event.event_type,
               eventDate: event.date_start,
+              contagemInicial: contagemSalva,
             },
             isMentoria: event.is_mentoria ?? false,
           }}
@@ -512,6 +553,53 @@ export default function EditarEventoModal({
               >
                 Reagendar
               </button>
+
+              {!event.is_mentoria && (
+                <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+                  <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                    Contagem inicial do equipamento
+                  </label>
+                  <p className="mb-2 text-[11px] text-neutral-400">
+                    Digite no dia da entrega. No dia de buscar, ao finalizar, ela já vem preenchida e falta só a final.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      inputMode="numeric"
+                      value={contagemTexto}
+                      onChange={(e) => {
+                        setContagemTexto(e.target.value.replace(/\D/g, ""));
+                        setContagemOk(null);
+                      }}
+                      placeholder="0"
+                      aria-label="Contagem inicial do equipamento"
+                      className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    />
+                    <button
+                      type="button"
+                      disabled={salvandoContagem}
+                      onClick={() => salvarContagemInicial(false)}
+                      className="rounded-lg bg-brand-teal px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+                    >
+                      {salvandoContagem ? "Salvando..." : "Salvar"}
+                    </button>
+                  </div>
+                  {contagemSalva != null && (
+                    <p className="mt-2 text-xs text-brand-teal">
+                      Guardada: {contagemSalva.toLocaleString("pt-BR")}.{" "}
+                      <button
+                        type="button"
+                        disabled={salvandoContagem}
+                        onClick={() => salvarContagemInicial(true)}
+                        className="text-neutral-500 underline underline-offset-2"
+                      >
+                        apagar
+                      </button>
+                    </p>
+                  )}
+                  {contagemOk && <p className="mt-1 text-xs text-brand-teal">{contagemOk}</p>}
+                  {contagemErro && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{contagemErro}</p>}
+                </div>
+              )}
 
               <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
                 <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">

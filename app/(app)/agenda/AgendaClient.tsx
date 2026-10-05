@@ -73,6 +73,8 @@ interface EventRow {
   rental_id: string | null;
   notes: string | null;
   taxa_status?: string | null;
+  contagem_inicial?: number | null;
+  contagem_inicial_em?: string | null;
   created_at?: string | null;
   // Quando "Pedir confirmação no WhatsApp" foi clicado para ESTA
   // reserva. Independente de calendar_events.confirmed: pedir e
@@ -435,6 +437,13 @@ export default function AgendaClient({
                   {e.confirmation_message_sent_at
                     ? `✓ mensagem enviada em ${formatDiaMes(e.confirmation_message_sent_at)}`
                     : "sem pedido de confirmação enviado ainda"}
+                </p>
+              )}
+              {/* Contagem inicial guardada na reserva: aparece no card para
+                  conferir sem abrir nada. */}
+              {e.contagem_inicial != null && !e.rental_id && (
+                <p className="mt-0.5 text-[11px] text-brand-teal">
+                  Contagem inicial: {Number(e.contagem_inicial).toLocaleString("pt-BR")}
                 </p>
               )}
             </div>

@@ -28,6 +28,9 @@ Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e men
 - As views `rentals_contabilizaveis` e `transactions_contabilizaveis` usam `select *`: ao adicionar coluna em `rentals` ou `transactions`, recriar a view na mesma migration.
 - Funções seguem o padrão existente: `security definer`, `set search_path = public`, checagem com `has_module_permission`, e `registrar_movimentacao` quando alteram dados.
 - Mudança que apaga ou altera dados existentes exige uma consulta de prévia, mostrada ao dono antes de rodar.
+- Função nova: depois de criar, rodar `revoke execute on function <nome> from public, anon;` e dar `grant execute ... to authenticated, service_role;`. Sem isso ela nasce executável por quem não está logado. Só `disponibilidade_publica` é aberta para `anon`.
+- Todo SQL para o dono rodar sai numa página (Artifact) com botão Copiar em cada bloco, um bloco por script, na ordem de execução, com uma consulta de conferência no fim. Nunca como arquivo anexo: o dono usa o celular e não abre anexo. Gerar com `python3 scripts/gerar-pagina-sql.py saida.html migrations/a.sql ... --conferencia "select ..."` e publicar com a ferramenta Artifact. Antes de entregar, rodar os scripts num Postgres local com o `schema.sql` carregado.
+- Aplicar migration pela ferramenta do Supabase (`apply_migration`) pode ser barrado pelo ambiente. Nesse caso não contornar com `execute_sql`: entregar a página de SQL e esperar o dono rodar.
 
 ## Ciclo da locação (conferido no código)
 
