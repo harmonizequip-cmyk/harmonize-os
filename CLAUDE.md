@@ -19,6 +19,16 @@ Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e men
 - Um aviso no Dashboard deve levar à lista do que ele avisa, nunca a uma tela genérica.
 - A tela de Pendências é só para quem deve ou ainda não foi cobrado.
 
+## Banco de dados: protocolo
+
+- Toda mudança de estrutura ou função vira um arquivo em `migrations/`, nomeado `AAAA-MM-DD-descricao.sql`.
+- A migration só roda no Supabase (projeto `vidnlzbxaxjlmzncqhxw`) depois do aval explícito do dono, e sempre antes de publicar o código que depende dela.
+- No mesmo commit, o `schema.sql` é atualizado para refletir a mudança. O `schema.sql` tem que conseguir recriar o banco do zero.
+- Depois de rodar, conferir no banco com uma consulta de leitura que a mudança entrou e dizer o resultado ao dono.
+- As views `rentals_contabilizaveis` e `transactions_contabilizaveis` usam `select *`: ao adicionar coluna em `rentals` ou `transactions`, recriar a view na mesma migration.
+- Funções seguem o padrão existente: `security definer`, `set search_path = public`, checagem com `has_module_permission`, e `registrar_movimentacao` quando alteram dados.
+- Mudança que apaga ou altera dados existentes exige uma consulta de prévia, mostrada ao dono antes de rodar.
+
 ## Ciclo da locação (conferido no código)
 
 1. **Reserva**: `calendar_events` com `status = 'pre_reserva'`, sem `rental_id`. Pode ter taxa de reserva (`taxa_status`).

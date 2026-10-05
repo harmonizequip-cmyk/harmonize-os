@@ -204,6 +204,9 @@ create table public.clients (
   -- sozinho quando a etapa muda — mover um Cliente de volta para
   -- "Agendamento" numa segunda venda não desfaz a conversão.
   is_client boolean not null default false,
+  -- Data em que virou cliente; preenchida pelos gatilhos keep_client_forever
+  -- e set_became_client_at (fim deste arquivo). Existia no banco e faltava aqui.
+  became_client_at timestamptz,
   -- Leva W: CPF ou CNPJ do contratante, usado na geração do contrato
   -- de locação. Texto livre, sem validação rígida de formato.
   document text,
@@ -4639,3 +4642,98 @@ end;
 $$;
 
 grant execute on function public.gerar_tarefas_agenda to authenticated;
+
+-- ============================================================
+-- OBJETOS QUE EXISTIAM NO BANCO E NÃO ESTAVAM NESTE ARQUIVO
+-- (2026-10-05, copiados de pg_get_functiondef / pg_get_triggerdef do
+-- projeto vidnlzbxaxjlmzncqhxw; as migrations de origem nunca foram
+-- guardadas em migrations/)
+-- ============================================================
+
+-- Calendário público de disponibilidade: só data, código do equipamento e
+-- se está reservado ou com taxa pendente, sem nome de cliente. Executável
+-- por anon (privilégio padrão do Postgres, nenhum revoke no banco).
+create or replace function public.disponibilidade_publica(p_inicio date, p_fim date)
+returns table(data date, equipamento text, situacao text)
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select ce.date_start,
+         e.code::text,
+         case when ce.taxa_status = 'pendente' then 'pre_reserva'
+              else 'agendado' end
+    from calendar_events ce
+    join equipments e on e.id = ce.equipment_id
+   where ce.date_start between p_inicio and p_fim
+     and ce.status <> 'cancelada'
+   order by ce.date_start, e.code;
+$$;
+
+-- Marca como cliente ao entrar na etapa "cliente" e impede tirar a marca,
+-- preservando a data original (became_client_at). Convive com
+-- marcar_is_client (acima), que faz parte disso de outro jeito.
+create or replace function public.keep_client_forever()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- Marca como cliente ao entrar na etapa "cliente"
+  if new.stage = 'cliente' and not coalesce(old.is_client, false) then
+    new.is_client := true;
+    new.became_client_at := coalesce(new.became_client_at, now());
+  end if;
+
+  -- Impede que alguém tire a marca de cliente e mantém a data original
+  if tg_op = 'UPDATE' and old.is_client = true then
+    new.is_client := true;
+    new.became_client_at := coalesce(old.became_client_at, new.became_client_at, now());
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_keep_client_forever
+  before insert or update on public.clients
+  for each row execute function public.keep_client_forever();
+
+-- Preenche became_client_at quando is_client vira true sem data.
+create or replace function public.set_became_client_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.is_client = true and new.became_client_at is null then
+    new.became_client_at := now();
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_set_became_client_at
+  before insert or update on public.clients
+  for each row execute function public.set_became_client_at();
+
+-- Mesmo corpo de profiles_lock_privileged_fields (acima), com outro nome e
+-- outro gatilho no mesmo BEFORE UPDATE de profiles. Está assim no banco.
+create or replace function public.protect_profile_privileges()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+begin
+  if not has_module_permission('configuracoes') then
+    new.is_admin := old.is_admin;
+    new.active := old.active;
+    new.permissions := old.permissions;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_protect_profile_privileges
+  before update on public.profiles
+  for each row execute function public.protect_profile_privileges();
