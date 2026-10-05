@@ -1,0 +1,46 @@
+# Harmonize OS
+
+Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e mentorias). Um operador só, que usa quase sempre pelo celular.
+
+## Onde as coisas estão
+
+- Código: Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres, RLS, RPCs `security definer`).
+- Repositório oficial: `harmonizequip-cmyk/harmonize-os`, branch `main`. Existe uma cópia antiga em `edercampos1985-svg/harmonize-os`: nunca publicar lá.
+- Deploy: Vercel, projeto `harmonize-os`, publica a cada push em `main`. Site: harmonize-os.vercel.app.
+- Banco: projeto Supabase `vidnlzbxaxjlmzncqhxw`. `schema.sql` é o retrato do banco e `migrations/` guarda cada mudança. Toda migration precisa ser aplicada no banco E refletida em `schema.sql`.
+
+## Como trabalhar aqui
+
+- Responder em português, direto, sem enrolação. O dono lê no celular: resposta curta, com o que mudou e o que ele precisa fazer.
+- Antes de afirmar o efeito de qualquer coisa, conferir no código ou no banco. Já houve afirmações erradas por dedução.
+- Antes de publicar: `npx tsc --noEmit`, `npx vitest run` e `npx next build`.
+- Depois de publicar, conferir o deploy no Vercel quando houver acesso.
+- SQL que altera dados ou estrutura só roda com o aval do dono. Consulta de leitura pode.
+- Um aviso no Dashboard deve levar à lista do que ele avisa, nunca a uma tela genérica.
+- A tela de Pendências é só para quem deve ou ainda não foi cobrado.
+
+## Ciclo da locação (conferido no código)
+
+1. **Reserva**: `calendar_events` com `status = 'pre_reserva'`, sem `rental_id`. Pode ter taxa de reserva (`taxa_status`).
+2. **Finalizar com disparos** (`finalize_rental_reservation` ou `create_rental`): cria a linha em `rentals` e preenche `calendar_events.rental_id`. É neste momento que as despesas lançadas na reserva se amarram à locação (gatilho `calendar_events_amarra_despesas`) e que a tarefa pós-locação passa a valer.
+3. **Pagamento**: `rental_payments` via `registrar_pagamento_locacao`. `rentals.pago` é calculado, nunca gravado à mão. Saldo vem da view `rentals_situacao_pagamento` (desconta parciais e taxa de reserva paga).
+4. **Status "realizada"**: quase nunca é marcado no banco. As telas derivam: locação não cancelada cuja data já passou conta como realizada. Não criar avisos pedindo para marcar.
+
+Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizaveis` (excluem cancelada e modo teste). Essas views usam `select *`: ao adicionar coluna na tabela, recriar a view.
+
+## Regras de negócio que já foram decididas
+
+- Mensagens ao cliente usam tratamento e primeiro nome (`lib/saudacao.ts`): cadastro primeiro, campo "Nome" como reserva.
+- Datas disponíveis: um dia só é sugerido como livre quando os dois HIPROs estão livres. O dono trabalha sozinho e nem sempre consegue atender dois lugares no mesmo dia, então a regra fica e ele marca os outros dias à mão.
+- Lançamento manual de receita esconde as categorias "Locação" e "Mentoria", que são geradas pelo sistema.
+- Locação cancelada não tem despesa.
+- Locação de vários dias deve ser um evento só, com data final. Várias reservas de um dia para o mesmo atendimento confundem os avisos.
+
+## Pendências conhecidas
+
+- Mostrar lucro por locação em Locações e por cliente em Relatórios. As views `rentals_lucro` e `clientes_lucro` já existem e nenhuma tela lê.
+- Bloco de despesas da reserva também no card do Funil e na página do cliente (hoje só na Agenda).
+- Benefício da indicação: o dono ainda vai definir.
+- Custo por disparo: adiado.
+- Backup: conferir o plano do Supabase e fazer um teste de restauração.
+- Contrato assinado e checklist: fora do escopo por decisão do dono.
