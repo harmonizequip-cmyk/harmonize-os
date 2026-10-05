@@ -10,6 +10,7 @@ import NovoLancamentoModal from "@/app/(app)/financeiro/NovoLancamentoModal";
 import NovoEventoModal from "@/app/(app)/agenda/NovoEventoModal";
 import ReservarHiproModal from "@/app/(app)/agenda/ReservarHiproModal";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
+import ReceberPagamentoModal from "@/components/ReceberPagamentoModal";
 import type { PricingConfig } from "@/lib/rental-pricing";
 
 interface ClientOption {
@@ -41,22 +42,13 @@ type ActionKey =
   | "evento"
   | "locacao"
   | "locacao_disparos"
-  | "receber"
-  | "taxa_recebida";
-
-// Atalhos que não abrem formulário: levam direto à lista de quem deve, em
-// Pendências, onde o recebimento é feito com o valor já preenchido.
-const ATALHOS_DE_TELA: Partial<Record<ActionKey, string>> = {
-  receber: "/pendencias",
-  taxa_recebida: "/pendencias#taxas",
-};
+  | "receber";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
 // sem aquele acesso não ver a opção aqui também.
 const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[] = [
-  { key: "receber", label: "Receber pagamento de locação", emoji: "💵", module: "financeiro" },
-  { key: "taxa_recebida", label: "Taxa de reserva recebida", emoji: "💳", module: "financeiro" },
+  { key: "receber", label: "Receber pagamento (aluguel ou taxa)", emoji: "💵", module: "financeiro" },
   { key: "tarefa", label: "Nova tarefa", emoji: "🗒️", module: "clientes" },
   { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
   { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
@@ -111,11 +103,6 @@ export default function QuickActionsButton({
 
   function handlePick(key: ActionKey) {
     setMenuOpen(false);
-    const destino = ATALHOS_DE_TELA[key];
-    if (destino) {
-      router.push(destino);
-      return;
-    }
     setActiveModal(key);
   }
 
@@ -175,6 +162,7 @@ export default function QuickActionsButton({
       {activeModal === "tarefa" && (
         <NovaTarefaModal leads={clients} onClose={() => setActiveModal(null)} onCreated={handleCreated} />
       )}
+      {activeModal === "receber" && <ReceberPagamentoModal onClose={() => setActiveModal(null)} />}
       {activeModal === "lead" && <NovoLeadModal onClose={() => setActiveModal(null)} onCreated={handleCreated} />}
       {activeModal === "lancamento" && (
         <NovoLancamentoModal
