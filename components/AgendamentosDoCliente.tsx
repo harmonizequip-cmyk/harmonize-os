@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { PIX_CONTAS } from "@/lib/rental-calculator";
+import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 
 import { hojeLocal } from "@/lib/period";
 // Uma linha por agendamento do cliente, já com o rótulo de situação
@@ -33,6 +35,14 @@ interface Agendamento {
   // Leva S: preenchidos só quando situacao é "cancelado".
   cancellation_reason: string | null;
   no_show: boolean;
+}
+
+// Saldo vem de rentals_situacao_pagamento (valor da locação menos taxa paga
+// menos pagamentos já lançados). É a única conta de "quanto falta": a tela
+// não recalcula, para não divergir do que o banco aceita receber.
+interface Saldo {
+  saldo: number;
+  totalPago: number;
 }
 
 const SITUACAO_META: Record<string, { label: string; classe: string }> = {
@@ -99,6 +109,9 @@ export default function AgendamentosDoCliente({
   const [pagando, setPagando] = useState<string | null>(null);
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [dataPagamento, setDataPagamento] = useState(hoje());
+  const [valorPagamento, setValorPagamento] = useState("");
+  const [pixConta, setPixConta] = useState<string>("harmonize");
+  const [saldos, setSaldos] = useState<Record<string, Saldo>>({});
 
   const carregar = useCallback(async () => {
     const { data, error } = await supabase.rpc("agendamentos_do_cliente", {
@@ -109,8 +122,26 @@ export default function AgendamentosDoCliente({
       setErro(error.message || "Não foi possível carregar os agendamentos.");
       return;
     }
-    setErro(null);
-    setItens((data ?? []) as Agendamento[]);
+    const lista = (data ?? []) as Agendamento[];
+    const ids = lista.map((a) => a.rental_id).filter((id): id is string => !!id);
+    const novos: Record<string, Saldo> = {};
+    let erroSaldo: string | null = null;
+    if (ids.length > 0) {
+      const { data: linhas, error: erroS } = await supabase
+        .from("rentals_situacao_pagamento")
+        .select("rental_id, saldo, total_pago")
+        .in("rental_id", ids);
+      if (erroS) {
+        erroSaldo = "Não consegui ler o saldo em aberto. Recarregue antes de registrar pagamento.";
+      } else {
+        for (const l of (linhas ?? []) as any[]) {
+          novos[l.rental_id] = { saldo: Number(l.saldo ?? 0), totalPago: Number(l.total_pago ?? 0) };
+        }
+      }
+    }
+    setSaldos(novos);
+    setErro(erroSaldo);
+    setItens(lista);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
@@ -157,16 +188,32 @@ export default function AgendamentosDoCliente({
 
   function confirmarPagamento(a: Agendamento) {
     if (!a.rental_id) return;
+    const saldo = saldos[a.rental_id]?.saldo;
+    if (saldo === undefined) {
+      setErro("Saldo em aberto indisponível. Recarregue a página e tente de novo.");
+      return;
+    }
     if (!dataPagamento) {
       setErro("Escolha a data em que o dinheiro entrou.");
       return;
     }
+    const valor = valorParaNumero(valorPagamento);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setErro("Informe um valor válido.");
+      return;
+    }
+    if (valor > saldo + 0.001) {
+      setErro(`O valor é maior que o saldo em aberto (${formatCurrency(saldo)}).`);
+      return;
+    }
     executar(
-      "marcar_locacao_paga",
+      "registrar_pagamento_locacao",
       {
         p_rental_id: a.rental_id,
-        p_payment_method: formaPagamento,
+        p_forma: formaPagamento,
+        p_valor: valor,
         p_data: dataPagamento,
+        p_pix_conta: formaPagamento === "pix" ? pixConta : null,
       },
       a.event_id
     );
@@ -176,7 +223,10 @@ export default function AgendamentosDoCliente({
     setPagando(a.event_id);
     setReagendando(null);
     setFormaPagamento("pix");
+    setPixConta("harmonize");
     setDataPagamento(hoje());
+    const saldo = a.rental_id ? saldos[a.rental_id]?.saldo : undefined;
+    setValorPagamento(saldo === undefined ? "" : numeroParaCampo(saldo));
     setErro(null);
   }
 
@@ -225,7 +275,9 @@ export default function AgendamentosDoCliente({
           const trabalhando = ocupado === a.event_id;
           const cancelado = a.situacao === "cancelado";
           const credito = a.taxa_status === "paga" ? Number(a.taxa_valor ?? 0) : 0;
-          const aReceber = Math.max(Number(a.valor ?? 0) - credito, 0);
+          const situacaoPag = a.rental_id ? saldos[a.rental_id] : undefined;
+          const aReceber = situacaoPag?.saldo ?? 0;
+          const jaRecebido = situacaoPag?.totalPago ?? 0;
 
           return (
             <div
@@ -276,10 +328,11 @@ export default function AgendamentosDoCliente({
 
               {/* O crédito da taxa é a parte que mais gera dúvida na hora
                   de cobrar, então aparece escrito, com a conta feita. */}
-              {a.rental_id && !a.pago && credito > 0 && !cancelado && (
+              {a.rental_id && !a.pago && !cancelado && situacaoPag && (credito > 0 || jaRecebido > 0) && (
                 <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-                  A taxa de {formatCurrency(credito)} já está paga e entra como crédito: faltam{" "}
-                  <span className="font-medium text-brand-teal">{formatCurrency(aReceber)}</span>.
+                  {credito > 0 ? `A taxa de ${formatCurrency(credito)} já está paga e entra como crédito. ` : ""}
+                  {jaRecebido > 0 ? `Já recebido: ${formatCurrency(jaRecebido)}. ` : ""}
+                  Faltam <span className="font-medium text-brand-teal">{formatCurrency(aReceber)}</span>.
                 </p>
               )}
 
@@ -334,10 +387,19 @@ export default function AgendamentosDoCliente({
               ) : pagando === a.event_id ? (
                 <div className="mt-2 rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
                   <p className="mb-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-                    Vai lançar {formatCurrency(aReceber)} no financeiro
-                    {credito > 0 ? `, já descontado o crédito de ${formatCurrency(credito)}` : ""}.
+                    Saldo em aberto: {formatCurrency(aReceber)}
+                    {credito > 0 ? ` (já descontado o crédito de ${formatCurrency(credito)})` : ""}
+                    {jaRecebido > 0 ? `, já recebido ${formatCurrency(jaRecebido)}` : ""}. Pode lançar menos, se o
+                    pagamento for parcial.
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={valorPagamento}
+                      onChange={(e) => setValorPagamento(e.target.value)}
+                      inputMode="decimal"
+                      aria-label="Valor recebido"
+                      className="w-28 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    />
                     <select
                       value={formaPagamento}
                       onChange={(e) => setFormaPagamento(e.target.value)}
@@ -349,6 +411,20 @@ export default function AgendamentosDoCliente({
                         </option>
                       ))}
                     </select>
+                    {formaPagamento === "pix" && (
+                      <select
+                        value={pixConta}
+                        onChange={(e) => setPixConta(e.target.value)}
+                        aria-label="Conta PIX que recebeu"
+                        className="min-w-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      >
+                        {PIX_CONTAS.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.nome}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <input
                       type="date"
                       value={dataPagamento}
@@ -361,7 +437,7 @@ export default function AgendamentosDoCliente({
                       onClick={() => confirmarPagamento(a)}
                       className={BOTAO_PRIMARIO}
                     >
-                      {trabalhando ? "Registrando..." : "Confirmar pagamento"}
+                      {trabalhando ? "Registrando..." : "Confirmar recebimento"}
                     </button>
                     <button
                       type="button"
@@ -480,7 +556,7 @@ export default function AgendamentosDoCliente({
                       {a.rental_id && !a.pago && (
                         <button
                           type="button"
-                          disabled={trabalhando}
+                          disabled={trabalhando || !situacaoPag}
                           onClick={() => abrirPagamento(a)}
                           className={BOTAO_PRIMARIO}
                         >

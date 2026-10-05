@@ -46,6 +46,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Locação cancelada não tem despesa.
 - Locação de vários dias deve ser um evento só, com data final. Várias reservas de um dia para o mesmo atendimento confundem os avisos.
 
+## Auditoria
+
+- `docs/AUDITORIA-HARMONIZE-2026-10-05.md`: achados, evidências e ordem de entregas (seção 5). Ler antes de mexer; trabalhar um item por vez e só avançar quando o dono pedir.
+
 ## Pendências conhecidas
 
 - Mostrar lucro por locação em Locações e por cliente em Relatórios. As views `rentals_lucro` e `clientes_lucro` já existem e nenhuma tela lê.
