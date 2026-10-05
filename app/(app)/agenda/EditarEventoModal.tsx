@@ -15,6 +15,7 @@ import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContr
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import { valorParaNumero } from "@/lib/valor";
+import { duracaoEmDias, somarDias } from "@/lib/period";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
@@ -26,6 +27,8 @@ interface EventToEdit {
   event_type: string;
   title: string;
   date_start: string;
+  // Data final quando a reserva cobre mais de um dia.
+  date_end?: string | null;
   status?: string;
   client_id: string | null;
   equipment_id?: string | null;
@@ -148,6 +151,9 @@ export default function EditarEventoModal({
   // RPC reagendar_agendamento — mesma função já usada na ficha do cliente.
   const [showReagendar, setShowReagendar] = useState(false);
   const [novaData, setNovaData] = useState(event.date_start);
+  // Data final (opcional). Em branco, o período se mantém com a mesma duração.
+  const [novaDataFim, setNovaDataFim] = useState("");
+  const duracaoAtual = duracaoEmDias(event.date_start, event.date_end);
   const [reagendando, setReagendando] = useState(false);
   const [reagendarError, setReagendarError] = useState<string | null>(null);
 
@@ -156,11 +162,16 @@ export default function EditarEventoModal({
       setReagendarError("Escolha a nova data.");
       return;
     }
+    if (novaDataFim && novaDataFim < novaData) {
+      setReagendarError("A data final não pode ser antes da data inicial.");
+      return;
+    }
     setReagendando(true);
     setReagendarError(null);
     const { error } = await supabase.rpc("reagendar_agendamento", {
       p_event_id: event.id,
       p_nova_data: novaData,
+      ...(novaDataFim ? { p_nova_data_fim: novaDataFim } : {}),
     });
     setReagendando(false);
     if (error) {
@@ -447,6 +458,7 @@ export default function EditarEventoModal({
           </h2>
           <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
             {EQUIPMENT_LABELS[event.event_type] ?? event.event_type} · {formatDate(event.date_start)}
+            {event.date_end && event.date_end > event.date_start ? ` a ${formatDate(event.date_end)}` : ""}
             {event.clients?.name ? ` · ${event.clients.name}` : ""}
             <br />
             {event.is_mentoria
@@ -502,6 +514,21 @@ export default function EditarEventoModal({
                 onChange={(e) => setNovaData(e.target.value)}
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
               />
+              <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                Data final (opcional)
+              </label>
+              <input
+                type="date"
+                value={novaDataFim}
+                min={novaData}
+                onChange={(e) => setNovaDataFim(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              />
+              <p className="mt-1 text-[11px] text-neutral-400">
+                {duracaoAtual > 1
+                  ? `Hoje a reserva tem ${duracaoAtual} dias. Em branco, ela mantém os ${duracaoAtual} dias a partir da nova data.`
+                  : "Em branco, a reserva continua de um dia só. Preencha para ela cobrir mais de um dia (uma taxa só)."}
+              </p>
               {reagendarError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{reagendarError}</p>}
               <div className="mt-3 flex gap-2">
                 <button
@@ -548,6 +575,7 @@ export default function EditarEventoModal({
                 onClick={() => {
                   setShowReagendar(true);
                   setNovaData(event.date_start);
+                  setNovaDataFim("");
                 }}
                 className="mt-3 w-full rounded-xl border border-brand-teal py-2.5 text-sm font-medium text-brand-teal"
               >
@@ -687,7 +715,9 @@ export default function EditarEventoModal({
         title: title.trim(),
         client_id: clientId || null,
         date_start: dateStart,
-        date_end: dateStart,
+        // Preserva a duração: mudar a data de um evento de vários dias não
+        // pode encolhê-lo para um dia só.
+        date_end: somarDias(dateStart, duracaoEmDias(event.date_start, event.date_end) - 1),
         notes: notes || null,
       })
       .eq("id", event.id);

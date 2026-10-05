@@ -21,7 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
-import { hojeLocal } from "@/lib/period";
+import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
@@ -55,6 +55,8 @@ interface EventRow {
   event_type: string;
   title: string;
   date_start: string;
+  // Data final quando a reserva ou locação cobre mais de um dia.
+  date_end?: string | null;
   status: string;
   confirmed: boolean;
   value: number | null;
@@ -260,10 +262,13 @@ export default function AgendaClient({
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRow[]>();
+    // Reserva de vários dias aparece em cada um dos seus dias.
     for (const e of eventosFiltrados) {
-      const list = map.get(e.date_start) ?? [];
-      list.push(e);
-      map.set(e.date_start, list);
+      for (const dia of diasDoPeriodo(e.date_start, e.date_end)) {
+        const list = map.get(dia) ?? [];
+        list.push(e);
+        map.set(dia, list);
+      }
     }
     return map;
   }, [eventosFiltrados]);
@@ -306,6 +311,7 @@ export default function AgendaClient({
       resumoMes.eventos,
       [
         { titulo: "Data", valor: (e) => formatDate(e.date_start) },
+        { titulo: "Data final", valor: (e) => (e.date_end && e.date_end > e.date_start ? formatDate(e.date_end) : "") },
         { titulo: "Título", valor: (e) => e.title },
         { titulo: "Tipo", valor: (e) => eventMeta(e).label },
         { titulo: "Cliente", valor: (e) => e.clients?.name ?? "" },
@@ -411,6 +417,11 @@ export default function AgendaClient({
             <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${meta.dot}`} />
             <div>
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{e.title}</p>
+              {e.date_end && e.date_end > e.date_start && (
+                <p className="mt-0.5 text-[11px] font-medium text-brand-blue">
+                  {formatDate(e.date_start)} a {formatDate(e.date_end)} ({duracaoEmDias(e.date_start, e.date_end)} dias, uma reserva só)
+                </p>
+              )}
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                 {meta.label}
                 {ehPreReserva(e) && (

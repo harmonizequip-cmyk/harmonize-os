@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/format";
 import { canvasToPngFile, drawAvailabilityImage } from "@/lib/availability-image";
 import { mensagemDatasDisponiveis } from "@/lib/saudacao";
+import { diasDoPeriodo } from "@/lib/period";
 
 const HOME_CITY_KEY = "harmonize_cidade_base";
 
@@ -173,17 +174,19 @@ export default function AvailabilityImageModal({
       const paddedEnd = toDateKey(addDays(endOfMonth(currentMonth), 1));
       const { data } = await supabase
         .from("calendar_events")
-        .select("date_start, clients(city)")
+        .select("date_start, date_end, clients(city)")
         .in("event_type", ["hipro_1", "hipro_2"])
         .neq("status", "cancelada")
-        .gte("date_start", paddedStart)
+        .gte("date_end", paddedStart)
         .lte("date_start", paddedEnd);
       if (cancelled) return;
 
-      const rows = (data ?? []).map((e: any) => ({
-        date: e.date_start as string,
-        city: (Array.isArray(e.clients) ? e.clients[0]?.city : e.clients?.city) ?? null,
-      }));
+      const rows = (data ?? []).flatMap((e: any) =>
+        diasDoPeriodo(e.date_start as string, (e.date_end ?? e.date_start) as string).map((d) => ({
+          date: d,
+          city: (Array.isArray(e.clients) ? e.clients[0]?.city : e.clients?.city) ?? null,
+        }))
+      );
 
       const busy = new Set(rows.filter((r) => r.date >= start && r.date <= end).map((r) => r.date));
       const cityMap = new Map<string, string>();

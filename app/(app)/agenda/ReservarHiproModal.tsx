@@ -38,6 +38,7 @@ export default function ReservarHiproModal({
   const [selectedClientId, setSelectedClientId] = useState("");
   const [equipmentId, setEquipmentId] = useState(equipments[0]?.id ?? "");
   const [eventDate, setEventDate] = useState(defaultDate ?? (() => hojeLocal())());
+  const [dataFim, setDataFim] = useState("");
   const [notes, setNotes] = useState("");
   const [isMentoria, setIsMentoria] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,6 +83,10 @@ export default function ReservarHiproModal({
       setError("Preencha cliente, equipamento e data.");
       return;
     }
+    if (dataFim && dataFim <= eventDate) {
+      setError("A data final precisa ser depois da data inicial.");
+      return;
+    }
     const confirmMsg = outroEquipAviso
       ? `${outroEquipAviso}\n\nReservar mesmo assim?`
       : "Reservar este equipamento para essa data? A contagem de disparos e o valor entram depois, quando o procedimento acontecer.";
@@ -99,7 +104,7 @@ export default function ReservarHiproModal({
       client_id: clientId,
       equipment_id: equipmentId,
       date_start: eventDate,
-      date_end: eventDate,
+      date_end: dataFim || eventDate,
       status: "pre_reserva",
       notes: notes || null,
       is_mentoria: isMentoria,
@@ -170,6 +175,22 @@ export default function ReservarHiproModal({
               onChange={(e) => setEventDate(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Data final (só se for mais de um dia)
+            </label>
+            <input
+              type="date"
+              value={dataFim}
+              min={eventDate}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            />
+            {dataFim && (
+              <p className="mt-1 text-xs text-neutral-500">Uma reserva só, com uma taxa de reserva só.</p>
+            )}
           </div>
 
           <div>

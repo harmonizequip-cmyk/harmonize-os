@@ -199,3 +199,22 @@ export function resolvePeriod(period: string | undefined, from?: string, to?: st
     to: new Date(`${p.fim}T00:00:00Z`),
   };
 }
+
+/**
+ * Todos os dias de um período, de `inicio` a `fim` (inclusive), como
+ * "YYYY-MM-DD". Reserva e locação de vários dias ocupam cada um desses dias na
+ * agenda, na imagem de datas livres e no radar. `max` evita um laço enorme se
+ * algum dado vier errado.
+ */
+export function diasDoPeriodo(inicio: string, fim: string | null | undefined, max = 62): string[] {
+  const ultimo = fim && fim > inicio ? fim : inicio;
+  const dias: string[] = [];
+  for (let d = inicio; d <= ultimo && dias.length < max; d = somarDias(d, 1)) dias.push(d);
+  return dias;
+}
+
+/** Quantos dias de calendário o período tem (1 para um dia só). */
+export function duracaoEmDias(inicio: string, fim: string | null | undefined): number {
+  if (!fim || fim <= inicio) return 1;
+  return Math.round((ancora(fim).getTime() - ancora(inicio).getTime()) / 86400000) + 1;
+}

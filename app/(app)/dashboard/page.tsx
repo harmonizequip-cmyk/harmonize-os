@@ -9,6 +9,7 @@ import { buscarPendencias, buscarTaxasAReceber, buscarReservasSemDisparos } from
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
+import { diasDoPeriodo } from "@/lib/period";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
 // máxima. Ficam aqui, juntas, para mudar num lugar só.
@@ -302,18 +303,19 @@ export default async function DashboardPage({
   const radarEndStr = somaDias(radarHorizonDays).toISOString().slice(0, 10);
   const { data: radarEvents } = await supabase
     .from("calendar_events")
-    .select("date_start, client_id, clients(city)")
+    .select("date_start, date_end, client_id, clients(city)")
     .eq("is_test", false)
     .in("event_type", ["hipro_1", "hipro_2"])
     .neq("status", "cancelada")
-    .gt("date_start", todayStr)
+    .gt("date_end", todayStr)
     .lte("date_start", radarEndStr);
 
   const normalizedRadarEvents = (radarEvents ?? []).map((e: any) => ({
     date_start: e.date_start as string,
+    date_end: (e.date_end ?? e.date_start) as string,
     city: (Array.isArray(e.clients) ? e.clients[0]?.city : e.clients?.city) ?? null,
   }));
-  const busyDaysSet = new Set(normalizedRadarEvents.map((e) => e.date_start));
+  const busyDaysSet = new Set(normalizedRadarEvents.flatMap((e) => diasDoPeriodo(e.date_start, e.date_end)));
   const citiesInRoute = Array.from(
     new Set(normalizedRadarEvents.map((e) => e.city).filter((c): c is string => !!c))
   );
