@@ -59,7 +59,7 @@ export function diasEntre(de: string, ate: string): number {
 }
 
 export async function buscarPendencias(supabase: SupabaseClient, hoje: string): Promise<Pendencias> {
-  const { data: rentals } = await supabase
+  const { data: rentals, error: erroLocacoes } = await supabase
     .from("rentals")
     .select(
       "id, client_id, event_date, event_date_end, calculated_value, clients(name, whatsapp, treatment, display_name)"
@@ -70,16 +70,21 @@ export async function buscarPendencias(supabase: SupabaseClient, hoje: string): 
     .lt("event_date", hoje)
     .limit(TETO);
 
+  // Falha de consulta nunca pode virar "ninguém devendo": quem lê precisa
+  // saber que a lista não carregou.
+  if (erroLocacoes) throw new Error(`Não consegui carregar as pendências: ${erroLocacoes.message}`);
+
   // Locação de vários dias só vence depois do último dia.
   const vencidas = (rentals ?? []).filter((r: any) => (r.event_date_end ?? r.event_date) < hoje);
 
   const saldoPorLocacao = new Map<string, { saldo: number; credito: number; pago: number }>();
   for (let i = 0; i < vencidas.length; i += LOTE) {
     const ids = vencidas.slice(i, i + LOTE).map((r: any) => r.id);
-    const { data: situacoes } = await supabase
+    const { data: situacoes, error: erroSituacoes } = await supabase
       .from("rentals_situacao_pagamento")
       .select("rental_id, saldo, credito_taxa, total_pago")
       .in("rental_id", ids);
+    if (erroSituacoes) throw new Error(`Não consegui carregar os saldos: ${erroSituacoes.message}`);
     for (const s of situacoes ?? []) {
       saldoPorLocacao.set(s.rental_id, {
         saldo: Number(s.saldo),
@@ -171,7 +176,7 @@ export async function buscarTaxasAReceber(
   hoje: string,
   diasCobrancaTaxa: number
 ): Promise<TaxaVencida[]> {
-  const { data } = await supabase
+  const { data, error: erroConsulta } = await supabase
     .from("calendar_events")
     .select("id, client_id, date_start, taxa_valor, created_at, clients(name, whatsapp, treatment, display_name)")
     .eq("is_test", false)
@@ -181,6 +186,8 @@ export async function buscarTaxasAReceber(
     .gte("date_start", hoje)
     .order("created_at", { ascending: true })
     .limit(TETO);
+
+  if (erroConsulta) throw new Error(`Não consegui carregar as taxas: ${erroConsulta.message}`);
 
   const lista = (data ?? []).map((e: any) => {
     const c = Array.isArray(e.clients) ? e.clients[0] : e.clients;
@@ -226,7 +233,7 @@ export async function buscarReservasSemDisparos(
   supabase: SupabaseClient,
   hoje: string
 ): Promise<ReservaSemDisparos[]> {
-  const { data } = await supabase
+  const { data, error: erroConsulta } = await supabase
     .from("calendar_events")
     .select("id, client_id, equipment_id, date_start, date_end, clients(name), equipments(name)")
     .eq("is_test", false)
@@ -236,6 +243,8 @@ export async function buscarReservasSemDisparos(
     .lt("date_end", hoje)
     .order("date_start", { ascending: true })
     .limit(TETO);
+
+  if (erroConsulta) throw new Error(`Não consegui carregar as reservas sem disparos: ${erroConsulta.message}`);
 
   const grupos: ReservaSemDisparos[] = [];
   const ultimoPorChave = new Map<string, ReservaSemDisparos>();

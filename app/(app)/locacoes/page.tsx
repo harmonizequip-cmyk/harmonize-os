@@ -71,11 +71,14 @@ export default async function LocacoesPage({
       break;
   }
 
-  const [{ data: rentals }, { data: clients }, { data: equipments }] = await Promise.all([
+  const [{ data: rentals, error: erroLocacoes }, { data: clients }, { data: equipments }] = await Promise.all([
     consulta.order("event_date", { ascending: false }).limit(TETO),
     supabase.from("clients").select("id, name").eq("is_test", false).order("name"),
     supabase.from("equipments").select("id, name").order("code"),
   ]);
+
+  // Lista que não carregou nunca pode aparecer como "sem locações".
+  if (erroLocacoes) throw new Error(`Não consegui carregar as locações: ${erroLocacoes.message}`);
 
   const normalizadas = (rentals ?? []).map((r: any) => ({
     ...r,

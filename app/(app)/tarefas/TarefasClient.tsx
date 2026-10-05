@@ -88,16 +88,25 @@ export default function TarefasClient({
   async function registerContactAttempt(taskId: string, responded: boolean) {
     setTaskBusyId(taskId);
     setPendentes((prev) => prev.filter((t) => t.id !== taskId));
-    await supabase.rpc("register_contact_attempt", { p_task_id: taskId, p_responded: responded });
+    const { error } = await supabase.rpc("register_contact_attempt", { p_task_id: taskId, p_responded: responded });
     setTaskBusyId(null);
+    if (error) {
+      window.alert(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.");
+    }
     router.refresh();
   }
 
   async function completeManualTask(taskId: string) {
     setTaskBusyId(taskId);
     setPendentes((prev) => prev.filter((t) => t.id !== taskId));
-    await supabase.from("tasks").update({ status: "concluida", completed_at: new Date().toISOString() }).eq("id", taskId);
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "concluida", completed_at: new Date().toISOString() })
+      .eq("id", taskId);
     setTaskBusyId(null);
+    if (error) {
+      window.alert(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.");
+    }
     router.refresh();
   }
 

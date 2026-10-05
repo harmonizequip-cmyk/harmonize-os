@@ -146,8 +146,7 @@ export default function FunilClient({
     });
     setTaskBusyId(null);
     if (error) {
-      router.refresh();
-      return;
+      window.alert(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.");
     }
     router.refresh();
   }
@@ -155,8 +154,14 @@ export default function FunilClient({
   async function completeManualTask(taskId: string) {
     setTaskBusyId(taskId);
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    await supabase.from("tasks").update({ status: "concluida", completed_at: new Date().toISOString() }).eq("id", taskId);
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "concluida", completed_at: new Date().toISOString() })
+      .eq("id", taskId);
     setTaskBusyId(null);
+    if (error) {
+      window.alert(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.");
+    }
     router.refresh();
   }
 
@@ -233,8 +238,15 @@ export default function FunilClient({
   );
 
   async function moveToStage(leadId: string, newStage: StageKey) {
+    const etapaAnterior = leads.find((l) => l.id === leadId)?.stage;
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
-    await supabase.from("clients").update({ stage: newStage }).eq("id", leadId);
+    const { error } = await supabase.from("clients").update({ stage: newStage }).eq("id", leadId);
+    if (error) {
+      if (etapaAnterior) {
+        setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: etapaAnterior } : l)));
+      }
+      window.alert(error.message || "Não foi possível mover o card. Ele voltou para a etapa anterior.");
+    }
     router.refresh();
   }
 

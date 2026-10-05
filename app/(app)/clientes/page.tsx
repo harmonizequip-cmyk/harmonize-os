@@ -60,7 +60,7 @@ export default async function ClientesPage({
   const todayStr = hojeLocal();
   const { data: upcomingEvents } = await supabase
     .from("calendar_events")
-    .select("client_id, date_start, confirmed")
+    .select("id, client_id, date_start, confirmed")
     .neq("status", "cancelada")
     .not("client_id", "is", null)
     .gte("date_start", todayStr)
@@ -76,10 +76,10 @@ export default async function ClientesPage({
   }
 
   // Primeiro evento futuro de cada cliente (a lista já vem ordenada por data)
-  const nextEventByClient = new Map<string, { date_start: string; confirmed: boolean }>();
+  const nextEventByClient = new Map<string, { id: string; date_start: string; confirmed: boolean }>();
   for (const e of upcomingEvents ?? []) {
     if (!nextEventByClient.has(e.client_id)) {
-      nextEventByClient.set(e.client_id, { date_start: e.date_start, confirmed: e.confirmed });
+      nextEventByClient.set(e.client_id, { id: e.id, date_start: e.date_start, confirmed: e.confirmed });
     }
   }
 

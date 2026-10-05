@@ -33,7 +33,7 @@ interface ClientRow {
   // nesta lista, só aparece como aviso quando ela está em negociação.
   stage?: string;
   stats: { count: number; total: number; lastDate: string | null };
-  nextEvent: { date_start: string; confirmed: boolean } | null;
+  nextEvent: { id: string; date_start: string; confirmed: boolean } | null;
 }
 
 export default function ClientesClient({
@@ -77,12 +77,18 @@ export default function ClientesClient({
     router.refresh();
   }
 
-  async function toggleConfirmed(clientId: string, currentEvent: { date_start: string; confirmed: boolean }) {
-    await supabase
-      .from("calendar_events")
-      .update({ confirmed: !currentEvent.confirmed })
-      .eq("client_id", clientId)
-      .eq("date_start", currentEvent.date_start);
+  // Pela RPC e pelo id do evento, como a Agenda faz: fica no histórico e só
+  // mexe naquela reserva (antes gravava por cliente+data, atingindo também
+  // reserva cancelada do mesmo dia).
+  async function toggleConfirmed(currentEvent: { id: string; confirmed: boolean }) {
+    const { error } = await supabase.rpc("confirmar_agendamento", {
+      p_event_id: currentEvent.id,
+      p_confirmado: !currentEvent.confirmed,
+    });
+    if (error) {
+      window.alert(error.message || "Não foi possível atualizar a confirmação. Tente novamente.");
+      return;
+    }
     router.refresh();
   }
 
@@ -191,7 +197,7 @@ export default function ClientesClient({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {c.nextEvent && (
                   <button
-                    onClick={() => toggleConfirmed(c.id, c.nextEvent!)}
+                    onClick={() => toggleConfirmed(c.nextEvent!)}
                     className={`rounded-full px-2 py-1 text-[11px] font-medium ${
                       c.nextEvent.confirmed
                         ? "bg-brand-teal/10 text-brand-teal"
