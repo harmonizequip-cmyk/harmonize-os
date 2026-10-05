@@ -55,8 +55,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 ## Pendências conhecidas
 
-- Limpeza do banco a decidir com o dono: `clients_backup_stage` (backup antigo de etapa, 191 linhas), gatilhos duplicados em `profiles` e `handle_new_user` (existe no schema.sql, não existe no banco).
 - Benefício da indicação: o dono ainda vai definir.
 - Custo por disparo: adiado.
-- Backup: conferir o plano do Supabase e fazer um teste de restauração.
+- Backup: o plano do Supabase é gratuito, então vale o backup manual semanal (Configurações > Baixar backup, guardar no Google Drive). Falta fazer um teste de restauração num projeto Supabase novo.
 - Contrato assinado e checklist: fora do escopo por decisão do dono.
