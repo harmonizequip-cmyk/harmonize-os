@@ -543,9 +543,17 @@ create table public.calendar_events (
   -- aconteceu, não a nova data.
   rescheduled boolean not null default false,
   rescheduled_at timestamptz,
+  -- Contagem do equipamento no dia em que foi entregue ao cliente (guardada
+  -- antes de fechar a conta). A calculadora usa como contagem inicial.
+  contagem_inicial bigint check (contagem_inicial is null or contagem_inicial >= 0),
+  contagem_inicial_em timestamptz,
   check (date_end >= date_start)
 );
 
+comment on column public.calendar_events.contagem_inicial is
+  'Contagem do equipamento no dia em que foi entregue ao cliente. Nula = ainda não registrada. Na finalização, a calculadora usa como contagem inicial.';
+comment on column public.calendar_events.contagem_inicial_em is
+  'Quando a contagem inicial foi registrada ou alterada pela última vez.';
 comment on column public.calendar_events.cancellation_reason is
   'Motivo do cancelamento, preenchido por cancelar_agendamento (leva S). Fica null enquanto o agendamento não foi cancelado, e é limpo de novo por reativar_agendamento.';
 comment on column public.calendar_events.no_show is
@@ -1080,12 +1088,13 @@ return jsonb_build_object(
 end;
 $$;create or replace function public.count_test_data()
 returns jsonb
-language sql
+language plpgsql
 security definer
-set search_path = public
-stable
+set search_path to 'public'
 as $$
-  select jsonb_build_object(
+begin
+  perform public.require_admin();
+  return jsonb_build_object(
     'clients',          (select count(*) from public.clients          where is_test),
     'transactions',     (select count(*) from public.transactions     where is_test),
     'rentals',          (select count(*) from public.rentals          where is_test),
@@ -1094,6 +1103,7 @@ as $$
     'tasks',            (select count(*) from public.tasks            where is_test),
     'rental_payments',  (select count(*) from public.rental_payments  where is_test)
   );
+end;
 $$;
 
 create or replace function public.purge_test_data()
@@ -1481,11 +1491,13 @@ create or replace function public.excluir_locacao_cascata(p_rental_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
 declare
   v_taxas uuid[];
 begin
+  perform public.require_admin();
+
   update rentals set transaction_id = null where id = p_rental_id;
 
   select array_agg(taxa_transaction_id) into v_taxas
@@ -1513,15 +1525,18 @@ create or replace function public.excluir_mentoria_cascata(p_mentoria_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
 declare
   v_evento_id uuid;
   v_transacao_id uuid;
 begin
+  perform public.require_admin();
+
   select calendar_event_id, transaction_id into v_evento_id, v_transacao_id
     from mentoring_events where id = p_mentoria_id;
 
+  -- Quebra os dois ciclos da mentoria antes de apagar qualquer coisa.
   update mentoring_events set calendar_event_id = null, transaction_id = null
    where id = p_mentoria_id;
   update calendar_events set mentoring_id = null where mentoring_id = p_mentoria_id;
@@ -2148,11 +2163,15 @@ create or replace function public.aplicar_previsoes_manutencao_vencidas()
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
 declare
   v_equip record;
 begin
+  if not public.has_module_permission('equipamentos') then
+    return;
+  end if;
+
   for v_equip in
     select id, name from equipments
      where status = 'manutencao'
@@ -2222,29 +2241,16 @@ grant execute on function public.adiar_previsao_manutencao to authenticated;
 drop function if exists public.agendamentos_do_cliente(uuid);
 
 create or replace function public.agendamentos_do_cliente(p_client_id uuid)
-returns table (
-  event_id uuid,
-  rental_id uuid,
-  equipamento text,
-  data date,
-  status text,
-  confirmado boolean,
-  valor numeric,
-  disparos integer,
-  situacao text,
-  taxa_status text,
-  taxa_valor numeric,
-  pago boolean,
-  pago_em date,
-  cancellation_reason text,
-  no_show boolean,
-  -- Reagendado: a reserva ou a locação já foi movida de data (igual ao banco).
-  reagendado boolean
+returns table(
+  event_id uuid, rental_id uuid, equipamento text, data date, status text,
+  confirmado boolean, valor numeric, disparos integer, situacao text,
+  taxa_status text, taxa_valor numeric, pago boolean, pago_em date,
+  cancellation_reason text, no_show boolean, reagendado boolean
 )
 language sql
 stable
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
   select
     ev.id,
@@ -2271,7 +2277,8 @@ as $$
   from calendar_events ev
   left join equipments eq on eq.id = ev.equipment_id
   left join rentals r on r.id = ev.rental_id
-  where ev.client_id = p_client_id
+  where public.has_module_permission('clientes')
+    and ev.client_id = p_client_id
   order by ev.date_start desc;
 $$;
 
@@ -2300,19 +2307,21 @@ $$;
 create or replace function public.definir_taxa_agendamento(
   p_event_id uuid,
   p_status text,
-  p_payment_method payment_method_type default 'pix'
+  p_payment_method payment_method_type default 'pix',
+  p_data date default null
 )
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
 declare
   v_status_atual text;
   v_transacao_id uuid;
   v_client_id uuid;
   v_client_name text;
-  v_data date;
+  v_data_evento date;
+  v_data_pagamento date := coalesce(p_data, public.hoje_local());
   v_categoria uuid;
   v_valor numeric;
   v_rental_id uuid;
@@ -2326,12 +2335,12 @@ begin
   end if;
 
   select ev.taxa_status, ev.taxa_transaction_id, ev.client_id, ev.date_start, c.name, ev.rental_id
-    into v_status_atual, v_transacao_id, v_client_id, v_data, v_client_name, v_rental_id
+    into v_status_atual, v_transacao_id, v_client_id, v_data_evento, v_client_name, v_rental_id
     from calendar_events ev
     left join clients c on c.id = ev.client_id
    where ev.id = p_event_id;
 
-  if v_data is null then
+  if v_data_evento is null then
     raise exception 'Agendamento não encontrado.';
   end if;
   if p_status = 'perdida' and v_status_atual <> 'paga' then
@@ -2352,7 +2361,7 @@ begin
     values (
       'entrada', v_categoria,
       'Taxa de compromisso - ' || coalesce(v_client_name, 'cliente'),
-      v_valor, p_payment_method, v_data, 'harmonize', v_client_id, auth.uid()
+      v_valor, p_payment_method, v_data_pagamento, 'harmonize', v_client_id, auth.uid()
     )
     returning id into v_transacao_id;
 
@@ -2368,8 +2377,6 @@ begin
          taxa_transaction_id = v_transacao_id
    where id = p_event_id;
 
-  -- Leva O: crédito de taxa mudou, o saldo da locação (se houver) precisa
-  -- ser recalculado — pago/pago_em nunca são setados direto por fora daqui.
   if v_rental_id is not null then
     perform public.recalcular_pagamento_locacao(v_rental_id);
   end if;
@@ -2383,7 +2390,7 @@ begin
     end,
     'calendar_events', p_event_id,
     public.descrever_registro('calendar_events', p_event_id),
-    jsonb_build_object('taxa_status', p_status, 'taxa_valor', v_valor)
+    jsonb_build_object('taxa_status', p_status, 'taxa_valor', v_valor, 'data_recebimento', v_data_pagamento)
   );
 end;
 $$;
@@ -4741,3 +4748,99 @@ $$;
 create trigger trg_protect_profile_privileges
   before update on public.profiles
   for each row execute function public.protect_profile_privileges();
+
+-- ============================================================
+-- CONTAGEM INICIAL GUARDADA NA RESERVA (2026-10-05)
+-- ============================================================
+-- p_contagem nulo apaga a contagem registrada.
+create or replace function public.definir_contagem_inicial_reserva(p_event_id uuid, p_contagem bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status event_status_type;
+  v_rental uuid;
+  v_equip uuid;
+  v_antes bigint;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+  if p_contagem is not null and p_contagem < 0 then
+    raise exception 'A contagem não pode ser negativa.';
+  end if;
+
+  select status, rental_id, equipment_id, contagem_inicial
+    into v_status, v_rental, v_equip, v_antes
+    from calendar_events where id = p_event_id;
+
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_equip is null then
+    raise exception 'Só reservas de equipamento têm contagem.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado.';
+  end if;
+  if v_rental is not null then
+    raise exception 'Esta reserva já foi finalizada: a contagem ficou registrada na locação.';
+  end if;
+
+  update calendar_events
+     set contagem_inicial = p_contagem,
+         contagem_inicial_em = case when p_contagem is null then null else now() end
+   where id = p_event_id;
+
+  -- A tabela movimentacoes só aceita as ações listadas no seu CHECK; usa
+  -- "editado" e diz o que mudou em acao_detalhada, como editar_pagamento_locacao.
+  perform public.registrar_movimentacao(
+    'editado',
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object(
+      'acao_detalhada', 'contagem inicial do equipamento',
+      'antes', v_antes,
+      'depois', p_contagem
+    )
+  );
+end;
+$$;
+
+-- ============================================================
+-- PRIVILÉGIOS DE EXECUÇÃO (2026-10-05, fecha-funcoes-sem-login)
+--
+-- Todas as funções do app ficam fechadas para quem não está logado (anon e
+-- PUBLIC) e abertas para authenticated e service_role. Exceção:
+-- disponibilidade_publica, o calendário público de datas livres. Três funções
+-- só são usadas por outras funções do banco (que rodam como dono), então
+-- quem está logado também não as chama. Fica no fim do arquivo para valer
+-- para todas as funções acima. Funções novas: depois de criar, rodar
+-- "revoke execute on function <nome> from public, anon;".
+-- ============================================================
+do $$
+declare
+  r record;
+begin
+  for r in
+    select p.oid::regprocedure as assinatura
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prokind in ('f', 'p')
+       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+  loop
+    execute format('revoke execute on function %s from public, anon', r.assinatura);
+    execute format('grant execute on function %s to authenticated, service_role', r.assinatura);
+  end loop;
+end $$;
+
+grant execute on function public.disponibilidade_publica(date, date) to anon;
+
+revoke execute on function public.registrar_movimentacao(text, text, uuid, text, jsonb) from authenticated;
+revoke execute on function public.descrever_registro(text, uuid) from authenticated;
+revoke execute on function public.recalcular_pagamento_locacao(uuid) from authenticated;
+
+alter default privileges for role postgres in schema public revoke execute on functions from anon;

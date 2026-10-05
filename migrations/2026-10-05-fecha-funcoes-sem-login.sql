@@ -1,6 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA E TESTADA num Postgres local com o schema.sql (sem erro), AINDA NÃO APLICADA (a tentativa de aplicar foi cancelada;
--- aguarda o dono rodar ou liberar). Depois de aplicada, refletir no schema.sql.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 05/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Fecha as funções do banco que qualquer pessoa sem login podia executar.
 --

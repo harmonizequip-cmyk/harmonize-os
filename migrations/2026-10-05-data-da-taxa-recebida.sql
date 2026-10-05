@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA E TESTADA num Postgres local com o schema.sql (sem erro), AINDA NÃO APLICADA (aguarda aval do dono para rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 05/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Data da taxa de reserva = dia em que o dinheiro entrou.
 --
