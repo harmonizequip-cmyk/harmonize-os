@@ -8,6 +8,7 @@ import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarCsv } from "@/lib/exportar-csv";
+import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
 
 type Ordem = "valor" | "atraso";
@@ -161,13 +162,21 @@ export default function PendenciasClient({
       )}
 
       {taxas.length > 0 && (
-        <div id="taxas" className="scroll-mt-4 space-y-2 rounded-2xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-900/10">
+        <div
+          id="taxas"
+          className={`scroll-mt-4 space-y-2 rounded-2xl border p-3 ${
+            taxas.some((t) => t.vencida)
+              ? "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-900/10"
+              : "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-900/10"
+          }`}
+        >
           <div>
             <p className="text-sm font-semibold text-red-700 dark:text-red-400">
-              Taxas de reserva vencidas ({taxas.length})
+              Taxas de reserva a receber ({taxas.length})
             </p>
             <p className="text-xs text-red-700/80 dark:text-red-400/80">
-              Reservas com a taxa sem pagar há mais de {diasCobrancaTaxa} dias e data ainda por vir.
+              Reservas com a taxa ainda sem pagar e data por vir. Vencida = mais de {diasCobrancaTaxa} dias sem
+              pagar. Ao receber, toque em "Taxa recebida".
             </p>
           </div>
           {taxas.map((t) => {
@@ -186,6 +195,11 @@ export default function PendenciasClient({
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="min-w-0 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
                     {t.cliente}
+                    {t.vencida && (
+                      <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                        vencida
+                      </span>
+                    )}
                   </p>
                   {t.valor > 0 && (
                     <p className="text-sm font-semibold text-red-700 dark:text-red-400">{formatCurrency(t.valor)}</p>
@@ -195,23 +209,26 @@ export default function PendenciasClient({
                   Reserva para {formatDate(t.dataEvento)} · taxa sem pagar há {t.diasSemPagar}{" "}
                   {t.diasSemPagar === 1 ? "dia" : "dias"}
                 </p>
-                <div className="mt-2 flex gap-2">
-                  {whatsapp && (
-                    <a
-                      href={whatsapp}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 rounded-lg border border-brand-teal py-1.5 text-center text-xs font-medium text-brand-teal"
+                <div className="mt-2 space-y-2">
+                  <TaxaRecebidaBotao eventId={t.eventId} valor={t.valor} />
+                  <div className="flex gap-2">
+                    {whatsapp && (
+                      <a
+                        href={whatsapp}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 rounded-lg border border-brand-teal py-1.5 text-center text-xs font-medium text-brand-teal"
+                      >
+                        Cobrar taxa no WhatsApp
+                      </a>
+                    )}
+                    <Link
+                      href={`/agenda?date=${t.dataEvento}`}
+                      className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
                     >
-                      Cobrar taxa no WhatsApp
-                    </a>
-                  )}
-                  <Link
-                    href="/agenda"
-                    className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
-                  >
-                    Abrir na agenda
-                  </Link>
+                      Abrir na agenda
+                    </Link>
+                  </div>
                 </div>
               </div>
             );

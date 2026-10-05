@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { hojeLocal } from "@/lib/period";
 import { fetchSettings } from "@/lib/settings";
-import { buscarPendencias, buscarTaxasVencidas, buscarReservasSemDisparos } from "@/lib/pendencias";
+import { buscarPendencias, buscarTaxasAReceber, buscarReservasSemDisparos } from "@/lib/pendencias";
 import PendenciasClient from "./PendenciasClient";
 
 // Controle de pendências de pagamento: quem está devendo, quanto e há
@@ -14,7 +14,7 @@ export default async function PendenciasPage() {
   const { diasCobrancaTaxa } = await fetchSettings(supabase);
   const [pendencias, taxas, semDisparos] = await Promise.all([
     buscarPendencias(supabase, hoje),
-    buscarTaxasVencidas(supabase, hoje, diasCobrancaTaxa),
+    buscarTaxasAReceber(supabase, hoje, diasCobrancaTaxa),
     buscarReservasSemDisparos(supabase, hoje),
   ]);
   return <PendenciasClient pendencias={pendencias} taxas={taxas} semDisparos={semDisparos} diasCobrancaTaxa={diasCobrancaTaxa} />;

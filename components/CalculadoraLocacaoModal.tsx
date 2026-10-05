@@ -549,7 +549,7 @@ export default function CalculadoraLocacaoModal({
       const { data, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
         p_calendar_event_id: linkedReservationId,
         p_shots: shots,
-        p_calculated_value: resumo.valorLocacao,
+        p_calculated_value: resumo.valorBruto,
         p_payment_method: primeiraForma,
         p_notes: notes || null,
         p_pix_conta: primeiraPixConta,
@@ -567,7 +567,7 @@ export default function CalculadoraLocacaoModal({
         p_equipment_id: equipmentId,
         p_event_date: eventDate,
         p_shots: shots,
-        p_calculated_value: resumo.valorLocacao,
+        p_calculated_value: resumo.valorBruto,
         p_payment_method: primeiraForma,
         p_notes: notes || null,
         p_pago: false,
@@ -594,7 +594,7 @@ export default function CalculadoraLocacaoModal({
       const { data, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
         p_calendar_event_id: mode.reservation.id,
         p_shots: isMentoria ? patientCountNumber : shots,
-        p_calculated_value: resumo.valorLocacao,
+        p_calculated_value: resumo.valorBruto,
         p_payment_method: primeiraForma,
         p_notes: notes || null,
         p_pix_conta: primeiraPixConta,

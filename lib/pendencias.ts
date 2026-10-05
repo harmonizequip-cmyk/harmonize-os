@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { taxaVencida } from "./taxa";
 // ============================================================
 // PENDÊNCIAS DE PAGAMENTO: quem está devendo e quanto
 //
@@ -158,15 +159,14 @@ export interface TaxaVencida {
   dataEvento: string;
   valor: number;
   diasSemPagar: number;
+  // Passou do prazo de cobrança (settings.dias_cobranca_taxa).
+  vencida: boolean;
 }
 
-function somarDiasIso(iso: string, dias: number): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + dias);
-  return d.toISOString().slice(0, 10);
-}
-
-export async function buscarTaxasVencidas(
+// Todas as taxas de reserva ainda pendentes com data por vir, vencidas ou não.
+// Quem deve a taxa aparece em Pendências desde o primeiro dia: o prazo só
+// decide o destaque e a ordem (vencidas primeiro).
+export async function buscarTaxasAReceber(
   supabase: SupabaseClient,
   hoje: string,
   diasCobrancaTaxa: number
@@ -179,11 +179,10 @@ export async function buscarTaxasVencidas(
     .neq("status", "cancelada")
     .not("equipment_id", "is", null)
     .gte("date_start", hoje)
-    .lte("created_at", `${somarDiasIso(hoje, -diasCobrancaTaxa)}T23:59:59.999-03:00`)
     .order("created_at", { ascending: true })
     .limit(TETO);
 
-  return (data ?? []).map((e: any) => {
+  const lista = (data ?? []).map((e: any) => {
     const c = Array.isArray(e.clients) ? e.clients[0] : e.clients;
     const criadoEm = new Date(new Date(e.created_at).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
     return {
@@ -196,8 +195,10 @@ export async function buscarTaxasVencidas(
       dataEvento: e.date_start,
       valor: Number(e.taxa_valor ?? 0),
       diasSemPagar: diasEntre(criadoEm, hoje),
+      vencida: taxaVencida(e.created_at, hoje, diasCobrancaTaxa),
     };
   });
+  return lista.sort((a, b) => Number(b.vencida) - Number(a.vencida));
 }
 
 // ============================================================

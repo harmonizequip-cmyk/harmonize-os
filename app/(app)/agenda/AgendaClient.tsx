@@ -23,6 +23,7 @@ import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
 import { hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
+import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
@@ -466,6 +467,13 @@ export default function AgendaClient({
           >
             💬 Pedir confirmação no WhatsApp
           </button>
+        )}
+
+        {/* Taxa de reserva pendente: baixa direto no card da agenda. */}
+        {ehPreReserva(e) && (
+          <div className="mt-2" onClick={(ev) => ev.stopPropagation()}>
+            <TaxaRecebidaBotao eventId={e.id} onDone={() => router.refresh()} />
+          </div>
         )}
       </div>
     );

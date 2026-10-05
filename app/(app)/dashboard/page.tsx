@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import { fetchSettings } from "@/lib/settings";
-import { buscarPendencias, buscarTaxasVencidas, buscarReservasSemDisparos } from "@/lib/pendencias";
+import { buscarPendencias, buscarTaxasAReceber, buscarReservasSemDisparos } from "@/lib/pendencias";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
@@ -172,12 +172,15 @@ export default async function DashboardPage({
         : { texto: `Faltam ${META_MIN - locMes} para a meta`, cor: "text-amber-600 dark:text-amber-400" };
   const metaEscala = Math.max(META_MAX + 5, locMes + preMes);
 
-  // Reservas de HIPRO com a taxa pendente além do prazo de cobrança
-  // (settings.dias_cobranca_taxa) e data ainda por vir. Só aviso, sempre
-  // sobre o presente, independente do filtro de período.
+  // Reservas de HIPRO com a taxa ainda pendente e data por vir; as que
+  // passaram do prazo de cobrança (settings.dias_cobranca_taxa) ficam em
+  // destaque. Só aviso, sempre sobre o presente, independente do filtro de
+  // período. A baixa é feita em Pendências, no mesmo lugar do aviso.
   const { diasCobrancaTaxa } = await fetchSettings(supabase);
-  const taxasVencidas = await buscarTaxasVencidas(supabase, todayStr, diasCobrancaTaxa);
-  const taxasVencidasCount = taxasVencidas.length;
+  const taxasAReceber = await buscarTaxasAReceber(supabase, todayStr, diasCobrancaTaxa);
+  const taxasAReceberCount = taxasAReceber.length;
+  const taxasVencidasCount = taxasAReceber.filter((t) => t.vencida).length;
+  const taxasAReceberTotal = taxasAReceber.reduce((s, t) => s + t.valor, 0);
 
   // Quem está devendo: total geral de hoje, independente do filtro de
   // período (dívida é estado atual, não movimento do período). Mesma conta
@@ -385,13 +388,21 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      {!!taxasVencidasCount && taxasVencidasCount > 0 && (
+      {taxasAReceberCount > 0 && (
         <Link
           href="/pendencias#taxas"
-          className="block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
+          className={
+            taxasVencidasCount > 0
+              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
+              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+          }
         >
-          💳 {taxasVencidasCount} {taxasVencidasCount === 1 ? "reserva está" : "reservas estão"} com a taxa vencida (mais de{" "}
-          {diasCobrancaTaxa} dias sem pagar) →
+          💳 {taxasAReceberCount} {taxasAReceberCount === 1 ? "taxa de reserva a receber" : "taxas de reserva a receber"} (
+          {formatCurrency(taxasAReceberTotal)})
+          {taxasVencidasCount > 0
+            ? `, ${taxasVencidasCount} ${taxasVencidasCount === 1 ? "vencida" : "vencidas"} (mais de ${diasCobrancaTaxa} dias)`
+            : ""}
+          : dar baixa →
         </Link>
       )}
 

@@ -148,3 +148,11 @@ Tamanho atual: 16 locações, 39 lançamentos, 40 eventos, 192 clientes, 1 usuá
 | 10 | Acerto do `schema.sql` com o banco | documentação | não |
 
 Em cada entrega: `npx tsc --noEmit`, `npx vitest run`, `npx next build`, publicar na `main`, conferir o deploy no Vercel, e responder ao dono em poucas linhas com o que mudou e o que ele deve conferir na tela.
+
+---
+
+## 6. Andamento
+
+- **Entrega 1 (0.1), feita em 05/10/2026:** "Marcar pago" usa o saldo e `registrar_pagamento_locacao`.
+- **Entrega 2 (0.2), feita em 05/10/2026 junto com a 3, a pedido do dono:** a calculadora grava o valor bruto (`valorBruto`) em `p_calculated_value`; testes em `lib/rental-calculator.test.ts`. Ainda aberto: no caminho "cobrar taxa agora" o pagamento total (locação + taxa) vai inteiro para `rental_payments`, e o banco recusa por passar do saldo. Não reproduzido em produção, a conferir.
+- **Entrega 3 (0.3), feita em 05/10/2026:** botão "Taxa recebida" (`components/TaxaRecebidaBotao.tsx`) em Pendências e no card da Agenda; Pendências e o aviso do Dashboard passam a listar toda taxa pendente, vencida ou não. Pergunta 2 (data do lançamento da taxa) continua aberta: `definir_taxa_agendamento` ainda data na data do evento.

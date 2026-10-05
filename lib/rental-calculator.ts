@@ -118,8 +118,14 @@ export interface ResumoLocacao {
   totalItensMenos: number;
   creditoTaxa: number;
   taxaACobrarAgora: number;
-  // O que vira o `calculated_value` da locação (rentals.calculated_value),
-  // já líquido do crédito de taxa paga antes.
+  // O que vira o `calculated_value` da locação (rentals.calculated_value):
+  // o valor BRUTO, sem descontar a taxa de reserva. O banco desconta a taxa
+  // paga por conta própria (view rentals_situacao_pagamento: saldo = valor
+  // - taxa paga - pagamentos), então gravar o valor já líquido descontaria
+  // a taxa duas vezes.
+  valorBruto: number;
+  // O que o cliente deve pela locação em si: bruto menos o crédito da taxa
+  // já paga. Só para exibição e para o total a pagar.
   valorLocacao: number;
   // valorLocacao + taxaACobrarAgora (a taxa entra como transação própria,
   // separada de rental_payments — ver comentário no componente).
@@ -150,6 +156,7 @@ export function calcularResumoLocacao(input: ResumoLocacaoInput): ResumoLocacao 
   const taxaACobrarAgora = input.reservationFeeStatus === "cobrar_agora" ? input.reservationFee : 0;
 
   const bruto = subtotalProduto + valorDeslocamento + totalItensMais - totalItensMenos;
+  const valorBruto = Math.max(0, round2(bruto));
   const valorLocacao = Math.max(0, round2(bruto - creditoTaxa));
   const totalAPagarAgora = round2(valorLocacao + taxaACobrarAgora);
 
@@ -162,6 +169,7 @@ export function calcularResumoLocacao(input: ResumoLocacaoInput): ResumoLocacao 
     totalItensMenos,
     creditoTaxa,
     taxaACobrarAgora,
+    valorBruto,
     valorLocacao,
     totalAPagarAgora,
   };
