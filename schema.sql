@@ -4839,11 +4839,12 @@ end;
 $$;
 
 -- ============================================================
--- PRIVILÉGIOS DE EXECUÇÃO (2026-10-05, fecha-funcoes-sem-login)
+-- PRIVILÉGIOS DE EXECUÇÃO (2026-10-05, fecha-funcoes-sem-login e
+-- fecha-calendario-publico)
 --
 -- Todas as funções do app ficam fechadas para quem não está logado (anon e
--- PUBLIC) e abertas para authenticated e service_role. Exceção:
--- disponibilidade_publica, o calendário público de datas livres. Três funções
+-- PUBLIC) e abertas para authenticated e service_role, sem exceção (o
+-- calendário público disponibilidade_publica também foi fechado). Três funções
 -- só são usadas por outras funções do banco (que rodam como dono), então
 -- quem está logado também não as chama. Fica no fim do arquivo para valer
 -- para todas as funções acima. Funções novas: depois de criar, rodar
@@ -4865,8 +4866,6 @@ begin
     execute format('grant execute on function %s to authenticated, service_role', r.assinatura);
   end loop;
 end $$;
-
-grant execute on function public.disponibilidade_publica(date, date) to anon;
 
 revoke execute on function public.registrar_movimentacao(text, text, uuid, text, jsonb) from authenticated;
 revoke execute on function public.descrever_registro(text, uuid) from authenticated;
