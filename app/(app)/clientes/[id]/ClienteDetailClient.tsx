@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 import type { PricingConfig } from "@/lib/rental-pricing";
+import { hojeLocal } from "@/lib/period";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
 import EditarClienteModal from "./EditarClienteModal";
@@ -143,7 +144,16 @@ export default function ClienteDetailClient({
   const totalFaturado = billableTotal;
   const ticketMedio = billableCount > 0 ? billableTotal / billableCount : 0;
   const ultimaLocacao = rentals[0]?.event_date;
-  const concluidas = rentals.filter((r) => r.status === "realizada").length;
+  // Realizada = já aconteceu e não foi cancelada. O status "realizada" do
+  // banco quase nunca é marcado à mão, então a tela deriva pela data.
+  const hojeStr = hojeLocal();
+  const situacaoDe = (r: RentalRow): string =>
+    r.status === "cancelada"
+      ? "cancelada"
+      : r.status === "realizada" || (r.event_date_end ?? r.event_date) < hojeStr
+        ? "realizada"
+        : r.status;
+  const concluidas = rentals.filter((r) => situacaoDe(r) === "realizada").length;
   const canceladas = rentals.filter((r) => r.status === "cancelada").length;
   const reagendadas = rentals.filter((r) => r.rescheduled).length + reagendadasPreReservaCount;
 
@@ -397,12 +407,12 @@ export default function ClienteDetailClient({
                 className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                   r.status === "cancelada"
                     ? "bg-brand-pink/10 text-brand-pink"
-                    : r.status === "realizada"
+                    : situacaoDe(r) === "realizada"
                       ? "bg-brand-teal/10 text-brand-teal"
                       : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
                 }`}
               >
-                {r.status.replace("_", " ")}
+                {situacaoDe(r).replace("_", " ")}
                 {r.rescheduled && " · ↻"}
               </span>
             </div>
@@ -469,12 +479,12 @@ export default function ClienteDetailClient({
                     className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                       r.status === "cancelada"
                         ? "bg-brand-pink/10 text-brand-pink"
-                        : r.status === "realizada"
+                        : situacaoDe(r) === "realizada"
                           ? "bg-brand-teal/10 text-brand-teal"
                           : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
                     }`}
                   >
-                    {r.status.replace("_", " ")}
+                    {situacaoDe(r).replace("_", " ")}
                     {r.rescheduled && " · ↻"}
                   </span>
                 </td>

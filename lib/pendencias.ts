@@ -27,9 +27,6 @@ export interface PendenciaLocacao {
   pago: number;
   saldo: number;
   diasAtraso: number;
-  // false = a locação já passou mas continua como "confirmada" (ninguém
-  // marcou como realizada na Agenda).
-  finalizada: boolean;
 }
 
 export interface PendenciaCliente {
@@ -64,7 +61,7 @@ export async function buscarPendencias(supabase: SupabaseClient, hoje: string): 
   const { data: rentals } = await supabase
     .from("rentals")
     .select(
-      "id, client_id, event_date, event_date_end, calculated_value, status, clients(name, whatsapp, treatment, display_name)"
+      "id, client_id, event_date, event_date_end, calculated_value, clients(name, whatsapp, treatment, display_name)"
     )
     .eq("is_test", false)
     .neq("status", "cancelada")
@@ -110,7 +107,6 @@ export async function buscarPendencias(supabase: SupabaseClient, hoje: string): 
       pago: s.pago,
       saldo: s.saldo,
       diasAtraso: diasEntre(r.event_date_end ?? r.event_date, hoje),
-      finalizada: r.status === "realizada",
     });
   }
 
@@ -202,4 +198,70 @@ export async function buscarTaxasVencidas(
       diasSemPagar: diasEntre(criadoEm, hoje),
     };
   });
+}
+
+// ============================================================
+// RESERVAS QUE JÁ PASSARAM SEM DISPAROS LANÇADOS
+//
+// Reserva de equipamento cuja data já passou, não cancelada e que nunca
+// virou locação (ninguém lançou os disparos). É atendimento feito e ainda
+// não cobrado: não aparece em Pendências nem em lugar nenhum, porque toda
+// outra tela só olha de hoje em diante. Dias seguidos do mesmo cliente no
+// mesmo equipamento contam como um atendimento só (a máquina ficou lá).
+// ============================================================
+
+export interface ReservaSemDisparos {
+  chave: string;
+  clientId: string | null;
+  cliente: string;
+  equipamento: string | null;
+  de: string;
+  ate: string;
+  dias: number;
+  diasDesde: number;
+}
+
+export async function buscarReservasSemDisparos(
+  supabase: SupabaseClient,
+  hoje: string
+): Promise<ReservaSemDisparos[]> {
+  const { data } = await supabase
+    .from("calendar_events")
+    .select("id, client_id, equipment_id, date_start, date_end, clients(name), equipments(name)")
+    .eq("is_test", false)
+    .eq("status", "pre_reserva")
+    .is("rental_id", null)
+    .not("equipment_id", "is", null)
+    .lt("date_end", hoje)
+    .order("date_start", { ascending: true })
+    .limit(TETO);
+
+  const grupos: ReservaSemDisparos[] = [];
+  const ultimoPorChave = new Map<string, ReservaSemDisparos>();
+  for (const e of (data ?? []) as any[]) {
+    const c = Array.isArray(e.clients) ? e.clients[0] : e.clients;
+    const eq = Array.isArray(e.equipments) ? e.equipments[0] : e.equipments;
+    const chaveGrupo = `${e.client_id ?? "sem"}|${e.equipment_id}`;
+    const anterior = ultimoPorChave.get(chaveGrupo);
+    // Emenda no grupo anterior quando começa até 1 dia depois do fim dele.
+    if (anterior && diasEntre(anterior.ate, e.date_start) <= 1) {
+      if (e.date_end > anterior.ate) anterior.ate = e.date_end;
+      anterior.dias = diasEntre(anterior.de, anterior.ate) + 1;
+      anterior.diasDesde = diasEntre(anterior.ate, hoje);
+      continue;
+    }
+    const novo: ReservaSemDisparos = {
+      chave: e.id,
+      clientId: e.client_id ?? null,
+      cliente: c?.name ?? "Cliente removido",
+      equipamento: eq?.name ?? null,
+      de: e.date_start,
+      ate: e.date_end,
+      dias: diasEntre(e.date_start, e.date_end) + 1,
+      diasDesde: diasEntre(e.date_end, hoje),
+    };
+    grupos.push(novo);
+    ultimoPorChave.set(chaveGrupo, novo);
+  }
+  return grupos;
 }

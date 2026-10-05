@@ -212,7 +212,12 @@ export default function AgendamentosDoCliente({
 
       <div className="space-y-2">
         {itens.map((a) => {
-          const meta = SITUACAO_META[a.situacao] ?? {
+          // Realizado = virou locação e a data já passou. O status "realizada"
+          // do banco quase nunca é marcado à mão, então a tela deriva pela
+          // data e não pede mais esse clique.
+          const jaAconteceu = !!a.rental_id && a.situacao !== "cancelado" && a.data < hoje();
+          const situacaoVista = jaAconteceu ? "realizado" : a.situacao;
+          const meta = SITUACAO_META[situacaoVista] ?? {
             label: a.situacao,
             classe: "bg-neutral-100 text-neutral-600",
           };
@@ -374,7 +379,7 @@ export default function AgendamentosDoCliente({
                 <>
                   {/* FAIXA 1: situação do agendamento */}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {a.situacao === "agendado" && (
+                    {a.situacao === "agendado" && !jaAconteceu && (
                       <button
                         type="button"
                         disabled={trabalhando}
@@ -391,7 +396,7 @@ export default function AgendamentosDoCliente({
                       </button>
                     )}
 
-                    {a.situacao === "confirmado" && a.rental_id && (
+                    {a.situacao === "confirmado" && a.rental_id && !jaAconteceu && a.data <= hoje() && (
                       <button
                         type="button"
                         disabled={trabalhando}

@@ -62,7 +62,9 @@ export default async function LocacoesPage({
       consulta = consulta.eq("pago", true);
       break;
     case "realizadas":
-      consulta = consulta.eq("status", "realizada");
+      // Realizada = já aconteceu e não foi cancelada. O status "realizada"
+      // do banco quase nunca é marcado à mão, então não serve de filtro.
+      consulta = consulta.neq("status", "cancelada").lt("event_date", hojeLocal());
       break;
     case "canceladas":
       consulta = consulta.eq("status", "cancelada");
@@ -109,7 +111,9 @@ export default async function LocacoesPage({
     ? normalizadas.filter((r: any) => (r.clients?.name ?? "").toLowerCase().includes(termo))
     : normalizadas;
   const linhas =
-    searchParams.situacao === "a_receber" ? porNome.filter((r: any) => r.vencida) : porNome;
+    searchParams.situacao === "a_receber" || searchParams.situacao === "realizadas"
+      ? porNome.filter((r: any) => r.vencida)
+      : porNome;
 
   return (
     <LocacoesClient

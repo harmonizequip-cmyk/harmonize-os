@@ -260,6 +260,7 @@ export default function FunilClient({
   function handlePedirConfirmacao(lead: LeadRow) {
     if (!lead.nextEvent) return;
     const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
+      name: lead.name,
       treatment: lead.treatment,
       displayName: lead.display_name,
       dateStart: lead.nextEvent.date_start,
@@ -661,9 +662,8 @@ export default function FunilClient({
 
             {pedidoCadastroIncompleto && (
               <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                ⚠️ Cadastro incompleto: falta Tratamento e/ou Nome de exibição deste cliente. Por enquanto a
-                mensagem vai com saudação genérica — preencha esses campos no cadastro do cliente para
-                personalizar.
+                ⚠️ Não consegui tirar o nome deste cliente do cadastro, então a saudação vai genérica. Ajuste o
+                texto abaixo antes de enviar, se quiser.
               </p>
             )}
 

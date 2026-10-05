@@ -1,38 +1,44 @@
 import { formatDate } from "./format";
+import { tratamentoEPrimeiroNome } from "./saudacao";
 
 /**
  * Monta a mensagem do botão "Pedir confirmação no WhatsApp".
  *
- * Fica separada de AgendaClient.tsx (que só chama esta função) por dois
- * motivos: dá para testar sem montar um componente React, e deixa
- * explícito que a mensagem depende SÓ de treatment/displayName/dateStart
- * — nunca do campo de nome antigo do cliente, nunca do equipamento
- * (HIPRO 1/HIPRO 2) e nunca de qualquer outro dado interno.
+ * A mensagem depende só do nome do cliente e da data: nunca do
+ * equipamento (HIPRO 1/HIPRO 2) nem de qualquer outro dado interno.
  *
- * Regra do cadastro incompleto (seção 6 do pedido): se faltar
- * tratamento OU nome de exibição, a mensagem inteira vira "Olá! 😊" —
- * não é só a saudação que fica genérica, é a mensagem toda, de
- * propósito, para o cadastro incompleto ficar visivelmente errado até
- * ser corrigido, em vez de mandar metade de uma mensagem plausível.
+ * Saudação: tratamento e primeiro nome, na mesma regra das outras
+ * mensagens (lib/saudacao.ts). Vem do cadastro (Tratamento e Nome de
+ * exibição) e, na falta deles, do campo "Nome" ("DRA. SIMONE KARLA -
+ * BOM JARDIM" vira "Dra. Simone").
+ *
+ * A mensagem vai sempre inteira. Antes, cadastro sem Tratamento ou Nome de
+ * exibição reduzia tudo a "Olá! 😊" para forçar o preenchimento; com
+ * quase todos os cadastros nessa situação, a regra só impedia o envio.
+ * cadastroIncompleto agora só é verdadeiro quando não dá para tirar nome
+ * nenhum, e nesse caso a saudação fica genérica.
  */
 export function buildPedidoConfirmacaoMessage(params: {
+  name?: string | null;
   treatment: string | null | undefined;
   displayName: string | null | undefined;
   dateStart: string;
 }): { message: string; cadastroIncompleto: boolean } {
-  const treatment = params.treatment?.trim() || null;
-  const displayName = params.displayName?.trim() || null;
+  const { tratamento, primeiroNome } = tratamentoEPrimeiroNome({
+    name: params.name,
+    treatment: params.treatment,
+    displayName: params.displayName,
+  });
 
-  if (!treatment || !displayName) {
-    return { message: "Olá! 😊", cadastroIncompleto: true };
-  }
-
-  // Só o primeiro nome na saudação ("Dra. Camila", não "Dra. Camila Lima").
-  const primeiroNome = displayName.split(/\s+/)[0];
+  const saudacao = !primeiroNome
+    ? "Olá! 😊"
+    : tratamento
+      ? `Olá, ${tratamento} ${primeiroNome}! 😊`
+      : `Olá, ${primeiroNome}! 😊`;
 
   const message =
-    `Olá, ${treatment} ${primeiroNome}! 😊\n\n` +
+    `${saudacao}\n\n` +
     `Passando para lembrar que seu HIPRO day está chegando: ${formatDate(params.dateStart)}.\n\n` +
     `Já estamos organizando tudo por aqui para mais um dia de sucesso. 🚀`;
-  return { message, cadastroIncompleto: false };
+  return { message, cadastroIncompleto: !primeiroNome };
 }

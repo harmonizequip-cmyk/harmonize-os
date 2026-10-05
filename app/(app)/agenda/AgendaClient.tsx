@@ -348,6 +348,7 @@ export default function AgendaClient({
   // calendar_events.confirmed.
   function handlePedirConfirmacao(event: EventRow) {
     const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
+      name: event.clients?.name,
       treatment: event.clients?.treatment,
       displayName: event.clients?.display_name,
       dateStart: event.date_start,
@@ -777,9 +778,8 @@ export default function AgendaClient({
 
             {pedidoCadastroIncompleto && (
               <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                ⚠️ Cadastro incompleto: falta Tratamento e/ou Nome de exibição deste cliente. Por enquanto a
-                mensagem vai com saudação genérica — preencha esses campos no cadastro do cliente para
-                personalizar.
+                ⚠️ Não consegui tirar o nome deste cliente do cadastro, então a saudação vai genérica. Ajuste o
+                texto abaixo antes de enviar, se quiser.
               </p>
             )}
 

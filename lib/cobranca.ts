@@ -3,18 +3,17 @@ import { saudacaoCurta } from "./saudacao";
 
 /**
  * Mensagem de cobrança por WhatsApp de um cliente com saldo em aberto.
- * Segue a regra de saudação das outras mensagens (tratamento + nome de
- * exibição); sem os dois, a saudação vira só "Olá! 😊", mas a cobrança em
- * si vai inteira, porque aqui o assunto é o valor e não pode se perder.
+ * Saudação com tratamento e primeiro nome, na regra de lib/saudacao.ts
+ * (cadastro primeiro, campo "Nome" como reserva). A cobrança vai sempre
+ * inteira, porque aqui o assunto é o valor e não pode se perder.
  */
 export function buildCobrancaMessage(params: {
+  name?: string | null;
   treatment: string | null | undefined;
   displayName: string | null | undefined;
   locacoes: { eventDate: string; saldo: number }[];
 }): string {
-  const treatment = params.treatment?.trim();
-  const displayName = params.displayName?.trim();
-  const saudacao = treatment && displayName ? `Olá, ${treatment} ${displayName}! 😊` : "Olá! 😊";
+  const saudacao = `${saudacaoCurta({ name: params.name, treatment: params.treatment, displayName: params.displayName })} 😊`;
   const total = params.locacoes.reduce((s, l) => s + l.saldo, 0);
 
   const corpo =

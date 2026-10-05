@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import { fetchSettings } from "@/lib/settings";
-import { buscarPendencias, buscarTaxasVencidas } from "@/lib/pendencias";
+import { buscarPendencias, buscarTaxasVencidas, buscarReservasSemDisparos } from "@/lib/pendencias";
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
@@ -184,9 +184,9 @@ export default async function DashboardPage({
   // da tela de Pendências.
   const pendencias = await buscarPendencias(supabase, todayStr);
 
-  // Devedores cuja locação já passou e ainda não foi marcada como realizada.
-  // Só entram quem ainda deve: locação paga e não finalizada não é pendência.
-  const naoFinalizadasCount = pendencias.locacoes.filter((l) => !l.finalizada).length;
+  // Reservas que já passaram sem disparos lançados: atendimento feito e
+  // ainda não cobrado, invisível em qualquer outra tela.
+  const semDisparos = await buscarReservasSemDisparos(supabase, todayStr);
 
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
@@ -372,12 +372,16 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      {naoFinalizadasCount > 0 && (
+      {semDisparos.length > 0 && (
         <Link
-          href="/pendencias"
+          href="/pendencias#sem-disparos"
           className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
         >
-          🏁 {naoFinalizadasCount} {naoFinalizadasCount === 1 ? "locação com valor em aberto ainda não foi finalizada" : "locações com valor em aberto ainda não foram finalizadas"}: marque como realizada na Agenda →
+          🧾 {semDisparos.length}{" "}
+          {semDisparos.length === 1
+            ? "atendimento já passou e está sem disparos lançados"
+            : "atendimentos já passaram e estão sem disparos lançados"}
+          : ainda não foram cobrados →
         </Link>
       )}
 

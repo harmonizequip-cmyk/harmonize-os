@@ -2,25 +2,75 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarCsv } from "@/lib/exportar-csv";
-import type { Pendencias, PendenciaLocacao, TaxaVencida } from "@/lib/pendencias";
+import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
 
 type Ordem = "valor" | "atraso";
 
 export default function PendenciasClient({
   pendencias,
   taxas,
+  semDisparos,
   diasCobrancaTaxa,
 }: {
   pendencias: Pendencias;
   taxas: TaxaVencida[];
+  semDisparos: ReservaSemDisparos[];
   diasCobrancaTaxa: number;
 }) {
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("valor");
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
+
+  // Registrar pagamento direto daqui, sem abrir o cliente.
+  const router = useRouter();
+  const supabase = createClient();
+  const [pagando, setPagando] = useState<string | null>(null);
+  const [pagValor, setPagValor] = useState("");
+  const [pagForma, setPagForma] = useState("pix");
+  const [pagConta, setPagConta] = useState<string>("harmonize");
+  const [pagSalvando, setPagSalvando] = useState(false);
+  const [pagErro, setPagErro] = useState<string | null>(null);
+
+  function abrirPagamento(l: PendenciaLocacao) {
+    setPagando(l.rentalId);
+    setPagValor(l.saldo.toFixed(2).replace(".", ","));
+    setPagForma("pix");
+    setPagConta("harmonize");
+    setPagErro(null);
+  }
+
+  async function salvarPagamento(l: PendenciaLocacao) {
+    const valor = Number(pagValor.replace(/\./g, "").replace(",", "."));
+    if (!valor || valor <= 0) {
+      setPagErro("Informe um valor válido.");
+      return;
+    }
+    if (valor > l.saldo + 0.001) {
+      setPagErro(`O valor é maior que o saldo em aberto (${formatCurrency(l.saldo)}).`);
+      return;
+    }
+    setPagSalvando(true);
+    setPagErro(null);
+    const { error } = await supabase.rpc("registrar_pagamento_locacao", {
+      p_rental_id: l.rentalId,
+      p_forma: pagForma,
+      p_valor: valor,
+      p_pix_conta: pagForma === "pix" ? pagConta : null,
+    });
+    setPagSalvando(false);
+    if (error) {
+      setPagErro(error.message || "Não foi possível registrar o pagamento.");
+      return;
+    }
+    setPagando(null);
+    router.refresh();
+  }
 
   const clientes = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -76,6 +126,39 @@ export default function PendenciasClient({
           Exportar CSV
         </button>
       </div>
+
+      {semDisparos.length > 0 && (
+        <div id="sem-disparos" className="scroll-mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-900/10">
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-400">
+              Atendimentos sem disparos lançados ({semDisparos.length})
+            </p>
+            <p className="text-xs text-amber-800/80 dark:text-amber-400/80">
+              A data já passou e ninguém lançou os disparos, então ainda não viraram cobrança. Abra na agenda e
+              use "Finalizar com disparos". Se não aconteceu, cancele a reserva.
+            </p>
+          </div>
+          {semDisparos.map((r) => (
+            <Link
+              key={r.chave}
+              href={`/agenda?date=${r.de}`}
+              className="flex items-baseline justify-between gap-2 rounded-xl bg-white/70 p-2.5 dark:bg-neutral-900/55"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{r.cliente}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {r.equipamento ? `${r.equipamento} · ` : ""}
+                  {r.de === r.ate ? formatDate(r.de) : `${formatDate(r.de)} a ${formatDate(r.ate)} (${r.dias} dias)`} ·
+                  terminou há {r.diasDesde} {r.diasDesde === 1 ? "dia" : "dias"}
+                </p>
+              </div>
+              <span className="whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400">
+                Abrir na agenda →
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {taxas.length > 0 && (
         <div id="taxas" className="scroll-mt-4 space-y-2 rounded-2xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-900/10">
@@ -182,7 +265,7 @@ export default function PendenciasClient({
 
       {pendencias.clientes.length === 0 ? (
         <div className={`${card} p-6 text-center text-sm text-neutral-500 dark:text-neutral-400`}>
-          Nenhum cliente devendo. Todas as locações realizadas estão pagas. 🎉
+          Nenhum cliente devendo. Todas as locações que já aconteceram estão pagas. 🎉
         </div>
       ) : clientes.length === 0 ? (
         <p className="text-sm text-neutral-500 dark:text-neutral-400">Nenhum cliente encontrado para essa busca.</p>
@@ -191,6 +274,7 @@ export default function PendenciasClient({
           {clientes.map((c) => {
             const aberto = abertos.has(c.clientId);
             const mensagem = buildCobrancaMessage({
+              name: c.cliente,
               treatment: c.treatment,
               displayName: c.displayName,
               locacoes: c.locacoes,
@@ -213,16 +297,12 @@ export default function PendenciasClient({
                 {aberto && (
                   <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
                     {c.locacoes.map((l) => (
-                      <div key={l.rentalId} className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
+                      <div key={l.rentalId} className="space-y-1.5">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
                         <span className="text-neutral-700 dark:text-neutral-300">
                           {formatDate(l.eventDate)}
                           {l.eventDateEnd && l.eventDateEnd !== l.eventDate ? ` a ${formatDate(l.eventDateEnd)}` : ""}
                           <span className="ml-2 text-neutral-400">há {l.diasAtraso} {l.diasAtraso === 1 ? "dia" : "dias"}</span>
-                          {!l.finalizada && (
-                            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                              não finalizada
-                            </span>
-                          )}
                         </span>
                         <span className="text-neutral-500 dark:text-neutral-400">
                           {formatCurrency(l.valor)}
@@ -232,6 +312,74 @@ export default function PendenciasClient({
                             falta {formatCurrency(l.saldo)}
                           </span>
                         </span>
+                      </div>
+                      {pagando === l.rentalId ? (
+                        <div className="space-y-2 rounded-xl border border-brand-teal/40 bg-brand-teal/5 p-2.5">
+                          <div className="flex flex-wrap gap-2">
+                            <input
+                              value={pagValor}
+                              onChange={(e) => setPagValor(e.target.value)}
+                              inputMode="decimal"
+                              aria-label="Valor recebido"
+                              className="w-28 rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                            />
+                            <select
+                              value={pagForma}
+                              onChange={(e) => setPagForma(e.target.value)}
+                              aria-label="Forma de pagamento"
+                              className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                            >
+                              <option value="pix">PIX</option>
+                              <option value="dinheiro">Dinheiro</option>
+                              <option value="debito">Débito</option>
+                              <option value="credito">Crédito</option>
+                              <option value="transferencia">Transferência</option>
+                              <option value="outros">Outros</option>
+                            </select>
+                            {pagForma === "pix" && (
+                              <select
+                                value={pagConta}
+                                onChange={(e) => setPagConta(e.target.value)}
+                                aria-label="Conta PIX que recebeu"
+                                className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                              >
+                                {PIX_CONTAS.map((c) => (
+                                  <option key={c.value} value={c.value}>
+                                    {c.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                          {pagErro && <p className="text-xs text-red-600 dark:text-red-400">{pagErro}</p>}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={pagSalvando}
+                              onClick={() => salvarPagamento(l)}
+                              className="flex-1 rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                            >
+                              {pagSalvando ? "Salvando..." : "Confirmar recebimento"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pagSalvando}
+                              onClick={() => setPagando(null)}
+                              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => abrirPagamento(l)}
+                          className="w-full rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white"
+                        >
+                          Registrar pagamento de {formatDate(l.eventDate)}
+                        </button>
+                      )}
                       </div>
                     ))}
                     <div className="flex gap-2 pt-1">
@@ -249,7 +397,7 @@ export default function PendenciasClient({
                         href={`/clientes/${c.clientId}`}
                         className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
                       >
-                        Abrir cliente e registrar pagamento
+                        Abrir cliente
                       </Link>
                     </div>
                   </div>

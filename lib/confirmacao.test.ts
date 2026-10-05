@@ -16,23 +16,37 @@ describe("buildPedidoConfirmacaoMessage", () => {
     expect(message).toContain("Já estamos organizando tudo por aqui");
   });
 
-  it("Teste 6: sem tratamento cai no fallback genérico e sinaliza cadastro incompleto", () => {
+  it("Teste 6: sem tratamento a mensagem vai inteira, só com o primeiro nome", () => {
     const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
       treatment: null,
       displayName: "Camila Lima",
       dateStart: "2026-10-01",
     });
-    expect(message).toBe("Olá! 😊");
-    expect(cadastroIncompleto).toBe(true);
+    expect(message).toContain("Olá, Camila! 😊");
+    expect(message).toContain("01/10/2026");
+    expect(cadastroIncompleto).toBe(false);
   });
 
-  it("Teste 7: sem nome de exibição cai no fallback genérico e sinaliza cadastro incompleto", () => {
+  it("Teste 7: sem Tratamento e Nome de exibição, tira o nome do campo Nome", () => {
+    const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
+      name: "DRA. MARI FILLER HIPNOSE - DONA DE CLÍNICA - HIPRO",
+      treatment: null,
+      displayName: "",
+      dateStart: "2026-10-01",
+    });
+    expect(message).toContain("Olá, Dra. Mari! 😊");
+    expect(message).toContain("seu HIPRO day está chegando: 01/10/2026");
+    expect(cadastroIncompleto).toBe(false);
+  });
+
+  it("sem nome nenhum: saudação genérica, mensagem inteira e aviso de cadastro incompleto", () => {
     const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
       treatment: "Dra.",
       displayName: "",
       dateStart: "2026-10-01",
     });
-    expect(message).toBe("Olá! 😊");
+    expect(message.startsWith("Olá! 😊")).toBe(true);
+    expect(message).toContain("01/10/2026");
     expect(cadastroIncompleto).toBe(true);
   });
 
@@ -69,12 +83,13 @@ describe("buildPedidoConfirmacaoMessage", () => {
     expect(message).toContain("05/01/2026");
   });
 
-  it("espaços em branco contam como campo vazio (cadastro incompleto)", () => {
-    const { cadastroIncompleto } = buildPedidoConfirmacaoMessage({
+  it("espaços em branco no tratamento não quebram a saudação", () => {
+    const { message, cadastroIncompleto } = buildPedidoConfirmacaoMessage({
       treatment: "  ",
       displayName: "Camila Lima",
       dateStart: "2026-10-01",
     });
-    expect(cadastroIncompleto).toBe(true);
+    expect(message).toContain("Olá, Camila! 😊");
+    expect(cadastroIncompleto).toBe(false);
   });
 });
