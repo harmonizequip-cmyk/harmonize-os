@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { calculateRentalValue, DEFAULT_PRICING } from "./rental-pricing";
+import { calculateMentoriaValue, calculateRentalValue, DEFAULT_PRICING } from "./rental-pricing";
 import { calcularResumoLocacao } from "./rental-calculator";
-import { descreverFaixa, montarAjustes, montarDadosCalculo, reais } from "./calculo-image";
+import { descreverFaixa, montarAjustes, montarDadosCalculo, montarDadosMentoria, reais } from "./calculo-image";
 
 describe("faixa aplicada na imagem do cálculo", () => {
   it("acima da faixa 2 descreve a faixa 3, a taxa e a conta do excedente", () => {
@@ -89,5 +89,42 @@ describe("ajustes e total da imagem do cálculo", () => {
     const a = montarAjustes({ itens: [], descontoPercentual: null, kmIda: 50, resumo });
     expect(a.map((x) => x.rotulo)).toEqual(["Deslocamento (50 km de ida)", "Taxa de reserva já paga (crédito)"]);
     expect(a[1].valor).toBe("-R$ 250,00");
+  });
+});
+
+describe("imagem da mentoria", () => {
+  it("mostra pacientes x valor por paciente e o total a pagar do resumo", () => {
+    const mentoria = calculateMentoriaValue(3, "pix");
+    const resumo = calcularResumoLocacao({
+      isMentoria: true,
+      shots: 0,
+      pricing: null,
+      custoManualPorDisparo: null,
+      mentoriaPricing: mentoria,
+      kmIda: 0,
+      itens: [],
+      reservationFeeStatus: "nao_aplica",
+      reservationFee: 250,
+    });
+    const d = montarDadosMentoria({
+      cliente: "DRA. TESTE",
+      dataEvento: "2026-10-20",
+      mentoria,
+      itens: [],
+      descontoPercentual: null,
+      kmIda: 0,
+      resumo,
+    });
+    expect(d.modo).toBe("mentoria");
+    expect(d.disparos).toBe(3);
+    expect(d.valorDisparos).toBe(mentoria.totalValue);
+    expect(d.faixaSubtitulo).toBe("À vista");
+    expect(d.faixaLinhas[0]).toBe(`3 paciente(s) x ${reais(mentoria.unitValue)} = ${reais(mentoria.totalValue)}`);
+    expect(d.total).toBe(resumo.totalAPagarAgora);
+  });
+
+  it("no crédito usa o valor parcelado e avisa as 10x", () => {
+    const mentoria = calculateMentoriaValue(2, "credito");
+    expect(mentoria.isParcelado).toBe(true);
   });
 });

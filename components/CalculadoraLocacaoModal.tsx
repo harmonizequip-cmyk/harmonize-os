@@ -61,7 +61,7 @@ import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
 import CalculoImagemBotao from "@/components/CalculoImagemBotao";
-import { montarDadosCalculo } from "@/lib/calculo-image";
+import { montarDadosCalculo, montarDadosMentoria } from "@/lib/calculo-image";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -510,9 +510,21 @@ export default function CalculadoraLocacaoModal({
   ]);
   const previewWhatsappLink = previewWhatsappText ? buildWhatsAppLink(activeClientWhatsapp, previewWhatsappText) : null;
 
-  // Dados da imagem do cálculo dos disparos (só modo disparo, com contagem).
+  // Dados da imagem do cálculo (disparos, com contagem, ou mentoria, com pacientes modelo).
   const dadosImagem = useMemo(() => {
-    if (isMentoria || !pricing || !resumo || shots <= 0) return null;
+    if (isMentoria) {
+      if (!mentoriaCalc || !resumo) return null;
+      return montarDadosMentoria({
+        cliente: activeClientName || null,
+        dataEvento: eventDate || null,
+        mentoria: mentoriaCalc,
+        itens,
+        descontoPercentual: descontoTipo === "percentual" ? descontoRawNumero : null,
+        kmIda: kmIdaNumber,
+        resumo,
+      });
+    }
+    if (!pricing || !resumo || shots <= 0) return null;
     return montarDadosCalculo({
       cliente: activeClientName || null,
       dataEvento: eventDate || null,
@@ -528,6 +540,7 @@ export default function CalculadoraLocacaoModal({
     });
   }, [
     isMentoria,
+    mentoriaCalc,
     pricing,
     resumo,
     shots,

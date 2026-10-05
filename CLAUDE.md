@@ -55,8 +55,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 ## Pendências conhecidas
 
-- Mostrar lucro por locação em Locações e por cliente em Relatórios. As views `rentals_lucro` e `clientes_lucro` já existem e nenhuma tela lê.
-- Bloco de despesas da reserva também no card do Funil e na página do cliente (hoje só na Agenda).
+- Limpeza do banco a decidir com o dono: `clients_backup_stage` (backup antigo de etapa, 191 linhas), gatilhos duplicados em `profiles` e `handle_new_user` (existe no schema.sql, não existe no banco).
 - Benefício da indicação: o dono ainda vai definir.
 - Custo por disparo: adiado.
 - Backup: conferir o plano do Supabase e fazer um teste de restauração.

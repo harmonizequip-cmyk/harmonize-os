@@ -98,8 +98,24 @@ export default async function LocacoesPage({
       .in("rental_id", ids);
     for (const s of situacoes ?? []) saldos.set(s.rental_id, Number(s.saldo));
   }
+  // Despesas e lucro de cada locação (view rentals_lucro: valor cobrado menos
+  // as saídas ligadas à locação). A view já ignora cancelada e teste.
+  const lucros = new Map<string, { despesas: number; lucro: number }>();
+  for (let i = 0; i < normalizadas.length; i += LOTE) {
+    const ids = normalizadas.slice(i, i + LOTE).map((r: any) => r.id);
+    const { data: linhasLucro, error: erroLucro } = await supabase
+      .from("rentals_lucro")
+      .select("rental_id, total_despesas, lucro_liquido")
+      .in("rental_id", ids);
+    if (erroLucro) throw new Error(`Não consegui carregar o lucro das locações: ${erroLucro.message}`);
+    for (const l of linhasLucro ?? []) {
+      lucros.set(l.rental_id, { despesas: Number(l.total_despesas), lucro: Number(l.lucro_liquido) });
+    }
+  }
   const hoje = hojeLocal();
   for (const r of normalizadas as any[]) {
+    r.despesas = lucros.get(r.id)?.despesas ?? null;
+    r.lucro = lucros.get(r.id)?.lucro ?? null;
     r.saldo = saldos.get(r.id) ?? (r.pago ? 0 : Number(r.calculated_value));
     // Locação de vários dias só vence depois do último dia.
     r.vencida = (r.event_date_end ?? r.event_date) < hoje;

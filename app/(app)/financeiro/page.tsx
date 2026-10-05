@@ -57,7 +57,7 @@ export default async function FinanceiroPage({
   }
 
   const [{ data: transactions, error: erroLancamentos }, { data: categories }, { data: clients }] = await Promise.all([
-    consulta.order("date", { ascending: false }).limit(TETO),
+    consulta.order("date", { ascending: false }).order("created_at", { ascending: false }).limit(TETO),
     supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
     supabase.from("clients").select("id, name").order("name"),
   ]);

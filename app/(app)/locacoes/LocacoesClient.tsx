@@ -32,6 +32,10 @@ interface Locacao {
   // Quanto ainda falta receber, já descontando pagamentos parciais e taxa
   // de reserva paga (view rentals_situacao_pagamento).
   saldo: number;
+  // Despesas ligadas à locação e lucro (valor cobrado menos despesas), da view
+  // rentals_lucro. Nulo em locação cancelada.
+  despesas?: number | null;
+  lucro?: number | null;
   // Já passou do último dia da locação (mesmo critério da tela de Pendências).
   vencida: boolean;
   rescheduled: boolean;
@@ -103,6 +107,7 @@ export default function LocacoesClient({
     let aReceber = 0;
     let cancelado = 0;
     let disparos = 0;
+    let lucro = 0;
     for (const r of linhas) {
       const valor = Number(r.calculated_value);
       if (r.status === "cancelada") {
@@ -110,11 +115,12 @@ export default function LocacoesClient({
         continue;
       }
       disparos += Number(r.shots ?? 0);
+      lucro += Number(r.lucro ?? 0);
       const saldo = Math.min(Math.max(Number(r.saldo ?? 0), 0), valor);
       recebido += valor - saldo;
       if (r.status === "realizada" || r.vencida) aReceber += saldo;
     }
-    return { recebido, aReceber, cancelado, disparos };
+    return { recebido, aReceber, cancelado, disparos, lucro };
   }, [linhas]);
 
   function baixarCsv() {
@@ -126,6 +132,8 @@ export default function LocacoesClient({
         { titulo: "Equipamento", valor: (r) => r.equipments?.name ?? "" },
         { titulo: "Disparos", valor: (r) => Number(r.shots ?? 0) },
         { titulo: "Valor", valor: (r) => Number(r.calculated_value) },
+        { titulo: "Despesas", valor: (r) => (r.despesas == null ? "" : Number(r.despesas)) },
+        { titulo: "Lucro", valor: (r) => (r.lucro == null ? "" : Number(r.lucro)) },
         { titulo: "Saldo", valor: (r) => (r.status === "cancelada" ? 0 : Number(r.saldo ?? 0)) },
         { titulo: "Situação", valor: (r) => situacao(r).label },
         { titulo: "Pago em", valor: (r) => (r.pago_em ? formatDate(r.pago_em) : "") },
@@ -207,7 +215,7 @@ export default function LocacoesClient({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Recebido</p>
           <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
@@ -218,6 +226,12 @@ export default function LocacoesClient({
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber</p>
           <p className="mt-0.5 text-sm font-semibold text-amber-600 dark:text-amber-400 sm:text-base">
             {formatCurrency(totais.aReceber)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Lucro</p>
+          <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
+            {formatCurrency(totais.lucro)}
           </p>
         </div>
         <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
@@ -278,6 +292,11 @@ export default function LocacoesClient({
                   Falta {formatCurrency(Number(r.saldo))}
                 </p>
               )}
+              {r.lucro != null && (
+                <p className="mt-1 text-right text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Lucro {formatCurrency(Number(r.lucro))} · despesas {formatCurrency(Number(r.despesas ?? 0))}
+                </p>
+              )}
               </Link>
               {temSaldo(r) && (
                 <div className="mt-2">
@@ -304,6 +323,7 @@ export default function LocacoesClient({
               <th className="px-4 py-3">Equipamento</th>
               <th className="px-4 py-3 text-right">Disparos</th>
               <th className="px-4 py-3 text-right">Valor</th>
+              <th className="px-4 py-3 text-right">Lucro</th>
               <th className="px-4 py-3">Situação</th>
               <th className="px-4 py-3">Pagamento</th>
               <th className="px-4 py-3">Receber</th>
@@ -346,6 +366,13 @@ export default function LocacoesClient({
                   >
                     {formatCurrency(Number(r.calculated_value))}
                   </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600 dark:text-neutral-400">
+                    {r.lucro != null ? (
+                      <span title={`Despesas: ${formatCurrency(Number(r.despesas ?? 0))}`}>{formatCurrency(Number(r.lucro))}</span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.classe}`}>
                       {s.label}
@@ -372,7 +399,7 @@ export default function LocacoesClient({
             })}
             {linhas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={9} className="px-4 py-8 text-center text-neutral-400">
                   Nenhuma locação em {periodo.rotulo}.
                 </td>
               </tr>

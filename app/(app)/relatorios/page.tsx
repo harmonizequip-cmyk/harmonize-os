@@ -47,6 +47,7 @@ export default async function RelatoriosPage({
     { data: entradas },
     { data: followupTags },
     { data: bookedEvents },
+    { data: lucroLinhas, error: erroLucro },
   ] = await Promise.all([
     // Relatório é a tela de decidir, então nem teste nem locação
     // cancelada podem entrar na conta. As views rentals_contabilizaveis
@@ -77,7 +78,29 @@ export default async function RelatoriosPage({
       .eq("is_test", false)
       .gte("date_start", periodo.inicio)
       .lte("date_start", periodo.fim),
+    // Lucro por locação no período (valor cobrado menos as despesas ligadas a
+    // ela). A view já ignora locação cancelada e teste.
+    supabase
+      .from("rentals_lucro")
+      .select("client_id, cliente, calculated_value, total_despesas, lucro_liquido")
+      .gte("event_date", periodo.inicio)
+      .lte("event_date", periodo.fim),
   ]);
+  if (erroLucro) throw new Error(`Não consegui carregar o lucro por cliente: ${erroLucro.message}`);
+
+  const lucroPorCliente = new Map<string, { name: string; locacoes: number; faturado: number; despesas: number; lucro: number }>();
+  for (const l of lucroLinhas ?? []) {
+    const id = l.client_id ?? "sem-cliente";
+    const atual = lucroPorCliente.get(id) ?? { name: l.cliente ?? "Sem cliente", locacoes: 0, faturado: 0, despesas: 0, lucro: 0 };
+    atual.locacoes += 1;
+    atual.faturado += Number(l.calculated_value);
+    atual.despesas += Number(l.total_despesas);
+    atual.lucro += Number(l.lucro_liquido);
+    lucroPorCliente.set(id, atual);
+  }
+  const lucroClientes = Array.from(lucroPorCliente.values()).sort((a, b) => b.lucro - a.lucro);
+  const lucroTotal = lucroClientes.reduce((acc, c) => acc + c.lucro, 0);
+  const despesasTotal = lucroClientes.reduce((acc, c) => acc + c.despesas, 0);
 
   // ---- 1) Degrau de incentivo de volume ----
   // Proposital: passar de tier2Limit disparos ativa uma taxa menor sobre
@@ -221,6 +244,9 @@ export default async function RelatoriosPage({
       nutricaoCount={nutricaoCount}
       weekdayBreakdown={weekdayBreakdown}
       revenueMix={revenueMix}
+      lucroClientes={lucroClientes}
+      lucroTotal={lucroTotal}
+      despesasTotal={despesasTotal}
     />
   );
 }

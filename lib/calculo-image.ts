@@ -1,6 +1,6 @@
 import { roundedRectPath } from "./availability-image";
 import type { ItemAjuste, ResumoLocacao } from "./rental-calculator";
-import type { RentalPricingBreakdown } from "./rental-pricing";
+import type { MentoriaPricingBreakdown, RentalPricingBreakdown } from "./rental-pricing";
 
 // ============================================================
 // IMAGEM DO CÁLCULO DOS DISPAROS
@@ -21,6 +21,8 @@ export interface LinhaAjusteImagem {
 }
 
 export interface DadosImagemCalculo {
+  /** "mentoria" não mostra contagens e troca os rótulos; o padrão é "disparos". */
+  modo?: "disparos" | "mentoria";
   cliente: string | null;
   dataEvento: string | null; // YYYY-MM-DD
   contagemInicial: number;
@@ -179,6 +181,45 @@ export function montarDadosCalculo(params: {
   };
 }
 
+/** Dados da imagem de uma mentoria: pacientes modelo x valor por paciente, mais os ajustes. */
+export function montarDadosMentoria(params: {
+  cliente: string | null;
+  dataEvento: string | null;
+  mentoria: MentoriaPricingBreakdown;
+  itens: ItemAjuste[];
+  descontoPercentual: number | null;
+  kmIda: number;
+  resumo: ResumoLocacao;
+}): DadosImagemCalculo {
+  const { mentoria } = params;
+  return {
+    modo: "mentoria",
+    cliente: params.cliente,
+    dataEvento: params.dataEvento,
+    contagemInicial: 0,
+    contagemFinal: 0,
+    disparos: mentoria.patientCount,
+    faixaTitulo: "VALOR POR PACIENTE",
+    faixaSubtitulo: mentoria.isParcelado ? "Parcelado no crédito até 10x" : "À vista",
+    faixaChip: reais(mentoria.unitValue),
+    faixaLinhas: [
+      `${inteiro(mentoria.patientCount)} paciente(s) x ${reais(mentoria.unitValue)} = ${reais(mentoria.totalValue)}`,
+    ],
+    valorDisparos: mentoria.totalValue,
+    ajustes: montarAjustes({
+      itens: params.itens,
+      descontoPercentual: params.descontoPercentual,
+      kmIda: params.kmIda,
+      resumo: params.resumo,
+    }),
+    total: params.resumo.totalAPagarAgora,
+    observacaoTotal:
+      params.resumo.taxaACobrarAgora > 0
+        ? `Inclui a taxa de reserva de ${reais(params.resumo.taxaACobrarAgora)}, paga agora como crédito`
+        : null,
+  };
+}
+
 // ------------------------------------------------------------
 // Desenho
 // ------------------------------------------------------------
@@ -237,7 +278,8 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   const alturaFaixa = 78 + linhasFaixa.length * 20;
   const alturaAjustes = dados.ajustes.length > 0 ? 40 + dados.ajustes.length * 52 : 0;
   const alturaObs = dados.observacaoTotal ? 24 : 0;
-  const altura = 96 + 3 * 60 + 70 + alturaFaixa + 20 + 90 + 20 + alturaAjustes + 130 + alturaObs + 56;
+  const ehMentoria = dados.modo === "mentoria";
+  const altura = 96 + (ehMentoria ? 60 : 3 * 60) + 70 + alturaFaixa + 20 + 90 + 20 + alturaAjustes + 130 + alturaObs + 56;
 
   const canvas = document.createElement("canvas");
   canvas.width = LARGURA * ESCALA;
@@ -255,7 +297,7 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   ctx.textAlign = "left";
   ctx.fillStyle = COR.teal;
   ctx.font = `700 12px ${FONTE}`;
-  ctx.fillText("HARMONIZE  ·  CÁLCULO DOS DISPAROS", MARGEM, y);
+  ctx.fillText(ehMentoria ? "HARMONIZE  ·  CÁLCULO DA MENTORIA" : "HARMONIZE  ·  CÁLCULO DOS DISPAROS", MARGEM, y);
   y += 26;
   ctx.fillStyle = COR.tinta;
   ctx.font = `700 22px ${FONTE}`;
@@ -284,8 +326,10 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
     ctx.textAlign = "left";
     y += 60;
   };
-  linhaCinza("Contagem inicial", inteiro(dados.contagemInicial));
-  linhaCinza("Contagem final", inteiro(dados.contagemFinal));
+  if (!ehMentoria) {
+    linhaCinza("Contagem inicial", inteiro(dados.contagemInicial));
+    linhaCinza("Contagem final", inteiro(dados.contagemFinal));
+  }
 
   // Disparos realizados
   roundedRectPath(ctx, MARGEM, y, larguraUtil, 56, 14);
@@ -296,7 +340,7 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   ctx.stroke();
   ctx.fillStyle = COR.tinta;
   ctx.font = `600 15px ${FONTE}`;
-  ctx.fillText("Disparos realizados", MARGEM + 16, y + 34);
+  ctx.fillText(ehMentoria ? "Pacientes modelo" : "Disparos realizados", MARGEM + 16, y + 34);
   ctx.fillStyle = COR.teal;
   ctx.font = `700 26px ${FONTE}`;
   ctx.textAlign = "right";
@@ -350,7 +394,7 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   ctx.fillStyle = COR.teal;
   ctx.font = `700 12px ${FONTE}`;
   ctx.textAlign = "center";
-  ctx.fillText("V A L O R   D O S   D I S P A R O S", LARGURA / 2, y + 28);
+  ctx.fillText(ehMentoria ? "V A L O R   D A   M E N T O R I A" : "V A L O R   D O S   D I S P A R O S", LARGURA / 2, y + 28);
   ctx.font = `700 34px ${FONTE}`;
   ctx.fillText(reais(dados.valorDisparos), LARGURA / 2, y + 66);
   ctx.textAlign = "left";

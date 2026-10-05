@@ -23,6 +23,14 @@ interface FollowupRow {
   count: number;
 }
 
+interface LucroClienteRow {
+  name: string;
+  locacoes: number;
+  faturado: number;
+  despesas: number;
+  lucro: number;
+}
+
 interface WeekdayRow {
   label: string;
   count: number;
@@ -107,6 +115,9 @@ export default function RelatoriosClient({
   nutricaoCount,
   weekdayBreakdown,
   revenueMix,
+  lucroClientes,
+  lucroTotal,
+  despesasTotal,
 }: {
   periodo: Periodo;
   cliff: PricingCliff | null;
@@ -125,6 +136,9 @@ export default function RelatoriosClient({
   nutricaoCount: number;
   weekdayBreakdown: WeekdayRow[];
   revenueMix: RevenueMixRow[];
+  lucroClientes: LucroClienteRow[];
+  lucroTotal: number;
+  despesasTotal: number;
 }) {
   // Origem "vencedora": só entra na conclusão se tiver pelo menos 3 leads
   // (senão um único lead convertido vira "100% de conversão", que é
@@ -229,6 +243,34 @@ export default function RelatoriosClient({
               ))}
             </div>
           )}
+        </Card>
+
+        <Card
+          icon="💰"
+          title="Lucro por cliente"
+          summary={
+            lucroClientes.length > 0
+              ? `Em ${periodo.rotulo}, o lucro das locações foi ${formatCurrency(lucroTotal)} (valor cobrado menos ${formatCurrency(despesasTotal)} de despesas lançadas nas locações).`
+              : "Nenhuma locação no período para calcular o lucro."
+          }
+          accent="teal"
+        >
+          <div className="space-y-1.5">
+            {lucroClientes.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-neutral-700 dark:text-neutral-300">
+                  {i + 1}. {c.name} ({c.locacoes} {c.locacoes === 1 ? "locação" : "locações"})
+                </span>
+                <span className="whitespace-nowrap font-medium text-neutral-900 dark:text-neutral-100">
+                  {formatCurrency(c.lucro)}
+                  <span className="ml-1 font-normal text-neutral-400">de {formatCurrency(c.faturado)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+            Só entram despesas amarradas à locação. Despesa lançada solta no Financeiro não entra nesta conta.
+          </p>
         </Card>
 
         <Card

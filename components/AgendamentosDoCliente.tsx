@@ -7,6 +7,7 @@ import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 
 import { hojeLocal } from "@/lib/period";
+import DespesasDaReserva from "@/components/DespesasDaReserva";
 // Uma linha por agendamento do cliente, já com o rótulo de situação
 // resolvido pelo banco. A função agendamentos_do_cliente é quem combina
 // os dois eixos (status da locação e marca de confirmado) num rótulo só,
@@ -101,6 +102,7 @@ export default function AgendamentosDoCliente({
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [despesasAbertas, setDespesasAbertas] = useState<Set<string>>(new Set());
   const [reagendando, setReagendando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
   // Painel de pagamento: forma e data são escolhidas na hora, porque o
@@ -324,6 +326,30 @@ export default function AgendamentosDoCliente({
                 <p className="mt-1 text-[11px] text-neutral-400">
                   Sem disparos lançados ainda. Finalize pela Agenda quando o procedimento acontecer.
                 </p>
+              )}
+
+              {/* Despesas da reserva (combustível, estacionamento, comida do dia):
+                  ficam na reserva e, ao finalizar, o banco as passa para a locação. */}
+              {a.rental_id == null && !cancelado && (
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDespesasAbertas((prev) => {
+                        const novo = new Set(prev);
+                        if (novo.has(a.event_id)) novo.delete(a.event_id);
+                        else novo.add(a.event_id);
+                        return novo;
+                      })
+                    }
+                    className="text-[11px] font-medium text-brand-teal underline underline-offset-2"
+                  >
+                    {despesasAbertas.has(a.event_id) ? "Esconder despesas" : "Despesas da reserva"}
+                  </button>
+                  {despesasAbertas.has(a.event_id) && (
+                    <DespesasDaReserva eventId={a.event_id} clientId={clientId} dataEvento={a.data} />
+                  )}
+                </div>
               )}
 
               {/* O crédito da taxa é a parte que mais gera dúvida na hora
