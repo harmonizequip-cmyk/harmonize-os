@@ -52,3 +52,12 @@ Não consigo entrar no app daqui (não há login neste ambiente) e não faço te
 ## Ordem
 
 Uma onda por vez. Dentro da onda 1, uma entrega por item, publicada e conferida antes da próxima. A onda 2 vai em 3 entregas: (7, 8, 9) receber, (10, 11, 15) agenda e ficha, (12, 13, 14) tarefas e Dashboard. A onda 3 só com aval item a item.
+
+---
+
+## Andamento (05/10/2026)
+
+- **Onda 1 feita**, exceto 1.2: Financeiro (pagamento de locação corrige e remove só o pagamento), conversor de valor em 10 campos, confirmar em Clientes pela RPC, erros visíveis no Funil e Tarefas, erro de consulta nas telas de dinheiro (com `app/(app)/error.tsx`).
+- **1.2 parado, depende do dono:** em "cobrar taxa agora" a calculadora cobra locação mais taxa, mas o banco trata a taxa paga como abatimento da locação. Definir se o total é locação + taxa ou se a taxa faz parte do valor da locação.
+- **Onda 2 feita:** `ReceberPagamentoBotao` em Pendências, Locações, Agenda (modal), ficha do cliente e Agenda de hoje; `TaxaRecebidaBotao` também na ficha e na Agenda de hoje; "+" com "Receber pagamento" e "Taxa de reserva recebida"; Tarefas com WhatsApp pronto e baixa de taxa; Dashboard gera e mostra as tarefas do dia; aviso de confirmação leva à lista.
+- **Onda 3 não iniciada:** cada item exige aval do dono.
