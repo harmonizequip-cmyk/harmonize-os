@@ -28,8 +28,21 @@ def partes(caminho):
     corpo = linhas[i:]
     while corpo and (corpo[-1].startswith("--") or not corpo[-1].strip()):
         corpo.pop()
-    texto = [l[2:].strip() for l in cab if l.startswith("--")]
-    texto = [t for t in texto if t and not set(t) <= {"-", "="} and not t.upper().startswith("STATUS")]
+    # O STATUS pode ocupar várias linhas: pula até a próxima linha de comentário vazia.
+    texto, em_status = [], False
+    for l in cab:
+        if not l.startswith("--"):
+            continue
+        t = l[2:].strip()
+        if t.upper().startswith("STATUS"):
+            em_status = True
+            continue
+        if not t:
+            em_status = False
+            continue
+        if em_status or set(t) <= {"-", "="}:
+            continue
+        texto.append(t)
     titulo = texto[0] if texto else caminho.split("/")[-1]
     desc = " ".join(texto[1:4])
     return titulo.rstrip("."), desc, "\n".join(corpo) + "\n"
