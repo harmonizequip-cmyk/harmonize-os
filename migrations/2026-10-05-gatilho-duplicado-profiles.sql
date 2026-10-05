@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 05/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Gatilho duplicado em profiles: trg_protect_profile_privileges e
 -- trg_profiles_lock_privileged_fields rodam o MESMO corpo (confirmado por

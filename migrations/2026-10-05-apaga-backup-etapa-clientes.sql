@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono decidir e rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 05/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Apaga clients_backup_stage: cópia antiga (id, etapa do funil) de 191
 -- clientes. Nada no app lê e nenhuma view depende dela. Prévia (05/10/2026):
