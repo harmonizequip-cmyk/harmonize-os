@@ -49,7 +49,7 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="min-w-0 flex-1 pb-20 md:pb-0">
         <MobileHeader />
         {testMode && (
           <Link
