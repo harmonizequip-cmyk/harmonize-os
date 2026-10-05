@@ -49,6 +49,8 @@ import {
   PAYMENT_LABELS,
   PIX_CONTAS,
   RESERVATION_FEE,
+  ordenarContagens,
+  valorDosDisparos,
   descontarTaxaDosPagamentos,
   type ItemAjuste,
   type PagamentoLinha,
@@ -281,9 +283,14 @@ export default function CalculadoraLocacaoModal({
   const [patientCount, setPatientCount] = useState("1");
   const [notes, setNotes] = useState("");
 
-  const initialNumber = Number(onlyDigits(initialCount));
-  const finalNumber = Number(onlyDigits(finalCount));
-  const shots = finalCount && initialCount ? finalNumber - initialNumber : 0;
+  // A menor contagem é sempre a inicial e a maior a final, na ordem em que
+  // forem digitadas; os disparos são a diferença entre as duas.
+  const contagens = ordenarContagens(Number(onlyDigits(initialCount)), Number(onlyDigits(finalCount)));
+  const contagensPreenchidas = !!initialCount && !!finalCount;
+  const initialNumber = contagens.inicial;
+  const finalNumber = contagens.final;
+  const contagensInvertidas = contagensPreenchidas && contagens.invertidas;
+  const shots = contagensPreenchidas ? contagens.disparos : 0;
   const patientCountNumber = Number(onlyDigits(patientCount)) || 0;
 
   const pricing = useMemo(() => {
@@ -336,7 +343,15 @@ export default function CalculadoraLocacaoModal({
   const [novoItemValor, setNovoItemValor] = useState("");
   const [novoItemTipo, setNovoItemTipo] = useState<"mais" | "menos">("mais");
 
-  const subtotalParaDesconto = (isMentoria ? mentoriaCalc?.totalValue : pricing?.totalValue) ?? 0;
+  // Desconto em porcentagem incide só sobre o valor dos disparos (com o custo
+  // negociado, se houver), nunca sobre aluguel, deslocamento ou taxa.
+  const subtotalParaDesconto = valorDosDisparos({
+    isMentoria,
+    shots,
+    pricing,
+    mentoriaPricing: mentoriaCalc,
+    custoManualPorDisparo,
+  });
   const aluguelNumero = parseDecimal(aluguelValor);
   const descontoRawNumero = parseDecimal(descontoValor);
   const descontoNumero =
@@ -551,8 +566,8 @@ export default function CalculadoraLocacaoModal({
         setError("Preencha a contagem inicial e final do equipamento.");
         return;
       }
-      if (finalNumber <= initialNumber) {
-        setError("A contagem final precisa ser maior que a inicial.");
+      if (finalNumber === initialNumber) {
+        setError("As duas contagens são iguais: não há disparos para cobrar.");
         return;
       }
     }
@@ -1122,6 +1137,13 @@ export default function CalculadoraLocacaoModal({
                   />
                 </div>
               </div>
+            )}
+            {!isMentoria && contagensInvertidas && (
+              <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                As contagens estavam invertidas. Para o cálculo, a menor ({initialNumber.toLocaleString("pt-BR")}) vale
+                como inicial e a maior ({finalNumber.toLocaleString("pt-BR")}) como final: {shots.toLocaleString("pt-BR")}{" "}
+                disparos.
+              </p>
             )}
           </div>
 

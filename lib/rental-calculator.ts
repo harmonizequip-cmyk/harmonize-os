@@ -161,6 +161,38 @@ export function descontarTaxaDosPagamentos<T extends { valor: number }>(
   return { linhas, taxaNaoCoberta: restante };
 }
 
+/**
+ * Contagem inicial e final do equipamento. A menor é sempre a inicial e a
+ * maior a final, na ordem em que forem digitadas: os disparos são a diferença
+ * entre as duas. `invertidas` avisa que a ordem digitada estava ao contrário.
+ */
+export function ordenarContagens(
+  a: number,
+  b: number
+): { inicial: number; final: number; disparos: number; invertidas: boolean } {
+  const inicial = Math.min(a, b);
+  const final = Math.max(a, b);
+  return { inicial, final, disparos: final - inicial, invertidas: a > b };
+}
+
+/**
+ * Valor dos disparos (ou da mentoria) que serve de base para o desconto em
+ * porcentagem: só o que foi cobrado pelos disparos, já considerando o custo
+ * por disparo negociado quando houver. Aluguel, deslocamento e outros itens
+ * não entram na base.
+ */
+export function valorDosDisparos(input: {
+  isMentoria: boolean;
+  shots: number;
+  pricing: { totalValue: number } | null;
+  mentoriaPricing: { totalValue: number } | null;
+  custoManualPorDisparo: number | null;
+}): number {
+  if (input.isMentoria) return input.mentoriaPricing?.totalValue ?? 0;
+  if (input.custoManualPorDisparo != null) return round2(input.shots * input.custoManualPorDisparo);
+  return input.pricing?.totalValue ?? 0;
+}
+
 export function calcularResumoLocacao(input: ResumoLocacaoInput): ResumoLocacao {
   const subtotalTabela = input.isMentoria
     ? input.mentoriaPricing?.totalValue ?? 0

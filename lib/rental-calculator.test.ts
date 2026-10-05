@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { calcularResumoLocacao, descontarTaxaDosPagamentos, type ResumoLocacaoInput } from "./rental-calculator";
+import {
+  calcularResumoLocacao,
+  descontarTaxaDosPagamentos,
+  ordenarContagens,
+  valorDosDisparos,
+  type ResumoLocacaoInput,
+} from "./rental-calculator";
 
 function entrada(extra: Partial<ResumoLocacaoInput>): ResumoLocacaoInput {
   return {
@@ -90,5 +96,51 @@ describe("taxa cobrada agora junto com a locação", () => {
     const registrado = r.linhas.reduce((s, l) => s + l.valor, 0);
     // Banco: saldo = valor gravado (bruto) - taxa paga - pagamentos.
     expect(resumo.valorBruto - resumo.taxaACobrarAgora - registrado).toBe(0);
+  });
+});
+
+describe("contagem inicial e final", () => {
+  it("na ordem certa, os disparos são final menos inicial", () => {
+    expect(ordenarContagens(7_576_475, 7_656_638)).toEqual({
+      inicial: 7_576_475,
+      final: 7_656_638,
+      disparos: 80_163,
+      invertidas: false,
+    });
+  });
+
+  it("digitadas ao contrário, a menor vira a inicial e o resultado é o mesmo", () => {
+    expect(ordenarContagens(7_656_638, 7_576_475)).toEqual({
+      inicial: 7_576_475,
+      final: 7_656_638,
+      disparos: 80_163,
+      invertidas: true,
+    });
+  });
+
+  it("contagens iguais dão zero disparos", () => {
+    expect(ordenarContagens(100, 100).disparos).toBe(0);
+  });
+});
+
+describe("base do desconto em porcentagem", () => {
+  const pricing = { totalValue: 6711.41 };
+
+  it("é só o valor dos disparos pela tabela, sem aluguel nem deslocamento", () => {
+    expect(
+      valorDosDisparos({ isMentoria: false, shots: 80_163, pricing, mentoriaPricing: null, custoManualPorDisparo: null })
+    ).toBe(6711.41);
+  });
+
+  it("com custo por disparo negociado, a base é disparos x custo e não a tabela", () => {
+    expect(
+      valorDosDisparos({ isMentoria: false, shots: 80_163, pricing, mentoriaPricing: null, custoManualPorDisparo: 0.05 })
+    ).toBe(4008.15);
+  });
+
+  it("em mentoria, a base é o valor da mentoria", () => {
+    expect(
+      valorDosDisparos({ isMentoria: true, shots: 0, pricing: null, mentoriaPricing: { totalValue: 1500 }, custoManualPorDisparo: null })
+    ).toBe(1500);
   });
 });
