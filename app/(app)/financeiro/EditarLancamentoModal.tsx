@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
+import { PIX_CONTAS } from "@/lib/rental-calculator";
+import { formatCurrency } from "@/lib/format";
+import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 
 const PAYMENT_METHODS = [
@@ -36,6 +40,16 @@ interface TransactionToEdit {
   client_id: string | null;
   rental_id?: string | null;
   calendar_event_id?: string | null;
+}
+
+// Pagamento de locação (linha de rental_payments ligada a este lançamento).
+interface PagamentoLocacao {
+  id: string;
+  rental_id: string;
+  forma: string;
+  valor: number;
+  data: string;
+  pix_conta: string | null;
 }
 
 export default function EditarLancamentoModal({
@@ -75,6 +89,110 @@ export default function EditarLancamentoModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+
+  // Entrada ligada a uma locação pode ser um pagamento dela. Nesse caso o
+  // valor e a data mandam no saldo da locação, então a edição passa pelas
+  // funções de pagamento (que mexem no caixa junto) e o "excluir" comum,
+  // que apagaria a locação inteira, sai de cena: só dá para remover o
+  // pagamento.
+  const ehEntradaLocacao = transaction.type === "entrada" && !!transaction.rental_id;
+  const [carregandoPag, setCarregandoPag] = useState(ehEntradaLocacao);
+  const [pagLocacao, setPagLocacao] = useState<PagamentoLocacao | null>(null);
+  const [pagMaximo, setPagMaximo] = useState<number | null>(null);
+  const [pagValor, setPagValor] = useState("");
+  const [pagData, setPagData] = useState("");
+  const [pagForma, setPagForma] = useState("pix");
+  const [pagConta, setPagConta] = useState("harmonize");
+
+  useEffect(() => {
+    if (!ehEntradaLocacao) return;
+    let ativo = true;
+    (async () => {
+      const { data: pag, error: erroPag } = await supabase
+        .from("rental_payments")
+        .select("id, rental_id, forma, valor, data, pix_conta")
+        .eq("transaction_id", transaction.id)
+        .maybeSingle();
+      if (!ativo) return;
+      if (erroPag) {
+        setError("Não consegui ler os dados do pagamento. Feche e abra de novo antes de editar.");
+        setCarregandoPag(false);
+        return;
+      }
+      if (pag) {
+        const p = pag as PagamentoLocacao;
+        setPagLocacao(p);
+        setPagValor(numeroParaCampo(Number(p.valor)));
+        setPagData(p.data);
+        setPagForma(p.forma);
+        setPagConta(p.pix_conta ?? "harmonize");
+        const { data: sit } = await supabase
+          .from("rentals_situacao_pagamento")
+          .select("saldo")
+          .eq("rental_id", p.rental_id)
+          .maybeSingle();
+        if (!ativo) return;
+        if (sit) setPagMaximo(Number(p.valor) + Number(sit.saldo ?? 0));
+      }
+      setCarregandoPag(false);
+    })();
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transaction.id]);
+
+  async function salvarPagamento() {
+    if (!pagLocacao) return;
+    const valor = valorParaNumero(pagValor);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setError("Informe um valor válido.");
+      return;
+    }
+    if (pagMaximo !== null && valor > pagMaximo + 0.001) {
+      setError(`O valor passa do que a locação tem a receber (máximo ${formatCurrency(pagMaximo)}).`);
+      return;
+    }
+    if (!pagData) {
+      setError("Informe a data em que o dinheiro entrou.");
+      return;
+    }
+    if (!window.confirm("Corrigir este pagamento? O caixa e o saldo da locação são atualizados juntos.")) return;
+    setSaving(true);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("editar_pagamento_locacao", {
+      p_payment_id: pagLocacao.id,
+      p_forma: pagForma,
+      p_valor: valor,
+      p_data: pagData,
+      p_pix_conta: pagForma === "pix" ? pagConta : null,
+    });
+    setSaving(false);
+    if (rpcError) {
+      setError(rpcError.message || "Não foi possível corrigir o pagamento.");
+      return;
+    }
+    onSaved();
+  }
+
+  async function removerPagamento() {
+    if (!pagLocacao) return;
+    if (
+      !window.confirm(
+        "Remover só este pagamento? O lançamento no caixa é apagado e o valor volta a ficar em aberto na locação. A locação em si não é apagada."
+      )
+    )
+      return;
+    setSaving(true);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("remover_pagamento_locacao", { p_payment_id: pagLocacao.id });
+    setSaving(false);
+    if (rpcError) {
+      setError(rpcError.message || "Não foi possível remover o pagamento.");
+      return;
+    }
+    onDeleted();
+  }
 
   // Locação e Mentoria (entrada) são geradas pelo sistema; só aparecem
   // aqui quando o lançamento já é de uma delas, para não sumir da tela.
@@ -126,6 +244,105 @@ export default function EditarLancamentoModal({
       return;
     }
     onSaved();
+  }
+
+  const casca = (filhos: React.ReactNode) => (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+      <div
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {filhos}
+      </div>
+    </div>
+  );
+
+  if (ehEntradaLocacao && carregandoPag) {
+    return casca(<p className="text-sm text-neutral-500 dark:text-neutral-400">Carregando pagamento...</p>);
+  }
+
+  if (pagLocacao) {
+    const campo =
+      "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+    const rotulo = "mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400";
+    return casca(
+      <>
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Pagamento de locação</h2>
+        <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
+          {transaction.description}. Valor e data ficam ligados ao saldo da locação, por isso a correção atualiza o
+          caixa e o saldo juntos.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className={rotulo}>Valor recebido</label>
+            <input inputMode="decimal" value={pagValor} onChange={(e) => setPagValor(e.target.value)} className={campo} />
+            {pagMaximo !== null && (
+              <p className="mt-1 text-[11px] text-neutral-400">Máximo permitido: {formatCurrency(pagMaximo)}</p>
+            )}
+          </div>
+          <div>
+            <label className={rotulo}>Data em que entrou</label>
+            <input type="date" value={pagData} onChange={(e) => setPagData(e.target.value)} className={campo} />
+          </div>
+          <div>
+            <label className={rotulo}>Forma de pagamento</label>
+            <select value={pagForma} onChange={(e) => setPagForma(e.target.value)} className={campo}>
+              {PAYMENT_METHODS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {pagForma === "pix" && (
+            <div>
+              <label className={rotulo}>Conta PIX que recebeu</label>
+              <select value={pagConta} onChange={(e) => setPagConta(e.target.value)} className={campo}>
+                {PIX_CONTAS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={salvarPagamento}
+            disabled={saving}
+            className="flex-1 rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+          >
+            {saving ? "Salvando..." : "Corrigir pagamento"}
+          </button>
+        </div>
+
+        <button
+          onClick={removerPagamento}
+          disabled={saving}
+          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400"
+        >
+          Remover só este pagamento
+        </button>
+        {transaction.client_id && (
+          <Link
+            href={`/clientes/${transaction.client_id}`}
+            className="mt-2 block text-center text-xs text-brand-teal underline underline-offset-2"
+          >
+            Abrir a ficha do cliente
+          </Link>
+        )}
+      </>
+    );
   }
 
   return (
@@ -261,11 +478,17 @@ export default function EditarLancamentoModal({
           </button>
         </div>
 
+        {ehEntradaLocacao && (
+          <p className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            Atenção: este lançamento pertence a uma locação. Excluir aqui apaga a locação inteira, com os pagamentos
+            e o agendamento.
+          </p>
+        )}
         <button
           onClick={() => setConfirmarExclusao(true)}
           className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
         >
-          Excluir lançamento
+          {ehEntradaLocacao ? "Excluir a locação inteira" : "Excluir lançamento"}
         </button>
 
         {/* A confirmação chama preview_exclusao antes de apagar e mostra o
