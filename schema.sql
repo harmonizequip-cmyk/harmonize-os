@@ -1712,28 +1712,36 @@ grant execute on function public.confirmar_agendamento to authenticated;
 -- financeiro não divergirem. A checagem amigável roda antes da
 -- constraint de exclusão (rede de segurança final), para a mensagem
 -- dizer de quem é a data em vez do código cru do Postgres.
+drop function if exists public.reagendar_agendamento(uuid, date);
+
 create or replace function public.reagendar_agendamento(
   p_event_id uuid,
-  p_nova_data date
+  p_nova_data date,
+  p_nova_data_fim date default null
 )
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
 declare
   v_data_antiga date;
+  v_fim_antigo date;
+  v_nova_fim date;
   v_equipment_id uuid;
   v_rental_id uuid;
   v_status event_status_type;
   v_ocupante text;
+  v_ocupante_de date;
+  v_ocupante_ate date;
+  v_mudou_inicio boolean;
 begin
   if not has_module_permission('agenda') then
     raise exception 'Sem permissão para reagendar.';
   end if;
 
-  select date_start, equipment_id, rental_id, status
-    into v_data_antiga, v_equipment_id, v_rental_id, v_status
+  select date_start, date_end, equipment_id, rental_id, status
+    into v_data_antiga, v_fim_antigo, v_equipment_id, v_rental_id, v_status
     from calendar_events where id = p_event_id;
 
   if v_data_antiga is null then
@@ -1742,61 +1750,81 @@ begin
   if v_status = 'cancelada' then
     raise exception 'Este agendamento está cancelado e não pode ser reagendado.';
   end if;
-  if p_nova_data = v_data_antiga then
+
+  -- Sem data final informada, o período se mantém com a mesma duração.
+  v_nova_fim := coalesce(p_nova_data_fim, p_nova_data + (v_fim_antigo - v_data_antiga));
+  if v_nova_fim < p_nova_data then
+    raise exception 'A data final do período não pode ser antes da data inicial.';
+  end if;
+  if p_nova_data = v_data_antiga and v_nova_fim = v_fim_antigo then
     raise exception 'A data nova é igual à atual.';
   end if;
+  v_mudou_inicio := p_nova_data <> v_data_antiga;
 
   if v_equipment_id is not null then
-    select coalesce(c.name, ev.title) into v_ocupante
+    select coalesce(c.name, ev.title), ev.date_start, ev.date_end
+      into v_ocupante, v_ocupante_de, v_ocupante_ate
       from calendar_events ev
       left join clients c on c.id = ev.client_id
      where ev.equipment_id = v_equipment_id
        and ev.status <> 'cancelada'
        and ev.id <> p_event_id
-       and daterange(ev.date_start, ev.date_end, '[]') && daterange(p_nova_data, p_nova_data, '[]')
+       and daterange(ev.date_start, ev.date_end, '[]') && daterange(p_nova_data, v_nova_fim, '[]')
      limit 1;
 
     if v_ocupante is not null then
-      raise exception 'O equipamento já está reservado em % para %.',
-        to_char(p_nova_data, 'DD/MM/YYYY'), v_ocupante;
+      raise exception 'O equipamento já está reservado de % a % para %.',
+        to_char(v_ocupante_de, 'DD/MM/YYYY'), to_char(v_ocupante_ate, 'DD/MM/YYYY'), v_ocupante;
     end if;
   end if;
 
-  -- A marca de reagendado vive em calendar_events, independente de já
-  -- existir locação ou não (pré-reserva reagendada também conta).
-  -- rescheduled_at registra QUANDO a ação aconteceu, que é o que o
-  -- Dashboard usa para contar "reagendado no período".
-  update calendar_events
-     set date_start = p_nova_data,
-         date_end   = p_nova_data,
-         rescheduled = true,
-         rescheduled_at = now()
-   where id = p_event_id;
-
+  -- A locação é atualizada ANTES do evento: o gatilho que copia a data do
+  -- evento para a locação rodaria com a data final antiga e a restrição
+  -- (data final >= data inicial) barraria o reagendamento de um período.
+  -- A marca de reagendado só vale quando o início mudou (mudar só a data
+  -- final é ajustar o período, não reagendar).
   if v_rental_id is not null then
     update rentals
        set event_date = p_nova_data,
-           rescheduled = true,
-           rescheduled_at = now()
+           event_date_end = case when v_nova_fim > p_nova_data then v_nova_fim else null end,
+           rescheduled = rescheduled or v_mudou_inicio,
+           rescheduled_at = case when v_mudou_inicio then now() else rescheduled_at end
      where id = v_rental_id;
 
-    update transactions
-       set date = p_nova_data
-     where rental_id = v_rental_id;
+    -- Só o lançamento de deslocamento acompanha a data do evento. Pagamentos
+    -- guardam o dia em que o dinheiro entrou e despesas têm a própria data:
+    -- reagendar não mexe nelas.
+    if v_mudou_inicio then
+      update transactions
+         set date = p_nova_data
+       where id = (select deslocamento_transaction_id from rentals where id = v_rental_id);
+    end if;
   end if;
 
+  update calendar_events
+     set date_start = p_nova_data,
+         date_end   = v_nova_fim,
+         rescheduled = rescheduled or v_mudou_inicio,
+         rescheduled_at = case when v_mudou_inicio then now() else rescheduled_at end
+   where id = p_event_id;
+
   perform public.registrar_movimentacao(
-    'reagendado', 'calendar_events', p_event_id,
+    case when v_mudou_inicio then 'reagendado' else 'editado' end,
+    'calendar_events', p_event_id,
     public.descrever_registro('calendar_events', p_event_id),
     jsonb_build_object(
+      'acao_detalhada', case when v_mudou_inicio then 'reagendado' else 'período alterado' end,
       'data_antiga', to_char(v_data_antiga, 'DD/MM/YYYY'),
-      'data_nova',   to_char(p_nova_data, 'DD/MM/YYYY')
+      'data_nova',   to_char(p_nova_data, 'DD/MM/YYYY'),
+      'fim_antigo',  to_char(v_fim_antigo, 'DD/MM/YYYY'),
+      'fim_novo',    to_char(v_nova_fim, 'DD/MM/YYYY')
     )
   );
 
 exception
   when exclusion_violation then
-    raise exception 'O equipamento já está reservado em %.', to_char(p_nova_data, 'DD/MM/YYYY');
+    raise exception 'O equipamento já está reservado no período de % a %.',
+      to_char(p_nova_data, 'DD/MM/YYYY'), to_char(v_nova_fim, 'DD/MM/YYYY');
 end;
 $$;
 
@@ -3865,7 +3893,7 @@ create or replace function public.finalize_rental_reservation(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path to 'public'
 as $$
 declare
   v_rental_id uuid;
@@ -3874,6 +3902,7 @@ declare
   v_client_id uuid;
   v_equipment_id uuid;
   v_event_date date;
+  v_event_date_end date;
   v_client_name text;
   v_is_mentoria boolean;
   v_km_ida numeric;
@@ -3887,8 +3916,8 @@ begin
     raise exception 'Sem permissão para finalizar locações';
   end if;
 
-  select client_id, equipment_id, date_start, is_mentoria, km_ida, valor_deslocamento
-    into v_client_id, v_equipment_id, v_event_date, v_is_mentoria, v_km_ida, v_valor_deslocamento
+  select client_id, equipment_id, date_start, date_end, is_mentoria, km_ida, valor_deslocamento
+    into v_client_id, v_equipment_id, v_event_date, v_event_date_end, v_is_mentoria, v_km_ida, v_valor_deslocamento
   from calendar_events
   where id = p_calendar_event_id and rental_id is null and status = 'pre_reserva';
 
@@ -3913,15 +3942,16 @@ begin
     end if;
   end if;
 
-  insert into rentals (client_id, equipment_id, event_date, shots, calculated_value, payment_method, notes, created_by, km_ida, valor_deslocamento)
-  values (v_client_id, v_equipment_id, v_event_date, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by, v_km_ida, coalesce(v_valor_deslocamento, 0))
+  -- A data final da reserva vai para a locação (nula quando é de um dia só,
+  -- igual a create_rental).
+  insert into rentals (client_id, equipment_id, event_date, event_date_end, shots, calculated_value, payment_method, notes, created_by, km_ida, valor_deslocamento)
+  values (
+    v_client_id, v_equipment_id, v_event_date,
+    case when v_event_date_end > v_event_date then v_event_date_end else null end,
+    p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by, v_km_ida, coalesce(v_valor_deslocamento, 0)
+  )
   returning id into v_rental_id;
 
-  -- Leva AC: ajuda de custo registrada na pré-reserva vira entrada no
-  -- financeiro ao finalizar (categoria Deslocamento, mesma forma de
-  -- pagamento e data da locação). Se a calculadora depois incluir o
-  -- deslocamento no valor, definir_deslocamento_locacao(p_incluso_no_valor
-  -- => true) remove este lançamento para não contar duas vezes.
   if coalesce(v_valor_deslocamento, 0) > 0 then
     select id into v_cat_desloc from categories
      where type = 'entrada' and is_default = true and name ilike 'Deslocamento%' limit 1;
@@ -3953,8 +3983,6 @@ begin
     values (v_rental_id, p_payment_method, p_calculated_value, v_event_date, v_pix_conta, v_transaction_id, v_created_by);
 
     update rentals set transaction_id = v_transaction_id where id = v_rental_id;
-    -- pago / pago_em: preenchidos automaticamente pelo trigger de
-    -- rental_payments (ver nota da leva O sobre o bug corrigido aqui).
   end if;
 
   update calendar_events
@@ -4671,15 +4699,16 @@ stable
 security definer
 set search_path to 'public'
 as $$
-  select ce.date_start,
+  select d::date,
          e.code::text,
          case when ce.taxa_status = 'pendente' then 'pre_reserva'
               else 'agendado' end
     from calendar_events ce
     join equipments e on e.id = ce.equipment_id
-   where ce.date_start between p_inicio and p_fim
+    cross join lateral generate_series(ce.date_start::timestamp, ce.date_end::timestamp, interval '1 day') d
+   where d::date between p_inicio and p_fim
      and ce.status <> 'cancelada'
-   order by ce.date_start, e.code;
+   order by d::date, e.code;
 $$;
 
 -- Marca como cliente ao entrar na etapa "cliente" e impede tirar a marca,

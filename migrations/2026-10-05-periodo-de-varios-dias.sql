@@ -1,6 +1,6 @@
 -- ============================================================
--- STATUS: ESCRITA E TESTADA num Postgres local com o schema.sql, AINDA NÃO
--- APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 05/10/2026, pelo dono,
+-- e conferida por consulta de leitura (assinaturas das 3 funções).
 --
 -- Locação de vários dias = uma reserva só, com data final, uma taxa só.
 --
