@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal, somarDias } from "@/lib/period";
+import { valorParaNumero } from "@/lib/valor";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -111,7 +112,7 @@ export default function DespesasDaReserva({
   }, [eventId]);
 
   async function lancar() {
-    const numero = Number(valor.replace(",", "."));
+    const numero = valorParaNumero(valor);
     if (!categoriaId || !numero || numero <= 0) {
       setErro("Escolha a categoria e informe um valor válido.");
       return;

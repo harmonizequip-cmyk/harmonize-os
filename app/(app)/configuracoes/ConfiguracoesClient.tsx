@@ -6,6 +6,7 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import type { AppSettings } from "@/lib/settings";
+import { valorParaNumero } from "@/lib/valor";
 
 const TAG_PALETTE = [
   { name: "Teal", hex: "#3DBFB8" },
@@ -26,7 +27,7 @@ interface TagRow {
 }
 
 function n(v: string) {
-  return Number(v.replace(",", "."));
+  return v.trim() === "" ? 0 : valorParaNumero(v);
 }
 
 export default function ConfiguracoesClient({

@@ -204,7 +204,7 @@ export default function EditarLancamentoModal({
   );
 
   async function handleSave() {
-    const amountNumber = Number(amount.replace(",", "."));
+    const amountNumber = valorParaNumero(amount);
     if (!description.trim() || !amountNumber || !date) {
       setError("Preencha descrição, valor e data.");
       return;

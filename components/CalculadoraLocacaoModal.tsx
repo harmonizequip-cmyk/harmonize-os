@@ -56,6 +56,7 @@ import {
 } from "@/lib/rental-calculator";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
+import { valorParaNumero } from "@/lib/valor";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -72,7 +73,7 @@ function onlyDigits(v: string): string {
   return v.replace(/\D/g, "");
 }
 function parseDecimal(v: string): number {
-  return Number(v.replace(/\./g, "").replace(",", ".")) || 0;
+  return valorParaNumero(v) || 0;
 }
 
 export interface EquipmentOption {

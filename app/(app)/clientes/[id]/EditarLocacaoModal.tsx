@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { calculateRentalValue, type PricingConfig } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
+import { valorParaNumero } from "@/lib/valor";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -114,7 +115,7 @@ export default function EditarLocacaoModal({
   const [error, setError] = useState<string | null>(null);
 
   const kmIdaNumber = Number(kmIda.replace(/\D/g, "")) || 0;
-  const valorDeslocamentoNumber = Number(valorDeslocamento.replace(",", ".")) || 0;
+  const valorDeslocamentoNumber = valorParaNumero(valorDeslocamento) || 0;
 
   // Leva S: cancelar deixou de ser uma opção do dropdown de status —
   // passa por uma RPC dedicada (cancelar_locacao), que aplica as mesmas
@@ -207,7 +208,7 @@ export default function EditarLocacaoModal({
   }, []);
 
   async function handleAddCusto() {
-    const valorCusto = Number(custoValor.replace(",", "."));
+    const valorCusto = valorParaNumero(custoValor);
     if (!custoCategoriaId || !valorCusto || valorCusto <= 0) {
       setCustoErro("Escolha a categoria e um valor maior que zero.");
       return;
@@ -262,7 +263,7 @@ export default function EditarLocacaoModal({
   }, []);
 
   async function handleAddPayment() {
-    const valorNumber = Number(novoValor.replace(",", "."));
+    const valorNumber = valorParaNumero(novoValor);
     if (!valorNumber || valorNumber <= 0) {
       setPaymentError("Informe um valor válido.");
       return;
@@ -319,7 +320,7 @@ export default function EditarLocacaoModal({
   }
 
   async function handleSave() {
-    const valorNumber = Number(valor.replace(",", "."));
+    const valorNumber = valorParaNumero(valor);
     if (!clientId) {
       setError("Selecione o cliente.");
       return;

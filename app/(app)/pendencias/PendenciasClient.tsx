@@ -8,6 +8,7 @@ import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarCsv } from "@/lib/exportar-csv";
+import { valorParaNumero } from "@/lib/valor";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
 
@@ -47,7 +48,7 @@ export default function PendenciasClient({
   }
 
   async function salvarPagamento(l: PendenciaLocacao) {
-    const valor = Number(pagValor.replace(/\./g, "").replace(",", "."));
+    const valor = valorParaNumero(pagValor);
     if (!valor || valor <= 0) {
       setPagErro("Informe um valor válido.");
       return;

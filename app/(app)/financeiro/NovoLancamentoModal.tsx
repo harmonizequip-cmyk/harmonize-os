@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 
 import { hojeLocal } from "@/lib/period";
+import { valorParaNumero } from "@/lib/valor";
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
   { value: "dinheiro", label: "Dinheiro" },
@@ -63,7 +64,7 @@ export default function NovoLancamentoModal({
   );
 
   async function handleSave() {
-    const numericAmount = Number(amount.replace(",", "."));
+    const numericAmount = valorParaNumero(amount);
     if (!categoryId || !description || !amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
       setError("Preencha categoria, descrição e um valor válido.");
       return;

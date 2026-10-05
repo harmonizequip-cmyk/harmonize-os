@@ -11,6 +11,7 @@ import DespesasDaReserva from "@/components/DespesasDaReserva";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
 import { formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
+import { valorParaNumero } from "@/lib/valor";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
@@ -175,7 +176,7 @@ export default function EditarEventoModal({
   }, [isRentalEvent, event.rental_id]);
 
   const kmIdaNumber = Number(kmIda.replace(/\D/g, "")) || 0;
-  const valorDeslocamentoNumber = Number(valorDeslocamento.replace(",", ".")) || 0;
+  const valorDeslocamentoNumber = valorParaNumero(valorDeslocamento) || 0;
 
   async function handleSalvarDeslocamento() {
     if (!event.rental_id) return;
@@ -225,7 +226,7 @@ export default function EditarEventoModal({
   }, [isPendingReservation, event.id]);
 
   const kmIdaReservaNumber = Number(kmIdaReserva.replace(/\D/g, "")) || 0;
-  const valorDeslocamentoReservaNumber = Number(valorDeslocamentoReserva.replace(",", ".")) || 0;
+  const valorDeslocamentoReservaNumber = valorParaNumero(valorDeslocamentoReserva) || 0;
 
   async function handleSalvarDeslocamentoReserva() {
     setSavingDeslocamentoReserva(true);
