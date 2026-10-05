@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (a tentativa de aplicar foi cancelada;
+-- STATUS: ESCRITA E TESTADA num Postgres local com o schema.sql (sem erro), AINDA NÃO APLICADA (a tentativa de aplicar foi cancelada;
 -- aguarda o dono rodar ou liberar). Depois de aplicada, refletir no schema.sql.
 --
 -- Fecha as funções do banco que qualquer pessoa sem login podia executar.
@@ -92,6 +92,9 @@ begin
   delete from mentoring_events where id = p_mentoria_id;
 end;
 $$;
+
+-- Recriada do zero: se a versão antiga (sem "reagendado") ainda existir, o tipo de retorno muda.
+drop function if exists public.agendamentos_do_cliente(uuid);
 
 create or replace function public.agendamentos_do_cliente(p_client_id uuid)
 returns table(

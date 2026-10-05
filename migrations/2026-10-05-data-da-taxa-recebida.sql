@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda aval do dono para rodar).
+-- STATUS: ESCRITA E TESTADA num Postgres local com o schema.sql (sem erro), AINDA NÃO APLICADA (aguarda aval do dono para rodar).
 --
 -- Data da taxa de reserva = dia em que o dinheiro entrou.
 --

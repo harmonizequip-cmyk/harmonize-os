@@ -50,6 +50,21 @@
 create extension if not exists "pgcrypto";
 create extension if not exists "btree_gist";
 
+-- "Hoje" no fuso do negócio, não em UTC. O Supabase roda em UTC:
+-- current_date sozinho já vira amanhã a partir das 21h no horário do
+-- Brasil (UTC-3 o ano todo, sem horário de verão desde 2019). Espelha
+-- lib/period.ts (hojeLocal) do frontend — usar esta função em vez de
+-- current_date sempre que o valor representa a data de hoje para quem
+-- está usando o sistema (leva Q).
+create or replace function public.hoje_local()
+returns date
+language sql
+stable
+as $$
+  select (now() at time zone 'America/Sao_Paulo')::date;
+$$;
+
+
 -- ------------------------------------------------------------
 -- ENUMS
 -- ------------------------------------------------------------
@@ -882,20 +897,6 @@ $$;
 
 comment on function public.require_admin() is
   'Porta de entrada das ações de administrador (limpeza de dados de teste, exclusão definitiva). active bloqueia mesmo administrador, igual a has_module_permission (leva H) — antes da leva Q, is_admin bastava mesmo com a conta desativada.';
-
--- "Hoje" no fuso do negócio, não em UTC. O Supabase roda em UTC:
--- current_date sozinho já vira amanhã a partir das 21h no horário do
--- Brasil (UTC-3 o ano todo, sem horário de verão desde 2019). Espelha
--- lib/period.ts (hojeLocal) do frontend — usar esta função em vez de
--- current_date sempre que o valor representa a data de hoje para quem
--- está usando o sistema (leva Q).
-create or replace function public.hoje_local()
-returns date
-language sql
-stable
-as $$
-  select (now() at time zone 'America/Sao_Paulo')::date;
-$$;
 
 -- Herança automática da chave geral (settings.test_mode): se quem
 -- inseriu não disse nada sobre is_test, o registro herda o estado da
@@ -2236,7 +2237,9 @@ returns table (
   pago boolean,
   pago_em date,
   cancellation_reason text,
-  no_show boolean
+  no_show boolean,
+  -- Reagendado: a reserva ou a locação já foi movida de data (igual ao banco).
+  reagendado boolean
 )
 language sql
 stable
@@ -2263,7 +2266,8 @@ as $$
     coalesce(r.pago, false),
     r.pago_em,
     ev.cancellation_reason,
-    ev.no_show
+    ev.no_show,
+    coalesce(ev.rescheduled, false) or coalesce(r.rescheduled, false)
   from calendar_events ev
   left join equipments eq on eq.id = ev.equipment_id
   left join rentals r on r.id = ev.rental_id

@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar ou liberar).
+-- STATUS: ESCRITA E TESTADA num Postgres local com o schema.sql (sem erro), AINDA NÃO APLICADA (aguarda o dono rodar ou liberar).
 --
 -- Guardar a contagem inicial do equipamento na reserva, sem fechar a conta.
 --
@@ -65,11 +65,17 @@ begin
          contagem_inicial_em = case when p_contagem is null then null else now() end
    where id = p_event_id;
 
+  -- A tabela movimentacoes só aceita as ações listadas no seu CHECK; usa
+  -- "editado" e diz o que mudou em acao_detalhada, como editar_pagamento_locacao.
   perform public.registrar_movimentacao(
-    'contagem_inicial_registrada',
+    'editado',
     'calendar_events', p_event_id,
     public.descrever_registro('calendar_events', p_event_id),
-    jsonb_build_object('contagem_inicial', p_contagem, 'antes', v_antes)
+    jsonb_build_object(
+      'acao_detalhada', 'contagem inicial do equipamento',
+      'antes', v_antes,
+      'depois', p_contagem
+    )
   );
 end;
 $$;
