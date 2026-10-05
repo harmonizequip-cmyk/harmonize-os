@@ -58,6 +58,8 @@ import {
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
+import CalculoImagemBotao from "@/components/CalculoImagemBotao";
+import { montarDadosCalculo } from "@/lib/calculo-image";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -482,6 +484,38 @@ export default function CalculadoraLocacaoModal({
     pagamentos,
   ]);
   const previewWhatsappLink = previewWhatsappText ? buildWhatsAppLink(activeClientWhatsapp, previewWhatsappText) : null;
+
+  // Dados da imagem do cálculo dos disparos (só modo disparo, com contagem).
+  const dadosImagem = useMemo(() => {
+    if (isMentoria || !pricing || !resumo || shots <= 0) return null;
+    return montarDadosCalculo({
+      cliente: activeClientName || null,
+      dataEvento: eventDate || null,
+      contagemInicial: initialNumber,
+      contagemFinal: finalNumber,
+      disparos: shots,
+      pricing,
+      custoManualPorDisparo,
+      itens,
+      descontoPercentual: descontoTipo === "percentual" ? descontoRawNumero : null,
+      kmIda: kmIdaNumber,
+      resumo,
+    });
+  }, [
+    isMentoria,
+    pricing,
+    resumo,
+    shots,
+    activeClientName,
+    eventDate,
+    initialNumber,
+    finalNumber,
+    custoManualPorDisparo,
+    itens,
+    descontoTipo,
+    descontoRawNumero,
+    kmIdaNumber,
+  ]);
   const [previewCopied, setPreviewCopied] = useState(false);
   async function handleCopyPreview() {
     if (!previewWhatsappText) return;
@@ -810,6 +844,7 @@ export default function CalculadoraLocacaoModal({
             <button onClick={handleCopy} className="rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600">
               {copied ? "Copiado!" : "Copiar texto"}
             </button>
+            <CalculoImagemBotao dados={dadosImagem} whatsapp={activeClientWhatsapp} />
           </div>
 
           {/* Despesa da locação (leva O): ligada a ESTA locação */}
@@ -1332,6 +1367,7 @@ export default function CalculadoraLocacaoModal({
                       {previewCopied ? "Copiado!" : "Copiar texto"}
                     </button>
                   </div>
+                  <CalculoImagemBotao dados={dadosImagem} whatsapp={activeClientWhatsapp} />
                 </div>
               )}
             </div>
