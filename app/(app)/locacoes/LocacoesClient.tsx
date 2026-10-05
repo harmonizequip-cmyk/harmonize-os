@@ -1,5 +1,6 @@
 "use client";
 
+import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import { useMemo } from "react";
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -47,6 +48,11 @@ function formatPeriodo(r: Locacao): string {
     return `${formatDate(r.event_date)} a ${formatDate(r.event_date_end)}`;
   }
   return formatDate(r.event_date);
+}
+
+// Tem dinheiro a receber: não cancelada, não paga e com saldo na view.
+function temSaldo(r: Locacao): boolean {
+  return r.status !== "cancelada" && !r.pago && Number(r.saldo) > 0.009;
 }
 
 function situacao(r: Locacao): { label: string; classe: string } {
@@ -233,11 +239,11 @@ export default function LocacoesClient({
         {linhas.map((r) => {
           const s = situacao(r);
           return (
-            <Link
+            <div
               key={r.id}
-              href={`/clientes/${r.client_id}`}
-              className="block rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+              className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
             >
+              <Link href={`/clientes/${r.client_id}`} className="block">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
@@ -272,7 +278,13 @@ export default function LocacoesClient({
                   Falta {formatCurrency(Number(r.saldo))}
                 </p>
               )}
-            </Link>
+              </Link>
+              {temSaldo(r) && (
+                <div className="mt-2">
+                  <ReceberPagamentoBotao rentalId={r.id} saldo={Number(r.saldo)} />
+                </div>
+              )}
+            </div>
           );
         })}
         {linhas.length === 0 && (
@@ -294,6 +306,7 @@ export default function LocacoesClient({
               <th className="px-4 py-3 text-right">Valor</th>
               <th className="px-4 py-3">Situação</th>
               <th className="px-4 py-3">Pagamento</th>
+              <th className="px-4 py-3">Receber</th>
             </tr>
           </thead>
           <tbody>
@@ -351,12 +364,15 @@ export default function LocacoesClient({
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
                     {PAGAMENTOS[r.payment_method] ?? r.payment_method}
                   </td>
+                  <td className="min-w-[10rem] px-4 py-3">
+                    {temSaldo(r) && <ReceberPagamentoBotao rentalId={r.id} saldo={Number(r.saldo)} />}
+                  </td>
                 </tr>
               );
             })}
             {linhas.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
                   Nenhuma locação em {periodo.rotulo}.
                 </td>
               </tr>

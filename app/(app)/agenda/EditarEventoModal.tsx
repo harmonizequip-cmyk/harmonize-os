@@ -8,8 +8,10 @@ import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import DespesasDaReserva from "@/components/DespesasDaReserva";
+import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
+import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
-import { formatDate } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import { valorParaNumero } from "@/lib/valor";
 
@@ -139,6 +141,27 @@ export default function EditarEventoModal({
   const [valorDeslocamento, setValorDeslocamento] = useState("");
   const [kmIda, setKmIda] = useState("");
   const [inclusoNoValor, setInclusoNoValor] = useState(false);
+
+  // Saldo em aberto da locação (view rentals_situacao_pagamento): mostra
+  // quanto falta e deixa receber sem sair da Agenda.
+  const [saldoLocacao, setSaldoLocacao] = useState<number | null>(null);
+  const [recarregarSaldo, setRecarregarSaldo] = useState(0);
+  useEffect(() => {
+    if (!event.rental_id) return;
+    let ativo = true;
+    supabase
+      .from("rentals_situacao_pagamento")
+      .select("saldo")
+      .eq("rental_id", event.rental_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (ativo) setSaldoLocacao(data ? Number(data.saldo) : null);
+      });
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.rental_id, recarregarSaldo]);
   const [savingDeslocamento, setSavingDeslocamento] = useState(false);
   const [deslocamentoError, setDeslocamentoError] = useState<string | null>(null);
 
@@ -460,6 +483,11 @@ export default function EditarEventoModal({
             </div>
           ) : (
             <>
+              {event.taxa_status === "pendente" && !event.is_mentoria && (
+                <div className="mb-3">
+                  <TaxaRecebidaBotao eventId={event.id} onDone={onSaved} />
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={onClose}
@@ -595,6 +623,28 @@ export default function EditarEventoModal({
             Este evento veio de uma locação HIPRO. Para editar cliente, data, equipamento, disparos ou valor, isso é
             feito na própria locação (na ficha do cliente), para manter o financeiro e a agenda sincronizados.
           </p>
+
+          {saldoLocacao !== null && (
+            <div className="mb-4 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+              {saldoLocacao > 0.009 ? (
+                <>
+                  <p className="mb-2 text-sm text-amber-700 dark:text-amber-400">
+                    Falta receber {formatCurrency(saldoLocacao)}.
+                  </p>
+                  <ReceberPagamentoBotao
+                    rentalId={event.rental_id as string}
+                    saldo={saldoLocacao}
+                    onDone={() => {
+                      setRecarregarSaldo((n) => n + 1);
+                      onSaved();
+                    }}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-brand-teal">Locação paga.</p>
+              )}
+            </div>
+          )}
 
           <div className="mb-4 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">

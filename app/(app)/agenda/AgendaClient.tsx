@@ -588,7 +588,7 @@ export default function AgendaClient({
       </p>
 
       {needsConfirmation.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
+        <div id="confirmacoes" className="scroll-mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
           <p className="mb-2 text-sm font-semibold text-amber-800 dark:text-amber-400">
             ⚠️ Precisam de confirmação (próximos 7 dias)
           </p>

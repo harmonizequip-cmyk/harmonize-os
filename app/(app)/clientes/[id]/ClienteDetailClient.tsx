@@ -12,6 +12,8 @@ import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContr
 import EditarClienteModal from "./EditarClienteModal";
 import EditarLocacaoModal from "./EditarLocacaoModal";
 import ReservarHiproModal from "../../agenda/ReservarHiproModal";
+import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
+import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import HistoricoClienteSection from "./HistoricoClienteSection";
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -56,6 +58,10 @@ interface RentalRow {
   rescheduled: boolean;
   equipment_id: string;
   notes: string | null;
+  // Saldo em aberto e total já pago (view rentals_situacao_pagamento).
+  pago?: boolean;
+  saldo?: number;
+  totalPago?: number;
   equipments?: { name: string; serial_number?: string | null; anvisa_registro?: string | null } | null;
 }
 
@@ -74,12 +80,18 @@ interface PreReservaRow {
   event_date: string;
   event_date_end?: string | null;
   equipment_id: string;
+  taxa_status?: string | null;
   equipments?: { name: string; serial_number?: string | null; anvisa_registro?: string | null } | null;
 }
 
 // Leva W: mostra o período completo quando a locação (ou pré-reserva)
 // cobre mais de um dia (event_date_end preenchido e diferente da data
 // inicial); senão mostra só a data única, igual sempre foi.
+// Tem dinheiro a receber: não cancelada, não paga e com saldo na view.
+function temSaldo(r: RentalRow): boolean {
+  return r.status !== "cancelada" && !r.pago && Number(r.saldo ?? 0) > 0.009;
+}
+
 function formatPeriodo(r: { event_date: string; event_date_end?: string | null }): string {
   if (r.event_date_end && r.event_date_end !== r.event_date) {
     return `${formatDate(r.event_date)} a ${formatDate(r.event_date_end)}`;
@@ -341,6 +353,11 @@ export default function ClienteDetailClient({
                   {pr.equipments?.name ?? "-"}
                 </p>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{formatPeriodo(pr)}</p>
+                {pr.taxa_status === "pendente" && (
+                  <div className="mt-2">
+                    <TaxaRecebidaBotao eventId={pr.id} />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setContratoOrigem({ kind: "reserva", reserva: pr })}
@@ -371,6 +388,11 @@ export default function ClienteDetailClient({
                     </td>
                     <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{pr.equipments?.name ?? "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
+                      {pr.taxa_status === "pendente" && (
+                        <div className="mb-2 min-w-[12rem] text-left">
+                          <TaxaRecebidaBotao eventId={pr.id} />
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => setContratoOrigem({ kind: "reserva", reserva: pr })}
@@ -422,6 +444,15 @@ export default function ClienteDetailClient({
               </span>
               <span className="font-medium text-brand-teal">{formatCurrency(Number(r.calculated_value))}</span>
             </div>
+            {temSaldo(r) && (
+              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                <p className="mb-1 text-[11px] text-amber-700 dark:text-amber-400">
+                  {(r.totalPago ?? 0) > 0 ? `Já recebido ${formatCurrency(r.totalPago ?? 0)}. ` : ""}
+                  Falta {formatCurrency(Number(r.saldo))}.
+                </p>
+                <ReceberPagamentoBotao rentalId={r.id} saldo={Number(r.saldo)} />
+              </div>
+            )}
             {r.status !== "cancelada" && (
               <button
                 type="button"
@@ -455,6 +486,7 @@ export default function ClienteDetailClient({
               <th className="px-4 py-3 text-right">Valor</th>
               <th className="px-4 py-3">Pagamento</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Receber</th>
               <th className="px-4 py-3">Contrato</th>
             </tr>
           </thead>
@@ -488,6 +520,9 @@ export default function ClienteDetailClient({
                     {r.rescheduled && " · ↻"}
                   </span>
                 </td>
+                <td className="min-w-[10rem] px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  {temSaldo(r) && <ReceberPagamentoBotao rentalId={r.id} saldo={Number(r.saldo)} />}
+                </td>
                 <td className="whitespace-nowrap px-4 py-3">
                   {r.status !== "cancelada" && (
                     <button
@@ -507,7 +542,7 @@ export default function ClienteDetailClient({
             ))}
             {rentals.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
                   Nenhuma locação registrada ainda.
                 </td>
               </tr>

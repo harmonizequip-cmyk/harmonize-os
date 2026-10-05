@@ -34,12 +34,29 @@ interface EquipmentOption {
   name: string;
 }
 
-type ActionKey = "tarefa" | "lancamento" | "lead" | "evento" | "locacao" | "locacao_disparos";
+type ActionKey =
+  | "tarefa"
+  | "lancamento"
+  | "lead"
+  | "evento"
+  | "locacao"
+  | "locacao_disparos"
+  | "receber"
+  | "taxa_recebida";
+
+// Atalhos que não abrem formulário: levam direto à lista de quem deve, em
+// Pendências, onde o recebimento é feito com o valor já preenchido.
+const ATALHOS_DE_TELA: Partial<Record<ActionKey, string>> = {
+  receber: "/pendencias",
+  taxa_recebida: "/pendencias#taxas",
+};
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
 // sem aquele acesso não ver a opção aqui também.
 const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[] = [
+  { key: "receber", label: "Receber pagamento de locação", emoji: "💵", module: "financeiro" },
+  { key: "taxa_recebida", label: "Taxa de reserva recebida", emoji: "💳", module: "financeiro" },
   { key: "tarefa", label: "Nova tarefa", emoji: "🗒️", module: "clientes" },
   { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
   { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
@@ -94,6 +111,11 @@ export default function QuickActionsButton({
 
   function handlePick(key: ActionKey) {
     setMenuOpen(false);
+    const destino = ATALHOS_DE_TELA[key];
+    if (destino) {
+      router.push(destino);
+      return;
+    }
     setActiveModal(key);
   }
 

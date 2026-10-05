@@ -2,13 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarCsv } from "@/lib/exportar-csv";
-import { valorParaNumero } from "@/lib/valor";
+import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
 
@@ -28,51 +25,6 @@ export default function PendenciasClient({
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("valor");
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
-
-  // Registrar pagamento direto daqui, sem abrir o cliente.
-  const router = useRouter();
-  const supabase = createClient();
-  const [pagando, setPagando] = useState<string | null>(null);
-  const [pagValor, setPagValor] = useState("");
-  const [pagForma, setPagForma] = useState("pix");
-  const [pagConta, setPagConta] = useState<string>("harmonize");
-  const [pagSalvando, setPagSalvando] = useState(false);
-  const [pagErro, setPagErro] = useState<string | null>(null);
-
-  function abrirPagamento(l: PendenciaLocacao) {
-    setPagando(l.rentalId);
-    setPagValor(l.saldo.toFixed(2).replace(".", ","));
-    setPagForma("pix");
-    setPagConta("harmonize");
-    setPagErro(null);
-  }
-
-  async function salvarPagamento(l: PendenciaLocacao) {
-    const valor = valorParaNumero(pagValor);
-    if (!valor || valor <= 0) {
-      setPagErro("Informe um valor válido.");
-      return;
-    }
-    if (valor > l.saldo + 0.001) {
-      setPagErro(`O valor é maior que o saldo em aberto (${formatCurrency(l.saldo)}).`);
-      return;
-    }
-    setPagSalvando(true);
-    setPagErro(null);
-    const { error } = await supabase.rpc("registrar_pagamento_locacao", {
-      p_rental_id: l.rentalId,
-      p_forma: pagForma,
-      p_valor: valor,
-      p_pix_conta: pagForma === "pix" ? pagConta : null,
-    });
-    setPagSalvando(false);
-    if (error) {
-      setPagErro(error.message || "Não foi possível registrar o pagamento.");
-      return;
-    }
-    setPagando(null);
-    router.refresh();
-  }
 
   const clientes = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -331,73 +283,11 @@ export default function PendenciasClient({
                           </span>
                         </span>
                       </div>
-                      {pagando === l.rentalId ? (
-                        <div className="space-y-2 rounded-xl border border-brand-teal/40 bg-brand-teal/5 p-2.5">
-                          <div className="flex flex-wrap gap-2">
-                            <input
-                              value={pagValor}
-                              onChange={(e) => setPagValor(e.target.value)}
-                              inputMode="decimal"
-                              aria-label="Valor recebido"
-                              className="w-28 rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                            />
-                            <select
-                              value={pagForma}
-                              onChange={(e) => setPagForma(e.target.value)}
-                              aria-label="Forma de pagamento"
-                              className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                            >
-                              <option value="pix">PIX</option>
-                              <option value="dinheiro">Dinheiro</option>
-                              <option value="debito">Débito</option>
-                              <option value="credito">Crédito</option>
-                              <option value="transferencia">Transferência</option>
-                              <option value="outros">Outros</option>
-                            </select>
-                            {pagForma === "pix" && (
-                              <select
-                                value={pagConta}
-                                onChange={(e) => setPagConta(e.target.value)}
-                                aria-label="Conta PIX que recebeu"
-                                className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                              >
-                                {PIX_CONTAS.map((c) => (
-                                  <option key={c.value} value={c.value}>
-                                    {c.nome}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                          {pagErro && <p className="text-xs text-red-600 dark:text-red-400">{pagErro}</p>}
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={pagSalvando}
-                              onClick={() => salvarPagamento(l)}
-                              className="flex-1 rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                            >
-                              {pagSalvando ? "Salvando..." : "Confirmar recebimento"}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={pagSalvando}
-                              onClick={() => setPagando(null)}
-                              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => abrirPagamento(l)}
-                          className="w-full rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white"
-                        >
-                          Registrar pagamento de {formatDate(l.eventDate)}
-                        </button>
-                      )}
+                      <ReceberPagamentoBotao
+                        rentalId={l.rentalId}
+                        saldo={l.saldo}
+                        rotulo={`Registrar pagamento de ${formatDate(l.eventDate)}`}
+                      />
                       </div>
                     ))}
                     <div className="flex gap-2 pt-1">

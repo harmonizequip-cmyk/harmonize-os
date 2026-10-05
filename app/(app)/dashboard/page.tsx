@@ -224,6 +224,33 @@ export default async function DashboardPage({
     ? "no mês corrente"
     : `de ${ocupInicio.split("-").reverse().join("/")} a ${ocupFim.split("-").reverse().join("/")}`;
 
+  // Tarefas: o Dashboard é a tela que se abre todo dia, então é aqui que elas
+  // precisam nascer e aparecer (antes só nasciam ao abrir Funil ou Tarefas, e
+  // a tarefa pós-locação some se passar a janela sem ninguém abrir essas
+  // telas). Falha aqui não derruba o Dashboard: é aviso, não dinheiro.
+  await supabase.rpc("gerar_tarefas_recontato");
+  await supabase.rpc("gerar_tarefas_agenda");
+  const { data: tarefasPendentes } = await supabase
+    .from("tasks")
+    .select("id, type, due_date")
+    .eq("status", "pendente")
+    .eq("is_test", false);
+  const tarefasDeHoje = (tarefasPendentes ?? []).filter((t: any) => t.due_date <= todayStr);
+  const tarefasPorTipo = new Map<string, number>();
+  for (const t of tarefasDeHoje as any[]) tarefasPorTipo.set(t.type, (tarefasPorTipo.get(t.type) ?? 0) + 1);
+  const ROTULO_TAREFA: Record<string, string> = {
+    recontato: "recontato",
+    pos_locacao: "pós-locação",
+    contato_inicial: "contato inicial",
+    cobranca_taxa: "cobrança de taxa",
+    confirmacao: "confirmação",
+    followup: "follow-up",
+  };
+  const resumoTarefas = Array.from(tarefasPorTipo.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([tipo, qtd]) => `${qtd} ${ROTULO_TAREFA[tipo] ?? tipo}`)
+    .join(", ");
+
   const in7Str = somaDias(7).toISOString().slice(0, 10);
   const { count: pendingConfirmations } = await supabase
     .from("calendar_events")
@@ -368,10 +395,20 @@ export default async function DashboardPage({
 
       {!!pendingConfirmations && pendingConfirmations > 0 && (
         <Link
-          href="/agenda"
+          href="/agenda#confirmacoes"
           className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
         >
           ⚠️ {pendingConfirmations} {pendingConfirmations === 1 ? "evento precisa" : "eventos precisam"} de confirmação nos próximos 7 dias →
+        </Link>
+      )}
+
+      {tarefasDeHoje.length > 0 && (
+        <Link
+          href="/tarefas"
+          className="block rounded-2xl border border-brand-blue/30 bg-brand-blue/5 p-3 text-sm text-brand-blue"
+        >
+          🗒️ {tarefasDeHoje.length} {tarefasDeHoje.length === 1 ? "tarefa para hoje ou atrasada" : "tarefas para hoje ou atrasadas"}{" "}
+          ({resumoTarefas}): abrir a lista →
         </Link>
       )}
 

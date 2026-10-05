@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/format";
+import { buildWhatsAppLink, formatDate } from "@/lib/format";
+import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
+import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 
 import { hojeLocal } from "@/lib/period";
 export interface TarefaRow {
@@ -16,6 +18,13 @@ export interface TarefaRow {
   title: string;
   due_date: string;
   completed_at: string | null;
+  client_whatsapp?: string | null;
+  client_treatment?: string | null;
+  client_display_name?: string | null;
+  // Reserva de onde a tarefa veio (cobrança de taxa, confirmação, pós-locação).
+  event_id?: string | null;
+  event_date?: string | null;
+  event_taxa_status?: string | null;
 }
 
 // Visão única de todas as tarefas do sistema — as automáticas do funil e as
@@ -25,9 +34,11 @@ export interface TarefaRow {
 export default function TarefasClient({
   initialPendentes,
   initialConcluidas,
+  valorTaxa,
 }: {
   initialPendentes: TarefaRow[];
   initialConcluidas: TarefaRow[];
+  valorTaxa?: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -204,6 +215,37 @@ export default function TarefasClient({
                   </button>
                   {expanded && (
                     <div className="border-t border-brand-blue/10 px-3 py-2 dark:border-brand-blue/15">
+                      {/* Ação do tipo da tarefa: o aviso nunca leva a uma tela
+                          sem a ação. WhatsApp com a mensagem pronta (a pessoa
+                          lê antes de enviar) e, na taxa, a baixa direto aqui. */}
+                      {(() => {
+                        const mensagem = mensagemDaTarefa({
+                          tipo: task.type,
+                          name: task.client_name,
+                          treatment: task.client_treatment,
+                          displayName: task.client_display_name,
+                          dataEvento: task.event_date,
+                          valorTaxa,
+                        });
+                        const link = mensagem ? buildWhatsAppLink(task.client_whatsapp ?? null, mensagem) : null;
+                        const taxaPendente = task.type === "cobranca_taxa" && task.event_id && task.event_taxa_status === "pendente";
+                        if (!link && !taxaPendente) return null;
+                        return (
+                          <div className="mb-2 space-y-2">
+                            {taxaPendente && <TaxaRecebidaBotao eventId={task.event_id as string} valor={valorTaxa} />}
+                            {link && (
+                              <a
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block rounded-lg border border-brand-teal py-1.5 text-center text-xs font-medium text-brand-teal"
+                              >
+                                💬 Enviar no WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="flex gap-2">
                         {task.type !== "contato_inicial" && task.type !== "followup" ? (
                           <button

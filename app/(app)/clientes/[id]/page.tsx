@@ -15,7 +15,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
   const { data: rentals } = await supabase
     .from("rentals")
     .select(
-      "id, event_date, event_date_end, shots, calculated_value, payment_method, status, rescheduled, equipment_id, notes, km_ida, valor_deslocamento, deslocamento_incluso_no_valor, equipments(name, serial_number, anvisa_registro)"
+      "id, event_date, event_date_end, shots, calculated_value, payment_method, status, rescheduled, pago, equipment_id, notes, km_ida, valor_deslocamento, deslocamento_incluso_no_valor, equipments(name, serial_number, anvisa_registro)"
     )
     .eq("client_id", params.id)
     .order("event_date", { ascending: false });
@@ -39,8 +39,22 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
   const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
   const settings = await fetchSettings(supabase);
 
+  // Saldo em aberto de cada locação (valor menos taxa paga e pagamentos),
+  // da mesma view que Pendências usa, para a ficha mostrar quanto falta e
+  // oferecer o botão de receber.
+  const idsLocacoes = (rentals ?? []).map((r: any) => r.id);
+  const { data: situacoes, error: erroSituacoes } = idsLocacoes.length
+    ? await supabase.from("rentals_situacao_pagamento").select("rental_id, saldo, total_pago").in("rental_id", idsLocacoes)
+    : { data: [] as any[], error: null };
+  if (erroSituacoes) throw new Error(`Não consegui carregar os saldos: ${erroSituacoes.message}`);
+  const saldoPorLocacao = new Map<string, { saldo: number; totalPago: number }>(
+    (situacoes ?? []).map((s: any) => [s.rental_id, { saldo: Number(s.saldo), totalPago: Number(s.total_pago) }])
+  );
+
   const normalizedRentals = (rentals ?? []).map((r: any) => ({
     ...r,
+    saldo: saldoPorLocacao.get(r.id)?.saldo ?? 0,
+    totalPago: saldoPorLocacao.get(r.id)?.totalPago ?? 0,
     equipments: Array.isArray(r.equipments) ? (r.equipments[0] ?? null) : (r.equipments ?? null),
   }));
 
@@ -51,7 +65,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
   // nenhuma em `rentals`.
   const { data: preReservas } = await supabase
     .from("calendar_events")
-    .select("id, date_start, date_end, equipment_id, equipments(name, serial_number, anvisa_registro)")
+    .select("id, date_start, date_end, equipment_id, taxa_status, equipments(name, serial_number, anvisa_registro)")
     .eq("client_id", params.id)
     .eq("status", "pre_reserva")
     .is("rental_id", null)
@@ -62,6 +76,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
     event_date: r.date_start,
     event_date_end: r.date_end,
     equipment_id: r.equipment_id,
+    taxa_status: r.taxa_status ?? null,
     equipments: Array.isArray(r.equipments) ? (r.equipments[0] ?? null) : (r.equipments ?? null),
   }));
 
