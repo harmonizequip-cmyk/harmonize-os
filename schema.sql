@@ -114,29 +114,6 @@ $function$;
 comment on function public.has_module_permission(text) is
   'Porta de entrada de toda política de RLS do sistema: true só se o perfil logado está active E (é admin OU tem o módulo liberado em permissions). active bloqueia mesmo administrador (leva H) — antes desta correção, is_admin ignorava active.';
 
--- Cria automaticamente a linha em profiles sempre que um usuário
--- novo é criado no Supabase Auth (Authentication > Users ou pela
--- futura tela de Configurações > Usuários). Sem isso, todo usuário
--- novo precisaria de um INSERT manual em profiles antes de conseguir
--- usar o sistema.
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profiles (id, name, email)
-  values (new.id, coalesce(new.raw_user_meta_data->>'name', new.email), new.email)
-  on conflict (id) do nothing;
-  return new;
-end;
-$$;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-
 -- Trava is_admin/active/permissions contra autoedição (leva J, item 1 de
 -- uma auditoria externa): sem isto, qualquer usuário logado conseguia
 -- chamar a API do Supabase direto e fazer
@@ -4755,28 +4732,6 @@ $$;
 create trigger trg_set_became_client_at
   before insert or update on public.clients
   for each row execute function public.set_became_client_at();
-
--- Mesmo corpo de profiles_lock_privileged_fields (acima), com outro nome e
--- outro gatilho no mesmo BEFORE UPDATE de profiles. Está assim no banco.
-create or replace function public.protect_profile_privileges()
-returns trigger
-language plpgsql
-security definer
-set search_path to 'public'
-as $$
-begin
-  if not has_module_permission('configuracoes') then
-    new.is_admin := old.is_admin;
-    new.active := old.active;
-    new.permissions := old.permissions;
-  end if;
-  return new;
-end;
-$$;
-
-create trigger trg_protect_profile_privileges
-  before update on public.profiles
-  for each row execute function public.protect_profile_privileges();
 
 -- ============================================================
 -- CONTAGEM INICIAL GUARDADA NA RESERVA (2026-10-05)
