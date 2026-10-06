@@ -25,6 +25,7 @@ Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e men
 - A migration só roda no Supabase (projeto `vidnlzbxaxjlmzncqhxw`) depois do aval explícito do dono, e sempre antes de publicar o código que depende dela.
 - No mesmo commit, o `schema.sql` é atualizado para refletir a mudança. O `schema.sql` tem que conseguir recriar o banco do zero.
 - Depois de rodar, conferir no banco com uma consulta de leitura que a mudança entrou e dizer o resultado ao dono.
+- Coluna criada direto no Supabase também precisa entrar no `schema.sql`. Para achar divergência: restaurar um backup recente com `scripts/restaurar-backup.py` num Postgres local com o `schema.sql`; a conferência linha a linha acusa coluna que falta.
 - As views `rentals_contabilizaveis` e `transactions_contabilizaveis` usam `select *`: ao adicionar coluna em `rentals` ou `transactions`, recriar a view na mesma migration.
 - Funções seguem o padrão existente: `security definer`, `set search_path = public`, checagem com `has_module_permission`, e `registrar_movimentacao` quando alteram dados.
 - Mudança que apaga ou altera dados existentes exige uma consulta de prévia, mostrada ao dono antes de rodar.
@@ -57,5 +58,5 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Benefício da indicação: o dono ainda vai definir.
 - Custo por disparo: adiado.
-- Backup: o plano do Supabase é gratuito, então vale o backup manual semanal (Configurações > Baixar backup, guardar no Google Drive). Falta fazer um teste de restauração num projeto Supabase novo.
+- Backup: o plano do Supabase é gratuito, então vale o backup manual semanal (Configurações > Baixar backup, guardar no Google Drive). Restauração testada em 06/10/2026 num Postgres temporário (`docs/RESTAURACAO-BACKUP.md`, `scripts/restaurar-backup.py`). Ainda não foi testada num projeto Supabase de verdade.
 - Contrato assinado e checklist: fora do escopo por decisão do dono.

@@ -196,6 +196,11 @@ create table public.clients (
   -- sozinho quando a etapa muda — mover um Cliente de volta para
   -- "Agendamento" numa segunda venda não desfaz a conversão.
   is_client boolean not null default false,
+  -- Estado (UF) do cliente e tags antigas (texto livre, anteriores à tabela
+  -- tags). Existiam no banco e faltavam aqui (achado no teste de restauração
+  -- do backup, 06/10/2026).
+  state text,
+  tags_legacy text[] not null default '{}',
   -- Data em que virou cliente; preenchida pelos gatilhos keep_client_forever
   -- e set_became_client_at (fim deste arquivo). Existia no banco e faltava aqui.
   became_client_at timestamptz,
@@ -651,7 +656,9 @@ create table public.expense_limits (
   category_id uuid not null references categories(id),
   scope scope_type not null default 'harmonize',
   month_limit numeric(12,2) not null check (month_limit > 0),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Existia no banco e faltava aqui (achado no teste de restauração do backup).
+  created_by uuid references profiles(id)
 );
 
 -- ------------------------------------------------------------
