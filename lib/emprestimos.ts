@@ -10,7 +10,7 @@ export function ehCategoriaDeEmprestimo(nome: string | null | undefined): boolea
 }
 
 /** Devedores que aparecem como sugestão mesmo antes do primeiro lançamento. */
-export const DEVEDORES_SUGERIDOS = ["LASER DREAM CAMPINA GRANDE", "LASER DREAM MIRAMAR"];
+export const DEVEDORES_SUGERIDOS = ["LASER DREAM CAMPINA GRANDE", "LASER DREAM JOÃO PESSOA"];
 
 export interface MovimentoEmprestimo {
   id: string;
