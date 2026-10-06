@@ -8,6 +8,8 @@ Backup de 05/10/2026 restaurado num Postgres temporário com o `schema.sql`: as 
 
 O teste achou 3 colunas que existiam no banco e faltavam no `schema.sql` (`clients.state`, `clients.tags_legacy`, `expense_limits.created_by`). Já corrigido.
 
+Backup antigo restaura em banco com colunas ou tabelas novas: o script só carrega as colunas que o arquivo traz (as novas ficam com o valor padrão) e trata tabela ausente como vazia. Testado de novo em 06/10/2026 depois de entrarem `settings.despesas_fixas` e a tabela `emprestimos`.
+
 ## Como restaurar num banco novo
 
 1. Criar um projeto Supabase novo.

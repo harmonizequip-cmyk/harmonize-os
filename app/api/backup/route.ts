@@ -19,6 +19,7 @@ const TABELAS = [
   "rentals",
   "rental_payments",
   "transactions",
+  "emprestimos",
   "mentoring_events",
   "expense_limits",
   "tasks",

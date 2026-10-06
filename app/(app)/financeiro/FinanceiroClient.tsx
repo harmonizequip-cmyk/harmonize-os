@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
@@ -92,11 +94,19 @@ export default function FinanceiroClient({
   const totais = useMemo(() => {
     let entradas = 0;
     let saidas = 0;
+    let emprestado = 0;
+    let devolvido = 0;
     for (const t of initialTransactions) {
+      // Empréstimo a terceiros e devolução: caixa, não resultado.
+      if (ehCategoriaDeEmprestimo(t.categories?.name)) {
+        if (t.type === "entrada") devolvido += Number(t.amount);
+        else emprestado += Number(t.amount);
+        continue;
+      }
       if (t.type === "entrada") entradas += Number(t.amount);
       else saidas += Number(t.amount);
     }
-    return { entradas, saidas, resultado: entradas - saidas };
+    return { entradas, saidas, resultado: entradas - saidas, emprestado, devolvido };
   }, [initialTransactions]);
 
   function baixarCsv() {
@@ -122,6 +132,16 @@ export default function FinanceiroClient({
     );
   }
 
+  // Lançamento de empréstimo se edita na tela de Empréstimos, para o controle
+  // e o lançamento do caixa nunca ficarem diferentes.
+  function abrirLancamento(t: TransactionRow) {
+    if (ehCategoriaDeEmprestimo(t.categories?.name)) {
+      router.push("/financeiro/emprestimos");
+      return;
+    }
+    setEditing(t);
+  }
+
   function handleCreated() {
     setModalOpen(false);
     router.refresh();
@@ -131,12 +151,20 @@ export default function FinanceiroClient({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Financeiro</h1>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
-        >
-          + Novo lançamento
-        </button>
+        <div className="flex gap-2">
+          <Link
+            href="/financeiro/emprestimos"
+            className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+          >
+            Empréstimos
+          </Link>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+          >
+            + Novo lançamento
+          </button>
+        </div>
       </div>
 
       <FiltroBarra
@@ -221,13 +249,19 @@ export default function FinanceiroClient({
           </p>
         </div>
       </div>
+      {(totais.emprestado > 0 || totais.devolvido > 0) && (
+        <Link href="/financeiro/emprestimos" className="block text-xs text-neutral-500 dark:text-neutral-400">
+          Fora do resultado: empréstimos {formatCurrency(totais.emprestado)} saíram
+          {totais.devolvido > 0 ? `, ${formatCurrency(totais.devolvido)} voltaram` : ""} →
+        </Link>
+      )}
 
       {/* Celular: lista de cartões empilhados */}
       <div className="space-y-2 sm:hidden">
         {initialTransactions.map((t) => (
           <div
             key={t.id}
-            onClick={() => setEditing(t)}
+            onClick={() => abrirLancamento(t)}
             className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55"
           >
             <div className="flex items-start justify-between">
@@ -288,7 +322,7 @@ export default function FinanceiroClient({
             {initialTransactions.map((t) => (
               <tr
                 key={t.id}
-                onClick={() => setEditing(t)}
+                onClick={() => abrirLancamento(t)}
                 className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
               >
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatDate(t.date)}</td>

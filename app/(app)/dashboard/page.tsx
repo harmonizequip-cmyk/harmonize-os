@@ -11,6 +11,7 @@ import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
 import EsteMesCard from "@/components/EsteMesCard";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
+import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { diasDoPeriodo } from "@/lib/period";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
@@ -394,11 +395,15 @@ export default async function DashboardPage({
     .in("stage", ["nutricao", "qualificado"])
     .order("name");
 
-  const rows = transactions ?? [];
-  const normalizedRows = rows.map((t: any) => ({
-    ...t,
-    categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
-  }));
+  // Empréstimo a terceiros e a devolução dele mexem no caixa (Saldo), mas não
+  // são receita nem despesa: ficam fora de Entradas, Saídas, Resultado e gráficos.
+  const normalizedRows = (transactions ?? [])
+    .map((t: any) => ({
+      ...t,
+      categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
+    }))
+    .filter((t: any) => !ehCategoriaDeEmprestimo(t.categories?.name));
+  const rows = normalizedRows;
   const entradas = rows.filter((t) => t.type === "entrada").reduce((sum, t) => sum + Number(t.amount), 0);
   const saidas = rows.filter((t) => t.type === "saida").reduce((sum, t) => sum + Number(t.amount), 0);
   const resultado = entradas - saidas;

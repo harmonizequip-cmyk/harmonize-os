@@ -3,6 +3,7 @@ import { fetchSettings } from "@/lib/settings";
 import { analyzePricingCliff } from "@/lib/pricing-opportunity";
 import { resolverPeriodo } from "@/lib/period";
 import RelatoriosClient from "./RelatoriosClient";
+import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 
 const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -148,9 +149,11 @@ export default async function RelatoriosPage({
 
   // Ajuda de custo de deslocamento (leva AC) entra no financeiro, mas não é
   // faturamento: fica fora de total, concentração e mix de receita.
-  const entradasFaturamento = (entradas ?? []).filter(
-    (t) => !(oneOf<{ name: string }>(t.categories as any)?.name ?? "").toLowerCase().startsWith("deslocamento")
-  );
+  // Devolução de empréstimo também entra no caixa sem ser faturamento.
+  const entradasFaturamento = (entradas ?? []).filter((t) => {
+    const nome = oneOf<{ name: string }>(t.categories as any)?.name ?? "";
+    return !nome.toLowerCase().startsWith("deslocamento") && !ehCategoriaDeEmprestimo(nome);
+  });
 
   // ---- 3) Concentração de receita ----
   const revenueByClient = new Map<string, { name: string; total: number }>();

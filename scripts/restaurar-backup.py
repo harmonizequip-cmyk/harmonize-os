@@ -25,11 +25,20 @@ import sys
 ORDEM = [
     "profiles", "settings", "equipments", "categories", "tags", "clients",
     "client_tags", "calendar_events", "rentals", "rental_payments",
-    "transactions", "mentoring_events", "expense_limits", "tasks",
+    "transactions", "emprestimos", "mentoring_events", "expense_limits", "tasks",
     "contratos_emitidos", "movimentacoes",
 ]
 # Tabelas que o schema.sql já semeia com linhas padrão: saem antes da carga.
 SEMEADAS = ["settings", "equipments", "categories", "tags"]
+
+
+def colunas_do_backup(linhas: list) -> list:
+    """Colunas presentes no arquivo, na ordem em que aparecem."""
+    vistas: dict = {}
+    for linha in linhas:
+        for chave in linha:
+            vistas.setdefault(chave, None)
+    return list(vistas)
 
 
 def main() -> int:
@@ -42,8 +51,9 @@ def main() -> int:
     esperado = backup.get("contagens", {})
     for nome in ORDEM:
         if nome not in tabelas:
-            print(f"Backup sem a tabela {nome}", file=sys.stderr)
-            return 1
+            # Backup anterior à tabela existir (emprestimos entrou em 06/10/2026).
+            tabelas[nome] = []
+            esperado.setdefault(nome, 0)
         if esperado.get(nome) != len(tabelas[nome]):
             print(f"Contagem do cabeçalho não bate em {nome}", file=sys.stderr)
             return 1
@@ -67,16 +77,24 @@ end $$;""")
         if "$bk$" in corpo:
             print(f"Conteúdo de {nome} contém o marcador $bk$", file=sys.stderr)
             return 1
+        colunas = colunas_do_backup(tabelas[nome])
+        if not colunas:
+            continue
+        lista = ", ".join(f'"{c}"' for c in colunas)
+        # Só as colunas que o arquivo traz: coluna criada depois do backup
+        # fica com o valor padrão do banco em vez de nulo.
         sql.append(
-            f"insert into public.{nome} select * from jsonb_populate_recordset(null::public.{nome}, $bk${corpo}$bk$::jsonb);"
+            f"insert into public.{nome} ({lista}) select {lista} from jsonb_populate_recordset(null::public.{nome}, $bk${corpo}$bk$::jsonb);"
         )
     sql.append("-- Conferência linha a linha: cada linha do arquivo precisa existir idêntica no banco.")
     sql.append("do $$\ndeclare v_dif integer;\nbegin")
     for nome in ORDEM:
         corpo = json.dumps(tabelas[nome], ensure_ascii=False)
+        chaves = "array[" + ", ".join(f"'{c}'" for c in colunas_do_backup(tabelas[nome])) + "]::text[]"
         sql.append(
             f"""  select count(*) into v_dif from (
-    select to_jsonb(t) from public.{nome} t
+    select (select coalesce(jsonb_object_agg(k, v), '{{}}'::jsonb) from jsonb_each(to_jsonb(t)) j(k, v) where k = any({chaves}))
+      from public.{nome} t
     except select e from jsonb_array_elements($bk${corpo}$bk$::jsonb) e
   ) d;
   if v_dif <> 0 or (select count(*) from public.{nome}) <> {len(tabelas[nome])} then

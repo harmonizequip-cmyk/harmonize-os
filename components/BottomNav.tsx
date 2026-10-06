@@ -17,6 +17,7 @@ import {
   History,
   Receipt,
   HandCoins,
+  Landmark,
   FileText,
   Settings,
 } from "lucide-react";
@@ -42,6 +43,7 @@ const MORE_ITEMS = [
   { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
   // Quem está devendo e quanto (o total também aparece no Dashboard).
   { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
+  { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },
   // Controle dos contratos de locação já emitidos (leva X).
   { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
