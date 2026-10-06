@@ -9,6 +9,8 @@ import { buscarPendencias, buscarTaxasAReceber, buscarReservasSemDisparos } from
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
+import EsteMesCard from "@/components/EsteMesCard";
+import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { diasDoPeriodo } from "@/lib/period";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
@@ -177,7 +179,64 @@ export default async function DashboardPage({
   // passaram do prazo de cobrança (settings.dias_cobranca_taxa) ficam em
   // destaque. Só aviso, sempre sobre o presente, independente do filtro de
   // período. A baixa é feita em Pendências, no mesmo lugar do aviso.
-  const { diasCobrancaTaxa } = await fetchSettings(supabase);
+  const { diasCobrancaTaxa, despesasFixas } = await fetchSettings(supabase);
+
+  // Quadro "Este mês": sobra (lucro) das locações do mês contra as contas
+  // fixas de Configurações. Só locações que contam como faturamento
+  // (rentals_contabilizaveis); o lucro de cada uma vem de rentals_lucro.
+  // A média por locação usa os últimos 90 dias, para estimar quantas faltam.
+  let metaDoMes = null as ReturnType<typeof calcularMetaDoMes> | null;
+  if (despesasFixas.length > 0) {
+    const noventaDiasAtras = somarDias(todayStr, -90);
+    const [{ data: contabilizaveis }, { count: reservasRestantes }] = await Promise.all([
+      supabase
+        .from("rentals_contabilizaveis")
+        .select("id, event_date")
+        .gte("event_date", noventaDiasAtras < mesInicio ? noventaDiasAtras : mesInicio)
+        .lte("event_date", mesFim),
+      supabase
+        .from("calendar_events")
+        .select("id", { count: "exact", head: true })
+        .eq("is_test", false)
+        .neq("status", "cancelada")
+        .is("rental_id", null)
+        .in("event_type", ["hipro_1", "hipro_2"])
+        .gte("date_start", todayStr)
+        .lte("date_start", mesFim),
+    ]);
+    const ids = (contabilizaveis ?? []).map((r: any) => r.id as string);
+    const lucroPorId = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data: lucros } = await supabase
+        .from("rentals_lucro")
+        .select("rental_id, lucro_liquido")
+        .in("rental_id", ids.slice(i, i + 100));
+      for (const l of lucros ?? []) lucroPorId.set(l.rental_id, Number(l.lucro_liquido));
+    }
+    let sobraDoMes = 0;
+    let locacoesDoMes = 0;
+    let somaRecentes = 0;
+    let qtdRecentes = 0;
+    for (const r of contabilizaveis ?? []) {
+      const lucro = lucroPorId.get(r.id) ?? 0;
+      if (r.event_date >= mesInicio && r.event_date <= mesFim) {
+        sobraDoMes += lucro;
+        locacoesDoMes += 1;
+      }
+      if (r.event_date >= noventaDiasAtras && r.event_date <= todayStr) {
+        somaRecentes += lucro;
+        qtdRecentes += 1;
+      }
+    }
+    metaDoMes = calcularMetaDoMes({
+      despesas: despesasFixas,
+      sobraDoMes,
+      locacoesDoMes,
+      sobraMediaPorLocacao: qtdRecentes > 0 ? somaRecentes / qtdRecentes : null,
+      reservasRestantes: reservasRestantes ?? 0,
+    });
+  }
+  const rotuloMesAtual = new Date(`${todayStr}T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", timeZone: "UTC" });
   const taxasAReceber = await buscarTaxasAReceber(supabase, todayStr, diasCobrancaTaxa);
   const taxasAReceberCount = taxasAReceber.length;
   const taxasVencidasCount = taxasAReceber.filter((t) => t.vencida).length;
@@ -394,6 +453,8 @@ export default async function DashboardPage({
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
         <PeriodFilter />
       </div>
+
+      <EsteMesCard meta={metaDoMes} rotuloMes={rotuloMesAtual} />
 
       {!!pendingConfirmations && pendingConfirmations > 0 && (
         <Link

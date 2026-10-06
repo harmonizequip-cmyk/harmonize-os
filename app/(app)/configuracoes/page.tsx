@@ -3,6 +3,7 @@ import { FlaskConical } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import BackupCard from "@/components/BackupCard";
+import ContasFixasCard from "@/components/ContasFixasCard";
 import ConfiguracoesClient from "./ConfiguracoesClient";
 
 export default async function ConfiguracoesPage() {
@@ -33,6 +34,8 @@ export default async function ConfiguracoesPage() {
       </Link>
 
       <BackupCard />
+
+      <ContasFixasCard inicial={settings.despesasFixas} />
 
       <ConfiguracoesClient initialSettings={settings} initialTags={tags ?? []} />
     </div>

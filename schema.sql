@@ -318,7 +318,11 @@ create table public.settings (
        and dias_pos_locacao between 0 and 30
        and dias_cobranca_taxa between 1 and 30),
   constraint settings_automacao_dias_check
-    check (dias_ate_reativar between 1 and 3650 and recontato_intervalo_dias between 1 and 365)
+    check (dias_ate_reativar between 1 and 3650 and recontato_intervalo_dias between 1 and 365),
+  -- Contas fixas do mês (2026-10-06), editadas em Configurações: base do
+  -- quadro "Este mês" do Dashboard. [{"nome","valor","tipo": negocio|pessoal}]
+  despesas_fixas jsonb not null default '[]'::jsonb,
+  constraint settings_despesas_fixas_lista check (jsonb_typeof(despesas_fixas) = 'array')
 );
 
 comment on column public.settings.mentoria_valor_avista is
@@ -371,6 +375,8 @@ insert into categories (name, type, is_default) values
   ('Alimentação', 'saida', true),
   ('Insumos', 'saida', true),
   ('Retiradas', 'saida', true),
+  ('Parcela de equipamento', 'saida', true),
+  ('Impostos', 'saida', true),
   ('Outros', 'saida', true);
 
 -- ------------------------------------------------------------

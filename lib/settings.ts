@@ -6,6 +6,7 @@ import {
   type PricingConfig,
   type MentoriaPricingConfig,
 } from "./rental-pricing";
+import { lerDespesasFixas, type DespesaFixa } from "./meta-mes";
 
 export interface AppSettings {
   pricing: PricingConfig;
@@ -21,6 +22,7 @@ export interface AppSettings {
   diasPosLocacao: number;
   tarefaTaxaAtiva: boolean;
   diasCobrancaTaxa: number;
+  despesasFixas: DespesaFixa[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   diasPosLocacao: 1,
   tarefaTaxaAtiva: true,
   diasCobrancaTaxa: 3,
+  despesasFixas: [],
 };
 
 /**
@@ -51,7 +54,7 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
   const { data, error } = await supabase
     .from("settings")
     .select(
-      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias, recontato_automatico, tarefa_confirmacao_ativa, dias_antes_confirmacao, tarefa_pos_locacao_ativa, dias_pos_locacao, tarefa_taxa_ativa, dias_cobranca_taxa"
+      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias, recontato_automatico, tarefa_confirmacao_ativa, dias_antes_confirmacao, tarefa_pos_locacao_ativa, dias_pos_locacao, tarefa_taxa_ativa, dias_cobranca_taxa, despesas_fixas"
     )
     .eq("id", true)
     .single();
@@ -84,5 +87,6 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
     diasPosLocacao: data.dias_pos_locacao ?? 1,
     tarefaTaxaAtiva: data.tarefa_taxa_ativa ?? true,
     diasCobrancaTaxa: data.dias_cobranca_taxa ?? 3,
+    despesasFixas: lerDespesasFixas(data.despesas_fixas),
   };
 }
