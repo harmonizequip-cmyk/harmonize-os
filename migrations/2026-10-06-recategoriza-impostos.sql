@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono decidir e rodar).
+-- STATUS: NÃO APLICADA por decisão do dono (06/10/2026): o lançamento continua em Retiradas.
 -- Depende de 2026-10-06-despesas-fixas-e-categorias.sql.
 --
 -- Prévia (06/10/2026): 1 lançamento de "Retiradas" passa para "Impostos":

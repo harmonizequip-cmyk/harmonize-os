@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 06/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Quadro "Este mês" do Dashboard: quanto falta para pagar as contas fixas
 -- do mês e quantas locações isso representa.

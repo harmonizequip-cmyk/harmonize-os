@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 06/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Prévia (06/10/2026): 2 contas pessoais pagas pelo caixa da empresa saem
 -- de "Outros" e vão para "Retiradas" (dinheiro que sai do negócio para a
