@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ClientPicker from "@/components/ClientPicker";
 import { createClient } from "@/lib/supabase/client";
 
 import { hojeLocal } from "@/lib/period";
@@ -101,18 +102,16 @@ export default function NovaTarefaModal({
                 {lockedClientName}
               </p>
             ) : (
-              <select
+              <ClientPicker
+                clients={sortedLeads}
                 value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-              >
-                <option value="">Nenhum (tarefa solta)</option>
-                {sortedLeads.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setClientId}
+                onClientCreated={() => {}}
+                label=""
+                optional
+                noneLabel="Nenhum (tarefa solta)"
+                allowCreate={false}
+              />
             )}
           </div>
         </div>

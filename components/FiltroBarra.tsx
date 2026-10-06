@@ -1,5 +1,6 @@
 "use client";
 
+import FiltroComBusca from "./FiltroComBusca";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { OPCOES_PERIODO } from "@/lib/period";
@@ -159,7 +160,16 @@ export default function FiltroBarra({
 
       {(campos.length > 0 || buscaPlaceholder) && (
         <div className="flex flex-wrap items-center gap-2">
-          {campos.map((campo) => (
+          {campos.map((campo) =>
+            campo.opcoes.length > 15 ? (
+              <FiltroComBusca
+                key={campo.chave}
+                valor={searchParams.get(campo.chave) ?? ""}
+                rotuloVazio={campo.rotuloVazio}
+                opcoes={campo.opcoes}
+                onChange={(v) => aplicar({ [campo.chave]: v })}
+              />
+            ) : (
             <select
               key={campo.chave}
               value={searchParams.get(campo.chave) ?? ""}
@@ -177,7 +187,8 @@ export default function FiltroBarra({
                 </option>
               ))}
             </select>
-          ))}
+            )
+          )}
 
           {buscaPlaceholder && (
             <input

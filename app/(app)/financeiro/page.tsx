@@ -59,7 +59,7 @@ export default async function FinanceiroPage({
   const [{ data: transactions, error: erroLancamentos }, { data: categories }, { data: clients }] = await Promise.all([
     consulta.order("date", { ascending: false }).order("created_at", { ascending: false }).limit(TETO),
     supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
-    supabase.from("clients").select("id, name").order("name"),
+    supabase.from("clients").select("id, name, city, whatsapp").order("name"),
   ]);
   // Lista que não carregou nunca pode aparecer como "sem lançamentos".
   if (erroLancamentos) throw new Error(`Não consegui carregar os lançamentos: ${erroLancamentos.message}`);

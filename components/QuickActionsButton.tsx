@@ -92,7 +92,7 @@ export default function QuickActionsButton({
   async function openMenu() {
     setMenuOpen(true);
     const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
-      supabase.from("clients").select("id, name, whatsapp, parceiro").order("name"),
+      supabase.from("clients").select("id, name, city, whatsapp, parceiro").order("name"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
       supabase.from("equipments").select("id, code, name").order("code"),
     ]);

@@ -13,7 +13,7 @@ export default async function AgendaPage() {
     .neq("status", "cancelada")
     .order("date_start", { ascending: true });
 
-  const { data: clients } = await supabase.from("clients").select("id, name").order("name");
+  const { data: clients } = await supabase.from("clients").select("id, name, city, whatsapp").order("name");
   const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
   const settings = await fetchSettings(supabase);
 

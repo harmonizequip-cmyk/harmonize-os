@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toUpperTrim } from "@/lib/format";
+import { filtrarParaEscolha } from "@/lib/busca-cliente";
 
 export interface ClientOption {
   id: string;
   name: string;
+  // Opcionais: quando vêm, entram na busca (cidade e parte do telefone).
+  city?: string | null;
+  whatsapp?: string | null;
 }
 
 // Combobox com busca por nome, usado em todo formulário que pede um
@@ -22,6 +26,8 @@ export default function ClientPicker({
   onClientCreated,
   label = "Cliente",
   optional = false,
+  noneLabel = "Nenhum",
+  allowCreate = true,
 }: {
   clients: ClientOption[];
   value: string;
@@ -29,6 +35,8 @@ export default function ClientPicker({
   onClientCreated: (client: ClientOption) => void;
   label?: string;
   optional?: boolean;
+  noneLabel?: string;
+  allowCreate?: boolean;
 }) {
   const supabase = createClient();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,9 +62,9 @@ export default function ClientPicker({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filtered = query.trim()
-    ? clients.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8)
-    : clients.slice(0, 8);
+  // Nome sem acento, cidade ou parte do telefone; cadastros que são só um
+  // telefone ficam no fim, para os nomes aparecerem primeiro.
+  const filtered = filtrarParaEscolha(clients, query).slice(0, 50);
 
   function selectClient(c: ClientOption) {
     onChange(c.id);
@@ -99,12 +107,14 @@ export default function ClientPicker({
 
   return (
     <div ref={containerRef}>
-      <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-        {label} {optional && <span className="text-neutral-400">(opcional)</span>}
-      </label>
+      {label && (
+        <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          {label} {optional && <span className="text-neutral-400">(opcional)</span>}
+        </label>
+      )}
 
       <input
-        value={open ? query : (selected?.name ?? "")}
+        value={open ? query : (selected?.name ?? (optional && !value ? noneLabel : ""))}
         onChange={(e) => {
           setQuery(e.target.value);
           if (!open) setOpen(true);
@@ -113,7 +123,7 @@ export default function ClientPicker({
           setQuery("");
           setOpen(true);
         }}
-        placeholder="Buscar por nome..."
+        placeholder="Buscar por nome, cidade ou telefone..."
         className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
       />
 
@@ -121,7 +131,7 @@ export default function ClientPicker({
         <div className="mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
           {!creating ? (
             <>
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-64 overflow-y-auto">
                 {optional && (
                   <button
                     type="button"
@@ -132,7 +142,7 @@ export default function ClientPicker({
                     }}
                     className="block w-full px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-700"
                   >
-                    Nenhum
+                    {noneLabel}
                   </button>
                 )}
                 {filtered.length === 0 && (
@@ -146,9 +156,11 @@ export default function ClientPicker({
                     className="block w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-700"
                   >
                     {c.name}
+                    {c.city && <span className="ml-1 text-xs text-neutral-400">· {c.city}</span>}
                   </button>
                 ))}
               </div>
+              {allowCreate && (
               <button
                 type="button"
                 onClick={() => {
@@ -159,6 +171,7 @@ export default function ClientPicker({
               >
                 + Cadastrar novo cliente/lead
               </button>
+              )}
             </>
           ) : (
             <div className="space-y-2 p-3">
