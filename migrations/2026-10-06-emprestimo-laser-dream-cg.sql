@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 06/10/2026, pelo dono, e conferida por consulta de leitura.
 -- Depende de 2026-10-06-emprestimos.sql.
 --
 -- Prévia (06/10/2026): o lançamento "IMPOSTOS CAMPINA GRANDE" de

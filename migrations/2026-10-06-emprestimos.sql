@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 06/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Controle de empréstimos que o dono faz a terceiros (LASER DREAM CAMPINA
 -- GRANDE, LASER DREAM MIRAMAR). Empréstimo não é despesa nem receita: é
