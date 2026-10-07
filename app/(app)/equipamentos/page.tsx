@@ -4,15 +4,23 @@ import EquipamentoStatusControl from "@/components/EquipamentoStatusControl";
 import EquipamentoInfoControl from "@/components/EquipamentoInfoControl";
 import EquipamentoPrevistasControl from "@/components/EquipamentoPrevistasControl";
 
-import { hojeLocal } from "@/lib/period";
+import { hojeLocal, resolverPeriodo } from "@/lib/period";
+import FiltroBarra from "@/components/FiltroBarra";
 const EQUIPMENT_COLORS: Record<string, string> = {
   hipro_1: "bg-brand-teal",
   hipro_2: "bg-brand-blue",
 };
 
-export default async function EquipamentosPage() {
+export default async function EquipamentosPage({
+  searchParams,
+}: {
+  searchParams: { period?: string; from?: string; to?: string };
+}) {
   const supabase = createClient();
   const today = hojeLocal();
+  // Locações, disparos e receita seguem o período escolhido (padrão: este
+  // mês). Status, próxima reserva e previstas são sempre "de hoje em diante".
+  const periodo = resolverPeriodo(searchParams.period ?? "mes", searchParams.from, searchParams.to);
 
   // Leva U: não há job agendado neste projeto, então a atualização de
   // previsões vencidas acontece "sob demanda" aqui, antes de montar a
@@ -30,7 +38,9 @@ export default async function EquipamentosPage() {
   // divergindo do mesmo número mostrado no Dashboard.
   const { data: rentals } = await supabase
     .from("rentals_contabilizaveis")
-    .select("id, equipment_id, calculated_value");
+    .select("id, equipment_id, calculated_value, shots")
+    .gte("event_date", periodo.inicio)
+    .lte("event_date", periodo.fim);
 
   // Saldo em aberto por locação, para calcular o pendente de cada
   // equipamento sem duplicar a lógica de pagamento parcial que já vive em
@@ -81,12 +91,15 @@ export default async function EquipamentosPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Equipamentos</h1>
 
+      <FiltroBarra periodoPadrao="mes" rotuloPeriodo={periodo.rotulo} />
+
       <div className="grid gap-4 sm:grid-cols-2">
         {(equipments ?? []).map((eq) => {
           const eqRentals = (rentals ?? []).filter((r) => r.equipment_id === eq.id);
           const totalLocacoes = eqRentals.length;
           const receitaTotal = eqRentals.reduce((sum, r) => sum + Number(r.calculated_value), 0);
           const pendenteTotal = eqRentals.reduce((sum, r) => sum + (saldoByRentalId.get(r.id) ?? 0), 0);
+          const disparosTotal = eqRentals.reduce((sum, r) => sum + Number(r.shots ?? 0), 0);
           const nextEvent = normalizedUpcoming.find((e) => e.equipment_id === eq.id);
           const eqPrevistas = normalizedPrevistas.filter((p) => p.equipment_id === eq.id);
 
@@ -126,11 +139,14 @@ export default async function EquipamentosPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Quantidade de locações</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações no período</p>
                   <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">{totalLocacoes}</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {disparosTotal.toLocaleString("pt-BR")} disparos
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Receita total</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Receita no período</p>
                   <p className="mt-0.5 text-sm font-medium text-brand-teal">{formatCurrency(receitaTotal)}</p>
                   {pendenteTotal > 0 && (
                     <p className="mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
