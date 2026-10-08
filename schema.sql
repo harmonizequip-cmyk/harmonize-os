@@ -5096,3 +5096,54 @@ begin
   end if;
 end
 $relogio$;
+
+-- Fotos do contador e comprovantes (migrations/2026-10-08-fotos-e-comprovantes.sql):
+-- pastas privadas no Storage; fotos com o módulo agenda, comprovantes com o financeiro.
+do $fotos$
+begin
+  if to_regclass('storage.buckets') is null then
+    raise notice 'Sem Storage do Supabase: pastas de fotos e comprovantes não criadas.';
+    return;
+  end if;
+
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('fotos-contador', 'fotos-contador', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+
+  drop policy if exists "fotos_contador_ler" on storage.objects;
+  drop policy if exists "fotos_contador_enviar" on storage.objects;
+  drop policy if exists "fotos_contador_trocar" on storage.objects;
+  drop policy if exists "fotos_contador_apagar" on storage.objects;
+
+  create policy "fotos_contador_ler" on storage.objects for select to authenticated
+    using (bucket_id = 'fotos-contador' and public.has_module_permission('agenda'));
+  create policy "fotos_contador_enviar" on storage.objects for insert to authenticated
+    with check (bucket_id = 'fotos-contador' and public.has_module_permission('agenda'));
+  create policy "fotos_contador_trocar" on storage.objects for update to authenticated
+    using (bucket_id = 'fotos-contador' and public.has_module_permission('agenda'))
+    with check (bucket_id = 'fotos-contador' and public.has_module_permission('agenda'));
+  create policy "fotos_contador_apagar" on storage.objects for delete to authenticated
+    using (bucket_id = 'fotos-contador' and public.has_module_permission('agenda'));
+
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('comprovantes', 'comprovantes', false, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+
+  drop policy if exists "comprovantes_ler" on storage.objects;
+  drop policy if exists "comprovantes_enviar" on storage.objects;
+  drop policy if exists "comprovantes_apagar" on storage.objects;
+
+  create policy "comprovantes_ler" on storage.objects for select to authenticated
+    using (bucket_id = 'comprovantes' and public.has_module_permission('financeiro'));
+  create policy "comprovantes_enviar" on storage.objects for insert to authenticated
+    with check (bucket_id = 'comprovantes' and public.has_module_permission('financeiro'));
+  create policy "comprovantes_apagar" on storage.objects for delete to authenticated
+    using (bucket_id = 'comprovantes' and public.has_module_permission('financeiro'));
+end
+$fotos$;

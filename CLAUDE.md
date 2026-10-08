@@ -61,6 +61,8 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Relógio pg_cron: 7h30 resumo do dia, 18h reservas de amanhã (só envia se houver). Todo aviso leva à tela do que avisa.
 - Junto do resumo das 7h30 saem avisos de evento (no máximo 6): buscar HIPRO de locação de vários dias, cobrança no 3º, 7º e 15º dia de atraso, taxa de reserva vencendo hoje, fim previsto de manutenção. Cobrança e taxa trazem botão WhatsApp com a mensagem pronta.
 - `supabase/functions/alertas/mensagens.ts` é cópia de `lib/saudacao.ts` e das mensagens de cobrança: mudou lá, mudar aqui e publicar a função de novo.
+- Compartilhar comprovante: manifest `share_target` manda para `/compartilhar`; o `sw.js` guarda o arquivo no cache `harmonize-compartilhado` e abre "Receber pagamento", que sobe o comprovante para a pasta `comprovantes` do Storage (`locacao/<id>` ou `taxa/<id>`).
+- Fotos do contador: pasta `fotos-contador` do Storage, `<id do evento>/entrega.jpg` e `busca.jpg`. Pastas criadas em `migrations/2026-10-08-fotos-e-comprovantes.sql`.
 - Atalhos do ícone (manifest `shortcuts`) usam `?acao=` (`/dashboard?acao=receber`, `/agenda?acao=reservar`).
 
 ## Pendências conhecidas

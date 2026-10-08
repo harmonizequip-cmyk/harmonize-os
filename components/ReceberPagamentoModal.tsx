@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import ReceberPagamentoBotao from "./ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "./TaxaRecebidaBotao";
+import { ehPdf, enviarComprovante, lerCompartilhado, limparCompartilhado } from "@/lib/comprovante";
 
 interface Aluguel {
   id: string;
@@ -37,6 +38,9 @@ function um<T>(v: T | T[] | null | undefined): T | null {
  * aba Aluguel (quitar tudo ou abater parte do saldo de qualquer locação com
  * saldo, vencida ou ainda por vir) e aba Taxa de reserva (baixa da taxa
  * pendente). Os botões são os mesmos usados em Pendências, Locações e Agenda.
+ * Quando abre pelo "Compartilhar > Harmonize" (comprovante vindo do
+ * WhatsApp), mostra o comprovante no topo e guarda ele na locação ou na
+ * reserva que for recebida.
  */
 export default function ReceberPagamentoModal({ onClose }: { onClose: () => void }) {
   const supabase = createClient();
@@ -47,6 +51,35 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
   const [alugueis, setAlugueis] = useState<Aluguel[]>([]);
   const [taxas, setTaxas] = useState<Taxa[]>([]);
   const [busca, setBusca] = useState("");
+  const [comprovante, setComprovante] = useState<File | null>(null);
+  const [comprovanteLink, setComprovanteLink] = useState<string | null>(null);
+  const [avisoComprovante, setAvisoComprovante] = useState<string | null>(null);
+
+  useEffect(() => {
+    lerCompartilhado().then((arquivo) => {
+      if (arquivo) setComprovante(arquivo);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!comprovante) {
+      setComprovanteLink(null);
+      return;
+    }
+    const link = URL.createObjectURL(comprovante);
+    setComprovanteLink(link);
+    return () => URL.revokeObjectURL(link);
+  }, [comprovante]);
+
+  function descartarComprovante() {
+    setComprovante(null);
+    limparCompartilhado();
+  }
+
+  function fechar() {
+    limparCompartilhado();
+    onClose();
+  }
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -146,7 +179,16 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
     [taxas, termo]
   );
 
-  function aoReceber() {
+  async function aoReceber(pasta: string, cliente: string) {
+    if (comprovante) {
+      const { ok } = await enviarComprovante(supabase, pasta, comprovante);
+      setAvisoComprovante(
+        ok
+          ? `Comprovante guardado no pagamento de ${cliente}.`
+          : "O pagamento foi registrado, mas o comprovante não subiu. Anexe pela agenda."
+      );
+      descartarComprovante();
+    }
     carregar();
     router.refresh();
   }
@@ -157,17 +199,46 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
     }`;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={fechar}>
       <div
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Receber pagamento</h2>
-          <button onClick={onClose} aria-label="Fechar" className="text-neutral-400">
+          <button onClick={fechar} aria-label="Fechar" className="text-neutral-400">
             <X size={20} />
           </button>
         </div>
+
+        {comprovante && comprovanteLink && (
+          <div className="mb-3 rounded-xl border border-brand-teal/40 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Comprovante recebido. Escolha abaixo de quem é.
+              </p>
+              <button onClick={descartarComprovante} className="text-[11px] text-neutral-500 underline underline-offset-2">
+                descartar
+              </button>
+            </div>
+            {ehPdf(comprovante) ? (
+              <a
+                href={comprovanteLink}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-brand-teal underline underline-offset-2"
+              >
+                Abrir o PDF ({comprovante.name})
+              </a>
+            ) : (
+              <a href={comprovanteLink} target="_blank" rel="noreferrer" className="block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={comprovanteLink} alt="Comprovante" className="max-h-64 w-full rounded-lg object-contain" />
+              </a>
+            )}
+          </div>
+        )}
+        {avisoComprovante && <p className="mb-3 text-xs text-brand-teal">{avisoComprovante}</p>}
 
         <div className="mb-3 flex gap-2">
           <button className={abaClasse(aba === "aluguel")} onClick={() => setAba("aluguel")}>
@@ -216,7 +287,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
                   {a.vencido ? " · já aconteceu" : " · ainda por vir"}
                   {a.totalPago > 0 ? ` · já recebido ${formatCurrency(a.totalPago)}` : ""}
                 </p>
-                <ReceberPagamentoBotao rentalId={a.id} saldo={a.saldo} rotulo="Receber (quitar ou abater)" onDone={aoReceber} />
+                <ReceberPagamentoBotao rentalId={a.id} saldo={a.saldo} rotulo="Receber (quitar ou abater)" onDone={() => aoReceber(`locacao/${a.id}`, a.cliente)} />
               </div>
             ))}
           </div>
@@ -238,7 +309,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
                   {t.valor > 0 && <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(t.valor)}</p>}
                 </div>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">Reserva para {formatDate(t.dataEvento)}</p>
-                <TaxaRecebidaBotao eventId={t.id} valor={t.valor} onDone={aoReceber} />
+                <TaxaRecebidaBotao eventId={t.id} valor={t.valor} onDone={() => aoReceber(`taxa/${t.id}`, t.cliente)} />
               </div>
             ))}
           </div>

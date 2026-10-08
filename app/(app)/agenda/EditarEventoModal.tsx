@@ -9,6 +9,8 @@ import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import DespesasDaReserva from "@/components/DespesasDaReserva";
+import FotosContador from "@/components/FotosContador";
+import Comprovantes from "@/components/Comprovantes";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
@@ -629,6 +631,11 @@ export default function EditarEventoModal({
                 </div>
               )}
 
+              {!event.is_mentoria && <FotosContador eventId={event.id} />}
+              {!event.is_mentoria && event.taxa_status && (
+                <Comprovantes pasta={`taxa/${event.id}`} titulo="Comprovantes da taxa de reserva" />
+              )}
+
               <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
                 <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
                   Ajuda de custo — deslocamento (opcional)
@@ -763,6 +770,11 @@ export default function EditarEventoModal({
               )}
             </div>
           )}
+
+          <div className="-mt-3 mb-4">
+            <FotosContador eventId={event.id} />
+            <Comprovantes pasta={`locacao/${event.rental_id}`} titulo="Comprovantes de pagamento" />
+          </div>
 
           <div className="mb-4 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">

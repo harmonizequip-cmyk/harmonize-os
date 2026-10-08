@@ -51,3 +51,38 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
+// Compartilhar comprovante: no WhatsApp (ou na galeria), Compartilhar >
+// Harmonize. O arquivo fica guardado aqui no aparelho e a janela "Receber
+// pagamento" abre já mostrando o comprovante; ao registrar, ele sobe junto
+// com o pagamento.
+const CAIXA_COMPARTILHADO = "harmonize-compartilhado";
+const CHAVE_COMPARTILHADO = "/compartilhado/atual";
+
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== "POST" || url.origin !== self.location.origin || url.pathname !== "/compartilhar") return;
+  event.respondWith(
+    (async () => {
+      try {
+        const form = await event.request.formData();
+        const arquivo = form.get("arquivo");
+        if (arquivo && typeof arquivo !== "string") {
+          const caixa = await caches.open(CAIXA_COMPARTILHADO);
+          await caixa.put(
+            CHAVE_COMPARTILHADO,
+            new Response(arquivo, {
+              headers: {
+                "Content-Type": arquivo.type || "application/octet-stream",
+                "X-Nome": encodeURIComponent(arquivo.name || "comprovante"),
+              },
+            })
+          );
+        }
+      } catch (e) {
+        // Sem o arquivo, a janela abre do mesmo jeito.
+      }
+      return Response.redirect("/dashboard?acao=receber", 303);
+    })()
+  );
+});
