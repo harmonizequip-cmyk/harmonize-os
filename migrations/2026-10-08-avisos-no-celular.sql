@@ -1,5 +1,6 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 08/10/2026, pelo dono, e conferida por consulta de leitura.
+-- A Edge Function "alertas" (supabase/functions/alertas) foi publicada no mesmo dia.
 --
 -- Avisos no celular (notificação do próprio Harmonize, web push).
 --   1. push_inscricoes: cada aparelho que tocou em "Ativar avisos" em
