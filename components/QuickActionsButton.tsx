@@ -42,7 +42,8 @@ type ActionKey =
   | "evento"
   | "locacao"
   | "locacao_disparos"
-  | "receber";
+  | "receber"
+  | "voz";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -50,6 +51,7 @@ type ActionKey =
 const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[] = [
   { key: "receber", label: "Receber pagamento (aluguel ou taxa)", emoji: "💵", module: "financeiro" },
   { key: "tarefa", label: "Nova tarefa", emoji: "🗒️", module: "clientes" },
+  { key: "voz", label: "Anotar por voz (vira tarefa)", emoji: "🎙️", module: "clientes" },
   { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
   { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
   { key: "evento", label: "Novo evento na agenda", emoji: "📅", module: "agenda" },
@@ -177,6 +179,9 @@ export default function QuickActionsButton({
 
       {activeModal === "tarefa" && (
         <NovaTarefaModal leads={clients} onClose={() => setActiveModal(null)} onCreated={handleCreated} />
+      )}
+      {activeModal === "voz" && (
+        <NovaTarefaModal leads={clients} porVoz onClose={() => setActiveModal(null)} onCreated={handleCreated} />
       )}
       {activeModal === "receber" && <ReceberPagamentoModal onClose={() => setActiveModal(null)} />}
       {activeModal === "lead" && <NovoLeadModal onClose={() => setActiveModal(null)} onCreated={handleCreated} />}

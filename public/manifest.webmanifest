@@ -36,6 +36,18 @@
       ]
     },
     {
+      "name": "Anotar por voz",
+      "short_name": "Anotar por voz",
+      "url": "/dashboard?acao=voz",
+      "icons": [
+        {
+          "src": "/icone-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
       "name": "Nova reserva de HIPRO",
       "short_name": "Nova reserva",
       "url": "/agenda?acao=reservar",
