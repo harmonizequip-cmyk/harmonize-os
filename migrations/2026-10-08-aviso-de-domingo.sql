@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: NÃO APLICADA. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 08/10/2026, pelo dono, e conferida por consulta de leitura (job harmonize-alerta-domingo, 0 22 * * 0, ativo).
 --
 -- Aviso de domingo no celular: todo domingo às 19h (22:00 em UTC) a função
 -- "alertas" manda o fechamento da semana (faturado, recebido, a receber,
