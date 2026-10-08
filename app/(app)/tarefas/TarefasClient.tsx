@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
+import ModoFila from "./ModoFila";
 
 import { hojeLocal } from "@/lib/period";
 export interface TarefaRow {
@@ -60,6 +61,16 @@ export default function TarefasClient({
   // desfazer_conclusao_tarefa (leva V), que cuida de desfazer isso com
   // segurança (ou bloquear se a tarefa seguinte já foi mexida).
   const [desfazerErro, setDesfazerErro] = useState<Record<string, string>>({});
+  const [filaAberta, setFilaAberta] = useState(false);
+
+  // Aviso das 7h30 com tarefas atrasadas abre /tarefas?fila=1.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("fila") !== "1") return;
+    url.searchParams.delete("fila");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    setFilaAberta(true);
+  }, []);
 
   useEffect(() => {
     setPendentes(initialPendentes);
@@ -121,6 +132,13 @@ export default function TarefasClient({
     router.refresh();
   }
 
+  async function adiarPara(taskId: string, data: string) {
+    const { error } = await supabase.from("tasks").update({ due_date: data }).eq("id", taskId);
+    if (error) window.alert(error.message || "Não foi possível adiar. A tarefa continua na fila.");
+    setPendentes((prev) => prev.filter((t) => t.id !== taskId));
+    router.refresh();
+  }
+
   async function adiarTarefa(taskId: string) {
     if (!adiarData) {
       setAdiarErro("Escolha a nova data.");
@@ -157,10 +175,31 @@ export default function TarefasClient({
   }
 
   const todayStr = hojeLocal();
+  // Fila: o que é para hoje ou já passou, das mais antigas para as mais novas.
+  const filaDeHoje = pendentes.filter((t) => t.due_date <= todayStr);
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Tarefas</h1>
+
+      {filaDeHoje.length > 0 && (
+        <button
+          onClick={() => setFilaAberta(true)}
+          className="w-full rounded-2xl bg-brand-gradient py-3 text-sm font-semibold text-white shadow-glow-teal sm:max-w-sm"
+        >
+          ⚡ Atacar a fila ({filaDeHoje.length} para hoje)
+        </button>
+      )}
+      {filaAberta && (
+        <ModoFila
+          tarefas={filaDeHoje}
+          valorTaxa={valorTaxa}
+          onFeito={completeManualTask}
+          onRespondeu={registerContactAttempt}
+          onAdiar={adiarPara}
+          onFechar={() => setFilaAberta(false)}
+        />
+      )}
 
       <input
         placeholder="Buscar por título ou cliente..."

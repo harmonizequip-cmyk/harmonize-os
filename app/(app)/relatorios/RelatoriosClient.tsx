@@ -5,6 +5,10 @@ import { formatCurrency } from "@/lib/format";
 import type { PricingCliff } from "@/lib/pricing-opportunity";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
+import { ORIGENS } from "@/app/(app)/funil/NovoLeadModal";
+import CompletarOrigem from "./CompletarOrigem";
+
+const rotuloOrigem = (v: string) => ORIGENS.find((o) => o.value === v)?.label ?? v;
 
 interface TopClient {
   name: string;
@@ -111,6 +115,7 @@ export default function RelatoriosClient({
   topClients,
   top3Share,
   origemBreakdown,
+  semOrigemQueAlugaram,
   followupBreakdown,
   nutricaoCount,
   weekdayBreakdown,
@@ -132,6 +137,7 @@ export default function RelatoriosClient({
   topClients: TopClient[];
   top3Share: number;
   origemBreakdown: OrigemRow[];
+  semOrigemQueAlugaram: { id: string; name: string }[];
   followupBreakdown: FollowupRow[];
   nutricaoCount: number;
   weekdayBreakdown: WeekdayRow[];
@@ -307,7 +313,7 @@ export default function RelatoriosClient({
           title="De onde vêm os clientes que fecham"
           summary={
             bestOrigem
-              ? `"${bestOrigem.origem}" converte melhor: ${fmtPct(bestOrigem.taxa)} dos leads viram cliente.`
+              ? `"${rotuloOrigem(bestOrigem.origem)}" converte melhor: ${fmtPct(bestOrigem.taxa)} dos leads viram cliente.`
               : "Ainda sem dados de origem suficientes pra apontar um canal melhor que outro."
           }
           accent="teal"
@@ -315,13 +321,14 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {origemBreakdown.map((o) => (
               <div key={o.origem} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{o.origem}</span>
+                <span className="text-neutral-700 dark:text-neutral-300">{rotuloOrigem(o.origem)}</span>
                 <span className="font-medium text-neutral-900 dark:text-neutral-100">
                   {o.convertidos}/{o.total} · {fmtPct(o.taxa)}
                 </span>
               </div>
             ))}
           </div>
+          <CompletarOrigem clientes={semOrigemQueAlugaram} />
         </Card>
 
         <Card

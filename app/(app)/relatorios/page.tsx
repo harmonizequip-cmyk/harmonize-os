@@ -49,6 +49,7 @@ export default async function RelatoriosPage({
     { data: followupTags },
     { data: bookedEvents },
     { data: lucroLinhas, error: erroLucro },
+    { data: clientesComLocacao },
   ] = await Promise.all([
     // Relatório é a tela de decidir, então nem teste nem locação
     // cancelada podem entrar na conta. As views rentals_contabilizaveis
@@ -86,6 +87,8 @@ export default async function RelatoriosPage({
       .select("client_id, cliente, calculated_value, total_despesas, lucro_liquido")
       .gte("event_date", periodo.inicio)
       .lte("event_date", periodo.fim),
+    // Quem já alugou alguma vez (todo o histórico), para completar a origem.
+    supabase.from("rentals_contabilizaveis").select("client_id"),
   ]);
   if (erroLucro) throw new Error(`Não consegui carregar o lucro por cliente: ${erroLucro.message}`);
 
@@ -184,6 +187,11 @@ export default async function RelatoriosPage({
     if (c.is_client) cur.convertidos += 1;
     origemMap.set(origem, cur);
   }
+  const jaAlugaram = new Set((clientesComLocacao ?? []).map((r: any) => r.client_id).filter(Boolean));
+  const semOrigemQueAlugaram = (clients ?? [])
+    .filter((c) => jaAlugaram.has(c.id) && !c.origem?.trim())
+    .map((c) => ({ id: c.id as string, name: c.name as string }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const origemBreakdown = Array.from(origemMap.entries())
     .map(([origem, v]) => ({ origem, total: v.total, convertidos: v.convertidos, taxa: v.total > 0 ? v.convertidos / v.total : 0 }))
     .sort((a, b) => b.total - a.total);
@@ -243,6 +251,7 @@ export default async function RelatoriosPage({
       topClients={topClients}
       top3Share={top3Share}
       origemBreakdown={origemBreakdown}
+      semOrigemQueAlugaram={semOrigemQueAlugaram}
       followupBreakdown={followupBreakdown}
       nutricaoCount={nutricaoCount}
       weekdayBreakdown={weekdayBreakdown}

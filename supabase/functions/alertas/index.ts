@@ -112,7 +112,11 @@ async function montarResumo(hoje: string): Promise<Aviso> {
     body: linhas.join("\n"),
     url: "/dashboard",
     tag: "resumo",
-    actions: [{ action: "ver", title: "Ver pendências", url: "/pendencias" }],
+    actions: [
+      { action: "ver", title: "Ver pendências", url: "/pendencias" },
+      // Com tarefa atrasada, o segundo botão abre a fila nas Tarefas.
+      ...((atrasadas ?? 0) > 0 ? [{ action: "fila", title: "Atacar tarefas", url: "/tarefas?fila=1" }] : []),
+    ],
   } as Aviso;
 }
 
