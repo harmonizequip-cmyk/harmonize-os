@@ -59,6 +59,9 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Web push do próprio Harmonize: app instalável (`public/manifest.webmanifest`, `public/sw.js`), cartão "Avisos no celular" em Configurações, tabela `push_inscricoes`.
 - Envio pela Edge Function `alertas` (código em `supabase/functions/alertas`, publicada no Supabase). Segredos no cofre (vault), lidos por `alertas_segredos()`, que só `service_role` executa. Nunca commitar a chave privada.
 - Relógio pg_cron: 7h30 resumo do dia, 18h reservas de amanhã (só envia se houver). Todo aviso leva à tela do que avisa.
+- Junto do resumo das 7h30 saem avisos de evento (no máximo 6): buscar HIPRO de locação de vários dias, cobrança no 3º, 7º e 15º dia de atraso, taxa de reserva vencendo hoje, fim previsto de manutenção. Cobrança e taxa trazem botão WhatsApp com a mensagem pronta.
+- `supabase/functions/alertas/mensagens.ts` é cópia de `lib/saudacao.ts` e das mensagens de cobrança: mudou lá, mudar aqui e publicar a função de novo.
+- Atalhos do ícone (manifest `shortcuts`) usam `?acao=` (`/dashboard?acao=receber`, `/agenda?acao=reservar`).
 
 ## Pendências conhecidas
 

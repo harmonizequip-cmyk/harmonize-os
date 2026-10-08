@@ -12,6 +12,7 @@
 // banco e chegam pela função alertas_segredos(), que só service_role executa.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { dataBr, linkWhatsApp, mensagemCobranca, mensagemTaxa, reais } from "./mensagens.ts";
 
 const VAPID_PUBLIC = "BHKPTBT935k49O-6dnrhtF9lwBDNnKU5k45Jl20NiHFa5oxrJESXamLGBIQI6oWH3mjr8Ah2uekyQXUg2-d3UNA";
 const SITE = "https://harmonize-os.vercel.app";
@@ -20,12 +21,22 @@ const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE
   auth: { persistSession: false },
 });
 
-const reais = (n: number) =>
-  "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+interface Aviso {
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+  // Até 2 botões no próprio aviso (ex: "Cobrar no WhatsApp", "Ver pendências").
+  actions?: { action: string; title: string; url: string }[];
+}
 
 const umDe = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 const EQUIP: Record<string, string> = { hipro_1: "HIPRO 1", hipro_2: "HIPRO 2" };
+
+function diasEntre(de: string, ate: string): number {
+  return Math.round((new Date(ate + "T12:00:00Z").getTime() - new Date(de + "T12:00:00Z").getTime()) / 86400000);
+}
 
 function somarDias(iso: string, dias: number): string {
   const d = new Date(iso + "T12:00:00Z");
@@ -61,7 +72,7 @@ async function reservasDoDia(dia: string) {
   });
 }
 
-async function montarResumo(hoje: string) {
+async function montarResumo(hoje: string): Promise<Aviso> {
   const reservas = await reservasDoDia(hoje);
 
   const { data: situacoes } = await admin.from("rentals_situacao_pagamento").select("rental_id, saldo").gt("saldo", 0);
@@ -94,10 +105,16 @@ async function montarResumo(hoje: string) {
     aReceber > 0 ? `A receber vencido: ${reais(aReceber)} (${clientes.size} ${clientes.size === 1 ? "cliente" : "clientes"})` : "Ninguém devendo",
     (atrasadas ?? 0) > 0 ? `${atrasadas} ${atrasadas === 1 ? "tarefa atrasada" : "tarefas atrasadas"}` : "Tarefas em dia",
   ];
-  return { title: "Harmonize · seu dia", body: linhas.join("\n"), url: "/dashboard", tag: "resumo" };
+  return {
+    title: "Harmonize · seu dia",
+    body: linhas.join("\n"),
+    url: "/dashboard",
+    tag: "resumo",
+    actions: [{ action: "ver", title: "Ver pendências", url: "/pendencias" }],
+  } as Aviso;
 }
 
-async function montarVespera(hoje: string) {
+async function montarVespera(hoje: string): Promise<Aviso | null> {
   const amanha = somarDias(hoje, 1);
   const reservas = await reservasDoDia(amanha);
   if (!reservas.length) return null;
@@ -107,6 +124,123 @@ async function montarVespera(hoje: string) {
     url: "/agenda",
     tag: "vespera",
   };
+}
+
+
+// Avisos por acontecimento, enviados junto com o resumo das 7h30. Cada um é um
+// aviso separado, com a tela certa (e o WhatsApp da cliente, quando é cobrança).
+const DIAS_DE_COBRANCA = [3, 7, 15];
+const MAX_AVISOS_EXTRAS = 6;
+
+async function avisosDoDia(hoje: string): Promise<Aviso[]> {
+  const avisos: Aviso[] = [];
+
+  // 1. Locação de vários dias que termina hoje: buscar o equipamento.
+  const { data: fins } = await admin
+    .from("calendar_events")
+    .select("id, event_type, date_start, date_end, clients(name, city)")
+    .in("event_type", ["hipro_1", "hipro_2"])
+    .neq("status", "cancelada")
+    .eq("is_test", false)
+    .eq("date_end", hoje)
+    .lt("date_start", hoje);
+  for (const e of fins ?? []) {
+    const c = umDe<any>((e as any).clients);
+    avisos.push({
+      title: `Buscar o ${EQUIP[(e as any).event_type] ?? "equipamento"} hoje`,
+      body: `Último dia da locação de ${c?.name ?? "cliente"}${c?.city ? " (" + c.city + ")" : ""}, iniciada em ${dataBr((e as any).date_start)}.`,
+      url: "/agenda",
+      tag: `fim-${(e as any).id}`,
+    });
+  }
+
+  // 2. Cobrança: cliente com locação vencida há 3, 7 ou 15 dias.
+  const { data: situacoes } = await admin.from("rentals_situacao_pagamento").select("rental_id, saldo").gt("saldo", 0);
+  const saldo = new Map((situacoes ?? []).map((s: any) => [s.rental_id, Number(s.saldo)]));
+  if (saldo.size) {
+    const { data: locacoes } = await admin
+      .from("rentals_contabilizaveis")
+      .select("id, client_id, event_date, event_date_end")
+      .in("id", Array.from(saldo.keys()));
+    const porCliente = new Map<string, { data: string; saldo: number; dias: number }[]>();
+    for (const r of locacoes ?? []) {
+      const fim = r.event_date_end ?? r.event_date;
+      if (!r.client_id || fim >= hoje) continue;
+      const lista = porCliente.get(r.client_id) ?? [];
+      lista.push({ data: r.event_date, saldo: saldo.get(r.id) ?? 0, dias: diasEntre(fim, hoje) });
+      porCliente.set(r.client_id, lista);
+    }
+    const devedores = Array.from(porCliente.entries()).filter(([, l]) => l.some((x) => DIAS_DE_COBRANCA.includes(x.dias)));
+    if (devedores.length) {
+      const { data: clientes } = await admin
+        .from("clients")
+        .select("id, name, whatsapp, treatment, display_name")
+        .in("id", devedores.map(([id]) => id));
+      const cli = new Map((clientes ?? []).map((c: any) => [c.id, c]));
+      for (const [id, lista] of devedores) {
+        const c = cli.get(id) ?? { name: "Cliente" };
+        const total = lista.reduce((s, l) => s + l.saldo, 0);
+        const maisAntigo = Math.max(...lista.map((l) => l.dias));
+        const whats = linkWhatsApp(c.whatsapp, mensagemCobranca(c, lista));
+        avisos.push({
+          title: `Cobrar ${c.name}: ${reais(total)}`,
+          body: `Pagamento vencido há ${maisAntigo} ${maisAntigo === 1 ? "dia" : "dias"}.`,
+          url: "/pendencias",
+          tag: `cobranca-${id}`,
+          actions: [
+            ...(whats ? [{ action: "whatsapp", title: "Cobrar no WhatsApp", url: whats }] : []),
+            { action: "ver", title: "Ver pendências", url: "/pendencias" },
+          ],
+        });
+      }
+    }
+  }
+
+  // 3. Taxa de reserva que venceu hoje (prazo de Configurações, contado da criação da reserva).
+  const { data: cfg } = await admin.from("settings").select("dias_cobranca_taxa").eq("id", true).single();
+  const prazo = Number(cfg?.dias_cobranca_taxa ?? 3);
+  const { data: taxas } = await admin
+    .from("calendar_events")
+    .select("id, date_start, taxa_valor, created_at, clients(name, whatsapp, treatment, display_name)")
+    .eq("is_test", false)
+    .eq("taxa_status", "pendente")
+    .neq("status", "cancelada")
+    .not("equipment_id", "is", null)
+    .gte("date_start", hoje);
+  for (const t of taxas ?? []) {
+    const criada = new Date(new Date((t as any).created_at).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    if (somarDias(criada, prazo) !== hoje) continue;
+    const c = umDe<any>((t as any).clients) ?? { name: "Cliente" };
+    const valor = Number((t as any).taxa_valor ?? 0);
+    const whats = linkWhatsApp(c.whatsapp, mensagemTaxa(c, (t as any).date_start, valor));
+    avisos.push({
+      title: `Taxa de reserva venceu: ${c.name}`,
+      body: `Reserva de ${dataBr((t as any).date_start)}${valor > 0 ? ", " + reais(valor) : ""}. Ainda não paga.`,
+      url: "/pendencias#taxas",
+      tag: `taxa-${(t as any).id}`,
+      actions: [
+        ...(whats ? [{ action: "whatsapp", title: "Cobrar no WhatsApp", url: whats }] : []),
+        { action: "ver", title: "Ver pendências", url: "/pendencias#taxas" },
+      ],
+    });
+  }
+
+  // 4. Equipamento com volta da manutenção prevista para hoje.
+  const { data: manut } = await admin
+    .from("equipments")
+    .select("id, name")
+    .eq("status", "manutencao")
+    .eq("status_previsto_fim", hoje);
+  for (const m of manut ?? []) {
+    avisos.push({
+      title: `${(m as any).name} volta da manutenção hoje`,
+      body: "Confira se ele já está pronto para as próximas reservas.",
+      url: "/equipamentos",
+      tag: `manutencao-${(m as any).id}`,
+    });
+  }
+
+  return avisos.slice(0, MAX_AVISOS_EXTRAS);
 }
 
 Deno.serve(async (req) => {
@@ -133,13 +267,23 @@ Deno.serve(async (req) => {
   const { data: hojeData } = await admin.rpc("hoje_local");
   const hoje = String(hojeData);
 
-  let aviso: { title: string; body: string; url: string; tag: string } | null = null;
-  if (tipo === "teste") aviso = { title: "Harmonize", body: "Avisos ligados neste aparelho. Toque para abrir o app.", url: "/dashboard", tag: "teste" };
-  else if (tipo === "resumo") aviso = await montarResumo(hoje);
-  else if (tipo === "vespera") aviso = await montarVespera(hoje);
-  else return json({ erro: "Tipo de aviso desconhecido." }, 400);
+  let avisos: Aviso[] = [];
+  if (tipo === "teste") {
+    avisos = [{
+      title: "Harmonize",
+      body: "Avisos ligados neste aparelho. Toque para abrir o app.",
+      url: "/dashboard",
+      tag: "teste",
+      actions: [{ action: "ver", title: "Ver pendências", url: "/pendencias" }],
+    }];
+  } else if (tipo === "resumo") {
+    avisos = [await montarResumo(hoje), ...(await avisosDoDia(hoje))];
+  } else if (tipo === "vespera") {
+    const v = await montarVespera(hoje);
+    avisos = v ? [v] : [];
+  } else return json({ erro: "Tipo de aviso desconhecido." }, 400);
 
-  if (!aviso) return json({ enviados: 0, motivo: "nada para avisar" });
+  if (!avisos.length) return json({ enviados: 0, motivo: "nada para avisar" });
 
   let consulta = admin.from("push_inscricoes").select("id, endpoint, p256dh, auth");
   if (somenteUsuario) consulta = consulta.eq("user_id", somenteUsuario);
@@ -149,23 +293,27 @@ Deno.serve(async (req) => {
   let removidos = 0;
   const falhas: string[] = [];
   for (const i of inscricoes ?? []) {
-    try {
-      await webpush.sendNotification(
-        { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } },
-        JSON.stringify(aviso),
-        { TTL: 60 * 60 * 6 }
-      );
-      enviados++;
-      await admin.from("push_inscricoes").update({ ultimo_envio: new Date().toISOString() }).eq("id", i.id);
-    } catch (e: any) {
-      // 404/410: o navegador não reconhece mais este aparelho (desinstalou, limpou dados).
-      if (e?.statusCode === 404 || e?.statusCode === 410) {
-        await admin.from("push_inscricoes").delete().eq("id", i.id);
-        removidos++;
-      } else {
+    let morto = false;
+    for (const aviso of avisos) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } },
+          JSON.stringify(aviso),
+          { TTL: 60 * 60 * 6 }
+        );
+        enviados++;
+      } catch (e: any) {
+        // 404/410: o navegador não reconhece mais este aparelho (desinstalou, limpou dados).
+        if (e?.statusCode === 404 || e?.statusCode === 410) {
+          await admin.from("push_inscricoes").delete().eq("id", i.id);
+          removidos++;
+          morto = true;
+          break;
+        }
         falhas.push(String(e?.statusCode ?? e?.message ?? e));
       }
     }
+    if (!morto) await admin.from("push_inscricoes").update({ ultimo_envio: new Date().toISOString() }).eq("id", i.id);
   }
-  return json({ tipo, enviados, removidos, falhas, aparelhos: (inscricoes ?? []).length, aviso });
+  return json({ tipo, enviados, removidos, falhas, aparelhos: (inscricoes ?? []).length, avisos: avisos.map((a) => a.title) });
 });

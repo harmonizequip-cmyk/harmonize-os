@@ -9,7 +9,67 @@
   "background_color": "#ffffff",
   "theme_color": "#2e9a94",
   "icons": [
-    { "src": "/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "/icone-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Receber pagamento",
+      "short_name": "Receber",
+      "url": "/dashboard?acao=receber",
+      "icons": [
+        {
+          "src": "/icone-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Nova reserva de HIPRO",
+      "short_name": "Nova reserva",
+      "url": "/agenda?acao=reservar",
+      "icons": [
+        {
+          "src": "/icone-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Agenda de hoje",
+      "short_name": "Hoje",
+      "url": "/agenda-hoje",
+      "icons": [
+        {
+          "src": "/icone-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Pendências",
+      "short_name": "Pendências",
+      "url": "/pendencias",
+      "icons": [
+        {
+          "src": "/icone-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

@@ -194,6 +194,14 @@ export default function AgendaClient({
   const [addChooserOpen, setAddChooserOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [reservaModalOpen, setReservaModalOpen] = useState(false);
+  // Atalho "Nova reserva" do ícone do app: /agenda?acao=reservar.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("acao") !== "reservar") return;
+    url.searchParams.delete("acao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    setReservaModalOpen(true);
+  }, []);
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   // Estado do modal "Pedir confirmação no WhatsApp". Guarda o evento

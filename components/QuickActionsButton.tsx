@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -100,6 +100,22 @@ export default function QuickActionsButton({
     setCategories(categoriesRes.data ?? []);
     setEquipments(equipmentsRes.data ?? []);
   }
+
+  // Atalho do ícone do app (manifest): /qualquer-tela?acao=receber abre direto
+  // a janela pedida. O parâmetro sai da barra de endereço logo depois, para
+  // um recarregar não abrir de novo.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const acao = url.searchParams.get("acao") as ActionKey | null;
+    if (!acao || !visibleActions.some((a) => a.key === acao)) return;
+    url.searchParams.delete("acao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    openMenu().then(() => {
+      setMenuOpen(false);
+      setActiveModal(acao);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handlePick(key: ActionKey) {
     setMenuOpen(false);
