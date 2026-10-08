@@ -54,6 +54,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - `docs/AUDITORIA-HARMONIZE-2026-10-05.md`: achados, evidências e ordem de entregas (seção 5). Ler antes de mexer; trabalhar um item por vez e só avançar quando o dono pedir.
 
+## Avisos no celular
+
+- Web push do próprio Harmonize: app instalável (`public/manifest.webmanifest`, `public/sw.js`), cartão "Avisos no celular" em Configurações, tabela `push_inscricoes`.
+- Envio pela Edge Function `alertas` (código em `supabase/functions/alertas`, publicada no Supabase). Segredos no cofre (vault), lidos por `alertas_segredos()`, que só `service_role` executa. Nunca commitar a chave privada.
+- Relógio pg_cron: 7h30 resumo do dia, 18h reservas de amanhã (só envia se houver). Todo aviso leva à tela do que avisa.
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.
