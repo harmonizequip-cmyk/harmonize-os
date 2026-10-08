@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: NÃO APLICADA. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 08/10/2026, pelo dono, e conferida por consulta de leitura (2 pastas privadas, 3 e 4 regras).
 --
 -- Fotos do contador do HIPRO e comprovantes de pagamento.
 --   Pasta privada "fotos-contador" no Storage do Supabase. Cada reserva ou

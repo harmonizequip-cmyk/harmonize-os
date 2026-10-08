@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { BookUser } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
+import { escolherContato, podeEscolherContato } from "@/lib/contatos";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
 // Exportado para o filtro do Funil usar a mesma lista, em vez de duplicar
@@ -38,6 +40,22 @@ export default function NovoLeadModal({
   const [parceiro, setParceiro] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [temContatos, setTemContatos] = useState(false);
+
+  useEffect(() => {
+    setTemContatos(podeEscolherContato());
+  }, []);
+
+  async function puxarDosContatos() {
+    try {
+      const c = await escolherContato();
+      if (!c) return;
+      if (c.nome) setName(c.nome);
+      if (c.telefone) setWhatsapp(c.telefone);
+    } catch {
+      setError("Não consegui abrir os contatos do celular.");
+    }
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -76,6 +94,16 @@ export default function NovoLeadModal({
         <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Novo lead</h2>
 
         <div className="space-y-3">
+          {temContatos && (
+            <button
+              type="button"
+              onClick={puxarDosContatos}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-teal py-2.5 text-sm font-medium text-brand-teal"
+            >
+              <BookUser size={16} />
+              Puxar dos contatos do celular
+            </button>
+          )}
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome</label>
             <input
