@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DatabaseBackup } from "lucide-react";
 
 const CHAVE = "harmonize-ultimo-backup";
@@ -10,11 +10,19 @@ const CHAVE = "harmonize-ultimo-backup";
  * guarda cópias que dê para restaurar, então o arquivo baixado aqui é a única
  * cópia fora do banco. O aviso de "último backup" fica só neste aparelho
  * (localStorage) e serve de lembrete, não de prova.
+ *
+ * "Salvar no Google Drive" abre o Compartilhar do celular com o arquivo, e
+ * basta escolher Drive. O aviso de domingo abre /configuracoes?acao=backup,
+ * que já deixa o arquivo pronto para isso caber num toque só (o celular só
+ * deixa abrir o Compartilhar logo depois de um toque).
  */
 export default function BackupCard() {
   const [ultimo, setUltimo] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [pronto, setPronto] = useState<File | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const cartao = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -23,6 +31,72 @@ export default function BackupCard() {
       // navegador sem armazenamento: o cartão funciona igual, só sem o lembrete
     }
   }, []);
+
+  // Vindo do aviso de domingo: rola até aqui e já prepara o arquivo.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("acao") !== "backup") return;
+    url.searchParams.delete("acao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    cartao.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    prepararParaDrive();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function marcarFeito() {
+    const agora = new Date().toISOString();
+    try {
+      localStorage.setItem(CHAVE, agora);
+    } catch {
+      // sem armazenamento: segue sem o lembrete
+    }
+    setUltimo(agora);
+  }
+
+  async function gerarArquivo(): Promise<File> {
+    const resposta = await fetch("/api/backup", { cache: "no-store" });
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => null);
+      throw new Error(corpo?.erro ?? "Não consegui gerar o backup.");
+    }
+    const texto = await resposta.text();
+    const base = `backup-harmonize-${new Date().toISOString().slice(0, 10)}`;
+    // O Compartilhar do Android costuma recusar .json; .txt passa e o
+    // conteúdo é o mesmo (o script de restauração lê qualquer um dos dois).
+    const json = new File([texto], `${base}.json`, { type: "application/json" });
+    if (typeof navigator !== "undefined" && "canShare" in navigator && navigator.canShare({ files: [json] })) return json;
+    return new File([texto], `${base}.txt`, { type: "text/plain" });
+  }
+
+  async function prepararParaDrive() {
+    setBaixando(true);
+    setErro(null);
+    try {
+      setPronto(await gerarArquivo());
+      setAviso("Arquivo pronto. Toque em Salvar no Google Drive.");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não consegui gerar o backup.");
+    }
+    setBaixando(false);
+  }
+
+  async function salvarNoDrive() {
+    if (!pronto) return prepararParaDrive();
+    const podeCompartilhar =
+      typeof navigator !== "undefined" && "canShare" in navigator && navigator.canShare({ files: [pronto] });
+    if (!podeCompartilhar) {
+      setErro("Este aparelho não abre o Compartilhar com arquivo. Use Baixar backup agora.");
+      return;
+    }
+    try {
+      await navigator.share({ files: [pronto], title: pronto.name });
+      marcarFeito();
+      setPronto(null);
+      setAviso("Feito. Confira no Drive se o arquivo chegou.");
+    } catch (e) {
+      if ((e as Error)?.name !== "AbortError") setErro("O Compartilhar não abriu. Toque de novo.");
+    }
+  }
 
   const diasDesde = ultimo ? Math.floor((Date.now() - new Date(ultimo).getTime()) / 86400000) : null;
   const atrasado = diasDesde === null || diasDesde >= 7;
@@ -46,13 +120,7 @@ export default function BackupCard() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      const agora = new Date().toISOString();
-      try {
-        localStorage.setItem(CHAVE, agora);
-      } catch {
-        // sem armazenamento: segue sem o lembrete
-      }
-      setUltimo(agora);
+      marcarFeito();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não consegui gerar o backup.");
     }
@@ -61,6 +129,7 @@ export default function BackupCard() {
 
   return (
     <div
+      ref={cartao}
       className={`rounded-2xl border p-4 ${
         atrasado
           ? "border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10"
@@ -84,14 +153,25 @@ export default function BackupCard() {
                 }).`
               : "Nenhum backup baixado neste aparelho ainda."}
           </p>
-          <button
-            type="button"
-            onClick={baixar}
-            disabled={baixando}
-            className="mt-3 rounded-xl bg-brand-teal px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {baixando ? "Gerando..." : "Baixar backup agora"}
-          </button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={salvarNoDrive}
+              disabled={baixando}
+              className="rounded-xl bg-brand-teal px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              {baixando ? "Gerando..." : pronto ? "Salvar no Google Drive" : "Preparar para o Google Drive"}
+            </button>
+            <button
+              type="button"
+              onClick={baixar}
+              disabled={baixando}
+              className="rounded-xl border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Baixar backup agora
+            </button>
+          </div>
+          {aviso && <p className="mt-2 text-xs text-brand-teal">{aviso}</p>}
           {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
         </div>
       </div>

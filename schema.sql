@@ -5097,6 +5097,35 @@ begin
 end
 $relogio$;
 
+-- Aviso de domingo 19h: fechamento da semana e backup (migrations/2026-10-08-aviso-de-domingo.sql).
+do $domingo$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_cron')
+     and exists (select 1 from pg_available_extensions where name = 'pg_net')
+     and exists (select 1 from pg_namespace where nspname = 'vault') then
+    create extension if not exists pg_cron;
+    create extension if not exists pg_net with schema extensions;
+    perform cron.unschedule(jobid) from cron.job where jobname = 'harmonize-alerta-domingo';
+    perform cron.schedule(
+      'harmonize-alerta-domingo',
+      '0 22 * * 0',
+      $job$
+      select net.http_post(
+        url := 'https://vidnlzbxaxjlmzncqhxw.supabase.co/functions/v1/alertas',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'x-alerta-segredo', (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_alertas_segredo')
+        ),
+        body := jsonb_build_object('tipo', 'domingo')
+      );
+      $job$
+    );
+  else
+    raise notice 'Sem pg_cron/pg_net/vault: aviso de domingo não agendado.';
+  end if;
+end
+$domingo$;
+
 -- Fotos do contador e comprovantes (migrations/2026-10-08-fotos-e-comprovantes.sql):
 -- pastas privadas no Storage; fotos com o módulo agenda, comprovantes com o financeiro.
 do $fotos$

@@ -8,6 +8,7 @@ import MobileHeader from "@/components/MobileHeader";
 import QuickActionsButton from "@/components/QuickActionsButton";
 import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
 import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
+import ReciboHost from "@/components/ReciboHost";
 
 export default async function AppLayout({
   children,
@@ -52,6 +53,7 @@ export default async function AppLayout({
     <div className="flex min-h-screen">
       <RegistrarServiceWorker />
       <GuardarAgendaOffline />
+      <ReciboHost />
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
       <main className="min-w-0 flex-1 pb-20 md:pb-0">
         <MobileHeader />

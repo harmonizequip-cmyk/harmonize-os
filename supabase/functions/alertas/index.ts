@@ -4,7 +4,9 @@
 // Quem chama:
 //   - o relógio do banco (pg_cron), com o cabeçalho x-alerta-segredo:
 //       { "tipo": "resumo" }  7h30, resumo do dia
-//       { "tipo": "vespera" } 18h, reservas de amanhã (só envia se houver)
+//       { "tipo": "vespera" } 18h, reservas de amanhã (só envia se houver) e
+//                             um aviso por cliente ainda sem pedido de confirmação
+//       { "tipo": "domingo" } domingo 19h, fechamento da semana e lembrete do backup
 //   - o botão "Enviar aviso de teste" em Configurações, com o login de quem
 //     está no app: { "tipo": "teste" } manda só para os aparelhos dessa pessoa.
 //
@@ -113,6 +115,168 @@ async function montarResumo(hoje: string): Promise<Aviso> {
     actions: [{ action: "ver", title: "Ver pendências", url: "/pendencias" }],
   } as Aviso;
 }
+
+// Uma por cliente de amanhã que ainda não recebeu o pedido de confirmação.
+// O botão abre a Agenda com a mensagem pronta; é lá que o envio fica
+// registrado (registrar_pedido_confirmacao), como no botão da própria Agenda.
+const MAX_CONFIRMACOES = 4;
+
+async function confirmacoesDeAmanha(hoje: string): Promise<Aviso[]> {
+  const amanha = somarDias(hoje, 1);
+  const { data } = await admin
+    .from("calendar_events")
+    .select("id, event_type, clients(name, city)")
+    .in("event_type", ["hipro_1", "hipro_2"])
+    .neq("status", "cancelada")
+    .eq("is_test", false)
+    .eq("confirmed", false)
+    .is("confirmation_message_sent_at", null)
+    .not("client_id", "is", null)
+    .eq("date_start", amanha)
+    .order("event_type")
+    .limit(MAX_CONFIRMACOES);
+  return (data ?? []).map((e: any) => {
+    const c = umDe<any>(e.clients);
+    const url = `/agenda?confirmar=${e.id}`;
+    return {
+      title: `Confirmar com ${c?.name ?? "a cliente"}`,
+      body: `${EQUIP[e.event_type] ?? e.event_type} amanhã${c?.city ? " em " + c.city : ""}. Toque para mandar a mensagem de confirmação.`,
+      url,
+      tag: `confirmar-${e.id}`,
+      actions: [{ action: "confirmar", title: "Mandar confirmação", url }],
+    };
+  });
+}
+
+// Dia livre (os dois HIPROs sem nada, fora domingo, mesma regra da imagem de
+// datas disponíveis) nos próximos 7 dias. Só às segundas e quintas, para não
+// virar ruído: quase toda semana tem dia livre.
+const DIAS_DO_AVISO_LIVRE = [1, 4];
+const NOMES_DIA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+async function avisoDiasLivres(hoje: string): Promise<Aviso | null> {
+  if (!DIAS_DO_AVISO_LIVRE.includes(new Date(hoje + "T12:00:00Z").getUTCDay())) return null;
+  const inicio = somarDias(hoje, 1);
+  const fim = somarDias(hoje, 7);
+  const { data } = await admin
+    .from("calendar_events")
+    .select("date_start, date_end")
+    .in("event_type", ["hipro_1", "hipro_2"])
+    .neq("status", "cancelada")
+    .eq("is_test", false)
+    .lte("date_start", fim)
+    .gte("date_end", inicio);
+  const ocupados = new Set<string>();
+  for (const e of data ?? []) {
+    for (let d = e.date_start; d <= e.date_end; d = somarDias(d, 1)) ocupados.add(d);
+  }
+  const livres: string[] = [];
+  for (let d = inicio; d <= fim; d = somarDias(d, 1)) {
+    if (new Date(d + "T12:00:00Z").getUTCDay() !== 0 && !ocupados.has(d)) livres.push(d);
+  }
+  if (!livres.length) return null;
+  const nomes = livres.map((d) => `${NOMES_DIA[new Date(d + "T12:00:00Z").getUTCDay()]} ${dataBr(d).slice(0, 5)}`);
+  return {
+    title: livres.length === 1 ? `Dia livre: ${nomes[0]}` : `${livres.length} dias livres nos próximos 7 dias`,
+    body: (livres.length === 1 ? "Os dois HIPROs estão livres." : nomes.join(", ") + ".") + " Mande as datas para os leads.",
+    url: "/agenda?acao=datas",
+    tag: "dias-livres",
+    actions: [{ action: "datas", title: "Gerar imagem das datas", url: "/agenda?acao=datas" }],
+  };
+}
+
+// Domingo à noite: o que aconteceu de segunda a domingo, comparado com a
+// semana anterior, e quanto falta para as contas fixas do mês.
+async function montarSemana(hoje: string): Promise<Aviso> {
+  const ini = somarDias(hoje, -6);
+  const iniAnt = somarDias(hoje, -13);
+  const fimAnt = somarDias(hoje, -7);
+
+  const faturado = async (de: string, ate: string) => {
+    const { data } = await admin
+      .from("rentals_contabilizaveis")
+      .select("calculated_value")
+      .gte("event_date", de)
+      .lte("event_date", ate);
+    return { total: (data ?? []).reduce((s: number, r: any) => s + Number(r.calculated_value ?? 0), 0), qtd: (data ?? []).length };
+  };
+  // Recebido = pagamentos de locação + taxas de reserva pagas na semana (fica de
+  // fora o que não é de cliente, como devolução de empréstimo).
+  const recebido = async (de: string, ate: string) => {
+    const { data: pags } = await admin
+      .from("rental_payments")
+      .select("valor, rentals!inner(is_test, status)")
+      .eq("rentals.is_test", false)
+      .neq("rentals.status", "cancelada")
+      .gte("data", de)
+      .lte("data", ate);
+    const { data: taxas } = await admin
+      .from("calendar_events")
+      .select("transactions!calendar_events_taxa_transaction_id_fkey!inner(amount, date)")
+      .eq("is_test", false)
+      .eq("taxa_status", "paga")
+      .gte("transactions.date", de)
+      .lte("transactions.date", ate);
+    const somaPags = (pags ?? []).reduce((s: number, p: any) => s + Number(p.valor ?? 0), 0);
+    const somaTaxas = (taxas ?? []).reduce((s: number, e: any) => s + Number(umDe<any>(e.transactions)?.amount ?? 0), 0);
+    return somaPags + somaTaxas;
+  };
+
+  const [sem, ant, rec] = await Promise.all([faturado(ini, hoje), faturado(iniAnt, fimAnt), recebido(ini, hoje)]);
+
+  const { data: situacoes } = await admin.from("rentals_situacao_pagamento").select("rental_id, saldo").gt("saldo", 0);
+  let aReceber = 0;
+  const ids = (situacoes ?? []).map((x: any) => x.rental_id);
+  if (ids.length) {
+    const { data: locs } = await admin.from("rentals_contabilizaveis").select("id, event_date, event_date_end").in("id", ids);
+    const saldo = new Map((situacoes ?? []).map((x: any) => [x.rental_id, Number(x.saldo)]));
+    for (const r of locs ?? []) if ((r.event_date_end ?? r.event_date) <= hoje) aReceber += saldo.get(r.id) ?? 0;
+  }
+
+  // Contas fixas do mês (Configurações) contra a sobra das locações do mês,
+  // a mesma conta do quadro "Este mês" do Dashboard.
+  const { data: cfg } = await admin.from("settings").select("despesas_fixas").eq("id", true).maybeSingle();
+  const fixas = (Array.isArray(cfg?.despesas_fixas) ? cfg!.despesas_fixas : []).reduce(
+    (s: number, d: any) => s + (Number(d?.valor) > 0 ? Number(d.valor) : 0),
+    0
+  );
+  let linhaFixas: string | null = null;
+  if (fixas > 0) {
+    const { data: lucros } = await admin
+      .from("rentals_lucro")
+      .select("lucro_liquido")
+      .gte("event_date", hoje.slice(0, 8) + "01")
+      .lte("event_date", hoje);
+    const sobra = (lucros ?? []).reduce((s: number, l: any) => s + Number(l.lucro_liquido ?? 0), 0);
+    linhaFixas = sobra >= fixas ? `Contas fixas do mês cobertas (sobra ${reais(sobra - fixas)})` : `Faltam ${reais(fixas - sobra)} para as contas fixas do mês`;
+  }
+
+  const variacao =
+    ant.total > 0
+      ? ` (${sem.total >= ant.total ? "+" : ""}${Math.round(((sem.total - ant.total) / ant.total) * 100)}% sobre a semana anterior)`
+      : "";
+  const linhas = [
+    `Faturado: ${reais(sem.total)} em ${sem.qtd} ${sem.qtd === 1 ? "locação" : "locações"}${variacao}`,
+    `Recebido: ${reais(rec)}`,
+    aReceber > 0 ? `A receber: ${reais(aReceber)}` : "Ninguém devendo",
+    ...(linhaFixas ? [linhaFixas] : []),
+  ];
+  return {
+    title: "Fechamento da semana",
+    body: linhas.join("\n"),
+    url: "/dashboard",
+    tag: "semana",
+    actions: [{ action: "ver", title: "Ver pendências", url: "/pendencias" }],
+  };
+}
+
+const AVISO_BACKUP: Aviso = {
+  title: "Hora do backup da semana",
+  body: "Toque, gere o arquivo e escolha Google Drive para guardar.",
+  url: "/configuracoes?acao=backup",
+  tag: "backup",
+  actions: [{ action: "backup", title: "Fazer backup", url: "/configuracoes?acao=backup" }],
+};
 
 async function montarVespera(hoje: string): Promise<Aviso | null> {
   const amanha = somarDias(hoje, 1);
@@ -277,10 +441,13 @@ Deno.serve(async (req) => {
       actions: [{ action: "ver", title: "Ver pendências", url: "/pendencias" }],
     }];
   } else if (tipo === "resumo") {
-    avisos = [await montarResumo(hoje), ...(await avisosDoDia(hoje))];
+    const livres = await avisoDiasLivres(hoje);
+    avisos = [await montarResumo(hoje), ...(await avisosDoDia(hoje)), ...(livres ? [livres] : [])];
   } else if (tipo === "vespera") {
     const v = await montarVespera(hoje);
-    avisos = v ? [v] : [];
+    avisos = v ? [v, ...(await confirmacoesDeAmanha(hoje))] : [];
+  } else if (tipo === "domingo") {
+    avisos = [await montarSemana(hoje), AVISO_BACKUP];
   } else return json({ erro: "Tipo de aviso desconhecido." }, 400);
 
   if (!avisos.length) return json({ enviados: 0, motivo: "nada para avisar" });

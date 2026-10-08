@@ -7,6 +7,7 @@ import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { formatCurrency } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
+import { avisarPagamentoRegistrado } from "./ReciboHost";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -87,6 +88,8 @@ export default function ReceberPagamentoBotao({
       return;
     }
     setAberto(false);
+    // Oferece o recibo (components/ReciboHost.tsx, no layout).
+    avisarPagamentoRegistrado({ rentalId, valor: v, forma, data });
     if (onDone) onDone();
     else router.refresh();
   }

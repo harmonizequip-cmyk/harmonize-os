@@ -213,6 +213,25 @@ export default function AgendaClient({
   const [pedidoMessage, setPedidoMessage] = useState("");
   const [pedidoCadastroIncompleto, setPedidoCadastroIncompleto] = useState(false);
   const [pedidoEnviando, setPedidoEnviando] = useState(false);
+  // Vindo de um aviso no celular: /agenda?confirmar=<id> abre a mensagem de
+  // confirmação daquela reserva (o envio é registrado ao tocar em enviar) e
+  // /agenda?acao=datas abre a imagem de datas disponíveis.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const confirmar = url.searchParams.get("confirmar");
+    const acao = url.searchParams.get("acao");
+    if (!confirmar && acao !== "datas") return;
+    url.searchParams.delete("confirmar");
+    if (acao === "datas") url.searchParams.delete("acao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    if (acao === "datas") setAvailabilityOpen(true);
+    if (confirmar) {
+      const ev = initialEvents.find((e) => e.id === confirmar);
+      if (ev) handlePedirConfirmacao(ev);
+    }
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [eventSearch, setEventSearch] = useState("");
   // Aqui o "período" já é o mês que a pessoa está olhando no calendário —
   // trocar de mês É o filtro de período desta tela, então não faz sentido
