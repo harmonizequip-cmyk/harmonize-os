@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ESCRITA, AINDA NÃO APLICADA (aguarda o dono rodar).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 08/10/2026, pelo dono, e conferida por consulta de leitura.
 --
 -- Nova etapa do funil de leads: "Desqualificado" (desqualificado), logo
 -- depois de Nutrição. Para lead que não tem perfil ou não vai fechar.
