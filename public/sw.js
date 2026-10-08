@@ -1,8 +1,33 @@
 // Service worker do Harmonize: recebe os avisos (web push) mesmo com o app
 // fechado e, ao tocar no aviso ou num botão dele, abre a tela certa (ou o
 // WhatsApp da cliente, no botão de cobrar).
-self.addEventListener("install", () => self.skipWaiting());
+// Página que abre quando o app é aberto sem sinal (mostra a cópia da agenda
+// guardada no aparelho). Fica guardada desde a instalação.
+const CAIXA_OFFLINE = "harmonize-offline-v1";
+const PAGINA_OFFLINE = "/sem-internet.html";
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CAIXA_OFFLINE)
+      .then((c) => c.add(PAGINA_OFFLINE))
+      .catch(() => {})
+      .then(() => self.skipWaiting())
+  );
+});
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
+// Abrir uma tela sem internet: em vez da tela de erro do Chrome, mostra a
+// agenda guardada. Com internet nada muda (a resposta vem da rede).
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode !== "navigate" || event.request.method !== "GET") return;
+  event.respondWith(
+    fetch(event.request).catch(async () => {
+      const guardada = await caches.match(PAGINA_OFFLINE);
+      return guardada || new Response("Sem internet.", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    })
+  );
+});
 
 self.addEventListener("push", (event) => {
   let dados = {};

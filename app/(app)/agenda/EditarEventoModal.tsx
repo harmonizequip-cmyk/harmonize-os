@@ -632,7 +632,7 @@ export default function EditarEventoModal({
               )}
 
               {!event.is_mentoria && <FotosContador eventId={event.id} />}
-              {!event.is_mentoria && event.taxa_status && (
+              {!event.is_mentoria && event.taxa_status && event.taxa_status !== "nao_aplica" && (
                 <Comprovantes pasta={`taxa/${event.id}`} titulo="Comprovantes da taxa de reserva" />
               )}
 

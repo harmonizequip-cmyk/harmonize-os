@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2e9a94">
+<title>Harmonize sem internet</title>
+<style>
+  /* Aberta pelo sw.js quando o app abre sem sinal. Lê a cópia que o app
+     guardou no aparelho (components/GuardarAgendaOffline.tsx). */
+  :root { --bg:#f3f8f8; --card:#fff; --fg:#1d2b2f; --muted:#5d7277; --line:#d5e5e6; --accent:#2e9a94; --warn:#b45309; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1a1c; --card:#172528; --fg:#e4eeef; --muted:#9db2b6; --line:#27393d; --accent:#46c2bb; --warn:#f59e0b; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:20px 16px 40px; display:grid; gap:12px; }
+  h1 { font-size:1.25rem; margin:0; }
+  h2 { font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); margin:12px 0 0; }
+  .sub { color:var(--muted); font-size:.85rem; margin:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:grid; gap:6px; min-width:0; }
+  .nome { font-weight:700; font-size:.95rem; overflow-wrap:anywhere; }
+  .linha { font-size:.82rem; color:var(--muted); overflow-wrap:anywhere; }
+  .alerta { font-size:.82rem; color:var(--warn); font-weight:600; }
+  .botoes { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .botoes a, button { font:inherit; font-size:.82rem; font-weight:700; text-decoration:none; border-radius:10px; padding:8px 14px; background:var(--accent); color:#fff; border:0; }
+  .botoes a.sec { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button { justify-self:start; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sem internet</h1>
+  <p class="sub" id="copia">Mostrando a última cópia guardada no aparelho.</p>
+  <button type="button" id="tentar">Tentar abrir o Harmonize de novo</button>
+  <div id="lista"></div>
+</main>
+<script>
+  document.getElementById("tentar").addEventListener("click", () => { location.href = "/dashboard"; });
+  window.addEventListener("online", () => { location.href = "/dashboard"; });
+
+  const lista = document.getElementById("lista");
+  const reais = (v) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const dataBr = (iso) => iso.split("-").reverse().slice(0, 2).join("/");
+  function hojeIso() {
+    const d = new Date();
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+  }
+  function somar(iso, n) {
+    const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
+  }
+  function digitos(tel) {
+    let d = String(tel || "").replace(/\D/g, "");
+    if (!d.startsWith("55") && d.startsWith("0")) d = d.slice(1);
+    return d ? (d.startsWith("55") ? d : "55" + d) : "";
+  }
+  function el(tag, cls, texto) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (texto != null) e.textContent = texto;
+    return e;
+  }
+  function botao(href, texto, sec) {
+    const a = el("a", sec ? "sec" : "", texto); a.href = href; return a;
+  }
+
+  let dados = null;
+  try { dados = JSON.parse(localStorage.getItem("harmonize-agenda-offline") || "null"); } catch (e) {}
+
+  if (!dados || !Array.isArray(dados.itens)) {
+    document.getElementById("copia").textContent =
+      "Ainda não há cópia guardada. Ela é feita sozinha toda vez que você abre o app com internet.";
+  } else {
+    const g = new Date(dados.geradoEm);
+    document.getElementById("copia").textContent =
+      "Cópia de " + g.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " às " +
+      g.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) +
+      ". Mudanças feitas depois disso não aparecem aqui.";
+
+    const hoje = hojeIso();
+    const amanha = somar(hoje, 1);
+    const grupos = new Map();
+    for (const it of dados.itens) {
+      if (it.fim < hoje) continue;
+      const dia = it.inicio < hoje ? hoje : it.inicio;
+      if (!grupos.has(dia)) grupos.set(dia, []);
+      grupos.get(dia).push(it);
+    }
+    const dias = [...grupos.keys()].sort();
+    if (dias.length === 0) lista.append(el("p", "sub", "Nenhum atendimento nos próximos dias."));
+    for (const dia of dias) {
+      const rotulo = dia === hoje ? "Hoje" : dia === amanha ? "Amanhã" : dataBr(dia);
+      lista.append(el("h2", "", rotulo));
+      for (const it of grupos.get(dia)) {
+        const c = el("div", "card");
+        c.append(el("div", "nome", (it.hora ? it.hora + " · " : "") + (it.cliente || it.titulo || "Sem cliente")));
+        const partes = [];
+        if (it.equipamento) partes.push(it.equipamento);
+        if (it.fim && it.fim !== it.inicio) partes.push(dataBr(it.inicio) + " a " + dataBr(it.fim) + (it.fim === dia ? " (dia de buscar)" : ""));
+        if (partes.length) c.append(el("div", "linha", partes.join(" · ")));
+        if (it.endereco) c.append(el("div", "linha", it.endereco));
+        if (it.notas) c.append(el("div", "linha", it.notas));
+        if (it.contagemInicial != null) c.append(el("div", "linha", "Contagem inicial: " + it.contagemInicial.toLocaleString("pt-BR")));
+        if (it.saldo != null && it.saldo > 0.009) c.append(el("div", "alerta", "Falta receber " + reais(it.saldo)));
+        if (it.taxaPendente != null) c.append(el("div", "alerta", "Taxa de reserva pendente" + (it.taxaPendente > 0 ? ": " + reais(it.taxaPendente) : "")));
+        if (it.semDisparos) c.append(el("div", "linha", "Sem disparos lançados ainda"));
+        const b = el("div", "botoes");
+        const tel = digitos(it.whatsapp);
+        if (tel) {
+          b.append(botao("tel:+" + tel, "Ligar"));
+          b.append(botao("intent://send?phone=" + tel + "#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=" +
+            encodeURIComponent("https://wa.me/" + tel) + ";end", "WhatsApp", true));
+        }
+        if (it.endereco) b.append(botao("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(it.endereco), "Mapa", true));
+        if (b.childElementCount) c.append(b);
+        lista.append(c);
+      }
+    }
+  }
+</script>
+</body>
+</html>

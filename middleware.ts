@@ -50,5 +50,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // manifest, service worker e ícones precisam abrir sem login (o navegador busca
   // sem os cookies da sessão para instalar o app e para receber avisos).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icone-).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|sem-internet.html|icone-).*)"],
 };
