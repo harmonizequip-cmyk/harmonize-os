@@ -29,6 +29,8 @@ export const STAGES = [
   { key: "lead", label: "Novo contato", dot: "bg-neutral-400" },
   { key: "contato", label: "Tentativa de contato", dot: "bg-brand-blue" },
   { key: "nutricao", label: "Nutrição", dot: "bg-amber-400" },
+  // Saída do funil: lead sem perfil ou que não vai fechar. Fica guardado, sem tarefa.
+  { key: "desqualificado", label: "Desqualificado", dot: "bg-red-400" },
   // Está respondendo no WhatsApp: conversa em andamento, antes de demonstrar interesse.
   { key: "em_contato", label: "Em contato", dot: "bg-emerald-500" },
   { key: "qualificado", label: "Interesse", dot: "bg-brand-lilac" },
@@ -253,9 +255,12 @@ export default function FunilClient({
   }
 
   async function avancarEtapa(lead: LeadRow) {
-    const idx = LEAD_STAGES.findIndex((s) => s.key === lead.stage);
-    if (idx === -1 || idx === LEAD_STAGES.length - 1) return;
-    moveToStage(lead.id, LEAD_STAGES[idx + 1].key);
+    // "Desqualificado" é saída do funil, não um passo adiante: o botão de
+    // avançar pula essa etapa (de Nutrição vai direto para Em contato).
+    const caminho = LEAD_STAGES.filter((s) => s.key !== "desqualificado" || lead.stage === "desqualificado");
+    const idx = caminho.findIndex((s) => s.key === lead.stage);
+    if (idx === -1 || idx === caminho.length - 1) return;
+    moveToStage(lead.id, caminho[idx + 1].key);
   }
 
   async function toggleConfirmed(lead: LeadRow) {

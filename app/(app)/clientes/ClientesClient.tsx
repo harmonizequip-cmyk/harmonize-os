@@ -14,6 +14,7 @@ const ETAPAS: Record<string, string> = {
   lead: "Lead",
   contato: "Contato",
   nutricao: "Nutrição",
+  desqualificado: "Desqualificado",
   em_contato: "Em contato",
   qualificado: "Qualificado",
   agendado: "Agendamento",
