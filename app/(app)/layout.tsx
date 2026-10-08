@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/BottomNav";
 import MobileHeader from "@/components/MobileHeader";
 import QuickActionsButton from "@/components/QuickActionsButton";
+import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
 
 export default async function AppLayout({
   children,
@@ -48,6 +49,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen">
+      <RegistrarServiceWorker />
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
       <main className="min-w-0 flex-1 pb-20 md:pb-0">
         <MobileHeader />

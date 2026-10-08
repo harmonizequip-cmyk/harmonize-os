@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Harmonize OS",
   description: "Gestão da Harmonize",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icone-192.png", apple: "/icone-180.png" },
+  appleWebApp: { capable: true, title: "Harmonize", statusBarStyle: "default" },
 };
 
 // Trava o zoom (pinça e duplo-toque) e fixa a largura na tela do
@@ -15,6 +18,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   minimumScale: 1,
   userScalable: false,
+  themeColor: "#2e9a94",
 };
 
 export default function RootLayout({

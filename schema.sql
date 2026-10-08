@@ -4966,6 +4966,54 @@ revoke execute on function public.remover_emprestimo(uuid) from public, anon;
 grant execute on function public.remover_emprestimo(uuid) to authenticated, service_role;
 
 -- ============================================================
+-- AVISOS NO CELULAR (2026-10-08, migration avisos-no-celular)
+-- Web push: aparelhos inscritos e a função que entrega os segredos (cofre do
+-- Supabase) à Edge Function "alertas". O relógio (pg_cron) fica no fim do
+-- arquivo, depois dos privilégios.
+-- ============================================================
+create table if not exists public.push_inscricoes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  aparelho text,
+  created_at timestamptz not null default now(),
+  ultimo_envio timestamptz
+);
+
+comment on table public.push_inscricoes is
+  'Aparelhos inscritos para receber avisos do Harmonize (web push). Uma linha por navegador/celular. A função alertas remove sozinha a inscrição que o navegador recusar (404/410).';
+
+alter table public.push_inscricoes enable row level security;
+
+drop policy if exists "push_inscricoes_select" on public.push_inscricoes;
+drop policy if exists "push_inscricoes_insert" on public.push_inscricoes;
+drop policy if exists "push_inscricoes_update" on public.push_inscricoes;
+drop policy if exists "push_inscricoes_delete" on public.push_inscricoes;
+create policy "push_inscricoes_select" on public.push_inscricoes for select using (user_id = auth.uid());
+create policy "push_inscricoes_insert" on public.push_inscricoes for insert with check (user_id = auth.uid());
+create policy "push_inscricoes_update" on public.push_inscricoes for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "push_inscricoes_delete" on public.push_inscricoes for delete using (user_id = auth.uid());
+
+-- plpgsql (e não sql) para o corpo só ser conferido na hora de rodar: o
+-- schema.sql também carrega num Postgres sem o cofre do Supabase.
+create or replace function public.alertas_segredos()
+returns table(vapid_private text, segredo text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+    select
+      (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_vapid_private'),
+      (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_alertas_segredo');
+end;
+$$;
+
+
+-- ============================================================
 -- PRIVILÉGIOS DE EXECUÇÃO (2026-10-05, fecha-funcoes-sem-login e
 -- fecha-calendario-publico)
 --
@@ -4999,3 +5047,52 @@ revoke execute on function public.descrever_registro(text, uuid) from authentica
 revoke execute on function public.recalcular_pagamento_locacao(uuid) from authenticated;
 
 alter default privileges for role postgres in schema public revoke execute on functions from anon;
+
+-- Avisos no celular: só a Edge Function (service_role) lê os segredos. Fica
+-- depois do bloco geral, que liberaria para authenticated.
+revoke execute on function public.alertas_segredos() from public, anon, authenticated;
+grant execute on function public.alertas_segredos() to service_role;
+
+-- Relógio dos avisos (7h30 e 18h de Brasília). Só existe no Supabase, que tem
+-- pg_cron, pg_net e o cofre; num Postgres comum este bloco não faz nada.
+do $relogio$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_cron')
+     and exists (select 1 from pg_available_extensions where name = 'pg_net')
+     and exists (select 1 from pg_namespace where nspname = 'vault') then
+    create extension if not exists pg_cron;
+    create extension if not exists pg_net with schema extensions;
+    perform cron.unschedule(jobid) from cron.job where jobname in ('harmonize-alerta-manha', 'harmonize-alerta-vespera');
+      
+      perform cron.schedule(
+        'harmonize-alerta-manha',
+        '30 10 * * *',
+        $job$
+        select net.http_post(
+          url := 'https://vidnlzbxaxjlmzncqhxw.supabase.co/functions/v1/alertas',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'x-alerta-segredo', (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_alertas_segredo')
+          ),
+          body := jsonb_build_object('tipo', 'resumo')
+        );
+        $job$
+      );
+      
+      perform cron.schedule(
+        'harmonize-alerta-vespera',
+        '0 21 * * *',
+        $job$
+        select net.http_post(
+          url := 'https://vidnlzbxaxjlmzncqhxw.supabase.co/functions/v1/alertas',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'x-alerta-segredo', (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_alertas_segredo')
+          ),
+          body := jsonb_build_object('tipo', 'vespera')
+        );
+        $job$
+      );
+  end if;
+end
+$relogio$;
