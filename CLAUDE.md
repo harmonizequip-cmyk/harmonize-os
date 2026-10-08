@@ -66,6 +66,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Anotar por voz: "+" > Anotar por voz ou atalho `/dashboard?acao=voz`. Abre a Nova tarefa escutando (`lib/reconhecer-fala.ts`) e `lib/voz.ts` tira da frase a data e o cliente. Na dúvida entre clientes, oferece as opções em vez de escolher.
 - Novo lead: "Puxar dos contatos do celular" (`lib/contatos.ts`, só Chrome no Android).
 - Sem internet: `components/GuardarAgendaOffline.tsx` guarda no localStorage (`harmonize-agenda-offline`) os atendimentos de hoje a 7 dias; o `sw.js` mostra `public/sem-internet.html` quando uma tela não abre por falta de rede.
+- Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
 - Atalhos do ícone (manifest `shortcuts`) usam `?acao=` (`/dashboard?acao=receber`, `/agenda?acao=reservar`).
 
 ## Pendências conhecidas

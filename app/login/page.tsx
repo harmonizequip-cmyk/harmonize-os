@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Fingerprint } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { digitalSuportada, mensagemErroDigital } from "@/lib/digital";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +13,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [temDigital, setTemDigital] = useState(false);
+
+  useEffect(() => {
+    setTemDigital(digitalSuportada());
+  }, []);
+
+  async function entrarComDigital() {
+    setError(null);
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPasskey();
+    setLoading(false);
+    if (error) {
+      const msg = mensagemErroDigital(error);
+      if (msg !== "Cancelado.") setError(msg);
+      return;
+    }
+    router.push("/dashboard");
+    router.refresh();
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -68,6 +89,18 @@ export default function LoginPage() {
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
+
+        {temDigital && (
+          <button
+            type="button"
+            onClick={entrarComDigital}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-teal py-2.5 text-sm font-medium text-brand-teal disabled:opacity-60"
+          >
+            <Fingerprint size={16} />
+            Entrar com a digital
+          </button>
+        )}
       </form>
     </div>
   );
