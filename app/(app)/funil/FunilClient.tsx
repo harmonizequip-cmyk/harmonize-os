@@ -29,6 +29,8 @@ export const STAGES = [
   { key: "lead", label: "Novo contato", dot: "bg-neutral-400" },
   { key: "contato", label: "Tentativa de contato", dot: "bg-brand-blue" },
   { key: "nutricao", label: "Nutrição", dot: "bg-amber-400" },
+  // Está respondendo no WhatsApp: conversa em andamento, antes de demonstrar interesse.
+  { key: "em_contato", label: "Em contato", dot: "bg-emerald-500" },
   { key: "qualificado", label: "Interesse", dot: "bg-brand-lilac" },
   { key: "agendado", label: "Agendamento", dot: "bg-brand-pink" },
   { key: "cliente", label: "Cliente", dot: "bg-brand-teal" },
