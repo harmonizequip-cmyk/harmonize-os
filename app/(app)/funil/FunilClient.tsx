@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Plus } from "lucide-react";
+import { Bell, LayoutGrid, List, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
@@ -132,6 +132,32 @@ export default function FunilClient({
   const [pedidoMessage, setPedidoMessage] = useState("");
   const [pedidoCadastroIncompleto, setPedidoCadastroIncompleto] = useState(false);
   const [pedidoEnviando, setPedidoEnviando] = useState(false);
+  // Celular abre em lista (abas de etapa); computador abre no quadro. A
+  // escolha fica guardada neste aparelho.
+  const [visao, setVisao] = useState<"lista" | "quadro">("lista");
+  const [etapaLista, setEtapaLista] = useState<Record<Aba, string | null>>({ leads: null, clientes: null });
+  const [moverLead, setMoverLead] = useState<LeadRow | null>(null);
+  const [avisoMovido, setAvisoMovido] = useState<string | null>(null);
+
+  useEffect(() => {
+    let salva: string | null = null;
+    try {
+      salva = localStorage.getItem("harmonize-funil-visao");
+    } catch {
+      // sem armazenamento: segue o padrão da tela
+    }
+    if (salva === "lista" || salva === "quadro") setVisao(salva);
+    else setVisao(window.matchMedia("(min-width: 640px)").matches ? "quadro" : "lista");
+  }, []);
+
+  function trocarVisao(v: "lista" | "quadro") {
+    setVisao(v);
+    try {
+      localStorage.setItem("harmonize-funil-visao", v);
+    } catch {
+      // sem armazenamento: vale só nesta visita
+    }
+  }
 
   useEffect(() => {
     setLeads(initialClients);
@@ -234,6 +260,63 @@ export default function FunilClient({
     return m;
   }, [tasks]);
 
+  // Cada etapa com seus contatos já ordenados e o sino de tarefas. Serve ao
+  // quadro e à lista.
+  const porEtapa = useMemo(() => {
+    const hoje = hojeLocal();
+    return colunas.map((stage) => {
+      const stageLeads = filtered
+        .filter((c) => etapaDe(c) === stage.key)
+        .sort((a, b) => {
+          // Primeiro a tarefa pendente mais antiga (a mais atrasada
+          // no topo); quem concluiu as tarefas, ou não tem nenhuma,
+          // desce. Empate ou ausência de tarefa cai na regra abaixo.
+          const ta = tarefasPorContato.get(a.id);
+          const tb = tarefasPorContato.get(b.id);
+          if (ta && !tb) return -1;
+          if (!ta && tb) return 1;
+          if (ta && tb && ta.maisAntiga !== tb.maisAntiga) return ta.maisAntiga.localeCompare(tb.maisAntiga);
+          // Quem tem data de agendamento vem antes de quem não tem, e
+          // entre os que têm, o mais próximo (menor data) vem primeiro.
+          // Usa nextEvent (reserva já no calendário) e, na falta dela,
+          // cai para data_evento (data só prevista, ainda sem reserva).
+          const dataA = a.nextEvent?.date_start ?? a.data_evento;
+          const dataB = b.nextEvent?.date_start ?? b.data_evento;
+          if (!dataA && !dataB) return 0;
+          if (!dataA) return 1;
+          if (!dataB) return -1;
+          return dataA.localeCompare(dataB);
+        });
+      // Sino da etapa: tarefas pendentes dos contatos que estão nela
+      // agora (sem considerar a busca e os filtros de tela).
+      let sinoTotal = 0;
+      let sinoAtrasadas = 0;
+      for (const c of leads) {
+        if (!!c.is_client !== (aba === "clientes") || etapaDe(c) !== stage.key) continue;
+        const t = tarefasPorContato.get(c.id);
+        if (!t) continue;
+        sinoTotal += t.qtd;
+        if (t.maisAntiga < hoje) sinoAtrasadas += 1;
+      }
+      return { stage, leads: stageLeads, sinoTotal, sinoAtrasadas };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colunas, filtered, tarefasPorContato, leads, aba]);
+
+  // Etapa aberta na lista: a escolhida, ou a primeira que tem alguém.
+  const etapaAberta =
+    etapaLista[aba] ?? porEtapa.find((e) => e.leads.length > 0)?.stage.key ?? colunas[0].key;
+  const listaAberta = porEtapa.find((e) => e.stage.key === etapaAberta) ?? porEtapa[0];
+
+  async function moverPelaLista(lead: LeadRow, novaEtapa: StageKey) {
+    setMoverLead(null);
+    if (lead.stage === novaEtapa) return;
+    if (!(await moveToStage(lead.id, novaEtapa))) return;
+    const rotulo = STAGES.find((s) => s.key === novaEtapa)?.label ?? novaEtapa;
+    setAvisoMovido(`${lead.name} foi para ${rotulo}.`);
+    window.setTimeout(() => setAvisoMovido(null), 2500);
+  }
+
   const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
   const pendingConfirmationLeads = useMemo(
@@ -241,7 +324,7 @@ export default function FunilClient({
     [leads]
   );
 
-  async function moveToStage(leadId: string, newStage: StageKey) {
+  async function moveToStage(leadId: string, newStage: StageKey): Promise<boolean> {
     const etapaAnterior = leads.find((l) => l.id === leadId)?.stage;
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l)));
     const { error } = await supabase.from("clients").update({ stage: newStage }).eq("id", leadId);
@@ -252,6 +335,7 @@ export default function FunilClient({
       window.alert(error.message || "Não foi possível mover o card. Ele voltou para a etapa anterior.");
     }
     router.refresh();
+    return !error;
   }
 
   async function avancarEtapa(lead: LeadRow) {
@@ -552,10 +636,36 @@ export default function FunilClient({
         </p>
       )}
 
+      <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/60 w-fit">
+        {(
+          [
+            { key: "lista", label: "Lista", Icone: List },
+            { key: "quadro", label: "Quadro", Icone: LayoutGrid },
+          ] as const
+        ).map(({ key, label, Icone }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => trocarVisao(key)}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              visao === key
+                ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
+                : "text-neutral-500 dark:text-neutral-400"
+            }`}
+          >
+            <Icone size={14} />
+            {label}
+          </button>
+        ))}
+      </div>
+
       {aba === "leads" ? (
         <p className="text-xs text-neutral-400">
-          <span className="sm:hidden">Arraste os cards para o lado para mudar de etapa, ou role a tela para ver as outras colunas.</span>
-          <span className="hidden sm:inline">Arraste os cards entre as colunas, ou use o botão "Avançar →" em cada um.</span>{" "}
+          {visao === "lista" ? (
+            <>Toque numa etapa para ver quem está nela. Para mudar alguém de etapa, use &quot;Mover&quot; ou &quot;Avançar →&quot; no card.</>
+          ) : (
+            <>Arraste os cards entre as colunas, ou use o botão &quot;Avançar →&quot; em cada um.</>
+          )}{" "}
           Ao fechar a locação, o lead passa sozinho para a aba Clientes; quem já é cliente antigo pode ser movido
           pelo botão dentro do card.
         </p>
@@ -567,46 +677,63 @@ export default function FunilClient({
         </p>
       )}
 
+      {visao === "lista" ? (
+        <div className="space-y-3">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+            {porEtapa.map(({ stage, leads: doEtapa, sinoAtrasadas }) => {
+              const ativa = stage.key === listaAberta.stage.key;
+              return (
+                <button
+                  key={stage.key}
+                  type="button"
+                  onClick={() => setEtapaLista((e) => ({ ...e, [aba]: stage.key }))}
+                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    ativa
+                      ? "border-brand-teal bg-brand-teal text-white"
+                      : "border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
+                  {stage.label}
+                  <span className={ativa ? "text-white/80" : "text-neutral-400"}>{doEtapa.length}</span>
+                  {sinoAtrasadas > 0 && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="Tem contato atrasado" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {avisoMovido && <p className="text-xs font-medium text-brand-teal">{avisoMovido}</p>}
+
+          <div className="space-y-2">
+            {listaAberta.leads.map((lead) => (
+              <div
+                key={lead.id}
+                onClick={() => setSelected(lead)}
+                className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal dark:border-neutral-800/60 dark:bg-neutral-900/55"
+              >
+                <LeadCardContent
+                  lead={lead}
+                  stage={listaAberta.stage}
+                  tarefa={tarefasPorContato.get(lead.id) ?? null}
+                  onToggleConfirmed={() => toggleConfirmed(lead)}
+                  onAvancar={() => avancarEtapa(lead)}
+                  onMover={aba === "leads" ? () => setMoverLead(lead) : undefined}
+                />
+              </div>
+            ))}
+            {listaAberta.leads.length === 0 && (
+              <p className="py-6 text-center text-sm text-neutral-400">Ninguém nesta etapa.</p>
+            )}
+          </div>
+        </div>
+      ) : (
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div
           className={`flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:snap-none ${
             activeId ? "" : "snap-x snap-proximity"
           }`}
         >
-          {colunas.map((stage) => {
-            const stageLeads = filtered
-              .filter((c) => etapaDe(c) === stage.key)
-              .sort((a, b) => {
-                // Primeiro a tarefa pendente mais antiga (a mais atrasada
-                // no topo); quem concluiu as tarefas, ou não tem nenhuma,
-                // desce. Empate ou ausência de tarefa cai na regra abaixo.
-                const ta = tarefasPorContato.get(a.id);
-                const tb = tarefasPorContato.get(b.id);
-                if (ta && !tb) return -1;
-                if (!ta && tb) return 1;
-                if (ta && tb && ta.maisAntiga !== tb.maisAntiga) return ta.maisAntiga.localeCompare(tb.maisAntiga);
-                // Quem tem data de agendamento vem antes de quem não tem, e
-                // entre os que têm, o mais próximo (menor data) vem primeiro.
-                // Usa nextEvent (reserva já no calendário) e, na falta dela,
-                // cai para data_evento (data só prevista, ainda sem reserva).
-                const dataA = a.nextEvent?.date_start ?? a.data_evento;
-                const dataB = b.nextEvent?.date_start ?? b.data_evento;
-                if (!dataA && !dataB) return 0;
-                if (!dataA) return 1;
-                if (!dataB) return -1;
-                return dataA.localeCompare(dataB);
-              });
-            // Sino da etapa: tarefas pendentes dos contatos que estão nela
-            // agora (sem considerar a busca e os filtros de tela).
-            let sinoTotal = 0;
-            let sinoAtrasadas = 0;
-            for (const c of leads) {
-              if (!!c.is_client !== (aba === "clientes") || etapaDe(c) !== stage.key) continue;
-              const t = tarefasPorContato.get(c.id);
-              if (!t) continue;
-              sinoTotal += t.qtd;
-              if (t.maisAntiga < hojeLocal()) sinoAtrasadas += 1;
-            }
+          {porEtapa.map(({ stage, leads: stageLeads, sinoTotal, sinoAtrasadas }) => {
             return (
               <FunilColumn
                 key={stage.key}
@@ -647,6 +774,44 @@ export default function FunilClient({
           ) : null}
         </DragOverlay>
       </DndContext>
+      )}
+
+      {moverLead && (
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setMoverLead(null)}>
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Mover {moverLead.name}</p>
+            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Escolha a nova etapa.</p>
+            <div className="space-y-1.5">
+              {LEAD_STAGES.map((st) => (
+                <button
+                  key={st.key}
+                  type="button"
+                  onClick={() => moverPelaLista(moverLead, st.key)}
+                  className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm ${
+                    st.key === moverLead.stage
+                      ? "border-brand-teal bg-brand-teal/10 font-medium text-brand-teal"
+                      : "border-neutral-200 text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${st.dot}`} />
+                  {st.label}
+                  {st.key === moverLead.stage && <span className="ml-auto text-xs">etapa atual</span>}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setMoverLead(null)}
+              className="mt-3 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {novaTarefaOpen && (
         <NovaTarefaModal leads={leads} onClose={() => setNovaTarefaOpen(false)} onCreated={handleTaskCreated} />
@@ -819,6 +984,7 @@ function LeadCardContent({
   tarefa,
   onToggleConfirmed,
   onAvancar,
+  onMover,
 }: {
   lead: LeadRow;
   stage: ColunaFunil;
@@ -826,6 +992,7 @@ function LeadCardContent({
   tarefa?: TarefaDoContato | null;
   onToggleConfirmed?: () => void;
   onAvancar?: () => void;
+  onMover?: () => void;
 }) {
   return (
     <div
@@ -912,16 +1079,31 @@ function LeadCardContent({
           ))}
         </div>
       )}
-      {!lead.is_client && stage.key !== "agendado" && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAvancar?.();
-          }}
-          className="mt-2 w-full rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal dark:bg-neutral-800 dark:text-neutral-300"
-        >
-          Avançar →
-        </button>
+      {!lead.is_client && (onMover || stage.key !== "agendado") && (
+        <div className="mt-2 flex gap-2">
+          {onMover && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMover();
+              }}
+              className="flex-1 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Mover ▾
+            </button>
+          )}
+          {stage.key !== "agendado" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAvancar?.();
+              }}
+              className="flex-1 rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal dark:bg-neutral-800 dark:text-neutral-300"
+            >
+              Avançar →
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
