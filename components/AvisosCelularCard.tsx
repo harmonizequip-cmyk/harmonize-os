@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { avisosSuportados, chaveParaBytes, VAPID_PUBLIC_KEY } from "@/lib/push";
+import { avisosSuportados, garantirInscricao, marcarAvisosDesligados } from "@/lib/push";
 
 type Estado = "carregando" | "sem_suporte" | "bloqueado" | "desligado" | "ligado";
 
@@ -38,9 +38,9 @@ export default function AvisosCelularCard() {
     (async () => {
       if (!avisosSuportados()) return setEstado("sem_suporte");
       if (Notification.permission === "denied") return setEstado("bloqueado");
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      const inscricao = await reg.pushManager.getSubscription();
-      setEstado(inscricao ? "ligado" : "desligado");
+      // "Ligado" só quando o banco conhece este aparelho (refaz a inscrição
+      // se ela morreu, por exemplo depois de reinstalar o app).
+      setEstado((await garantirInscricao(supabase)) ? "ligado" : "desligado");
     })().catch(() => setEstado("sem_suporte"));
 
     return () => window.removeEventListener("beforeinstallprompt", aoPedir);
@@ -57,30 +57,8 @@ export default function AvisosCelularCard() {
         setErro("Os avisos não foram autorizados neste aparelho.");
         return;
       }
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      const inscricao =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: chaveParaBytes(VAPID_PUBLIC_KEY) as unknown as BufferSource,
-        }));
-      const json = inscricao.toJSON();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Entre no app de novo e tente outra vez.");
-      const { error } = await supabase.from("push_inscricoes").upsert(
-        {
-          user_id: user.id,
-          endpoint: inscricao.endpoint,
-          p256dh: json.keys?.p256dh ?? "",
-          auth: json.keys?.auth ?? "",
-          aparelho: navigator.userAgent.slice(0, 200),
-        },
-        { onConflict: "endpoint" }
-      );
-      if (error) throw new Error(error.message);
+      marcarAvisosDesligados(false);
+      if (!(await garantirInscricao(supabase, true))) throw new Error("Entre no app de novo e tente outra vez.");
       setEstado("ligado");
       setMensagem("Avisos ligados neste aparelho. Toque em \"Enviar aviso de teste\" para conferir.");
     } catch (e) {
@@ -101,6 +79,7 @@ export default function AvisosCelularCard() {
         await supabase.from("push_inscricoes").delete().eq("endpoint", inscricao.endpoint);
         await inscricao.unsubscribe();
       }
+      marcarAvisosDesligados(true);
       setEstado("desligado");
       setMensagem("Avisos desligados neste aparelho.");
     } catch {
