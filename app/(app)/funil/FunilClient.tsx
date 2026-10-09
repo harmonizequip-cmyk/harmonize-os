@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarCsv } from "@/lib/exportar-csv";
+import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import { ORIGENS } from "./NovoLeadModal";
@@ -138,6 +139,8 @@ export default function FunilClient({
   const [etapaLista, setEtapaLista] = useState<Record<Aba, string | null>>({ leads: null, clientes: null });
   const [moverLead, setMoverLead] = useState<LeadRow | null>(null);
   const [avisoMovido, setAvisoMovido] = useState<string | null>(null);
+  // Card da lista com as tarefas abertas (toque no selo "N tarefas").
+  const [tarefasAbertas, setTarefasAbertas] = useState<string | null>(null);
 
   useEffect(() => {
     let salva: string | null = null;
@@ -718,7 +721,77 @@ export default function FunilClient({
                   onToggleConfirmed={() => toggleConfirmed(lead)}
                   onAvancar={() => avancarEtapa(lead)}
                   onMover={aba === "leads" ? () => setMoverLead(lead) : undefined}
+                  onTarefas={() => setTarefasAbertas((cur) => (cur === lead.id ? null : lead.id))}
+                  tarefasAbertas={tarefasAbertas === lead.id}
                 />
+                {tarefasAbertas === lead.id && (
+                  <div className="mt-2 space-y-2 border-t border-neutral-100 pt-2 dark:border-neutral-800" onClick={(e) => e.stopPropagation()}>
+                    {tasks
+                      .filter((t) => t.client_id === lead.id)
+                      .sort((a, b) => a.due_date.localeCompare(b.due_date))
+                      .map((task) => {
+                        const busy = taskBusyId === task.id;
+                        const mensagem = mensagemDaTarefa({
+                          tipo: task.type,
+                          name: lead.name,
+                          treatment: lead.treatment,
+                          displayName: lead.display_name,
+                          dataEvento: lead.nextEvent?.date_start ?? null,
+                        });
+                        const link = mensagem ? buildWhatsAppLink(lead.whatsapp, mensagem) : null;
+                        const deFunil = task.type === "contato_inicial" || task.type === "followup";
+                        return (
+                          <div key={task.id} className="rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
+                            <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                              {task.title}
+                              <span className="ml-1.5 font-normal text-neutral-500">{formatDate(task.due_date)}</span>
+                              {task.due_date < hojeLocal() && (
+                                <span className="ml-1.5 text-[10px] font-medium text-red-600 dark:text-red-400">atrasada</span>
+                              )}
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {link && (
+                                <a
+                                  href={link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-lg border border-brand-teal px-2.5 py-1 text-[11px] font-medium text-brand-teal"
+                                >
+                                  💬 WhatsApp
+                                </a>
+                              )}
+                              {deFunil ? (
+                                <>
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => registerContactAttempt(task.id, true)}
+                                    className="rounded-lg bg-brand-teal/10 px-2.5 py-1 text-[11px] font-medium text-brand-teal disabled:opacity-50"
+                                  >
+                                    ✅ Respondeu
+                                  </button>
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => registerContactAttempt(task.id, false)}
+                                    className="rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                                  >
+                                    🔁 Sem resposta
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => completeManualTask(task.id)}
+                                  className="rounded-lg bg-brand-teal/10 px-2.5 py-1 text-[11px] font-medium text-brand-teal disabled:opacity-50"
+                                >
+                                  ✅ Concluir
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             ))}
             {listaAberta.leads.length === 0 && (
@@ -985,6 +1058,8 @@ function LeadCardContent({
   onToggleConfirmed,
   onAvancar,
   onMover,
+  onTarefas,
+  tarefasAbertas,
 }: {
   lead: LeadRow;
   stage: ColunaFunil;
@@ -993,6 +1068,8 @@ function LeadCardContent({
   onToggleConfirmed?: () => void;
   onAvancar?: () => void;
   onMover?: () => void;
+  onTarefas?: () => void;
+  tarefasAbertas?: boolean;
 }) {
   return (
     <div
@@ -1009,6 +1086,15 @@ function LeadCardContent({
 
       {tarefa && (
         <span
+          role={onTarefas ? "button" : undefined}
+          onClick={
+            onTarefas
+              ? (e) => {
+                  e.stopPropagation();
+                  onTarefas();
+                }
+              : undefined
+          }
           className={`mt-1 flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
             tarefa.maisAntiga < hojeLocal()
               ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
@@ -1018,6 +1104,7 @@ function LeadCardContent({
           <Bell size={11} strokeWidth={2} />
           {tarefa.qtd === 1 ? "1 tarefa" : `${tarefa.qtd} tarefas`} · {formatDate(tarefa.maisAntiga)}
           {tarefa.maisAntiga < hojeLocal() ? " · atrasada" : ""}
+          {onTarefas ? (tarefasAbertas ? " ▲" : " · dar baixa ▼") : ""}
         </span>
       )}
 
