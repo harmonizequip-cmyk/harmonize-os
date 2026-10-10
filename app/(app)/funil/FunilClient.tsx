@@ -95,6 +95,11 @@ export interface TaskRow {
   due_date: string;
 }
 
+const DIAS_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+function diaDaSemana(iso: string) {
+  return DIAS_SEMANA[new Date(`${iso.slice(0, 10)}T12:00:00`).getDay()];
+}
+
 function formatDiaMes(iso: string) {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -1079,9 +1084,14 @@ function LeadCardContent({
           : ""
       }
     >
-      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-        {lead.name}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+        {lead.parceiro && (
+          <span className="flex-shrink-0 rounded-full bg-brand-lilac/15 px-2 py-0.5 text-[11px] font-semibold text-brand-lilac">
+            🤝 Parceiro
+          </span>
+        )}
+      </div>
       {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
 
       {tarefa && (
@@ -1114,13 +1124,16 @@ function LeadCardContent({
             e.stopPropagation();
             onToggleConfirmed?.();
           }}
-          className={`mt-1 block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+          className={`mt-1.5 block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold ${
             lead.nextEvent.confirmed
               ? "bg-brand-teal/10 text-brand-teal"
               : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
           }`}
         >
-          📅 {formatDate(lead.nextEvent.date_start)} · {lead.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
+          📅 Próximo agendamento: {diaDaSemana(lead.nextEvent.date_start)} {formatDate(lead.nextEvent.date_start)}
+          <span className="block text-[11px] font-medium">
+            {lead.nextEvent.confirmed ? "Confirmado ✓" : "Não confirmado · toque para marcar"}
+          </span>
         </button>
       ) : (
         lead.data_evento && (

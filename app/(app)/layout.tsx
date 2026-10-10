@@ -7,6 +7,7 @@ import BottomNav from "@/components/BottomNav";
 import MobileHeader from "@/components/MobileHeader";
 import QuickActionsButton from "@/components/QuickActionsButton";
 import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
+import AvisosDesligadosFaixa from "@/components/AvisosDesligadosFaixa";
 import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
 import ReciboHost from "@/components/ReciboHost";
 
@@ -65,7 +66,10 @@ export default async function AppLayout({
             MODO TESTE LIGADO · tudo que for criado agora não conta nos relatórios · toque para desligar
           </Link>
         )}
-        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">{children}</div>
+        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
+          <AvisosDesligadosFaixa />
+          {children}
+        </div>
       </main>
       <BottomNav permissions={permissions} isAdmin={isAdmin} permissionsLoaded={permissionsLoaded} />
       <QuickActionsButton
