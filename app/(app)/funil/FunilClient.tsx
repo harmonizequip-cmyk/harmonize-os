@@ -46,7 +46,18 @@ export type StageKey = (typeof STAGES)[number]["key"];
 export const LEAD_STAGES = STAGES.filter((s) => s.key !== "cliente");
 
 type ColunaFunil = { key: string; label: string; dot: string };
-type TarefaDoContato = { qtd: number; maisAntiga: string };
+type TarefaDoContato = { qtd: number; maisAntiga: string; tipos: string[] };
+
+// Nome curto do tipo de tarefa, para o selo do card.
+const TIPO_TAREFA: Record<string, string> = {
+  contato_inicial: "Primeiro contato",
+  followup: "Follow-up",
+  manual: "Tarefa",
+  recontato: "Chamar de volta",
+  confirmacao: "Confirmar reserva",
+  pos_locacao: "Pós-locação",
+  cobranca_taxa: "Cobrar taxa",
+};
 type Aba = "leads" | "clientes";
 
 export interface TagOption {
@@ -259,10 +270,12 @@ export default function FunilClient({
     for (const t of tasks) {
       if (!t.client_id) continue;
       const cur = m.get(t.client_id);
-      if (!cur) m.set(t.client_id, { qtd: 1, maisAntiga: t.due_date });
+      const tipo = TIPO_TAREFA[t.type] ?? "Tarefa";
+      if (!cur) m.set(t.client_id, { qtd: 1, maisAntiga: t.due_date, tipos: [tipo] });
       else {
         cur.qtd += 1;
         if (t.due_date < cur.maisAntiga) cur.maisAntiga = t.due_date;
+        if (!cur.tipos.includes(tipo)) cur.tipos.push(tipo);
       }
     }
     return m;
@@ -1105,14 +1118,15 @@ function LeadCardContent({
                 }
               : undefined
           }
-          className={`mt-1 flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+          className={`mt-1 flex w-fit max-w-full flex-wrap items-center gap-x-1 rounded-2xl px-2 py-0.5 text-[11px] font-medium ${
             tarefa.maisAntiga < hojeLocal()
               ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
               : "bg-brand-blue/10 text-brand-blue"
           }`}
         >
           <Bell size={11} strokeWidth={2} />
-          {tarefa.qtd === 1 ? "1 tarefa" : `${tarefa.qtd} tarefas`} · {formatDate(tarefa.maisAntiga)}
+          {tarefa.tipos.join(" + ")}
+          {tarefa.qtd > tarefa.tipos.length ? ` (${tarefa.qtd})` : ""} · {formatDate(tarefa.maisAntiga)}
           {tarefa.maisAntiga < hojeLocal() ? " · atrasada" : ""}
           {onTarefas ? (tarefasAbertas ? " ▲" : " · dar baixa ▼") : ""}
         </span>
