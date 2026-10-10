@@ -149,6 +149,17 @@ interface EquipmentOption {
   name: string;
 }
 
+interface BloqueioAgenda {
+  id: string;
+  equipamento: string;
+  tipo: "manutencao" | "recesso" | "outro";
+  motivo: string | null;
+  data_inicio: string;
+  data_fim: string;
+}
+
+const ROTULO_BLOQUEIO_AGENDA: Record<string, string> = { manutencao: "Manutenção", recesso: "Recesso", outro: "Bloqueado" };
+
 function toDateKey(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
@@ -176,6 +187,7 @@ export default function AgendaClient({
   reservationFee,
   mentoriaPricing,
   diasTaxa = 3,
+  bloqueios = [],
 }: {
   initialEvents: EventRow[];
   clients: ClientOption[];
@@ -184,6 +196,7 @@ export default function AgendaClient({
   reservationFee?: number;
   mentoriaPricing?: MentoriaPricingConfig;
   diasTaxa?: number;
+  bloqueios?: BloqueioAgenda[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -286,6 +299,19 @@ export default function AgendaClient({
     setSelectedDate(e.date_start);
     setEventSearch("");
   }
+
+  // Dias com algum HIPRO bloqueado (manutenção, recesso...).
+  const bloqueiosPorDia = useMemo(() => {
+    const map = new Map<string, BloqueioAgenda[]>();
+    for (const b of bloqueios) {
+      for (const dia of diasDoPeriodo(b.data_inicio, b.data_fim, 400)) {
+        const lista = map.get(dia) ?? [];
+        lista.push(b);
+        map.set(dia, lista);
+      }
+    }
+    return map;
+  }, [bloqueios]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRow[]>();
@@ -705,7 +731,13 @@ export default function AgendaClient({
             );
 
             return (
-              <div key={key} className="mx-auto flex h-10 w-10 items-center justify-center">
+              <div key={key} className="relative mx-auto flex h-10 w-10 items-center justify-center">
+                {bloqueiosPorDia.has(key) && (
+                  <span
+                    className="pointer-events-none absolute bottom-0 left-1/2 h-[3px] w-5 -translate-x-1/2 rounded-full bg-neutral-400 dark:bg-neutral-500"
+                    title="HIPRO bloqueado"
+                  />
+                )}
                 {hasEvents && !selected ? (
                   <div
                     className="flex h-9 w-9 items-center justify-center rounded-full p-[2px]"
@@ -726,7 +758,7 @@ export default function AgendaClient({
 
       <p className="text-[11px] text-neutral-400">
         Anel claro no dia = pré-reserva (taxa de reserva pendente). Anel com a cor cheia = agendamento (taxa paga ou
-        isenta).
+        isenta). Traço cinza embaixo do dia = HIPRO bloqueado (manutenção, recesso).
       </p>
 
       <div>
@@ -766,6 +798,23 @@ export default function AgendaClient({
         )}
 
         <div className="space-y-2">
+          {(bloqueiosPorDia.get(selectedDate) ?? []).map((b) => (
+            <div
+              key={b.id}
+              className="flex items-start gap-2 rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-200"
+            >
+              <span>🔒</span>
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {b.equipamento} bloqueado · {ROTULO_BLOQUEIO_AGENDA[b.tipo] ?? "Bloqueado"}
+                </p>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  {formatDate(b.data_inicio)} a {formatDate(b.data_fim)}
+                  {b.motivo ? ` · ${b.motivo}` : ""} · não aceita reserva nesses dias
+                </p>
+              </div>
+            </div>
+          ))}
           {selectedDayEvents.map(renderCard)}
           {selectedDayEvents.length === 0 && (
             <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">

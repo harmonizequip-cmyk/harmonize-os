@@ -188,60 +188,8 @@ export default function EquipamentoStatusControl({
             {working ? "Salvando..." : "Voltar para ativo"}
           </button>
         )
-      ) : showForm ? (
-        <div className="mt-2 rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-          <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-            Motivo (opcional)
-          </label>
-          <textarea
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-          />
-          <label className="mb-1 mt-2 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-            Previsão de volta (opcional)
-          </label>
-          <input
-            type="date"
-            value={previstoFim}
-            onChange={(e) => setPrevistoFim(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-          />
-          <p className="mt-1 text-[10px] text-neutral-400">
-            Se informar, o equipamento volta para ativo sozinho nessa data, e aparece um aviso 2 dias antes.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setMotivo("");
-                setPrevistoFim("");
-                setError(null);
-              }}
-              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
-            >
-              Desistir
-            </button>
-            <button
-              type="button"
-              disabled={working}
-              onClick={() => definirStatus("manutencao", motivo, previstoFim || null)}
-              className="flex-1 rounded-lg bg-amber-600 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-            >
-              {working ? "Salvando..." : "Confirmar"}
-            </button>
-          </div>
-        </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="mt-2 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 dark:border-amber-900/50 dark:text-amber-400"
-        >
-          Marcar em manutenção
-        </button>
+        <p className="mt-1 text-[10px] text-neutral-400">Para manutenção, use &quot;Bloquear período&quot; abaixo.</p>
       )}
     </div>
   );

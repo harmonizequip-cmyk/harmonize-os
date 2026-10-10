@@ -174,6 +174,15 @@ async function avisoDiasLivres(hoje: string): Promise<Aviso | null> {
   for (const e of data ?? []) {
     for (let d = e.date_start; d <= e.date_end; d = somarDias(d, 1)) ocupados.add(d);
   }
+  // HIPRO bloqueado (manutenção, recesso) também conta como ocupado.
+  const { data: bloqueios } = await admin
+    .from("bloqueios_equipamento")
+    .select("data_inicio, data_fim")
+    .lte("data_inicio", fim)
+    .gte("data_fim", inicio);
+  for (const b of bloqueios ?? []) {
+    for (let d = b.data_inicio; d <= b.data_fim; d = somarDias(d, 1)) ocupados.add(d);
+  }
   const livres: string[] = [];
   for (let d = inicio; d <= fim; d = somarDias(d, 1)) {
     if (new Date(d + "T12:00:00Z").getUTCDay() !== 0 && !ocupados.has(d)) livres.push(d);

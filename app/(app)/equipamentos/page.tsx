@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import EquipamentoStatusControl from "@/components/EquipamentoStatusControl";
+import BloqueiosEquipamento, { type Bloqueio } from "@/components/BloqueiosEquipamento";
 import EquipamentoInfoControl from "@/components/EquipamentoInfoControl";
 import EquipamentoPrevistasControl from "@/components/EquipamentoPrevistasControl";
 
@@ -27,6 +28,14 @@ export default async function EquipamentosPage({
   // lista — garante que a tela nunca mostre um equipamento em
   // manutenção cuja previsão de retorno já passou.
   await supabase.rpc("aplicar_previsoes_manutencao_vencidas");
+
+  // Bloqueios de agenda de hoje em diante (manutenção programada, recesso...).
+  const { data: bloqueiosRaw } = await supabase
+    .from("bloqueios_equipamento")
+    .select("id, equipment_id, tipo, motivo, data_inicio, data_fim")
+    .gte("data_fim", today)
+    .order("data_inicio");
+  const bloqueios = (bloqueiosRaw ?? []) as Bloqueio[];
 
   const { data: equipments } = await supabase
     .from("equipments")
@@ -167,6 +176,11 @@ export default async function EquipamentosPage({
                   />
                 </div>
               </div>
+              <BloqueiosEquipamento
+                equipmentId={eq.id}
+                equipmentName={eq.name}
+                bloqueios={bloqueios.filter((b) => b.equipment_id === eq.id)}
+              />
             </div>
           );
         })}

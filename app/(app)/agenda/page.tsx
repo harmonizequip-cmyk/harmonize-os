@@ -16,6 +16,11 @@ export default async function AgendaPage() {
   const { data: clients } = await supabase.from("clients").select("id, name, city, whatsapp").order("name");
   const { data: equipments } = await supabase.from("equipments").select("id, code, name").order("code");
   const settings = await fetchSettings(supabase);
+  // Períodos em que um HIPRO não aceita reserva (manutenção, recesso...).
+  const { data: bloqueios } = await supabase
+    .from("bloqueios_equipamento")
+    .select("id, equipment_id, tipo, motivo, data_inicio, data_fim, equipments(name)")
+    .order("data_inicio");
 
   const normalizedEvents = (events ?? []).map((e: any) => ({
     ...e,
@@ -31,6 +36,14 @@ export default async function AgendaPage() {
       reservationFee={settings.reservationFee}
       mentoriaPricing={settings.mentoriaPricing}
       diasTaxa={settings.diasCobrancaTaxa}
+      bloqueios={(bloqueios ?? []).map((b: any) => ({
+        id: b.id,
+        equipamento: (Array.isArray(b.equipments) ? b.equipments[0]?.name : b.equipments?.name) ?? "HIPRO",
+        tipo: b.tipo,
+        motivo: b.motivo,
+        data_inicio: b.data_inicio,
+        data_fim: b.data_fim,
+      }))}
     />
   );
 }

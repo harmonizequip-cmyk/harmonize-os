@@ -189,6 +189,19 @@ export default function AvailabilityImageModal({
       );
 
       const busy = new Set(rows.filter((r) => r.date >= start && r.date <= end).map((r) => r.date));
+      // Dia com algum HIPRO bloqueado (manutenção, recesso) também não entra
+      // como livre: a regra é os dois livres.
+      const { data: bloqueios } = await supabase
+        .from("bloqueios_equipamento")
+        .select("data_inicio, data_fim")
+        .lte("data_inicio", end)
+        .gte("data_fim", start);
+      if (cancelled) return;
+      for (const b of bloqueios ?? []) {
+        for (const d of diasDoPeriodo(b.data_inicio as string, b.data_fim as string, 400)) {
+          if (d >= start && d <= end) busy.add(d);
+        }
+      }
       const cityMap = new Map<string, string>();
       for (const r of rows) {
         if (r.city && !cityMap.has(r.date)) cityMap.set(r.date, r.city);

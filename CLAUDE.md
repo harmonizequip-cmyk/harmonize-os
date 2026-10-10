@@ -76,6 +76,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
 - Atalhos do ícone (manifest `shortcuts`) usam `?acao=` (`/dashboard?acao=receber`, `/agenda?acao=reservar`).
 
+## Bloqueio da agenda
+
+- `bloqueios_equipamento` (tipo manutencao, recesso ou outro; datas inclusivas), escrito só por `criar_bloqueio_equipamento`, `alterar_fim_bloqueio_equipamento` e `excluir_bloqueio_equipamento`. Gatilho `trg_validar_bloqueio_equipamento` recusa reserva nova ou mudança de data/equipamento que caia num bloqueio; reservas que já existiam ficam.
+- Manutenção agora é bloqueio do tipo manutencao (tela Equipamentos > Bloquear período). Quando cobre hoje, `sincronizar_manutencao_por_bloqueio` põe o equipamento em manutenção com `status_previsto_fim` = último dia + 1; o retorno automático antigo continua. "Voltar para ativo" e "Adiar previsão" ajustam o bloqueio.
+- Agenda (traço cinza no dia e cartão 🔒), imagem de datas livres e aviso de dias livres tratam dia bloqueado como ocupado.
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.
