@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: NÃO APLICADA. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 10/10/2026, pelo dono, e conferida por consulta de leitura (tabela 1, funções 5, gatilho 1; anon sem acesso).
 --
 -- Bloqueio da agenda do HIPRO por período.
 --   1. bloqueios_equipamento: um período (de / até, inclusive) em que o
