@@ -9,7 +9,6 @@ import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import DespesasDaReserva from "@/components/DespesasDaReserva";
-import FotosContador from "@/components/FotosContador";
 import Comprovantes from "@/components/Comprovantes";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
@@ -631,7 +630,6 @@ export default function EditarEventoModal({
                 </div>
               )}
 
-              {!event.is_mentoria && <FotosContador eventId={event.id} />}
               {!event.is_mentoria && event.taxa_status && event.taxa_status !== "nao_aplica" && (
                 <Comprovantes pasta={`taxa/${event.id}`} titulo="Comprovantes da taxa de reserva" />
               )}
@@ -772,7 +770,6 @@ export default function EditarEventoModal({
           )}
 
           <div className="-mt-3 mb-4">
-            <FotosContador eventId={event.id} />
             <Comprovantes pasta={`locacao/${event.rental_id}`} titulo="Comprovantes de pagamento" />
           </div>
 

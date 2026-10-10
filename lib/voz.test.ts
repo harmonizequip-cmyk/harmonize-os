@@ -56,3 +56,47 @@ describe("interpretarFala", () => {
     expect(interpretarFala("enviar recibo thaysa araujo", CLIENTES, HOJE).clienteId).toBe("4");
   });
 });
+
+import { interpretarDespesa } from "./voz";
+
+const CATEGORIAS = [
+  { id: "c1", name: "Combustível" },
+  { id: "c2", name: "Alimentação" },
+  { id: "c3", name: "Hospedagem" },
+  { id: "c4", name: "Estacionamento" },
+  { id: "c5", name: "Outros" },
+];
+
+describe("interpretarDespesa", () => {
+  const ctx = { categorias: CATEGORIAS, clientes: CLIENTES, hoje: HOJE };
+
+  it("gasolina, valor, pix e data", () => {
+    const r = interpretarDespesa("gasolina 150 reais no pix depois de amanhã", ctx);
+    expect(r).toMatchObject({ valor: "150,00", forma: "pix", categoriaId: "c1", data: "2026-10-10", descricao: "Gasolina" });
+  });
+
+  it("centavos e cartão", () => {
+    const r = interpretarDespesa("almoço em Recife 45,90 no cartão", ctx);
+    expect(r).toMatchObject({ valor: "45,90", forma: "credito", categoriaId: "c2", descricao: "Almoço em Recife" });
+  });
+
+  it("reais e centavos falados, hotel, cliente", () => {
+    const r = interpretarDespesa("despesa hotel da Ylka 280 reais e 50 centavos dinheiro", ctx);
+    expect(r).toMatchObject({ valor: "280,50", forma: "dinheiro", categoriaId: "c3", clienteId: "1" });
+  });
+
+  it("dia do mês não vira valor", () => {
+    const r = interpretarDespesa("estacionamento 20 reais dia 15", ctx);
+    expect(r).toMatchObject({ valor: "20,00", data: "2026-10-15", categoriaId: "c4" });
+  });
+
+  it("milhar com ponto", () => {
+    expect(interpretarDespesa("R$ 1.250,00 hospedagem", ctx).valor).toBe("1.250,00");
+  });
+
+  it("sem categoria reconhecida fica em branco", () => {
+    const r = interpretarDespesa("presente para cliente 80 reais", ctx);
+    expect(r.categoriaId).toBeNull();
+    expect(r.valor).toBe("80,00");
+  });
+});

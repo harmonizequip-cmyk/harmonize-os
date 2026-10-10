@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Mic } from "lucide-react";
 import ClientPicker from "@/components/ClientPicker";
 import { createClient } from "@/lib/supabase/client";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
+import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
+import { interpretarDespesa, type ClienteParaVoz } from "@/lib/voz";
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
   { value: "dinheiro", label: "Dinheiro" },
@@ -34,16 +37,18 @@ interface ClientOption {
 export default function NovoLancamentoModal({
   categories,
   clients,
+  porVoz = false,
   onClose,
   onCreated,
 }: {
   categories: CategoryRow[];
   clients: ClientOption[];
+  porVoz?: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const supabase = createClient();
-  const [type, setType] = useState<"entrada" | "saida">("entrada");
+  const [type, setType] = useState<"entrada" | "saida">(porVoz ? "saida" : "entrada");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -55,6 +60,57 @@ export default function NovoLancamentoModal({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Despesa por voz ("+" > Despesa por voz): a frase preenche categoria,
+  // descrição, valor, forma, data e cliente; a pessoa confere e salva.
+  const [temMicrofone, setTemMicrofone] = useState(false);
+  const [ouvindo, setOuvindo] = useState(false);
+  const [parcial, setParcial] = useState("");
+  const [entendido, setEntendido] = useState<string | null>(null);
+  const [candidatos, setCandidatos] = useState<ClienteParaVoz[]>([]);
+  const pararRef = useRef<(() => void) | null>(null);
+  const clientesRef = useRef(clients);
+  clientesRef.current = clients;
+
+  function falarDespesa(automatico = false) {
+    setError(null);
+    setParcial("");
+    setEntendido(null);
+    setOuvindo(true);
+    pararRef.current = escutar(setParcial, (final, erro) => {
+      setOuvindo(false);
+      pararRef.current = null;
+      if (!final) {
+        if (erro) setError(automatico ? "Toque no microfone para falar." : erro);
+        return;
+      }
+      const r = interpretarDespesa(final, {
+        categorias: categories.filter((c) => c.type === "saida"),
+        clientes: clientesRef.current,
+        hoje: hojeLocal(),
+      });
+      setType("saida");
+      setCategoryId(r.categoriaId ?? "");
+      setDescription(r.descricao);
+      if (r.valor) setAmount(r.valor);
+      if (r.forma) setPaymentMethod(r.forma);
+      setDate(r.data);
+      setClientId(r.clienteId ?? "");
+      setVinculo(SEM_VINCULO);
+      setCandidatos(r.candidatos);
+      setEntendido(final);
+    });
+  }
+
+  useEffect(() => {
+    const pode = podeReconhecerFala();
+    setTemMicrofone(pode);
+    if (pode && porVoz) falarDespesa(true);
+    if (!pode && porVoz) setError("Este navegador não entende fala. Preencha abaixo.");
+    return () => pararRef.current?.();
+    // Só ao abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Receita de locação e de mentoria não se lança por aqui: ela nasce
   // sozinha quando a locação ou a mentoria é finalizada, com pagamento e
@@ -103,6 +159,49 @@ export default function NovoLancamentoModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Novo lançamento</h2>
+
+        {temMicrofone && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => (ouvindo ? pararRef.current?.() : falarDespesa())}
+              className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium ${
+                ouvindo ? "animate-pulse bg-red-600 text-white" : "border border-brand-teal text-brand-teal"
+              }`}
+            >
+              <Mic size={16} />
+              {ouvindo ? "Ouvindo... toque para parar" : "Falar a despesa"}
+            </button>
+            {ouvindo && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {parcial || "Ex: gasolina 150 reais no pix ontem"}
+              </p>
+            )}
+            {entendido && !ouvindo && (
+              <p className="mt-1 text-[11px] text-neutral-400">
+                Ouvi: &ldquo;{entendido}&rdquo;. Confira categoria, valor e data antes de salvar.
+              </p>
+            )}
+            {candidatos.length > 0 && !clientId && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className="w-full text-[11px] text-neutral-400">É de qual cliente?</span>
+                {candidatos.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setClientId(c.id);
+                      setCandidatos([]);
+                    }}
+                    className="rounded-full border border-brand-teal px-2.5 py-1 text-xs text-brand-teal"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mb-4 grid grid-cols-2 gap-2">
           {(["entrada", "saida"] as const).map((t) => (

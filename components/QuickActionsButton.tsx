@@ -43,7 +43,8 @@ type ActionKey =
   | "locacao"
   | "locacao_disparos"
   | "receber"
-  | "voz";
+  | "voz"
+  | "despesa_voz";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -53,6 +54,7 @@ const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[
   { key: "tarefa", label: "Nova tarefa", emoji: "🗒️", module: "clientes" },
   { key: "voz", label: "Anotar por voz (vira tarefa)", emoji: "🎙️", module: "clientes" },
   { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
+  { key: "despesa_voz", label: "Despesa por voz", emoji: "🎙️", module: "financeiro" },
   { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
   { key: "evento", label: "Novo evento na agenda", emoji: "📅", module: "agenda" },
   // Pedido 1 da auditoria: antes só existia a reserva sem disparos aqui no
@@ -189,6 +191,15 @@ export default function QuickActionsButton({
         <NovoLancamentoModal
           categories={categories}
           clients={clients}
+          onClose={() => setActiveModal(null)}
+          onCreated={handleCreated}
+        />
+      )}
+      {activeModal === "despesa_voz" && (
+        <NovoLancamentoModal
+          categories={categories}
+          clients={clients}
+          porVoz
           onClose={() => setActiveModal(null)}
           onCreated={handleCreated}
         />

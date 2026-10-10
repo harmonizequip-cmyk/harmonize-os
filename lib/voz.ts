@@ -117,7 +117,7 @@ function palavras(s: string): string[] {
   return semAcento(s).replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
 }
 
-function acharCliente(t: string, clientes: ClienteParaVoz[]): { id: string | null; candidatos: ClienteParaVoz[] } {
+export function acharCliente(t: string, clientes: ClienteParaVoz[]): { id: string | null; candidatos: ClienteParaVoz[] } {
   const ditas = new Set(palavras(t));
   let melhor = 0;
   let achados: ClienteParaVoz[] = [];
@@ -159,4 +159,122 @@ export function interpretarFala(fala: string, clientes: ClienteParaVoz[], hoje: 
 
   const { id, candidatos } = acharCliente(titulo, clientes);
   return { titulo, data, clienteId: id, candidatos };
+}
+
+// ------------------------------------------------------------
+// Despesa por voz: "gasolina 150 reais no pix ontem" vira categoria
+// Combustível, valor 150,00, forma PIX e data de ontem. Mesma ideia da
+// tarefa: preenche o formulário e a pessoa confere antes de salvar.
+// ------------------------------------------------------------
+
+export interface CategoriaParaVoz {
+  id: string;
+  name: string;
+}
+
+export interface DespesaInterpretada {
+  descricao: string;
+  valor: string | null; // "150,00", pronto para o campo
+  data: string;
+  forma: string | null; // pix, dinheiro, debito, credito, transferencia
+  categoriaId: string | null;
+  clienteId: string | null;
+  candidatos: ClienteParaVoz[];
+}
+
+// Palavra dita -> trecho do nome da categoria cadastrada.
+const SINONIMOS_CATEGORIA: [RegExp, string][] = [
+  [/\b(gasolina|etanol|alcool|diesel|abasteci\w*|abastec\w*|combustivel|posto)\b/, "combust"],
+  [/\b(almoco|almocei|jantar|jantei|janta|cafe|lanche|lanchei|comida|restaurante|refeicao|alimentacao)\b/, "aliment"],
+  [/\b(hotel|pousada|hospedagem|airbnb|diaria)\b/, "hosped"],
+  [/\b(estacionamento|estacionei|estacionar|zona azul)\b/, "estacion"],
+  [/\b(insumo|insumos|gel|ponteira|ponteiras)\b/, "insumo"],
+  [/\b(imposto|impostos|das)\b/, "imposto"],
+  [/\b(parcela|prestacao)\b/, "parcela"],
+  [/\b(retirada|retirei)\b/, "retirada"],
+];
+
+const FORMAS: [RegExp, string][] = [
+  [/\b(?:no |via |pelo |com )?pix\b/, "pix"],
+  [/\b(?:no |em |com )?(?:dinheiro|especie)\b/, "dinheiro"],
+  [/\b(?:no |em |com )?(?:cartao de )?debito\b/, "debito"],
+  [/\b(?:no |em |com )?(?:cartao de )?credito\b/, "credito"],
+  [/\b(?:no |em |com )?cartao\b/, "credito"],
+  [/\b(?:por |via |com )?(?:transferencia|ted)\b/, "transferencia"],
+];
+
+function tirarTrecho(texto: string, comparavel: string, ini: number, fim: number): [string, string] {
+  const junta = (a: string) => a.replace(/\s+/g, " ").trim();
+  return [junta(texto.slice(0, ini) + " " + texto.slice(fim)), junta(comparavel.slice(0, ini) + " " + comparavel.slice(fim))];
+}
+
+function formatarValor(n: number): string {
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function interpretarDespesa(
+  fala: string,
+  { categorias, clientes, hoje }: { categorias: CategoriaParaVoz[]; clientes: ClienteParaVoz[]; hoje: string }
+): DespesaInterpretada {
+  let texto = fala.trim().replace(/\s+/g, " ").normalize("NFC");
+  let comp = semAcento(texto);
+  const mesmoTamanho = comp.length === texto.length;
+
+  // Data primeiro, para "dia 15" não virar valor.
+  let data = hoje;
+  const achada = mesmoTamanho ? acharData(comp, hoje) : null;
+  if (achada) {
+    data = achada.data;
+    [texto, comp] = tirarTrecho(texto, comp, achada.trecho[0], achada.trecho[1]);
+  }
+
+  // Valor: "R$ 150", "150 reais", "150,50", "150 reais e 50 centavos".
+  let valor: string | null = null;
+  const reValor =
+    /(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?:\s*(?:reais|real|conto|contos|pila))?(?:\s*e\s*(\d{1,2})\s*centavos?)?/;
+  const mv = comp.match(reValor);
+  if (mv && mv.index !== undefined) {
+    let bruto = mv[1];
+    if (/\.\d{3}/.test(bruto)) bruto = bruto.replace(/\./g, "");
+    bruto = bruto.replace(",", ".");
+    let n = Number(bruto);
+    if (mv[2]) n += Number(mv[2]) / 100;
+    if (Number.isFinite(n) && n > 0) {
+      valor = formatarValor(n);
+      [texto, comp] = tirarTrecho(texto, comp, mv.index, mv.index + mv[0].length);
+    }
+  }
+
+  let forma: string | null = null;
+  for (const [re, f] of FORMAS) {
+    const m = comp.match(re);
+    if (m && m.index !== undefined) {
+      forma = f;
+      [texto, comp] = tirarTrecho(texto, comp, m.index, m.index + m[0].length);
+      break;
+    }
+  }
+
+  let categoriaId: string | null = null;
+  const nomeNorm = (c: CategoriaParaVoz) => semAcento(c.name);
+  for (const [re, chave] of SINONIMOS_CATEGORIA) {
+    if (re.test(comp)) {
+      categoriaId = categorias.find((c) => nomeNorm(c).includes(chave))?.id ?? null;
+      if (categoriaId) break;
+    }
+  }
+  if (!categoriaId) {
+    const ditas = new Set(palavras(comp));
+    categoriaId = categorias.find((c) => palavras(c.name).some((p) => p.length >= 4 && ditas.has(p)))?.id ?? null;
+  }
+
+  texto = texto
+    .replace(/^(?:nova despesa|despesa|lancar|lançar|gastei|paguei|gasto|saida|saída)(?:\s+(?:de|com|no|na))?[\s,:.-]*/i, "")
+    .replace(/[\s,.-]+$/, "")
+    .trim();
+  const nomeCategoria = categorias.find((c) => c.id === categoriaId)?.name ?? "";
+  const descricao = texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : nomeCategoria;
+
+  const { id: clienteId, candidatos } = acharCliente(texto, clientes);
+  return { descricao, valor, data, forma, categoriaId, clienteId, candidatos };
 }
