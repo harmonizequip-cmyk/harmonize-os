@@ -59,7 +59,7 @@ import {
 } from "@/lib/rental-calculator";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
-import { valorParaNumero } from "@/lib/valor";
+import { valorParaNumero, lerCustoPorDisparo, limparCampoCustoPorDisparo } from "@/lib/valor";
 import CalculoImagemBotao from "@/components/CalculoImagemBotao";
 import { montarDadosCalculo, montarDadosMentoria } from "@/lib/calculo-image";
 
@@ -331,8 +331,8 @@ export default function CalculadoraLocacaoModal({
   // Custo por disparo negociado manualmente (não existe em mentoria)
   // ------------------------------------------------------------
   const [usarCustoManual, setUsarCustoManual] = useState(false);
-  const [custoManualInput, setCustoManualInput] = useState(""); // centavos, estilo protótipo: "9" = R$0,09
-  const custoManualPorDisparo = usarCustoManual && custoManualInput ? Number(onlyDigits(custoManualInput)) / 100 : null;
+  const [custoManualInput, setCustoManualInput] = useState(""); // "0,065" como escrito; só dígitos = centavos ("9" = R$0,09)
+  const custoManualPorDisparo = usarCustoManual ? lerCustoPorDisparo(custoManualInput) : null;
 
   // ------------------------------------------------------------
   // Deslocamento
@@ -1232,17 +1232,17 @@ export default function CalculadoraLocacaoModal({
                       {usarCustoManual && (
                         <div className="mt-2">
                           <input
-                            inputMode="numeric"
+                            inputMode="decimal"
                             value={custoManualInput}
-                            onChange={(e) => setCustoManualInput(onlyDigits(e.target.value))}
-                            placeholder="Ex: 9 = R$ 0,09"
+                            onChange={(e) => setCustoManualInput(limparCampoCustoPorDisparo(e.target.value))}
+                            placeholder="Ex: 0,065"
                             className="w-full max-w-[180px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                           />
                           {custoManualPorDisparo != null && resumo && (
                             <div className="mt-2 space-y-1 rounded-lg border border-dashed border-brand-teal/30 bg-brand-teal/5 p-2.5 text-xs">
                               <div className="flex justify-between">
                                 <span className="text-neutral-500">Custo negociado</span>
-                                <span className="font-medium">R$ {custoManualPorDisparo.toFixed(2)} / disparo</span>
+                                <span className="font-medium">R$ {custoManualPorDisparo.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} / disparo</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-neutral-500">Valor com custo negociado</span>

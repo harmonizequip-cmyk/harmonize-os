@@ -15,3 +15,25 @@ export function valorParaNumero(texto: string): number {
 export function numeroParaCampo(n: number): string {
   return n.toFixed(2).replace(".", ",");
 }
+
+/**
+ * Lê o custo negociado por disparo, com até 4 casas.
+ * Com vírgula ou ponto vale como escrito: "0,065" = 0,065.
+ * Só dígitos segue o costume antigo de centavos: "9" = 0,09.
+ * Devolve null quando vazio, ilegível ou zero.
+ */
+export function lerCustoPorDisparo(texto: string): number | null {
+  const t = texto.trim().replace(/\s/g, "").replace(/^R\$/, "");
+  if (!t) return null;
+  const n = /[.,]/.test(t) ? Number(t.replace(",", ".")) : Number(t) / 100;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 10000) / 10000;
+}
+
+/** Limpa o campo do custo por disparo: dígitos e uma vírgula, até 4 casas. */
+export function limparCampoCustoPorDisparo(texto: string): string {
+  const s = texto.replace(/\./g, ",").replace(/[^\d,]/g, "");
+  const i = s.indexOf(",");
+  if (i === -1) return s;
+  return s.slice(0, i + 1) + s.slice(i + 1).replace(/,/g, "").slice(0, 4);
+}
