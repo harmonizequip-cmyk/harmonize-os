@@ -34,6 +34,8 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
   const [forma, setForma] = useState("pix");
   const [descricao, setDescricao] = useState("");
   const [outroNome, setOutroNome] = useState("");
+  // Só a pendência: registra quem deve sem mexer no caixa (empréstimo antigo).
+  const [semCaixa, setSemCaixa] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [removendo, setRemovendo] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
     setForma("pix");
     setDescricao("");
     setOutroNome("");
+    setSemCaixa(false);
     setErro(null);
   }
 
@@ -58,6 +61,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
     setForma(m.forma ?? "pix");
     setDescricao(m.descricao ?? "");
     setOutroNome("");
+    setSemCaixa(!!m.semCaixa);
     setErro(null);
   }
 
@@ -77,6 +81,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
         p_forma: forma,
         p_data: data,
         p_descricao: descricao || null,
+        p_sem_caixa: semCaixa,
       });
       setSalvando(false);
       if (error) return setErro(error.message || "Não foi possível salvar.");
@@ -85,8 +90,9 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
       return;
     }
     if (!Number.isFinite(numero) || numero <= 0) return setErro("Informe um valor maior que zero.");
-    const texto =
-      form.tipo === "concedido"
+    const texto = semCaixa
+      ? `Registrar ${form.tipo === "concedido" ? "empréstimo" : "devolução"} de ${formatCurrency(numero)} (${nome.toUpperCase()}) só como pendência, sem mexer no caixa?`
+      : form.tipo === "concedido"
         ? `Registrar empréstimo de ${formatCurrency(numero)} para ${nome.toUpperCase()}? Sai do caixa como saída, fora do resultado.`
         : `Registrar devolução de ${formatCurrency(numero)} de ${nome.toUpperCase()}? Entra no caixa como entrada, fora do faturamento.`;
     if (!window.confirm(texto)) return;
@@ -99,6 +105,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
       p_forma: forma,
       p_data: data,
       p_descricao: descricao || null,
+      p_sem_caixa: semCaixa,
     });
     setSalvando(false);
     if (error) return setErro(error.message || "Não foi possível salvar.");
@@ -196,6 +203,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
                 <button type="button" onClick={() => abrirEdicao(m)} className="min-w-0 text-left text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-300">
                   {formatDate(m.data)} · {m.tipo === "concedido" ? "Emprestado" : "Devolvido"}
                   {m.descricao ? ` · ${m.descricao}` : ""}
+                  {m.semCaixa && <span className="ml-1 text-neutral-400">(só pendência)</span>}
                   {!somenteLeitura && <span className="ml-1 text-brand-teal">editar</span>}
                 </button>
                 <span className="flex items-center gap-2 whitespace-nowrap">
@@ -279,6 +287,14 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
                 </option>
               ))}
             </select>
+
+            <label className="mt-3 flex items-start gap-2 rounded-xl border border-neutral-200 p-2.5 text-sm text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
+              <input type="checkbox" checked={semCaixa} onChange={(e) => setSemCaixa(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              <span>
+                Só registrar a pendência
+                <span className="block text-[11px] text-neutral-400">Não mexe no saldo do caixa. Use para empréstimos antigos.</span>
+              </span>
+            </label>
 
             <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
             <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" className={campo} />

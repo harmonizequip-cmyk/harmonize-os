@@ -8,7 +8,7 @@ export default async function EmprestimosPage() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("emprestimos")
-    .select("id, devedor, tipo, valor, data, descricao, transactions(payment_method)")
+    .select("id, devedor, tipo, valor, data, descricao, transaction_id, transactions(payment_method)")
     .eq("is_test", false)
     .order("data", { ascending: false });
   if (error) throw new Error(`Não consegui carregar os empréstimos: ${error.message}`);
@@ -20,6 +20,7 @@ export default async function EmprestimosPage() {
     valor: Number(m.valor),
     data: m.data,
     descricao: m.descricao,
+    semCaixa: !m.transaction_id,
     forma: (Array.isArray(m.transactions) ? m.transactions[0] : m.transactions)?.payment_method ?? null,
   }));
 

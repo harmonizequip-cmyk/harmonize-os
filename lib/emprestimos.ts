@@ -20,6 +20,8 @@ export interface MovimentoEmprestimo {
   data: string;
   descricao: string | null;
   forma?: string | null;
+  /** Só a pendência: sem lançamento no caixa (empréstimo antigo). */
+  semCaixa?: boolean;
 }
 
 export interface ResumoDevedor {

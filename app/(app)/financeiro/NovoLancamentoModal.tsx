@@ -72,6 +72,7 @@ export default function NovoLancamentoModal({
   // Empréstimo para a Laser Dream: saída = empréstimo concedido, entrada =
   // devolução. Vai pelo controle de Empréstimos (fora do resultado).
   const [emprestimo, setEmprestimo] = useState<string | null>(null);
+  const [emprestimoSemCaixa, setEmprestimoSemCaixa] = useState(false);
   // Compra no cartão de crédito: vira uma saída por parcela, cada uma no mês
   // da fatura dela; o dinheiro só sai quando a fatura é paga.
   const [cartoes, setCartoes] = useState<{ id: string; nome: string; scope: string }[]>([]);
@@ -209,6 +210,7 @@ export default function NovoLancamentoModal({
         p_forma: paymentMethod,
         p_data: date,
         p_descricao: [description, notes].filter(Boolean).join(" · ") || null,
+        p_sem_caixa: emprestimoSemCaixa,
       });
       setSaving(false);
       if (e) {
@@ -303,6 +305,10 @@ export default function NovoLancamentoModal({
                 <p className="mt-1.5 text-[11px] text-neutral-400">
                   {type === "saida" ? "Saída = empréstimo concedido." : "Entrada = devolução do empréstimo."} Fica fora do resultado e aparece em Empréstimos.
                 </p>
+                <label className="mt-1.5 flex items-center gap-2 text-[11px] text-neutral-600 dark:text-neutral-300">
+                  <input type="checkbox" checked={emprestimoSemCaixa} onChange={(e) => setEmprestimoSemCaixa(e.target.checked)} />
+                  Só registrar a pendência (não mexe no saldo)
+                </label>
               </>
             )}
           </div>
