@@ -10,6 +10,8 @@ import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
 import EsteMesCard from "@/components/EsteMesCard";
+import PrevisaoCaixaCard from "@/components/PrevisaoCaixaCard";
+import { preverCaixa, type ReservaFutura, type LocacaoPassada } from "@/lib/previsao";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { diasDoPeriodo } from "@/lib/period";
@@ -250,6 +252,43 @@ export default async function DashboardPage({
   // da tela de Pendências.
   const pendencias = await buscarPendencias(supabase, todayStr);
 
+  // Previsão de caixa (30 e 60 dias): reservas marcadas, estimadas pela média
+  // das locações passadas, mais o que está vencido, menos custos e contas fixas.
+  const fim60 = somarDias(todayStr, 60);
+  const [{ data: reservasFuturasRaw }, { data: lucrosRaw }, { data: mentoriasRaw }] = await Promise.all([
+    supabase
+      .from("calendar_events")
+      .select("id, date_start, client_id, event_type, is_mentoria, taxa_status, taxa_valor, clients(name)")
+      .eq("is_test", false)
+      .neq("status", "cancelada")
+      .is("rental_id", null)
+      .in("event_type", ["hipro_1", "hipro_2", "mentoria"])
+      .gte("date_start", todayStr)
+      .lte("date_start", fim60),
+    supabase.from("rentals_lucro").select("rental_id, client_id, calculated_value, total_despesas"),
+    supabase.from("calendar_events").select("rental_id").eq("is_mentoria", true).not("rental_id", "is", null),
+  ]);
+  const idsMentoria = new Set((mentoriasRaw ?? []).map((m: any) => m.rental_id as string));
+  const historicoCaixa: LocacaoPassada[] = (lucrosRaw ?? []).map((l: any) => ({
+    clienteId: l.client_id,
+    valor: Number(l.calculated_value ?? 0),
+    despesas: Number(l.total_despesas ?? 0),
+    mentoria: idsMentoria.has(l.rental_id),
+  }));
+  const reservasFuturas: ReservaFutura[] = (reservasFuturasRaw ?? []).map((e: any) => ({
+    id: e.id,
+    data: e.date_start,
+    clienteId: e.client_id,
+    clienteNome: (Array.isArray(e.clients) ? e.clients[0]?.name : e.clients?.name) ?? null,
+    equipamento: e.event_type === "hipro_1" ? "HIPRO 1" : e.event_type === "hipro_2" ? "HIPRO 2" : "Mentoria",
+    mentoria: !!e.is_mentoria || e.event_type === "mentoria",
+    taxaPaga: e.taxa_status === "paga" ? Number(e.taxa_valor ?? 0) : 0,
+  }));
+  const fixasMensais = despesasFixas.reduce((s, f) => s + (f.valor > 0 ? f.valor : 0), 0);
+  const baseCaixa = { hoje: todayStr, reservas: reservasFuturas, historico: historicoCaixa, aReceberVencido: pendencias.total, fixasMensais };
+  const previsao30 = preverCaixa({ ...baseCaixa, dias: 30, fim: somarDias(todayStr, 30) });
+  const previsao60 = preverCaixa({ ...baseCaixa, dias: 60, fim: fim60 });
+
   // Reservas que já passaram sem disparos lançados: atendimento feito e
   // ainda não cobrado, invisível em qualquer outra tela.
   const semDisparos = await buscarReservasSemDisparos(supabase, todayStr);
@@ -481,6 +520,8 @@ export default async function DashboardPage({
       </div>
 
       <EsteMesCard meta={metaDoMes} rotuloMes={rotuloMesAtual} />
+
+      <PrevisaoCaixaCard p30={previsao30} p60={previsao60} />
 
       {!!pendingConfirmations && pendingConfirmations > 0 && (
         <Link

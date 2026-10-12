@@ -90,6 +90,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Tela Equipamentos > cartão "Aplicadores" (`components/AplicadoresCard.tsx`, `lib/aplicador.ts`). Aviso no Dashboard com a garantia entre 90% e 100%, levando a `/equipamentos#aplicadores`; no resumo das 7h30, o mesmo só às segundas. Fora da garantia só aparece no cartão, sem aviso.
 - Revisão anual é do equipamento: `equipments.ultima_revisao`, gravada por `registrar_revisao_equipamento`. Próxima = última + 1 ano. Aviso no Dashboard 30 dias antes ou vencida (leva a `/equipamentos#revisao-<code>`), e no resumo das 7h30 às segundas.
 
+## Previsão de caixa
+
+- Dashboard > "Previsão de caixa" (`components/PrevisaoCaixaCard.tsx`, conta em `lib/previsao.ts`), 30 ou 60 dias: reservas marcadas (sem `rental_id`) estimadas pela média das locações do próprio cliente ou pela média geral, menos a taxa já paga; mais o a receber vencido (`buscarPendencias`); menos custos das locações (proporção despesas/faturamento de `rentals_lucro`) e contas fixas de Configurações (1 vez a cada 30 dias). Mentoria sem histórico fica "sem estimativa".
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.
