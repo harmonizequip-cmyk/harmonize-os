@@ -85,9 +85,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 ## Aplicadores (desgaste por disparos)
 
 - A contagem de disparos é por aplicador, não por HIPRO: 4 aplicadores, 2 montados e 2 de reserva, e eles trocam de aparelho.
-- `aplicadores` (nome, série, `limite_disparos` opcional, última leitura `contador_base` em `contador_base_em`) e `aplicador_montagens` (onde esteve montado, intervalo [desde, ate), um por HIPRO). Escritos só por `salvar_aplicador`, `montar_aplicador` e `registrar_leitura_aplicador`.
+- `aplicadores` (nome, série, `garantia_disparos` opcional (o fabricante garante até 6 milhões de disparos; passar não para o aplicador), última leitura `contador_base` em `contador_base_em`) e `aplicador_montagens` (onde esteve montado, intervalo [desde, ate), um por HIPRO). Escritos só por `salvar_aplicador`, `montar_aplicador` e `registrar_leitura_aplicador`.
 - View `aplicadores_uso`: disparos = última leitura + disparos das locações (`rentals_contabilizaveis`, fora mentoria) do HIPRO onde estava montado, depois da leitura. A locação do dia da troca conta para quem entrou.
-- Tela Equipamentos > cartão "Aplicadores" (`components/AplicadoresCard.tsx`, `lib/aplicador.ts`). Aviso no Dashboard a partir de 90% do limite, levando a `/equipamentos#aplicadores`; no resumo das 7h30, 90% só às segundas e acima do limite todo dia.
+- Tela Equipamentos > cartão "Aplicadores" (`components/AplicadoresCard.tsx`, `lib/aplicador.ts`). Aviso no Dashboard com a garantia entre 90% e 100%, levando a `/equipamentos#aplicadores`; no resumo das 7h30, o mesmo só às segundas. Fora da garantia só aparece no cartão, sem aviso.
+- Revisão anual é do equipamento: `equipments.ultima_revisao`, gravada por `registrar_revisao_equipamento`. Próxima = última + 1 ano. Aviso no Dashboard 30 dias antes ou vencida (leva a `/equipamentos#revisao-<code>`), e no resumo das 7h30 às segundas.
 
 ## Pendências conhecidas
 

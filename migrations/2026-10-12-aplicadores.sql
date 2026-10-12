@@ -1,12 +1,13 @@
 -- ============================================================
 -- STATUS: ainda NÃO aplicada. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
 --
--- Desgaste por aplicador.
+-- Garantia dos aplicadores (disparos) e revisão anual dos HIPROs.
 --   A contagem de disparos do HIPRO é por aplicador, não por aparelho, e
 --   os aplicadores trocam de aparelho (4 aplicadores, 2 montados e 2 de
 --   reserva).
---   1. aplicadores: cada aplicador com nome, número de série, limite de
---      disparos (vida útil, opcional) e a última leitura do contador
+--   1. aplicadores: cada aplicador com nome, número de série, garantia em
+--      disparos (o fabricante garante até 6 milhões; opcional) e a última
+--      leitura do contador
 --      (contador_base em contador_base_em).
 --   2. aplicador_montagens: histórico de onde cada aplicador esteve montado
 --      (de / até; "até" nulo = montado agora). Um aplicador por HIPRO.
@@ -17,13 +18,15 @@
 --   4. Funções salvar_aplicador, montar_aplicador e
 --      registrar_leitura_aplicador (módulo "equipamentos"), cada uma
 --      registrando em movimentacoes.
+--   5. Revisão anual do equipamento: equipments.ultima_revisao, gravada por
+--      registrar_revisao_equipamento. Próxima = última + 1 ano.
 -- ============================================================
 
 create table if not exists public.aplicadores (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   numero_serie text,
-  limite_disparos integer check (limite_disparos is null or limite_disparos > 0),
+  garantia_disparos integer check (garantia_disparos is null or garantia_disparos > 0),
   contador_base integer not null default 0 check (contador_base >= 0),
   contador_base_em date not null default public.hoje_local(),
   ativo boolean not null default true,
@@ -66,7 +69,7 @@ select
   a.id,
   a.nome,
   a.numero_serie,
-  a.limite_disparos,
+  a.garantia_disparos,
   a.contador_base,
   a.contador_base_em,
   a.ativo,
@@ -97,7 +100,7 @@ create or replace function public.salvar_aplicador(
   p_id uuid,
   p_nome text,
   p_numero_serie text default null,
-  p_limite_disparos integer default null,
+  p_garantia_disparos integer default null,
   p_ativo boolean default true,
   p_contador_inicial integer default null
 )
@@ -116,26 +119,26 @@ begin
   if v_nome is null then
     raise exception 'Dê um nome ao aplicador.';
   end if;
-  if p_limite_disparos is not null and p_limite_disparos <= 0 then
-    raise exception 'O limite de disparos precisa ser maior que zero.';
+  if p_garantia_disparos is not null and p_garantia_disparos <= 0 then
+    raise exception 'A garantia em disparos precisa ser maior que zero.';
   end if;
   if p_contador_inicial is not null and p_contador_inicial < 0 then
     raise exception 'O contador não pode ser negativo.';
   end if;
 
   if p_id is null then
-    insert into aplicadores (nome, numero_serie, limite_disparos, contador_base, contador_base_em, ativo)
-    values (v_nome, nullif(trim(p_numero_serie), ''), p_limite_disparos, coalesce(p_contador_inicial, 0), public.hoje_local(), coalesce(p_ativo, true))
+    insert into aplicadores (nome, numero_serie, garantia_disparos, contador_base, contador_base_em, ativo)
+    values (v_nome, nullif(trim(p_numero_serie), ''), p_garantia_disparos, coalesce(p_contador_inicial, 0), public.hoje_local(), coalesce(p_ativo, true))
     returning id into v_id;
     perform public.registrar_movimentacao(
       'criado', 'aplicadores', v_id, 'Aplicador ' || v_nome,
-      jsonb_build_object('contador', coalesce(p_contador_inicial, 0), 'limite', p_limite_disparos)
+      jsonb_build_object('contador', coalesce(p_contador_inicial, 0), 'garantia', p_garantia_disparos)
     );
   else
     update aplicadores
        set nome = v_nome,
            numero_serie = nullif(trim(p_numero_serie), ''),
-           limite_disparos = p_limite_disparos,
+           garantia_disparos = p_garantia_disparos,
            ativo = coalesce(p_ativo, true)
      where id = p_id
      returning id into v_id;
@@ -148,7 +151,7 @@ begin
     end if;
     perform public.registrar_movimentacao(
       'editado', 'aplicadores', v_id, 'Aplicador ' || v_nome,
-      jsonb_build_object('limite', p_limite_disparos, 'ativo', coalesce(p_ativo, true))
+      jsonb_build_object('garantia', p_garantia_disparos, 'ativo', coalesce(p_ativo, true))
     );
   end if;
   return v_id;
@@ -270,3 +273,46 @@ grant execute on function public.registrar_leitura_aplicador(uuid, integer, date
 
 revoke all on public.aplicadores, public.aplicador_montagens, public.aplicadores_uso from anon;
 grant select on public.aplicadores, public.aplicador_montagens, public.aplicadores_uso to authenticated, service_role;
+
+-- Revisão anual do equipamento (é do HIPRO, não do aplicador).
+alter table public.equipments add column if not exists ultima_revisao date;
+comment on column public.equipments.ultima_revisao is
+  'Data da última revisão anual. Próxima = esta data + 1 ano. Gravada só por registrar_revisao_equipamento.';
+
+create or replace function public.registrar_revisao_equipamento(
+  p_equipment_id uuid,
+  p_data date
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nome text;
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos equipamentos.';
+  end if;
+  if p_data is null then
+    raise exception 'Informe a data da revisão.';
+  end if;
+  if p_data > public.hoje_local() then
+    raise exception 'A revisão não pode ser numa data futura.';
+  end if;
+
+  update equipments set ultima_revisao = p_data where id = p_equipment_id returning name into v_nome;
+  if v_nome is null then
+    raise exception 'Equipamento não encontrado.';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'equipments', p_equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object('acao_detalhada', 'Revisão anual feita em ' || to_char(p_data, 'DD/MM/YYYY')
+      || '; próxima em ' || to_char(p_data + interval '1 year', 'DD/MM/YYYY'))
+  );
+end;
+$$;
+
+revoke execute on function public.registrar_revisao_equipamento(uuid, date) from public, anon;
+grant execute on function public.registrar_revisao_equipamento(uuid, date) to authenticated, service_role;

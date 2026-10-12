@@ -417,23 +417,42 @@ async function avisosDoDia(hoje: string): Promise<Aviso[]> {
     });
   }
 
-  // 5. Aplicador perto do limite de disparos (90%: só às segundas) ou
-  // acima dele (todo dia). Se a view não existir, não avisa nada.
-  const segunda = new Date(hoje + "T12:00:00Z").getUTCDay() === 1;
-  const { data: aplic } = await admin
-    .from("aplicadores_uso")
-    .select("id, nome, disparos, limite_disparos")
-    .eq("ativo", true)
-    .not("limite_disparos", "is", null);
-  for (const a of (aplic ?? []) as any[]) {
-    const pct = Number(a.disparos) / Number(a.limite_disparos);
-    if (pct < 0.9 || (pct < 1 && !segunda)) continue;
-    avisos.push({
-      title: pct >= 1 ? `${a.nome} passou do limite de disparos` : `${a.nome} em ${Math.round(pct * 100)}% do limite`,
-      body: `≈ ${Number(a.disparos).toLocaleString("pt-BR")} de ${Number(a.limite_disparos).toLocaleString("pt-BR")} disparos. Programe a troca ou a revisão.`,
-      url: "/equipamentos#aplicadores",
-      tag: `aplicador-${a.id}`,
-    });
+  // 5. Aplicador com a garantia acabando (90% a 100%), só às segundas. Quem
+  // já passou da garantia não avisa. Se a view não existir, não avisa nada.
+  if (new Date(hoje + "T12:00:00Z").getUTCDay() === 1) {
+    const { data: aplic } = await admin
+      .from("aplicadores_uso")
+      .select("id, nome, disparos, garantia_disparos")
+      .eq("ativo", true)
+      .not("garantia_disparos", "is", null);
+    for (const a of (aplic ?? []) as any[]) {
+      const pct = Number(a.disparos) / Number(a.garantia_disparos);
+      if (pct < 0.9 || pct >= 1) continue;
+      const faltam = Number(a.garantia_disparos) - Number(a.disparos);
+      avisos.push({
+        title: `${a.nome}: garantia em ${Math.round(pct * 100)}%`,
+        body: `Faltam ≈ ${faltam.toLocaleString("pt-BR")} disparos para sair da garantia. Se precisar de revisão coberta, é a hora.`,
+        url: "/equipamentos#aplicadores",
+        tag: `aplicador-${a.id}`,
+      });
+    }
+  }
+
+  // 6. Revisão anual do HIPRO a 30 dias ou vencida, só às segundas.
+  if (new Date(hoje + "T12:00:00Z").getUTCDay() === 1) {
+    const { data: revs } = await admin.from("equipments").select("id, code, name, ultima_revisao").not("ultima_revisao", "is", null);
+    for (const e of (revs ?? []) as any[]) {
+      const [a, m, d] = String(e.ultima_revisao).split("-").map(Number);
+      const proxima = `${a + 1}-${String(m).padStart(2, "0")}-${String(m === 2 && d === 29 ? 28 : d).padStart(2, "0")}`;
+      const dias = Math.round((Date.parse(proxima + "T12:00:00Z") - Date.parse(hoje + "T12:00:00Z")) / 86400000);
+      if (dias > 30) continue;
+      avisos.push({
+        title: dias < 0 ? `Revisão anual do ${e.name} vencida` : `Revisão anual do ${e.name} em ${dias} ${dias === 1 ? "dia" : "dias"}`,
+        body: "Marque o dia com a assistência e trave a agenda em Bloquear período.",
+        url: `/equipamentos#revisao-${e.code}`,
+        tag: `revisao-${e.id}`,
+      });
+    }
   }
 
   return avisos.slice(0, MAX_AVISOS_EXTRAS);

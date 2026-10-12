@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
-import { type AplicadorUso, situacaoAplicador, lerContador, formatarContador } from "@/lib/aplicador";
+import { type AplicadorUso, situacaoAplicador, lerContador, formatarContador, GARANTIA_PADRAO } from "@/lib/aplicador";
 
 interface Equip {
   id: string;
@@ -24,7 +24,7 @@ const campo =
 const rotulo = "mb-0.5 block text-[10px] text-neutral-500";
 const botaoSalvar = "rounded-lg bg-brand-teal px-3 py-1.5 text-[11px] font-medium text-white disabled:opacity-60";
 
-const COR_BARRA = { ok: "bg-brand-teal", perto: "bg-amber-500", passou: "bg-red-500", sem_limite: "bg-neutral-400" };
+const COR_BARRA = { ok: "bg-brand-teal", perto: "bg-amber-500", fora: "bg-neutral-500", sem_garantia: "bg-neutral-400" };
 
 export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicadores: AplicadorUso[]; equipamentos: Equip[] }) {
   const supabase = createClient();
@@ -57,7 +57,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
     setDestino(a.equipment_id ? "" : equipamentos[0]?.id ?? "");
     setNome(a.nome);
     setSerie(a.numero_serie ?? "");
-    setLimite(a.limite_disparos ? formatarContador(String(a.limite_disparos)) : "");
+    setLimite(a.garantia_disparos ? formatarContador(String(a.garantia_disparos)) : "");
   }
 
   function abrirNovo() {
@@ -66,7 +66,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
     setNovo(true);
     setNome(`Aplicador ${aplicadores.length + 1}`);
     setSerie("");
-    setLimite("");
+    setLimite(formatarContador(String(GARANTIA_PADRAO)));
     setContador("");
     setDestino("");
   }
@@ -106,7 +106,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
         p_id: a.id,
         p_nome: nome,
         p_numero_serie: serie || null,
-        p_limite_disparos: lerContador(limite),
+        p_garantia_disparos: lerContador(limite),
         p_ativo: ativo,
       })
     );
@@ -118,7 +118,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
         p_id: a.id,
         p_nome: a.nome,
         p_numero_serie: a.numero_serie,
-        p_limite_disparos: a.limite_disparos,
+        p_garantia_disparos: a.garantia_disparos,
         p_ativo: true,
       })
     );
@@ -133,7 +133,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
       p_id: null,
       p_nome: nome,
       p_numero_serie: serie || null,
-      p_limite_disparos: lerContador(limite),
+      p_garantia_disparos: lerContador(limite),
       p_ativo: true,
       p_contador_inicial: n,
     });
@@ -226,19 +226,19 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
                     </div>
                     <p
                       className={`mt-1 text-[11px] ${
-                        s.situacao === "passou"
-                          ? "font-semibold text-red-600 dark:text-red-400"
+                        s.situacao === "fora"
+                          ? "font-medium text-neutral-600 dark:text-neutral-300"
                           : s.situacao === "perto"
                             ? "font-semibold text-amber-600 dark:text-amber-400"
                             : "text-neutral-500 dark:text-neutral-400"
                       }`}
                     >
-                      {Math.round(s.pct * 100)}% do limite de {a.limite_disparos!.toLocaleString("pt-BR")}
-                      {s.situacao === "passou" ? " · passou do limite" : ` · faltam ${s.faltam!.toLocaleString("pt-BR")}`}
+                      {s.situacao === "fora" ? "Fora da garantia" : `${Math.round(s.pct * 100)}% da garantia`} de {a.garantia_disparos!.toLocaleString("pt-BR")}
+                      {s.situacao === "fora" ? ` · passou ${(a.disparos - a.garantia_disparos!).toLocaleString("pt-BR")}` : ` · faltam ${s.faltam!.toLocaleString("pt-BR")}`}
                     </p>
                   </>
                 ) : (
-                  <p className="mt-1 text-[11px] text-neutral-400">Sem limite definido (toque em Editar para pôr a vida útil).</p>
+                  <p className="mt-1 text-[11px] text-neutral-400">Sem garantia definida (toque em Editar para pôr).</p>
                 )}
                 <p className="mt-0.5 text-[10px] text-neutral-400">
                   Última leitura: {a.contador_base.toLocaleString("pt-BR")} em {formatDate(a.contador_base_em)}
@@ -334,12 +334,12 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
                         <input value={serie} onChange={(e) => setSerie(e.target.value)} className={campo} />
                       </div>
                       <div className="col-span-2">
-                        <label className={rotulo}>Vida útil (limite de disparos)</label>
+                        <label className={rotulo}>Garantia até (disparos)</label>
                         <input
                           inputMode="numeric"
                           value={limite}
                           onChange={(e) => setLimite(formatarContador(e.target.value))}
-                          placeholder="Ex: 1.000.000"
+                          placeholder="Ex: 6.000.000"
                           className={campo}
                         />
                       </div>
@@ -397,12 +397,12 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
               </select>
             </div>
             <div className="col-span-2">
-              <label className={rotulo}>Vida útil (limite de disparos)</label>
+              <label className={rotulo}>Garantia até (disparos)</label>
               <input
                 inputMode="numeric"
                 value={limite}
                 onChange={(e) => setLimite(formatarContador(e.target.value))}
-                placeholder="opcional, ex: 1.000.000"
+                placeholder="Ex: 6.000.000"
                 className={campo}
               />
             </div>

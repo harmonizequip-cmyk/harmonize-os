@@ -14,6 +14,7 @@ import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { diasDoPeriodo } from "@/lib/period";
 import { situacaoAplicador } from "@/lib/aplicador";
+import { situacaoRevisao } from "@/lib/revisao";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
 // máxima. Ficam aqui, juntas, para mudar num lugar só.
@@ -253,16 +254,24 @@ export default async function DashboardPage({
   // ainda não cobrado, invisível em qualquer outra tela.
   const semDisparos = await buscarReservasSemDisparos(supabase, todayStr);
 
-  // Aplicadores perto (90%) ou acima do limite de disparos. Só aviso: se a
-  // view ainda não existir, nada aparece.
+  // Aplicadores com a garantia acabando (90% a 100%). Quem já passou da
+  // garantia não avisa: continua funcionando e o aviso ficaria para sempre.
+  // Se a view ainda não existir, nada aparece.
   const { data: aplicadoresUso } = await supabase
     .from("aplicadores_uso")
-    .select("nome, disparos, limite_disparos")
+    .select("nome, disparos, garantia_disparos")
     .eq("ativo", true)
-    .not("limite_disparos", "is", null);
+    .not("garantia_disparos", "is", null);
   const aplicadoresAlerta = (aplicadoresUso ?? [])
-    .map((a) => ({ nome: a.nome as string, ...situacaoAplicador({ disparos: Number(a.disparos), limite_disparos: Number(a.limite_disparos) }) }))
-    .filter((a) => a.situacao === "perto" || a.situacao === "passou");
+    .map((a) => ({ nome: a.nome as string, ...situacaoAplicador({ disparos: Number(a.disparos), garantia_disparos: Number(a.garantia_disparos) }) }))
+    .filter((a) => a.situacao === "perto");
+
+  // Revisão anual dos HIPROs: avisa 30 dias antes e quando venceu. Consulta
+  // à parte para não derrubar nada se a coluna ainda não existir.
+  const { data: revisoesRaw } = await supabase.from("equipments").select("code, name, ultima_revisao");
+  const revisoesAlerta = (revisoesRaw ?? [])
+    .map((e) => ({ code: e.code as string, nome: e.name as string, ...situacaoRevisao(e.ultima_revisao as string | null, todayStr) }))
+    .filter((e) => e.situacao === "perto" || e.situacao === "vencida");
 
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
@@ -508,14 +517,27 @@ export default async function DashboardPage({
       {aplicadoresAlerta.length > 0 && (
         <Link
           href="/equipamentos#aplicadores"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+        >
+          🔧 Garantia acabando: {aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", ")}. Ver
+          aplicadores →
+        </Link>
+      )}
+
+      {revisoesAlerta.length > 0 && (
+        <Link
+          href={`/equipamentos#revisao-${revisoesAlerta[0].code}`}
           className={
-            aplicadoresAlerta.some((a) => a.situacao === "passou")
+            revisoesAlerta.some((e) => e.situacao === "vencida")
               ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
               : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
           }
         >
-          🔧 {aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", ")} do limite de disparos: ver
-          aplicadores →
+          🛠️ Revisão anual:{" "}
+          {revisoesAlerta
+            .map((e) => (e.situacao === "vencida" ? `${e.nome} vencida` : e.dias === 0 ? `${e.nome} hoje` : `${e.nome} em ${e.dias} ${e.dias === 1 ? "dia" : "dias"}`))
+            .join(", ")}
+          : marcar e travar a agenda →
         </Link>
       )}
 

@@ -5,6 +5,7 @@ import BloqueiosEquipamento, { type Bloqueio } from "@/components/BloqueiosEquip
 import EquipamentoInfoControl from "@/components/EquipamentoInfoControl";
 import EquipamentoPrevistasControl from "@/components/EquipamentoPrevistasControl";
 import AplicadoresCard from "@/components/AplicadoresCard";
+import RevisaoAnualControl from "@/components/RevisaoAnualControl";
 import { type AplicadorUso, situacaoAplicador } from "@/lib/aplicador";
 
 import { hojeLocal, resolverPeriodo } from "@/lib/period";
@@ -42,13 +43,13 @@ export default async function EquipamentosPage({
   // Aplicadores e disparos estimados de cada um (view aplicadores_uso).
   const { data: aplicadoresRaw } = await supabase
     .from("aplicadores_uso")
-    .select("id, nome, numero_serie, limite_disparos, contador_base, contador_base_em, ativo, equipment_id, montado_desde, disparos")
+    .select("id, nome, numero_serie, garantia_disparos, contador_base, contador_base_em, ativo, equipment_id, montado_desde, disparos")
     .order("nome");
   const aplicadores = ((aplicadoresRaw ?? []) as AplicadorUso[]).map((a) => ({ ...a, disparos: Number(a.disparos) }));
 
   const { data: equipments } = await supabase
     .from("equipments")
-    .select("id, code, name, status, status_motivo, status_desde, status_previsto_fim, serial_number, anvisa_registro")
+    .select("id, code, name, status, status_motivo, status_desde, status_previsto_fim, serial_number, anvisa_registro, ultima_revisao")
     .order("code");
 
   // Lê da view rentals_contabilizaveis, não da tabela rentals: a receita
@@ -178,6 +179,10 @@ export default async function EquipamentosPage({
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações previstas</p>
                   <EquipamentoPrevistasControl items={eqPrevistas} />
                 </div>
+                <div id={`revisao-${eq.code}`} className="col-span-2 scroll-mt-20">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Revisão anual</p>
+                  <RevisaoAnualControl equipmentId={eq.id} ultimaRevisao={eq.ultima_revisao ?? null} />
+                </div>
                 <div className="col-span-2">
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">Aplicador montado</p>
                   <a href="#aplicadores" className="mt-0.5 block text-sm font-medium text-neutral-900 dark:text-neutral-100">
@@ -187,14 +192,14 @@ export default async function EquipamentosPage({
                         {situacao?.pct != null && (
                           <span
                             className={`ml-1 text-xs ${
-                              situacao.situacao === "passou"
-                                ? "font-semibold text-red-600 dark:text-red-400"
+                              situacao.situacao === "fora"
+                                ? "font-normal text-neutral-500"
                                 : situacao.situacao === "perto"
                                   ? "font-semibold text-amber-600 dark:text-amber-400"
                                   : "font-normal text-neutral-500"
                             }`}
                           >
-                            ({Math.round(situacao.pct * 100)}% do limite)
+                            ({situacao.situacao === "fora" ? "fora da garantia" : `${Math.round(situacao.pct * 100)}% da garantia`})
                           </span>
                         )}
                       </>
