@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ainda NÃO aplicada. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 13/10/2026, pelo dono, e conferida por consulta de leitura (funções 2, registrar com 7 parâmetros, anon sem acesso).
 --
 -- Editar um lançamento de empréstimo (Laser Dream João Pessoa / Campina Grande).
 --   editar_emprestimo muda devedor, valor, data, forma e descrição do
