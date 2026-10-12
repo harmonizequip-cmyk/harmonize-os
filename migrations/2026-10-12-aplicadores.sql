@@ -22,6 +22,19 @@
 --      registrar_revisao_equipamento. Próxima = última + 1 ano.
 -- ============================================================
 
+-- Se a primeira versão deste script (com "limite_disparos") já tiver rodado,
+-- ajusta para a atual. Num banco sem ela, este bloco não faz nada.
+do $v1$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'aplicadores' and column_name = 'limite_disparos') then
+    alter table public.aplicadores rename column limite_disparos to garantia_disparos;
+  end if;
+end
+$v1$;
+drop view if exists public.aplicadores_uso;
+drop function if exists public.salvar_aplicador(uuid, text, text, integer, boolean, integer);
+
 create table if not exists public.aplicadores (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
