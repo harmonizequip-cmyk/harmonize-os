@@ -21,6 +21,7 @@ import {
   FileText,
   Settings,
   PiggyBank,
+  CreditCard,
 } from "lucide-react";
 
 // Os 4 atalhos de uso diário, nessa ordem. O 5º e último botão não é um
@@ -46,6 +47,7 @@ const MORE_ITEMS = [
   // Quem está devendo e quanto (o total também aparece no Dashboard).
   { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
   { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },
+  { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro" },
   // Controle dos contratos de locação já emitidos (leva X).
   { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda" },
   { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },

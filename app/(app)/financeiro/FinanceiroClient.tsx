@@ -10,6 +10,7 @@ import FiltroBarra from "@/components/FiltroBarra";
 import { exportarCsv } from "@/lib/exportar-csv";
 import NovoLancamentoModal from "./NovoLancamentoModal";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { foraDoResultadoPorCartao, rotuloFatura } from "@/lib/cartao";
 import EditarLancamentoModal from "./EditarLancamentoModal";
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -104,7 +105,13 @@ export default function FinanceiroClient({
     let saidas = 0;
     let emprestado = 0;
     let devolvido = 0;
+    let faturasPagas = 0;
     for (const t of initialTransactions) {
+      // Pagamento de fatura: as compras do cartão já contaram como saída.
+      if (foraDoResultadoPorCartao((t as any).cartao_mov)) {
+        faturasPagas += Number(t.amount);
+        continue;
+      }
       // Empréstimo a terceiros e devolução: caixa, não resultado.
       if (ehCategoriaDeEmprestimo(t.categories?.name)) {
         if (t.type === "entrada") devolvido += Number(t.amount);
@@ -114,7 +121,7 @@ export default function FinanceiroClient({
       if (t.type === "entrada") entradas += Number(t.amount);
       else saidas += Number(t.amount);
     }
-    return { entradas, saidas, resultado: entradas - saidas, emprestado, devolvido };
+    return { entradas, saidas, resultado: entradas - saidas, emprestado, devolvido, faturasPagas };
   }, [initialTransactions]);
 
   function baixarCsv() {
@@ -165,6 +172,12 @@ export default function FinanceiroClient({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{pessoal ? "Financeiro pessoal" : "Financeiro"}</h1>
         <div className="flex gap-2">
+          <Link
+            href="/financeiro/cartoes"
+            className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+          >
+            Cartões
+          </Link>
           {!pessoal && (
             <Link
               href="/financeiro/emprestimos"
@@ -293,6 +306,11 @@ export default function FinanceiroClient({
           </p>
         </div>
       </div>
+      {totais.faturasPagas > 0 && (
+        <Link href="/financeiro/cartoes" className="block text-xs text-neutral-500 dark:text-neutral-400">
+          Fora do resultado: faturas de cartão pagas {formatCurrency(totais.faturasPagas)} (as compras já contaram) →
+        </Link>
+      )}
       {(totais.emprestado > 0 || totais.devolvido > 0) && (
         <Link href="/financeiro/emprestimos" className="block text-xs text-neutral-500 dark:text-neutral-400">
           Fora do resultado: empréstimos {formatCurrency(totais.emprestado)} saíram

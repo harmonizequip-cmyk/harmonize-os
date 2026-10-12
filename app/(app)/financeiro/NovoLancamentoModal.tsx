@@ -10,6 +10,7 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { interpretarDespesa, type ClienteParaVoz } from "@/lib/voz";
+import { DEVEDORES_SUGERIDOS } from "@/lib/emprestimos";
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
   { value: "dinheiro", label: "Dinheiro" },
@@ -68,6 +69,14 @@ export default function NovoLancamentoModal({
   const [pessoal, setPessoal] = useState(escopoInicial === "pessoal");
   const [custoDoAtendimento, setCustoDoAtendimento] = useState(true);
   const [categoriasPessoais, setCategoriasPessoais] = useState<CategoryRow[]>([]);
+  // Empréstimo para a Laser Dream: saída = empréstimo concedido, entrada =
+  // devolução. Vai pelo controle de Empréstimos (fora do resultado).
+  const [emprestimo, setEmprestimo] = useState<string | null>(null);
+  // Compra no cartão de crédito: vira uma saída por parcela, cada uma no mês
+  // da fatura dela; o dinheiro só sai quando a fatura é paga.
+  const [cartoes, setCartoes] = useState<{ id: string; nome: string; scope: string }[]>([]);
+  const [cartaoId, setCartaoId] = useState("");
+  const [parcelas, setParcelas] = useState(1);
 
   useEffect(() => {
     supabase
@@ -76,6 +85,12 @@ export default function NovoLancamentoModal({
       .eq("scope", "pessoal")
       .order("name")
       .then(({ data }) => setCategoriasPessoais((data ?? []) as CategoryRow[]));
+    supabase
+      .from("cartoes")
+      .select("id, nome, scope")
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => setCartoes((data ?? []) as { id: string; nome: string; scope: string }[]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -143,8 +158,66 @@ export default function NovoLancamentoModal({
     (c) => c.type === type && !(type === "entrada" && CATEGORIAS_AUTOMATICAS.includes(c.name.trim().toLowerCase()))
   );
 
+  const cartoesDoLado = cartoes.filter((c) => c.scope === (pessoal ? "pessoal" : "harmonize"));
+  const noCartao = type === "saida" && paymentMethod === "credito" && !emprestimo && cartoesDoLado.length > 0;
+
   async function handleSave() {
     const numericAmount = valorParaNumero(amount);
+    if (noCartao) {
+      if (!cartaoId) {
+        setError("Escolha o cartão.");
+        return;
+      }
+      if (!categoryId || !description || !amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
+        setError("Preencha categoria, descrição e um valor válido.");
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      const { error: e } = await supabase.rpc("registrar_compra_cartao", {
+        p_cartao_id: cartaoId,
+        p_category_id: categoryId,
+        p_valor_total: numericAmount,
+        p_parcelas: parcelas,
+        p_data: date,
+        p_descricao: description,
+        p_client_id: clientId || null,
+        p_rental_id: clientId ? vinculo.rentalId : null,
+        p_calendar_event_id: clientId ? vinculo.eventId : null,
+        p_conta_no_lucro: contaNoLucro,
+        p_notes: notes || null,
+      });
+      setSaving(false);
+      if (e) {
+        setError(e.message || "Não foi possível salvar a compra.");
+        return;
+      }
+      onCreated();
+      return;
+    }
+    if (emprestimo) {
+      if (!amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
+        setError("Informe um valor válido.");
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      const { error: e } = await supabase.rpc("registrar_emprestimo", {
+        p_devedor: emprestimo,
+        p_tipo: type === "saida" ? "concedido" : "devolucao",
+        p_valor: numericAmount,
+        p_forma: paymentMethod,
+        p_data: date,
+        p_descricao: [description, notes].filter(Boolean).join(" · ") || null,
+      });
+      setSaving(false);
+      if (e) {
+        setError(e.message || "Não foi possível salvar o empréstimo.");
+        return;
+      }
+      onCreated();
+      return;
+    }
     if (!categoryId || !description || !amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
       setError("Preencha categoria, descrição e um valor válido.");
       return;
@@ -199,6 +272,41 @@ export default function NovoLancamentoModal({
           Conta pessoal
           <span className="text-[11px] text-neutral-400">(não entra no caixa da Harmonize)</span>
         </label>
+
+        {!pessoal && (
+          <div className="-mt-2 mb-4 rounded-xl border border-neutral-200 px-3 py-2 dark:border-neutral-700">
+            <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-200">
+              <input
+                type="checkbox"
+                checked={!!emprestimo}
+                onChange={(e) => setEmprestimo(e.target.checked ? DEVEDORES_SUGERIDOS[0] : null)}
+                className="h-4 w-4"
+              />
+              Empréstimo para a Laser Dream
+            </label>
+            {emprestimo && (
+              <>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {DEVEDORES_SUGERIDOS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setEmprestimo(d)}
+                      className={`rounded-lg border py-1.5 text-xs font-medium ${
+                        emprestimo === d ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                      }`}
+                    >
+                      {d.replace("LASER DREAM ", "").replace("CAMPINA GRANDE", "Campina Grande").replace("JOÃO PESSOA", "João Pessoa")}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] text-neutral-400">
+                  {type === "saida" ? "Saída = empréstimo concedido." : "Entrada = devolução do empréstimo."} Fica fora do resultado e aparece em Empréstimos.
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {temMicrofone && (
           <div className="mb-4">
@@ -265,7 +373,7 @@ export default function NovoLancamentoModal({
         </div>
 
         <div className="space-y-3">
-          <div>
+          <div className={emprestimo ? "hidden" : ""}>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Categoria</label>
             <select
               value={categoryId}
@@ -301,7 +409,7 @@ export default function NovoLancamentoModal({
             />
           </div>
 
-          <div>
+          <div className={emprestimo ? "hidden" : ""}>
             <ClientPicker
               clients={clients}
               value={clientId}
@@ -316,7 +424,7 @@ export default function NovoLancamentoModal({
             />
           </div>
 
-          {type === "saida" && clientId && (
+          {type === "saida" && clientId && !emprestimo && (
             <LocacaoDoClienteSelect
               key={clientId}
               clientId={clientId}
@@ -356,7 +464,11 @@ export default function NovoLancamentoModal({
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
             <select
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
+              onChange={(e) => {
+                setPaymentMethod(e.target.value);
+                setCartaoId("");
+                setParcelas(1);
+              }}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             >
               {PAYMENT_METHODS.map((p) => (
@@ -366,6 +478,45 @@ export default function NovoLancamentoModal({
               ))}
             </select>
           </div>
+
+          {noCartao && (
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/60">
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cartão</label>
+                <select
+                  value={cartaoId}
+                  onChange={(e) => setCartaoId(e.target.value)}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  <option value="">Selecione</option>
+                  {cartoesDoLado.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Parcelas</label>
+                <select
+                  value={parcelas}
+                  onChange={(e) => setParcelas(Number(e.target.value))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n === 1 ? "À vista" : `${n}x`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="self-end text-[11px] text-neutral-500">
+                {parcelas > 1 && valorParaNumero(amount) > 0
+                  ? `${parcelas}x de ${(valorParaNumero(amount) / parcelas).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                  : "Sai da conta quando pagar a fatura."}
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>

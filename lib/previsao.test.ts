@@ -34,6 +34,12 @@ describe("preverCaixa", () => {
     expect(p.contasFixas).toBe(10000);
   });
 
+  it("faturas de cartão até o fim do período saem do saldo", () => {
+    const p = preverCaixa({ ...base, reservas: [], faturas: [{ vencimento: "2026-11-05", valor: 800 }, { vencimento: "2026-12-05", valor: 900 }] });
+    expect(p.faturasCartao).toBe(800);
+    expect(p.saldo).toBe(1000 - 800 - 5000);
+  });
+
   it("mentoria sem histórico fica sem estimativa", () => {
     const p = preverCaixa({ ...base, reservas: [res({ mentoria: true })] });
     expect(p.reservas[0]).toMatchObject({ base: "sem", estimado: 0 });

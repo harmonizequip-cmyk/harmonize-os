@@ -36,7 +36,7 @@ export async function carregarLancamentos(
   let consulta = supabase
     .from("transactions_contabilizaveis")
     .select(
-      "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, categories(name), clients(name)"
+      "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
     )
     .eq("scope", escopo)
     .gte("date", periodo.inicio)

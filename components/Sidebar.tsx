@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   PiggyBank,
+  CreditCard,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -41,6 +42,7 @@ const NAV_ITEMS = [
   // Quem está devendo e quanto (o total também aparece no Dashboard).
   { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
   { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },
+  { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro" },
   // Controle dos contratos de locação já emitidos (leva X). Fica perto de
   // Locações porque nasce de lá (um contrato é sempre de uma locação).
   { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda" },

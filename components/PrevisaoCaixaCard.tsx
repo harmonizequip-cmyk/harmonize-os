@@ -64,6 +64,7 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
         )}
         {p.aReceberVencido > 0 && linha("A receber de locações que já passaram", p.aReceberVencido, "+")}
         {p.custosLocacoes > 0 && linha("Custos das locações", p.custosLocacoes, "-", "combustível, hospedagem... pela média")}
+        {p.faturasCartao > 0 && linha("Faturas de cartão a pagar", p.faturasCartao, "-")}
         {p.contasFixas > 0 && linha(`Contas fixas (${p.meses} ${p.meses === 1 ? "mês" : "meses"})`, p.contasFixas, "-")}
       </div>
 

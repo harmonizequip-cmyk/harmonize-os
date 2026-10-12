@@ -14,6 +14,7 @@ import PrevisaoCaixaCard from "@/components/PrevisaoCaixaCard";
 import { preverCaixa, type ReservaFutura, type LocacaoPassada } from "@/lib/previsao";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
+import { foraDoResultadoPorCartao, foraDoSaldoPorCartao } from "@/lib/cartao";
 import { diasDoPeriodo } from "@/lib/period";
 import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
@@ -52,7 +53,7 @@ export default async function DashboardPage({
   // Lançamentos do período filtrado, para os cards de Entradas/Saídas/Resultado e os gráficos
   const { data: transactions } = await supabase
     .from("transactions_contabilizaveis")
-    .select("id, type, amount, date, category_id, categories(name)")
+    .select("id, type, amount, date, category_id, cartao_mov, categories(name)")
     .eq("scope", "harmonize")
     .gte("date", fromStr)
     .lte("date", toStr);
@@ -60,7 +61,7 @@ export default async function DashboardPage({
   // Todos os lançamentos históricos, para o Saldo acumulado (não depende do filtro de período)
   const { data: allTimeTransactions } = await supabase
     .from("transactions_contabilizaveis")
-    .select("type, amount")
+    .select("type, amount, cartao_mov")
     .eq("scope", "harmonize");
 
   // Contagem de locações do período, sem cancelada nem teste (as canceladas
@@ -287,7 +288,16 @@ export default async function DashboardPage({
     taxaPaga: e.taxa_status === "paga" ? Number(e.taxa_valor ?? 0) : 0,
   }));
   const fixasMensais = despesasFixas.reduce((s, f) => s + (f.valor > 0 ? f.valor : 0), 0);
-  const baseCaixa = { hoje: todayStr, reservas: reservasFuturas, historico: historicoCaixa, aReceberVencido: pendencias.total, fixasMensais };
+  // Faturas de cartão da Harmonize ainda não pagas (vencidas também contam).
+  const { data: faturasRaw } = await supabase
+    .from("faturas_cartao")
+    .select("vencimento, total_compras, total_pago")
+    .eq("scope", "harmonize")
+    .lte("vencimento", fim60);
+  const faturasAbertas = ((faturasRaw ?? []) as any[])
+    .map((f) => ({ vencimento: f.vencimento as string, valor: Math.round((Number(f.total_compras) - Number(f.total_pago)) * 100) / 100 }))
+    .filter((f) => f.valor > 0.009);
+  const baseCaixa = { hoje: todayStr, reservas: reservasFuturas, historico: historicoCaixa, aReceberVencido: pendencias.total, fixasMensais, faturas: faturasAbertas };
   const previsao30 = preverCaixa({ ...baseCaixa, dias: 30, fim: somarDias(todayStr, 30) });
   const previsao60 = preverCaixa({ ...baseCaixa, dias: 60, fim: fim60 });
 
@@ -464,13 +474,14 @@ export default async function DashboardPage({
       ...t,
       categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
     }))
-    .filter((t: any) => !ehCategoriaDeEmprestimo(t.categories?.name));
+    .filter((t: any) => !ehCategoriaDeEmprestimo(t.categories?.name) && !foraDoResultadoPorCartao(t.cartao_mov));
   const rows = normalizedRows;
   const entradas = rows.filter((t) => t.type === "entrada").reduce((sum, t) => sum + Number(t.amount), 0);
   const saidas = rows.filter((t) => t.type === "saida").reduce((sum, t) => sum + Number(t.amount), 0);
   const resultado = entradas - saidas;
 
-  const saldoTotal = (allTimeTransactions ?? []).reduce(
+  // Compra no cartão só tira dinheiro quando a fatura é paga.
+  const saldoTotal = (allTimeTransactions ?? []).filter((t: any) => !foraDoSaldoPorCartao(t.cartao_mov)).reduce(
     (sum, t) => sum + (t.type === "entrada" ? Number(t.amount) : -Number(t.amount)),
     0
   );

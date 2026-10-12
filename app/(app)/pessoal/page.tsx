@@ -11,9 +11,10 @@ export default async function PessoalPage({ searchParams }: { searchParams: Filt
   const [d, settings, { data: todos }] = await Promise.all([
     carregarLancamentos(supabase, searchParams, "pessoal"),
     fetchSettings(supabase),
-    supabase.from("transactions").select("type, amount").eq("scope", "pessoal").eq("is_test", false).limit(20000),
+    supabase.from("transactions").select("type, amount, cartao_mov").eq("scope", "pessoal").eq("is_test", false).limit(20000),
   ]);
-  const saldo = (todos ?? []).reduce((s, t: any) => s + (t.type === "entrada" ? 1 : -1) * Number(t.amount), 0);
+  // Compra no cartão só sai da conta quando a fatura é paga.
+  const saldo = (todos ?? []).filter((t: any) => t.cartao_mov !== "compra").reduce((s, t: any) => s + (t.type === "entrada" ? 1 : -1) * Number(t.amount), 0);
   const fixas = settings.despesasFixas.filter((f) => f.tipo === "pessoal").map((f) => ({ nome: f.nome, valor: f.valor }));
   return (
     <FinanceiroClient

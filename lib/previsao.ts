@@ -39,6 +39,7 @@ export interface PrevisaoCaixa {
   entradasReservas: number;
   aReceberVencido: number;
   custosLocacoes: number;
+  faturasCartao: number;
   contasFixas: number;
   meses: number;
   saldo: number;
@@ -55,6 +56,8 @@ export function preverCaixa(p: {
   historico: LocacaoPassada[];
   aReceberVencido: number;
   fixasMensais: number;
+  // Faturas de cartão da Harmonize ainda não pagas (o que falta de cada uma).
+  faturas?: { vencimento: string; valor: number }[];
 }): PrevisaoCaixa {
   const hipro = p.historico.filter((h) => !h.mentoria && h.valor > 0);
   const ment = p.historico.filter((h) => h.mentoria && h.valor > 0);
@@ -92,14 +95,16 @@ export function preverCaixa(p: {
   const meses = Math.max(1, Math.round(p.dias / 30));
   const contasFixas = r2(p.fixasMensais * meses);
   const aReceberVencido = r2(p.aReceberVencido);
+  const faturasCartao = r2((p.faturas ?? []).filter((f) => f.vencimento <= p.fim).reduce((s, f) => s + f.valor, 0));
   return {
     dias: p.dias,
     reservas,
     entradasReservas,
     aReceberVencido,
     custosLocacoes,
+    faturasCartao,
     contasFixas,
     meses,
-    saldo: r2(entradasReservas + aReceberVencido - custosLocacoes - contasFixas),
+    saldo: r2(entradasReservas + aReceberVencido - custosLocacoes - faturasCartao - contasFixas),
   };
 }

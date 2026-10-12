@@ -106,6 +106,14 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - "Novo lançamento" tem a caixinha "Conta pessoal". Despesa pessoal ligada a locação/reserva: "custo do atendimento pago do bolso" (`conta_no_lucro = true`, entra em `rentals_lucro`) ou "gasto meu" (fora do lucro). Despesas da reserva têm "Pago com" (caixa, bolso-custo, gasto pessoal) via `registrar_despesa_reserva(..., p_pessoal)`.
 - Contas fixas pessoais (Configurações) não entram mais no quadro "Este mês", na previsão de caixa nem no fechamento de domingo; aparecem no Pessoal.
 
+## Cartão de crédito
+
+- `cartoes` (cada um da Harmonize ou pessoal; dia de fechamento, vencimento, limite), escrito só por `salvar_cartao`. Tela Financeiro > "Cartões" (`/financeiro/cartoes`, `CartoesClient.tsx`): fatura atual e as outras, movimentos, "Pagar fatura", cadastro.
+- Compra: Novo lançamento, saída, forma Crédito, escolhe cartão e parcelas → `registrar_compra_cartao` cria uma saída por parcela (data + n meses), `cartao_mov = 'compra'`, `fatura_ref` = mês do vencimento ('AAAA-MM', `fatura_da_compra`, espelhada em `lib/cartao.ts`). Conta como gasto no mês da parcela, mas não sai do saldo.
+- Pagamento: `pagar_fatura_cartao` cria saída "Pagamento de fatura" (`cartao_mov = 'pagamento'`): sai do saldo e fica fora de Entradas/Saídas/Resultado (Financeiro, Dashboard). View `faturas_cartao` soma compras e pagos por fatura. `excluir_compra_cartao` apaga todas as parcelas.
+- Previsão de caixa desconta as faturas da Harmonize ainda não pagas até o fim do período.
+- Novo lançamento também tem "Empréstimo para a Laser Dream" (João Pessoa ou Campina Grande): saída = concedido, entrada = devolução, via `registrar_emprestimo`.
+
 ## Acesso só de visualização
 
 - `profiles.somente_leitura`. Configurações > "Acesso só de visualização" (`components/AcessoVisualizacaoCard.tsx`) cria o login (signUp num cliente sem sessão) e chama `liberar_acesso_visualizacao(email, nome)`: vê tudo menos Configurações. `remover_acesso_visualizacao` desliga.
