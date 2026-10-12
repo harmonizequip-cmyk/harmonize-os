@@ -72,9 +72,9 @@
       ]
     },
     {
-      "name": "Pendências",
-      "short_name": "Pendências",
-      "url": "/pendencias",
+      "name": "Dias disponíveis",
+      "short_name": "Dias livres",
+      "url": "/agenda?acao=datas",
       "icons": [
         {
           "src": "/icone-192.png",
