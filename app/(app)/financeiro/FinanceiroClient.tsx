@@ -9,6 +9,7 @@ import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarCsv } from "@/lib/exportar-csv";
 import NovoLancamentoModal from "./NovoLancamentoModal";
+import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import EditarLancamentoModal from "./EditarLancamentoModal";
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -76,14 +77,21 @@ export default function FinanceiroClient({
   clients,
   periodo,
   atingiuTeto,
+  escopo = "harmonize",
+  resumoPessoal,
 }: {
   initialTransactions: TransactionRow[];
   categories: CategoryRow[];
   clients: ClientOption[];
   periodo: Periodo;
   atingiuTeto: boolean;
+  escopo?: "harmonize" | "pessoal";
+  // Só no pessoal: saldo de sempre da conta e as contas fixas pessoais.
+  resumoPessoal?: { saldo: number; fixas: { nome: string; valor: number }[] };
 }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
+  const pessoal = escopo === "pessoal";
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TransactionRow | null>(null);
 
@@ -127,7 +135,7 @@ export default function FinanceiroClient({
         { titulo: "Pagamento", valor: (t) => PAYMENT_LABELS[t.payment_method] ?? t.payment_method },
         { titulo: "Teste", valor: (t) => (t.is_test ? "sim" : "") },
       ],
-      "financeiro",
+      pessoal ? "financeiro-pessoal" : "financeiro",
       periodo.rotulo
     );
   }
@@ -135,6 +143,11 @@ export default function FinanceiroClient({
   // Lançamento de empréstimo se edita na tela de Empréstimos, para o controle
   // e o lançamento do caixa nunca ficarem diferentes.
   function abrirLancamento(t: TransactionRow) {
+    if (somenteLeitura) return;
+    if ((t as any).vinculo_id) {
+      window.alert("Esta entrada veio de uma Retirada no caixa da Harmonize. Para mudar ou apagar, edite a retirada no Financeiro.");
+      return;
+    }
     if (ehCategoriaDeEmprestimo(t.categories?.name)) {
       router.push("/financeiro/emprestimos");
       return;
@@ -150,22 +163,53 @@ export default function FinanceiroClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Financeiro</h1>
+        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{pessoal ? "Financeiro pessoal" : "Financeiro"}</h1>
         <div className="flex gap-2">
-          <Link
-            href="/financeiro/emprestimos"
-            className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
-          >
-            Empréstimos
-          </Link>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
-          >
-            + Novo lançamento
-          </button>
+          {!pessoal && (
+            <Link
+              href="/financeiro/emprestimos"
+              className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+            >
+              Empréstimos
+            </Link>
+          )}
+          {!somenteLeitura && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
+            >
+              + Novo lançamento
+            </button>
+          )}
         </div>
       </div>
+
+      {pessoal && resumoPessoal && (
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Saldo da conta pessoal</p>
+          <p className={`text-xl font-semibold ${resumoPessoal.saldo >= 0 ? "text-brand-teal" : "text-brand-pink"}`}>
+            {formatCurrency(resumoPessoal.saldo)}
+          </p>
+          <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            Tudo que entrou menos tudo que saiu, desde o primeiro lançamento. Retiradas da Harmonize entram aqui sozinhas.
+          </p>
+          {resumoPessoal.fixas.length > 0 && (
+            <div className="mt-3 border-t border-neutral-200/70 pt-2 dark:border-neutral-800">
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Contas fixas pessoais do mês: {formatCurrency(resumoPessoal.fixas.reduce((s, f) => s + f.valor, 0))}
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {resumoPessoal.fixas.map((f) => (
+                  <li key={f.nome} className="flex justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                    <span>{f.nome}</span>
+                    <span>{formatCurrency(f.valor)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <FiltroBarra
         periodoPadrao="mes"
@@ -278,6 +322,7 @@ export default function FinanceiroClient({
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
                   {t.clients?.name ? ` · ${t.clients.name}` : ""}
                   {vinculoLocacao(t)}
+                  {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">· custo de atendimento</span>}
                 </p>
               </div>
               <span
@@ -347,6 +392,7 @@ export default function FinanceiroClient({
                     <span className="ml-1 text-xs font-normal text-neutral-400">· {t.clients.name}</span>
                   )}
                   {vinculoLocacao(t)}
+                  {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">· custo de atendimento</span>}
                 </td>
                 <td
                   className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
@@ -373,8 +419,9 @@ export default function FinanceiroClient({
 
       {modalOpen && (
         <NovoLancamentoModal
-          categories={categories}
+          categories={pessoal ? categories.filter((c) => (c as any).scope === "harmonize") : categories}
           clients={clients}
+          escopoInicial={escopo}
           onClose={() => setModalOpen(false)}
           onCreated={handleCreated}
         />

@@ -38,12 +38,14 @@ export default function NovoLancamentoModal({
   categories,
   clients,
   porVoz = false,
+  escopoInicial = "harmonize",
   onClose,
   onCreated,
 }: {
   categories: CategoryRow[];
   clients: ClientOption[];
   porVoz?: boolean;
+  escopoInicial?: "harmonize" | "pessoal";
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -60,6 +62,22 @@ export default function NovoLancamentoModal({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Conta pessoal: o lançamento vai para o financeiro pessoal. Despesa
+  // pessoal ligada a uma locação pode ser custo do atendimento pago do bolso
+  // (entra no lucro da locação) ou gasto pessoal durante o atendimento.
+  const [pessoal, setPessoal] = useState(escopoInicial === "pessoal");
+  const [custoDoAtendimento, setCustoDoAtendimento] = useState(true);
+  const [categoriasPessoais, setCategoriasPessoais] = useState<CategoryRow[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("categories")
+      .select("id, name, type")
+      .eq("scope", "pessoal")
+      .order("name")
+      .then(({ data }) => setCategoriasPessoais((data ?? []) as CategoryRow[]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Despesa por voz ("+" > Despesa por voz): a frase preenche categoria,
   // descrição, valor, forma, data e cliente; a pessoa confere e salva.
@@ -116,7 +134,12 @@ export default function NovoLancamentoModal({
   // sozinha quando a locação ou a mentoria é finalizada, com pagamento e
   // saldo amarrados. Lançar à mão criaria receita em dobro, fora do
   // controle de pagamento. Por isso as duas categorias ficam ocultas.
-  const filteredCategories = categories.filter(
+  const vinculadoALocacao = type === "saida" && !!clientId && !!(vinculo.rentalId || vinculo.eventId);
+  const contaNoLucro = pessoal && vinculadoALocacao && custoDoAtendimento;
+  // Custo do atendimento usa as categorias da Harmonize (Combustível...);
+  // o resto do pessoal usa as categorias pessoais.
+  const listaCategorias = pessoal && !contaNoLucro ? categoriasPessoais : categories;
+  const filteredCategories = listaCategorias.filter(
     (c) => c.type === type && !(type === "entrada" && CATEGORIAS_AUTOMATICAS.includes(c.name.trim().toLowerCase()))
   );
 
@@ -139,7 +162,8 @@ export default function NovoLancamentoModal({
       payment_method: paymentMethod,
       date,
       notes: notes || null,
-      scope: "harmonize",
+      scope: pessoal ? "pessoal" : "harmonize",
+      conta_no_lucro: contaNoLucro,
     });
     setSaving(false);
     if (error) {
@@ -158,7 +182,23 @@ export default function NovoLancamentoModal({
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Novo lançamento</h2>
+        <h2 className="mb-3 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          {pessoal ? "Novo lançamento pessoal" : "Novo lançamento"}
+        </h2>
+
+        <label className="mb-4 flex items-center gap-2 rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
+          <input
+            type="checkbox"
+            checked={pessoal}
+            onChange={(e) => {
+              setPessoal(e.target.checked);
+              setCategoryId("");
+            }}
+            className="h-4 w-4"
+          />
+          Conta pessoal
+          <span className="text-[11px] text-neutral-400">(não entra no caixa da Harmonize)</span>
+        </label>
 
         {temMicrofone && (
           <div className="mb-4">
@@ -270,7 +310,7 @@ export default function NovoLancamentoModal({
                 setVinculo(SEM_VINCULO);
               }}
               onClientCreated={() => {}}
-              label="Cliente (deslocamento, etc.)"
+              label={pessoal ? "Cliente (se foi num atendimento)" : "Cliente (deslocamento, etc.)"}
               optional
               allowCreate={false}
             />
@@ -285,6 +325,31 @@ export default function NovoLancamentoModal({
               dataReferencia={date}
               sugerir
             />
+          )}
+
+          {pessoal && vinculadoALocacao && (
+            <div className="space-y-1.5 rounded-xl bg-neutral-50 p-3 text-sm dark:bg-neutral-800/60">
+              {[
+                [true, "Custo do atendimento pago do bolso", "Entra no lucro da locação (ex.: gasolina da viagem)"],
+                [false, "Gasto meu durante o atendimento", "Só no pessoal, não mexe no lucro"],
+              ].map(([valor, titulo, dica]) => (
+                <label key={String(valor)} className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    checked={custoDoAtendimento === valor}
+                    onChange={() => {
+                      setCustoDoAtendimento(valor as boolean);
+                      setCategoryId("");
+                    }}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="text-neutral-800 dark:text-neutral-200">{titulo as string}</span>
+                    <span className="block text-[11px] text-neutral-400">{dica as string}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
           )}
 
           <div>

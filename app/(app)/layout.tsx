@@ -10,6 +10,7 @@ import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
 import AvisosDesligadosFaixa from "@/components/AvisosDesligadosFaixa";
 import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
 import ReciboHost from "@/components/ReciboHost";
+import { SomenteLeituraProvider } from "@/components/SomenteLeitura";
 
 export default async function AppLayout({
   children,
@@ -26,12 +27,14 @@ export default async function AppLayout({
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("name, permissions, is_admin")
+    .select("name, permissions, is_admin, somente_leitura")
     .eq("id", user.id)
     .single();
 
   const permissions = (profile?.permissions as Record<string, boolean>) ?? {};
   const isAdmin = !!profile?.is_admin;
+  // Acesso só de visualização: sem avisos, sem "+", sem botões de alterar.
+  const somenteLeitura = !!profile?.somente_leitura;
   // Distingue "usuário sem essa permissão" (permissions/is_admin vieram e diziam
   // que não pode) de "não deu pra saber" (a query falhou/voltou vazia). Sem essa
   // distinção, qualquer falha temporária ao buscar o perfil faz o menu inteiro
@@ -51,10 +54,11 @@ export default async function AppLayout({
   const settings = await fetchSettings(supabase);
 
   return (
+    <SomenteLeituraProvider valor={somenteLeitura}>
     <div className="flex min-h-screen">
-      <RegistrarServiceWorker />
+      {!somenteLeitura && <RegistrarServiceWorker />}
       <GuardarAgendaOffline />
-      <ReciboHost />
+      {!somenteLeitura && <ReciboHost />}
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
       <main className="min-w-0 flex-1 pb-20 md:pb-0">
         <MobileHeader />
@@ -66,18 +70,26 @@ export default async function AppLayout({
             MODO TESTE LIGADO · tudo que for criado agora não conta nos relatórios · toque para desligar
           </Link>
         )}
+        {somenteLeitura && (
+          <div className="bg-neutral-800 px-4 py-1.5 text-center text-[11px] font-medium text-white">
+            Modo visualização: dá para ver tudo, mas não alterar
+          </div>
+        )}
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
-          <AvisosDesligadosFaixa />
+          {!somenteLeitura && <AvisosDesligadosFaixa />}
           {children}
         </div>
       </main>
       <BottomNav permissions={permissions} isAdmin={isAdmin} permissionsLoaded={permissionsLoaded} />
-      <QuickActionsButton
-        permissions={permissions}
-        isAdmin={isAdmin}
-        pricingConfig={settings.pricing}
-        reservationFee={settings.reservationFee}
-      />
+      {!somenteLeitura && (
+        <QuickActionsButton
+          permissions={permissions}
+          isAdmin={isAdmin}
+          pricingConfig={settings.pricing}
+          reservationFee={settings.reservationFee}
+        />
+      )}
     </div>
+    </SomenteLeituraProvider>
   );
 }

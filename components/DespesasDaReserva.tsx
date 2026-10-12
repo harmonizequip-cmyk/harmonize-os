@@ -22,6 +22,8 @@ interface Despesa {
   date: string;
   categoria: string | null;
   cliente: string | null;
+  // Paga com dinheiro pessoal: 'custo' entra no lucro, 'meu' não.
+  pessoal: null | "custo" | "meu";
 }
 
 // Janela, em dias em torno da data da reserva, em que uma despesa avulsa é
@@ -38,6 +40,7 @@ function paraDespesa(t: any): Despesa {
     date: t.date,
     categoria: cat?.name ?? null,
     cliente: cli?.name ?? null,
+    pessoal: t.scope === "pessoal" ? (t.conta_no_lucro ? "custo" : "meu") : null,
   };
 }
 
@@ -59,6 +62,9 @@ export default function DespesasDaReserva({
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [avulsas, setAvulsas] = useState<Despesa[]>([]);
   const [categorias, setCategorias] = useState<{ id: string; name: string }[]>([]);
+  const [categoriasPessoais, setCategoriasPessoais] = useState<{ id: string; name: string }[]>([]);
+  // Quem pagou: caixa da Harmonize, bolso como custo do atendimento, ou gasto pessoal.
+  const [pagoCom, setPagoCom] = useState<"" | "custo" | "meu">("");
   const [carregando, setCarregando] = useState(true);
   const [mostrarAvulsas, setMostrarAvulsas] = useState(false);
 
@@ -71,7 +77,7 @@ export default function DespesasDaReserva({
   const [erro, setErro] = useState<string | null>(null);
 
   async function carregar() {
-    const campos = "id, description, amount, date, categories(name), clients(name)";
+    const campos = "id, description, amount, date, scope, conta_no_lucro, categories(name), clients(name)";
     let consultaAvulsas = supabase
       .from("transactions")
       .select(campos)
@@ -90,7 +96,7 @@ export default function DespesasDaReserva({
       ? consultaAvulsas.or(`client_id.eq.${clientId},client_id.is.null`)
       : consultaAvulsas.is("client_id", null);
 
-    const [daReserva, soltas, cats] = await Promise.all([
+    const [daReserva, soltas, cats, catsPessoais] = await Promise.all([
       supabase
         .from("transactions")
         .select(campos)
@@ -99,10 +105,12 @@ export default function DespesasDaReserva({
         .order("date", { ascending: false }),
       consultaAvulsas,
       supabase.from("categories").select("id, name").eq("type", "saida").eq("scope", "harmonize").order("name"),
+      supabase.from("categories").select("id, name").eq("type", "saida").eq("scope", "pessoal").order("name"),
     ]);
     setDespesas((daReserva.data ?? []).map(paraDespesa));
     setAvulsas((soltas.data ?? []).map(paraDespesa));
     setCategorias(cats.data ?? []);
+    setCategoriasPessoais(catsPessoais.data ?? []);
     setCarregando(false);
   }
 
@@ -125,7 +133,8 @@ export default function DespesasDaReserva({
       p_amount: numero,
       p_payment_method: forma,
       p_date: data,
-      p_description: descricao.trim() || categorias.find((c) => c.id === categoriaId)?.name || null,
+      p_description: descricao.trim() || listaCategorias.find((c) => c.id === categoriaId)?.name || null,
+      p_pessoal: pagoCom || null,
     });
     setSalvando(false);
     if (error) {
@@ -160,7 +169,9 @@ export default function DespesasDaReserva({
     await carregar();
   }
 
-  const total = despesas.reduce((s, d) => s + d.amount, 0);
+  // Total que pesa no lucro: o gasto pessoal ("meu") fica de fora.
+  const total = despesas.filter((d) => d.pessoal !== "meu").reduce((s, d) => s + d.amount, 0);
+  const listaCategorias = pagoCom === "meu" ? categoriasPessoais : categorias;
   const campo =
     "rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
 
@@ -185,6 +196,11 @@ export default function DespesasDaReserva({
                   <span className="min-w-0 truncate text-neutral-700 dark:text-neutral-300">
                     {formatDate(d.date)} · {d.categoria ?? d.description}
                     {d.categoria && d.description !== d.categoria ? ` · ${d.description}` : ""}
+                    {d.pessoal && (
+                      <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        {d.pessoal === "custo" ? "do bolso" : "pessoal, fora do lucro"}
+                      </span>
+                    )}
                   </span>
                   <span className="flex flex-shrink-0 items-center gap-2">
                     <span className="font-medium text-neutral-800 dark:text-neutral-100">{formatCurrency(d.amount)}</span>
@@ -198,9 +214,21 @@ export default function DespesasDaReserva({
           )}
 
           <div className="mt-3 grid grid-cols-2 gap-2">
+            <select
+              value={pagoCom}
+              onChange={(e) => {
+                setPagoCom(e.target.value as "" | "custo" | "meu");
+                setCategoriaId("");
+              }}
+              className={`${campo} col-span-2`}
+            >
+              <option value="">Pago com o caixa da Harmonize</option>
+              <option value="custo">Pago do meu bolso: custo do atendimento</option>
+              <option value="meu">Gasto pessoal meu (fora do lucro)</option>
+            </select>
             <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} className={`${campo} col-span-2`}>
               <option value="">Categoria da despesa</option>
-              {categorias.map((c) => (
+              {listaCategorias.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>

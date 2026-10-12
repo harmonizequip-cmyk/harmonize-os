@@ -29,6 +29,7 @@ Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e men
 - As views `rentals_contabilizaveis` e `transactions_contabilizaveis` usam `select *`: ao adicionar coluna em `rentals` ou `transactions`, recriar a view na mesma migration.
 - Funções seguem o padrão existente: `security definer`, `set search_path = public`, checagem com `has_module_permission`, e `registrar_movimentacao` quando alteram dados.
 - Mudança que apaga ou altera dados existentes exige uma consulta de prévia, mostrada ao dono antes de rodar.
+- Tabela nova: criar também o gatilho de acesso só de visualização (`create trigger trg_somente_leitura before insert or update or delete on public.<tabela> for each statement execute function public.bloquear_somente_leitura();`).
 - Função nova: depois de criar, rodar `revoke execute on function <nome> from public, anon;` e dar `grant execute ... to authenticated, service_role;`. Sem isso ela nasce executável por quem não está logado. Nenhuma função é aberta para `anon`.
 - Todo SQL para o dono rodar sai numa página (Artifact) com botão Copiar em cada bloco, um bloco por script, na ordem de execução, com uma consulta de conferência no fim. Nunca como arquivo anexo: o dono usa o celular e não abre anexo. Gerar com `python3 scripts/gerar-pagina-sql.py saida.html migrations/a.sql ... --conferencia "select ..."` e publicar com a ferramenta Artifact. Antes de entregar, rodar os scripts num Postgres local com o `schema.sql` carregado.
 - Aplicar migration pela ferramenta do Supabase (`apply_migration`) pode ser barrado pelo ambiente. Nesse caso não contornar com `execute_sql`: entregar a página de SQL e esperar o dono rodar.
@@ -97,6 +98,18 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 ## Arte para a cliente divulgar
 
 - Agenda > reserva pendente de HIPRO com cliente > "🎨 Arte para a cliente divulgar" (`components/ArteDivulgacaoModal.tsx`, desenho em `lib/arte-divulgacao.ts`). Formatos Status/Story (1080x1920) e Feed (1080x1350), sem a marca da Harmonize. Textos editáveis; clínica, cidade e WhatsApp vêm do cadastro. "Mandar para a cliente" compartilha a imagem com a mensagem pronta. Abre por portal porque a janela da reserva usa backdrop-filter.
+
+## Financeiro pessoal
+
+- Menu "Pessoal" (`/pessoal`, permissão `pessoal`): mesma tela do Financeiro (`FinanceiroClient` com `escopo="pessoal"`, carga em `financeiro/carregar-lancamentos.ts`), lançamentos com `scope = 'pessoal'`, saldo de sempre da conta e as contas fixas do tipo pessoal. Categorias pessoais próprias.
+- Retirada: saída "Retiradas" no caixa da Harmonize cria sozinha a entrada "Retirada da Harmonize" no pessoal (gatilho `espelhar_retirada`, `transactions.vinculo_id`); mudar/apagar a retirada muda/apaga a entrada. A entrada não se edita no pessoal.
+- "Novo lançamento" tem a caixinha "Conta pessoal". Despesa pessoal ligada a locação/reserva: "custo do atendimento pago do bolso" (`conta_no_lucro = true`, entra em `rentals_lucro`) ou "gasto meu" (fora do lucro). Despesas da reserva têm "Pago com" (caixa, bolso-custo, gasto pessoal) via `registrar_despesa_reserva(..., p_pessoal)`.
+- Contas fixas pessoais (Configurações) não entram mais no quadro "Este mês", na previsão de caixa nem no fechamento de domingo; aparecem no Pessoal.
+
+## Acesso só de visualização
+
+- `profiles.somente_leitura`. Configurações > "Acesso só de visualização" (`components/AcessoVisualizacaoCard.tsx`) cria o login (signUp num cliente sem sessão) e chama `liberar_acesso_visualizacao(email, nome)`: vê tudo menos Configurações. `remover_acesso_visualizacao` desliga.
+- O gatilho `trg_somente_leitura` (em toda tabela de public, por comando) recusa gravação de quem é só de visualização, inclusive por funções `security definer`; no Storage, políticas restritivas. Na tela (`useSomenteLeitura`, `components/SomenteLeitura.tsx`): faixa "Modo visualização", sem "+", sem avisos/inscrição de push, sem recibo; o Financeiro esconde "Novo lançamento" e não abre edição.
 
 ## Pendências conhecidas
 

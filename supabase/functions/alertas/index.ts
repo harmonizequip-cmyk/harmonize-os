@@ -246,11 +246,12 @@ async function montarSemana(hoje: string): Promise<Aviso> {
     for (const r of locs ?? []) if ((r.event_date_end ?? r.event_date) <= hoje) aReceber += saldo.get(r.id) ?? 0;
   }
 
-  // Contas fixas do mês (Configurações) contra a sobra das locações do mês,
-  // a mesma conta do quadro "Este mês" do Dashboard.
+  // Contas fixas do negócio (Configurações) contra a sobra das locações do
+  // mês, a mesma conta do quadro "Este mês" do Dashboard. As pessoais ficam
+  // no Financeiro pessoal.
   const { data: cfg } = await admin.from("settings").select("despesas_fixas").eq("id", true).maybeSingle();
   const fixas = (Array.isArray(cfg?.despesas_fixas) ? cfg!.despesas_fixas : []).reduce(
-    (s: number, d: any) => s + (Number(d?.valor) > 0 ? Number(d.valor) : 0),
+    (s: number, d: any) => s + (d?.tipo !== "pessoal" && Number(d?.valor) > 0 ? Number(d.valor) : 0),
     0
   );
   let linhaFixas: string | null = null;

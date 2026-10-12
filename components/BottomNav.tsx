@@ -20,6 +20,7 @@ import {
   Landmark,
   FileText,
   Settings,
+  PiggyBank,
 } from "lucide-react";
 
 // Os 4 atalhos de uso diário, nessa ordem. O 5º e último botão não é um
@@ -41,6 +42,7 @@ const MORE_ITEMS = [
   // Histórico de locações realizadas: os FATOS. Fica ao lado de
   // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
   { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
+  { href: "/pessoal", label: "Pessoal", icon: PiggyBank, module: "pessoal" },
   // Quem está devendo e quanto (o total também aparece no Dashboard).
   { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
   { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },

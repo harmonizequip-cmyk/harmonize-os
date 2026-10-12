@@ -24,11 +24,13 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  PiggyBank,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
+  { href: "/pessoal", label: "Pessoal", icon: PiggyBank, module: "pessoal" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
   { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },

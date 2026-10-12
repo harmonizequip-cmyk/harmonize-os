@@ -184,7 +184,9 @@ export default async function DashboardPage({
   // passaram do prazo de cobrança (settings.dias_cobranca_taxa) ficam em
   // destaque. Só aviso, sempre sobre o presente, independente do filtro de
   // período. A baixa é feita em Pendências, no mesmo lugar do aviso.
-  const { diasCobrancaTaxa, despesasFixas } = await fetchSettings(supabase);
+  const { diasCobrancaTaxa, despesasFixas: todasFixas } = await fetchSettings(supabase);
+  // Contas fixas pessoais ficam no Financeiro pessoal; aqui só as do negócio.
+  const despesasFixas = todasFixas.filter((f) => f.tipo === "negocio");
 
   // Quadro "Este mês": sobra (lucro) das locações do mês contra as contas
   // fixas de Configurações. Só locações que contam como faturamento

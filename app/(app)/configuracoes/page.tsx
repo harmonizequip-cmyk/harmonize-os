@@ -5,6 +5,7 @@ import { fetchSettings } from "@/lib/settings";
 import BackupCard from "@/components/BackupCard";
 import AvisosCelularCard from "@/components/AvisosCelularCard";
 import DigitalCard from "@/components/DigitalCard";
+import AcessoVisualizacaoCard from "@/components/AcessoVisualizacaoCard";
 import ContasFixasCard from "@/components/ContasFixasCard";
 import ConfiguracoesClient from "./ConfiguracoesClient";
 
@@ -37,6 +38,7 @@ export default async function ConfiguracoesPage() {
 
       <AvisosCelularCard />
       <DigitalCard />
+      <AcessoVisualizacaoCard />
 
       <BackupCard />
 
