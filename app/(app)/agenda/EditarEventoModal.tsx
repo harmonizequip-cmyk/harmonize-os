@@ -13,6 +13,7 @@ import Comprovantes from "@/components/Comprovantes";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
+import ArteDivulgacaoModal from "@/components/ArteDivulgacaoModal";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import { valorParaNumero } from "@/lib/valor";
@@ -151,6 +152,7 @@ export default function EditarEventoModal({
   // Reagendar (só para pré-reserva): troca a data sem cancelar nada, via
   // RPC reagendar_agendamento — mesma função já usada na ficha do cliente.
   const [showReagendar, setShowReagendar] = useState(false);
+  const [showArte, setShowArte] = useState(false);
   const [novaData, setNovaData] = useState(event.date_start);
   // Data final (opcional). Em branco, o período se mantém com a mesma duração.
   const [novaDataFim, setNovaDataFim] = useState("");
@@ -582,6 +584,23 @@ export default function EditarEventoModal({
               >
                 Reagendar
               </button>
+
+              {!event.is_mentoria && event.client_id && (
+                <button
+                  onClick={() => setShowArte(true)}
+                  className="mt-2 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                >
+                  🎨 Arte para a cliente divulgar
+                </button>
+              )}
+              {showArte && event.client_id && (
+                <ArteDivulgacaoModal
+                  clientId={event.client_id}
+                  dataInicio={event.date_start}
+                  dataFim={event.date_end ?? null}
+                  onClose={() => setShowArte(false)}
+                />
+              )}
 
               {!event.is_mentoria && (
                 <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">

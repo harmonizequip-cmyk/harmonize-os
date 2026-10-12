@@ -94,6 +94,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Dashboard > "Previsão de caixa" (`components/PrevisaoCaixaCard.tsx`, conta em `lib/previsao.ts`), 30 ou 60 dias: reservas marcadas (sem `rental_id`) estimadas pela média das locações do próprio cliente ou pela média geral, menos a taxa já paga; mais o a receber vencido (`buscarPendencias`); menos custos das locações (proporção despesas/faturamento de `rentals_lucro`) e contas fixas de Configurações (1 vez a cada 30 dias). Mentoria sem histórico fica "sem estimativa".
 
+## Arte para a cliente divulgar
+
+- Agenda > reserva pendente de HIPRO com cliente > "🎨 Arte para a cliente divulgar" (`components/ArteDivulgacaoModal.tsx`, desenho em `lib/arte-divulgacao.ts`). Formatos Status/Story (1080x1920) e Feed (1080x1350), sem a marca da Harmonize. Textos editáveis; clínica, cidade e WhatsApp vêm do cadastro. "Mandar para a cliente" compartilha a imagem com a mensagem pronta. Abre por portal porque a janela da reserva usa backdrop-filter.
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.
