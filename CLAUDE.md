@@ -113,6 +113,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Pagamento: `pagar_fatura_cartao` cria saída "Pagamento de fatura" (`cartao_mov = 'pagamento'`): sai do saldo e fica fora de Entradas/Saídas/Resultado (Financeiro, Dashboard). View `faturas_cartao` soma compras e pagos por fatura. `excluir_compra_cartao` apaga todas as parcelas.
 - Previsão de caixa desconta as faturas da Harmonize ainda não pagas até o fim do período.
 - Novo lançamento também tem "Empréstimo para a Laser Dream" (João Pessoa ou Campina Grande): saída = concedido, entrada = devolução, via `registrar_emprestimo`.
+- Tela Empréstimos: tocar num movimento abre a edição (devedor, valor, data, forma, observação) via `editar_emprestimo`, que muda o empréstimo e o lançamento do Financeiro juntos; "Apagar este lançamento" usa `remover_emprestimo`.
 
 ## Acesso só de visualização
 

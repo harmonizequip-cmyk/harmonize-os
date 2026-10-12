@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
-import { DEVEDORES_SUGERIDOS, type ResumoDevedor } from "@/lib/emprestimos";
+import { DEVEDORES_SUGERIDOS, type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
+import { useSomenteLeitura } from "@/components/SomenteLeitura";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -25,7 +26,9 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
   const router = useRouter();
   const totalAReceber = devedores.reduce((s, d) => s + Math.max(0, d.saldo), 0);
 
-  const [form, setForm] = useState<{ tipo: Tipo; devedor: string } | null>(null);
+  const somenteLeitura = useSomenteLeitura();
+  // editId preenchido = editando um lançamento que já existe.
+  const [form, setForm] = useState<{ tipo: Tipo; devedor: string; editId?: string } | null>(null);
   const [valor, setValor] = useState("");
   const [data, setData] = useState(() => hojeLocal());
   const [forma, setForma] = useState("pix");
@@ -47,11 +50,40 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
     setErro(null);
   }
 
+  function abrirEdicao(m: MovimentoEmprestimo) {
+    if (somenteLeitura) return;
+    setForm({ tipo: m.tipo, devedor: m.devedor, editId: m.id });
+    setValor(String(m.valor).replace(".", ","));
+    setData(m.data);
+    setForma(m.forma ?? "pix");
+    setDescricao(m.descricao ?? "");
+    setOutroNome("");
+    setErro(null);
+  }
+
   async function salvar() {
     if (!form) return;
     const nome = (form.devedor === "__outro__" ? outroNome : form.devedor).trim();
     const numero = valorParaNumero(valor);
     if (!nome) return setErro("Informe para quem foi o empréstimo.");
+    if (form.editId) {
+      if (!Number.isFinite(numero) || numero <= 0) return setErro("Informe um valor maior que zero.");
+      setSalvando(true);
+      setErro(null);
+      const { error } = await supabase.rpc("editar_emprestimo", {
+        p_id: form.editId,
+        p_devedor: nome,
+        p_valor: numero,
+        p_forma: forma,
+        p_data: data,
+        p_descricao: descricao || null,
+      });
+      setSalvando(false);
+      if (error) return setErro(error.message || "Não foi possível salvar.");
+      setForm(null);
+      router.refresh();
+      return;
+    }
     if (!Number.isFinite(numero) || numero <= 0) return setErro("Informe um valor maior que zero.");
     const texto =
       form.tipo === "concedido"
@@ -98,12 +130,12 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
           </Link>
           <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Empréstimos</h1>
         </div>
-        <button
+        {!somenteLeitura && <button
           onClick={() => abrir("concedido", nomes[0] ?? "__outro__")}
           className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal"
         >
           + Novo empréstimo
-        </button>
+        </button>}
       </div>
 
       <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
@@ -161,16 +193,17 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
           <div className="mt-3 space-y-1.5 border-t border-neutral-200 pt-2 dark:border-neutral-800">
             {d.movimentos.map((m) => (
               <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-neutral-600 dark:text-neutral-300">
+                <button type="button" onClick={() => abrirEdicao(m)} className="min-w-0 text-left text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-300">
                   {formatDate(m.data)} · {m.tipo === "concedido" ? "Emprestado" : "Devolvido"}
                   {m.descricao ? ` · ${m.descricao}` : ""}
-                </span>
+                  {!somenteLeitura && <span className="ml-1 text-brand-teal">editar</span>}
+                </button>
                 <span className="flex items-center gap-2 whitespace-nowrap">
                   <span className={m.tipo === "concedido" ? "font-medium text-brand-pink" : "font-medium text-brand-teal"}>
                     {m.tipo === "concedido" ? "-" : "+"}
                     {formatCurrency(m.valor)}
                   </span>
-                  <button
+                  {!somenteLeitura && <button
                     onClick={() =>
                       remover(m.id, `${m.tipo === "concedido" ? "Empréstimo" : "Devolução"} de ${formatCurrency(m.valor)} em ${formatDate(m.data)}`)
                     }
@@ -179,7 +212,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
                     aria-label="Apagar"
                   >
                     ✕
-                  </button>
+                  </button>}
                 </span>
               </div>
             ))}
@@ -193,7 +226,12 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
             className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
+            {form.editId && (
+              <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                Editar {form.tipo === "concedido" ? "empréstimo" : "devolução"}
+              </p>
+            )}
+            <div className={`mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800 ${form.editId ? "hidden" : ""}`}>
               {(["concedido", "devolucao"] as const).map((t) => (
                 <button
                   key={t}
@@ -247,6 +285,19 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
 
             {erro && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{erro}</p>}
 
+            {form.editId && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const id = form.editId!;
+                  await remover(id, `${form.tipo === "concedido" ? "Empréstimo" : "Devolução"} de ${valor ? `R$ ${valor}` : ""} em ${formatDate(data)}`);
+                  setForm(null);
+                }}
+                className="mt-4 w-full rounded-xl border border-red-300 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+              >
+                Apagar este lançamento
+              </button>
+            )}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button onClick={() => setForm(null)} className="rounded-xl border border-neutral-300 py-2.5 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
                 Cancelar

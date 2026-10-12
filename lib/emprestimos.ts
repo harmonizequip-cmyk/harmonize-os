@@ -19,6 +19,7 @@ export interface MovimentoEmprestimo {
   valor: number;
   data: string;
   descricao: string | null;
+  forma?: string | null;
 }
 
 export interface ResumoDevedor {
