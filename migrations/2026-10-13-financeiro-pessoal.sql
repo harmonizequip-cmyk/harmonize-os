@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ainda NÃO aplicada. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 13/10/2026, pelo dono, e conferida por consulta de leitura (colunas, categorias pessoais, 23 tabelas protegidas, funções; anon sem acesso).
 --
 -- Financeiro pessoal e acesso só de visualização.
 --   1. Acesso só de visualização (para a esposa do dono): profiles ganha

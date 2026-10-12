@@ -1,6 +1,5 @@
 -- ============================================================
--- STATUS: ainda NÃO aplicada. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono,
--- DEPOIS de 2026-10-13-financeiro-pessoal.sql.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 13/10/2026, pelo dono, e conferida por consulta de leitura (colunas, categorias pessoais, 23 tabelas protegidas, funções; anon sem acesso).
 --
 -- Cartão de crédito com fatura.
 --   1. cartoes: cada cartão é de um lado (scope harmonize ou pessoal), com
