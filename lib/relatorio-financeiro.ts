@@ -1,0 +1,66 @@
+// Contas dos relatórios financeiros (aba Harmonize e aba Pessoal). Ficam
+// fora de Entradas/Saídas: empréstimo e devolução (caixa, não resultado) e
+// pagamento de fatura (as compras do cartão já contaram).
+
+import { ehCategoriaDeEmprestimo } from "./emprestimos";
+import { foraDoResultadoPorCartao, type CartaoMov } from "./cartao";
+
+export interface LinhaFinanceira {
+  type: "entrada" | "saida";
+  amount: number;
+  date: string;
+  categoria: string | null;
+  cartao_mov?: CartaoMov;
+}
+
+export interface CategoriaSoma {
+  categoria: string;
+  total: number;
+  pct: number;
+}
+
+export interface MesResumo {
+  mes: string; // AAAA-MM
+  entradas: number;
+  saidas: number;
+  resultado: number;
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+export function contaNoResultado(l: LinhaFinanceira): boolean {
+  return !ehCategoriaDeEmprestimo(l.categoria) && !foraDoResultadoPorCartao(l.cartao_mov);
+}
+
+/** Soma por categoria de um tipo, maior primeiro, com o peso de cada uma. */
+export function porCategoria(linhas: LinhaFinanceira[], tipo: "entrada" | "saida"): CategoriaSoma[] {
+  const mapa = new Map<string, number>();
+  for (const l of linhas) {
+    if (l.type !== tipo || !contaNoResultado(l)) continue;
+    const nome = l.categoria ?? "Sem categoria";
+    mapa.set(nome, (mapa.get(nome) ?? 0) + Number(l.amount));
+  }
+  const total = Array.from(mapa.values()).reduce((s, v) => s + v, 0);
+  return Array.from(mapa.entries())
+    .map(([categoria, v]) => ({ categoria, total: r2(v), pct: total > 0 ? v / total : 0 }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/** Últimos `meses` meses até o mês de `hoje`, do mais antigo ao atual (mês sem lançamento entra zerado). */
+export function evolucaoMensal(linhas: LinhaFinanceira[], hoje: string, meses = 12): MesResumo[] {
+  const [a, m] = hoje.split("-").map(Number);
+  const lista: MesResumo[] = [];
+  for (let i = meses - 1; i >= 0; i--) {
+    const t = a * 12 + (m - 1) - i;
+    lista.push({ mes: `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`, entradas: 0, saidas: 0, resultado: 0 });
+  }
+  const idx = new Map(lista.map((x, i) => [x.mes, i]));
+  for (const l of linhas) {
+    if (!contaNoResultado(l)) continue;
+    const i = idx.get(l.date.slice(0, 7));
+    if (i == null) continue;
+    if (l.type === "entrada") lista[i].entradas += Number(l.amount);
+    else lista[i].saidas += Number(l.amount);
+  }
+  return lista.map((x) => ({ ...x, entradas: r2(x.entradas), saidas: r2(x.saidas), resultado: r2(x.entradas - x.saidas) }));
+}

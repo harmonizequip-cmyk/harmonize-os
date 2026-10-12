@@ -4,6 +4,8 @@ import { analyzePricingCliff } from "@/lib/pricing-opportunity";
 import { resolverPeriodo } from "@/lib/period";
 import RelatoriosClient from "./RelatoriosClient";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
+import RelatorioFinanceiro from "@/components/RelatorioFinanceiro";
+import { carregarFinanceiro } from "@/lib/carregar-relatorio-financeiro";
 
 const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -32,6 +34,9 @@ export default async function RelatoriosPage({
   // receita em cima de quatro locações diria que um cliente é 60% do
   // faturamento, o que é ruído, não risco.
   const periodo = resolverPeriodo(searchParams.period ?? "ano", searchParams.from, searchParams.to);
+
+  // O financeiro pessoal tem relatório próprio em /pessoal/relatorios.
+  const financeiroHarmonize = await carregarFinanceiro(supabase, "harmonize", periodo);
 
   // NEM TUDO AQUI SEGUE O PERÍODO, DE PROPÓSITO.
   // Dinheiro e atividade seguem: faturamento, mix, concentração,
@@ -236,6 +241,7 @@ export default async function RelatoriosPage({
 
   return (
     <RelatoriosClient
+      financeiro={<RelatorioFinanceiro escopo="harmonize" rotuloPeriodo={periodo.rotulo} {...financeiroHarmonize} />}
       periodo={periodo}
       cliff={cliff}
       dealsInDeadZoneCount={dealsInDeadZone.length}

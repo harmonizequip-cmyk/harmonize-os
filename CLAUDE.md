@@ -99,16 +99,18 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Agenda > reserva pendente de HIPRO com cliente > "🎨 Arte para a cliente divulgar" (`components/ArteDivulgacaoModal.tsx`, desenho em `lib/arte-divulgacao.ts`). Formatos Status/Story (1080x1920) e Feed (1080x1350), sem a marca da Harmonize. Textos editáveis; clínica, cidade e WhatsApp vêm do cadastro. "Mandar para a cliente" compartilha a imagem com a mensagem pronta. Abre por portal porque a janela da reserva usa backdrop-filter.
 
-## Financeiro pessoal
+## Espaço Pessoal (chave Harmonize | Pessoal)
 
-- Menu "Pessoal" (`/pessoal`, permissão `pessoal`): mesma tela do Financeiro (`FinanceiroClient` com `escopo="pessoal"`, carga em `financeiro/carregar-lancamentos.ts`), lançamentos com `scope = 'pessoal'`, saldo de sempre da conta e as contas fixas do tipo pessoal. Categorias pessoais próprias.
+- Chave no topo de toda tela (`components/EspacoSwitch.tsx`), para quem tem a permissão `pessoal`. O espaço sai do endereço (`lib/espaco.ts`): tudo em `/pessoal` é Pessoal, e Sidebar/BottomNav trocam o menu para Início (`/pessoal`, dashboard pessoal), Lançamentos (`/pessoal/lancamentos`), Cartões (`/pessoal/cartoes`) e Relatórios (`/pessoal/relatorios`). No Pessoal o "+" da Harmonize some; o Início tem "+ Novo lançamento" com "Conta pessoal" marcada.
+- Lançamentos: mesma tela do Financeiro (`FinanceiroClient` com `escopo="pessoal"`, carga em `financeiro/carregar-lancamentos.ts`), `scope = 'pessoal'`, saldo de sempre e contas fixas do tipo pessoal. Categorias pessoais próprias.
 - Retirada: saída "Retiradas" no caixa da Harmonize cria sozinha a entrada "Retirada da Harmonize" no pessoal (gatilho `espelhar_retirada`, `transactions.vinculo_id`); mudar/apagar a retirada muda/apaga a entrada. A entrada não se edita no pessoal.
 - "Novo lançamento" tem a caixinha "Conta pessoal". Despesa pessoal ligada a locação/reserva: "custo do atendimento pago do bolso" (`conta_no_lucro = true`, entra em `rentals_lucro`) ou "gasto meu" (fora do lucro). Despesas da reserva têm "Pago com" (caixa, bolso-custo, gasto pessoal) via `registrar_despesa_reserva(..., p_pessoal)`.
-- Contas fixas pessoais (Configurações) não entram mais no quadro "Este mês", na previsão de caixa nem no fechamento de domingo; aparecem no Pessoal.
+- Contas fixas pessoais (Configurações) não entram no quadro "Este mês", na previsão de caixa nem no fechamento de domingo; aparecem no Pessoal.
+- Relatórios financeiros (`components/RelatorioFinanceiro.tsx`, carga em `lib/carregar-relatorio-financeiro.ts`, contas em `lib/relatorio-financeiro.ts`): gastos e entradas por categoria, 12 meses, cartões (recentes e próximas faturas) e, na Harmonize, empréstimos. Na Harmonize aparece no topo de Relatórios ("Financeiro da Harmonize"); no Pessoal, em `/pessoal/relatorios`. Ficam fora das somas: empréstimo/devolução e pagamento de fatura.
 
 ## Cartão de crédito
 
-- `cartoes` (cada um da Harmonize ou pessoal; dia de fechamento, vencimento, limite), escrito só por `salvar_cartao`. Tela Financeiro > "Cartões" (`/financeiro/cartoes`, `CartoesClient.tsx`): fatura atual e as outras, movimentos, "Pagar fatura", cadastro.
+- `cartoes` (cada um da Harmonize ou pessoal; dia de fechamento, vencimento, limite), escrito só por `salvar_cartao`. Tela Cartões (`/financeiro/cartoes` só os da Harmonize, `/pessoal/cartoes` só os pessoais; `CartoesClient.tsx` com `escopo`): fatura atual e as outras, movimentos, "Pagar fatura", cadastro.
 - Compra: Novo lançamento, saída, forma Crédito, escolhe cartão e parcelas → `registrar_compra_cartao` cria uma saída por parcela (data + n meses), `cartao_mov = 'compra'`, `fatura_ref` = mês do vencimento ('AAAA-MM', `fatura_da_compra`, espelhada em `lib/cartao.ts`). Conta como gasto no mês da parcela, mas não sai do saldo.
 - Pagamento: `pagar_fatura_cartao` cria saída "Pagamento de fatura" (`cartao_mov = 'pagamento'`): sai do saldo e fica fora de Entradas/Saídas/Resultado (Financeiro, Dashboard). View `faturas_cartao` soma compras e pagos por fatura. `excluir_compra_cartao` apaga todas as parcelas.
 - Previsão de caixa desconta as faturas da Harmonize ainda não pagas até o fim do período.

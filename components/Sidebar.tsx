@@ -1,5 +1,6 @@
 "use client";
 
+import { ehEspacoPessoal } from "@/lib/espaco";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,10 +29,17 @@ import {
   CreditCard,
 } from "lucide-react";
 
+// Menu do espaço Pessoal (chave Harmonize | Pessoal no topo).
+const PESSOAL_ITEMS = [
+  { href: "/pessoal", label: "Início", icon: PiggyBank, module: "pessoal" },
+  { href: "/pessoal/lancamentos", label: "Lançamentos", icon: Wallet, module: "pessoal" },
+  { href: "/pessoal/cartoes", label: "Cartões", icon: CreditCard, module: "pessoal" },
+  { href: "/pessoal/relatorios", label: "Relatórios", icon: BarChart3, module: "pessoal" },
+];
+
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
-  { href: "/pessoal", label: "Pessoal", icon: PiggyBank, module: "pessoal" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
   { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
@@ -99,7 +107,8 @@ export default function Sidebar({
     router.refresh();
   }
 
-  const items = NAV_ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
+  const pessoal = ehEspacoPessoal(pathname);
+  const items = (pessoal ? PESSOAL_ITEMS : NAV_ITEMS).filter((item) => isAdmin || permissions?.[item.module]);
 
   return (
     <aside
@@ -150,7 +159,7 @@ export default function Sidebar({
 
       <nav className="flex-1 space-y-0.5">
         {items.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = item.href === "/pessoal" ? pathname === "/pessoal" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link

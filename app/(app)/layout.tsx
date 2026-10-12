@@ -11,6 +11,7 @@ import AvisosDesligadosFaixa from "@/components/AvisosDesligadosFaixa";
 import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
 import ReciboHost from "@/components/ReciboHost";
 import { SomenteLeituraProvider } from "@/components/SomenteLeitura";
+import EspacoSwitch from "@/components/EspacoSwitch";
 
 export default async function AppLayout({
   children,
@@ -35,6 +36,8 @@ export default async function AppLayout({
   const isAdmin = !!profile?.is_admin;
   // Acesso só de visualização: sem avisos, sem "+", sem botões de alterar.
   const somenteLeitura = !!profile?.somente_leitura;
+  // Chave Harmonize | Pessoal no topo, para quem tem o financeiro pessoal.
+  const temPessoal = isAdmin || !!permissions.pessoal;
   // Distingue "usuário sem essa permissão" (permissions/is_admin vieram e diziam
   // que não pode) de "não deu pra saber" (a query falhou/voltou vazia). Sem essa
   // distinção, qualquer falha temporária ao buscar o perfil faz o menu inteiro
@@ -77,6 +80,7 @@ export default async function AppLayout({
         )}
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
           {!somenteLeitura && <AvisosDesligadosFaixa />}
+          {temPessoal && <EspacoSwitch />}
           {children}
         </div>
       </main>

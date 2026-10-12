@@ -64,7 +64,17 @@ function situacao(f: { total_compras: number; total_pago: number; fechamento: st
   return { texto: "Aberta", cor: "text-neutral-500" };
 }
 
-export default function CartoesClient({ cartoes, faturas }: { cartoes: Cartao[]; faturas: Fatura[] }) {
+export default function CartoesClient({
+  cartoes: todosCartoes,
+  faturas,
+  escopo,
+}: {
+  cartoes: Cartao[];
+  faturas: Fatura[];
+  escopo: "harmonize" | "pessoal";
+}) {
+  // Cada espaço mostra só os próprios cartões.
+  const cartoes = todosCartoes.filter((c) => c.scope === escopo);
   const supabase = createClient();
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
@@ -177,17 +187,19 @@ export default function CartoesClient({ cartoes, faturas }: { cartoes: Cartao[];
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <Link href="/financeiro" className="text-xs text-neutral-500">
-            ← Financeiro
+          <Link href={escopo === "pessoal" ? "/pessoal/lancamentos" : "/financeiro"} className="text-xs text-neutral-500">
+            ← {escopo === "pessoal" ? "Lançamentos" : "Financeiro"}
           </Link>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Cartões de crédito</h1>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+            {escopo === "pessoal" ? "Cartões pessoais" : "Cartões da Harmonize"}
+          </h1>
         </div>
         {!somenteLeitura && (
           <button
             type="button"
             onClick={() => {
               setErro(null);
-              setEditando({ scope: "harmonize", ativo: true });
+              setEditando({ scope: escopo, ativo: true });
             }}
             className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
           >
@@ -205,22 +217,6 @@ export default function CartoesClient({ cartoes, faturas }: { cartoes: Cartao[];
         <div className="space-y-2 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
           <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{editando.id ? "Editar cartão" : "Novo cartão"}</p>
           <input value={editando.nome ?? ""} onChange={(e) => setEditando({ ...editando, nome: e.target.value })} placeholder="Nome (ex: Inter PJ)" className={campo} />
-          {!editando.id && (
-            <div className="grid grid-cols-2 gap-2">
-              {(["harmonize", "pessoal"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setEditando({ ...editando, scope: s })}
-                  className={`rounded-lg border py-2 text-xs font-medium ${
-                    editando.scope === s ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
-                  }`}
-                >
-                  {s === "harmonize" ? "Da Harmonize" : "Pessoal"}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="mb-0.5 block text-[11px] text-neutral-500">Fecha dia</label>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ehEspacoPessoal } from "@/lib/espaco";
 import {
   LayoutDashboard,
   GitBranch,
@@ -33,6 +34,14 @@ const MAIN_ITEMS = [
   { href: "/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
 ];
 
+// Menu do espaço Pessoal (chave Harmonize | Pessoal no topo).
+const PESSOAL_ITEMS = [
+  { href: "/pessoal", label: "Início", icon: PiggyBank, module: "pessoal" },
+  { href: "/pessoal/lancamentos", label: "Lançamentos", icon: Wallet, module: "pessoal" },
+  { href: "/pessoal/cartoes", label: "Cartões", icon: CreditCard, module: "pessoal" },
+  { href: "/pessoal/relatorios", label: "Relatórios", icon: BarChart3, module: "pessoal" },
+];
+
 // Tudo que não é atalho do dia a dia fica atrás do botão de menu:
 // Clientes, Tarefas (visão completa, pendentes + concluídas — o Funil só
 // mostra as pendentes), Equipamentos (cujos números principais já aparecem
@@ -43,7 +52,6 @@ const MORE_ITEMS = [
   // Histórico de locações realizadas: os FATOS. Fica ao lado de
   // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
   { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
-  { href: "/pessoal", label: "Pessoal", icon: PiggyBank, module: "pessoal" },
   // Quem está devendo e quanto (o total também aparece no Dashboard).
   { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
   { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },
@@ -67,8 +75,9 @@ export default function BottomNav({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const pessoal = ehEspacoPessoal(pathname);
 
-  const mainItems = MAIN_ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
+  const mainItems = (pessoal ? PESSOAL_ITEMS : MAIN_ITEMS).filter((item) => isAdmin || permissions?.[item.module]);
   const moreItemsByPermission = MORE_ITEMS.filter((item) => isAdmin || permissions?.[item.module]);
   // Mesma cautela de sempre: se a busca de permissões no servidor falhou
   // (permissionsLoaded === false), não dá pra confiar na lista filtrada —
@@ -81,7 +90,8 @@ export default function BottomNav({
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-white/50 bg-white/75 py-2 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/70 md:hidden">
         {mainItems.map((item) => {
-          const active = pathname.startsWith(item.href);
+          // "Início" do Pessoal (/pessoal) só acende na própria página.
+          const active = item.href === "/pessoal" ? pathname === "/pessoal" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link
@@ -107,7 +117,7 @@ export default function BottomNav({
           );
         })}
 
-        <button
+        {!pessoal && <button
           onClick={() => setMenuOpen(true)}
           className={`flex flex-col items-center rounded-xl px-3 py-1 text-[10px] transition ${
             isInMore ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
@@ -121,7 +131,7 @@ export default function BottomNav({
             <Menu size={17} strokeWidth={1.75} className={isInMore ? "text-white dark:text-neutral-900" : ""} />
           </span>
           <span className="mt-0.5 font-medium">Menu</span>
-        </button>
+        </button>}
       </nav>
 
       {menuOpen && (

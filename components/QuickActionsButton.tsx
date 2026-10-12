@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { ehEspacoPessoal } from "@/lib/espaco";
 import { Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import NovaTarefaModal from "@/app/(app)/funil/NovaTarefaModal";
@@ -80,6 +81,7 @@ export default function QuickActionsButton({
   reservationFee?: number;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<ActionKey | null>(null);
@@ -132,6 +134,9 @@ export default function QuickActionsButton({
   }
 
   if (visibleActions.length === 0) return null;
+
+  // No espaço Pessoal o "+" é da Harmonize e não aparece (cada tela pessoal tem o próprio botão).
+  if (ehEspacoPessoal(pathname)) return null;
 
   return (
     <>

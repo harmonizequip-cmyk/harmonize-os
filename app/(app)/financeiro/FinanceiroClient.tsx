@@ -173,7 +173,7 @@ export default function FinanceiroClient({
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{pessoal ? "Financeiro pessoal" : "Financeiro"}</h1>
         <div className="flex gap-2">
           <Link
-            href="/financeiro/cartoes"
+            href={pessoal ? "/pessoal/cartoes" : "/financeiro/cartoes"}
             className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
           >
             Cartões
@@ -307,7 +307,7 @@ export default function FinanceiroClient({
         </div>
       </div>
       {totais.faturasPagas > 0 && (
-        <Link href="/financeiro/cartoes" className="block text-xs text-neutral-500 dark:text-neutral-400">
+        <Link href={pessoal ? "/pessoal/cartoes" : "/financeiro/cartoes"} className="block text-xs text-neutral-500 dark:text-neutral-400">
           Fora do resultado: faturas de cartão pagas {formatCurrency(totais.faturasPagas)} (as compras já contaram) →
         </Link>
       )}

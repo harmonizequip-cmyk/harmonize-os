@@ -11,6 +11,7 @@ export default async function CartoesPage() {
   ]);
   return (
     <CartoesClient
+      escopo="harmonize"
       cartoes={(cartoes ?? []) as Cartao[]}
       faturas={((faturas ?? []) as any[]).map((f) => ({ ...f, total_compras: Number(f.total_compras), total_pago: Number(f.total_pago) })) as Fatura[]}
     />

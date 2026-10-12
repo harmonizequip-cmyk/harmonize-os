@@ -102,6 +102,7 @@ function Card({
 }
 
 export default function RelatoriosClient({
+  financeiro,
   periodo,
   cliff,
   dealsInDeadZoneCount,
@@ -124,6 +125,7 @@ export default function RelatoriosClient({
   lucroTotal,
   despesasTotal,
 }: {
+  financeiro?: React.ReactNode;
   periodo: Periodo;
   cliff: PricingCliff | null;
   dealsInDeadZoneCount: number;
@@ -171,6 +173,13 @@ export default function RelatoriosClient({
       </div>
 
       <FiltroBarra periodoPadrao="ano" rotuloPeriodo={periodo.rotulo} />
+
+      {financeiro && (
+        <section className="space-y-3">
+          <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Financeiro da Harmonize</p>
+          {financeiro}
+        </section>
+      )}
 
       {/* Sem este aviso, um faturamento do mês ao lado de uma taxa de
           conversão de sempre parece contradição. Dizer qual bloco segue
