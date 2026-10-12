@@ -13,6 +13,7 @@ import EsteMesCard from "@/components/EsteMesCard";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { diasDoPeriodo } from "@/lib/period";
+import { situacaoAplicador } from "@/lib/aplicador";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
 // máxima. Ficam aqui, juntas, para mudar num lugar só.
@@ -252,6 +253,17 @@ export default async function DashboardPage({
   // ainda não cobrado, invisível em qualquer outra tela.
   const semDisparos = await buscarReservasSemDisparos(supabase, todayStr);
 
+  // Aplicadores perto (90%) ou acima do limite de disparos. Só aviso: se a
+  // view ainda não existir, nada aparece.
+  const { data: aplicadoresUso } = await supabase
+    .from("aplicadores_uso")
+    .select("nome, disparos, limite_disparos")
+    .eq("ativo", true)
+    .not("limite_disparos", "is", null);
+  const aplicadoresAlerta = (aplicadoresUso ?? [])
+    .map((a) => ({ nome: a.nome as string, ...situacaoAplicador({ disparos: Number(a.disparos), limite_disparos: Number(a.limite_disparos) }) }))
+    .filter((a) => a.situacao === "perto" || a.situacao === "passou");
+
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
   const ocupFim = umDiaSo ? ultimoDiaDoMes(todayStr) : toStr;
@@ -490,6 +502,20 @@ export default async function DashboardPage({
             ? "atendimento já passou e está sem disparos lançados"
             : "atendimentos já passaram e estão sem disparos lançados"}
           : ainda não foram cobrados →
+        </Link>
+      )}
+
+      {aplicadoresAlerta.length > 0 && (
+        <Link
+          href="/equipamentos#aplicadores"
+          className={
+            aplicadoresAlerta.some((a) => a.situacao === "passou")
+              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
+              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+          }
+        >
+          🔧 {aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", ")} do limite de disparos: ver
+          aplicadores →
         </Link>
       )}
 

@@ -82,6 +82,13 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Manutenção agora é bloqueio do tipo manutencao (tela Equipamentos > Bloquear período). Quando cobre hoje, `sincronizar_manutencao_por_bloqueio` põe o equipamento em manutenção com `status_previsto_fim` = último dia + 1; o retorno automático antigo continua. "Voltar para ativo" e "Adiar previsão" ajustam o bloqueio.
 - Agenda (traço cinza no dia e cartão 🔒), imagem de datas livres e aviso de dias livres tratam dia bloqueado como ocupado.
 
+## Aplicadores (desgaste por disparos)
+
+- A contagem de disparos é por aplicador, não por HIPRO: 4 aplicadores, 2 montados e 2 de reserva, e eles trocam de aparelho.
+- `aplicadores` (nome, série, `limite_disparos` opcional, última leitura `contador_base` em `contador_base_em`) e `aplicador_montagens` (onde esteve montado, intervalo [desde, ate), um por HIPRO). Escritos só por `salvar_aplicador`, `montar_aplicador` e `registrar_leitura_aplicador`.
+- View `aplicadores_uso`: disparos = última leitura + disparos das locações (`rentals_contabilizaveis`, fora mentoria) do HIPRO onde estava montado, depois da leitura. A locação do dia da troca conta para quem entrou.
+- Tela Equipamentos > cartão "Aplicadores" (`components/AplicadoresCard.tsx`, `lib/aplicador.ts`). Aviso no Dashboard a partir de 90% do limite, levando a `/equipamentos#aplicadores`; no resumo das 7h30, 90% só às segundas e acima do limite todo dia.
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.

@@ -417,6 +417,25 @@ async function avisosDoDia(hoje: string): Promise<Aviso[]> {
     });
   }
 
+  // 5. Aplicador perto do limite de disparos (90%: só às segundas) ou
+  // acima dele (todo dia). Se a view não existir, não avisa nada.
+  const segunda = new Date(hoje + "T12:00:00Z").getUTCDay() === 1;
+  const { data: aplic } = await admin
+    .from("aplicadores_uso")
+    .select("id, nome, disparos, limite_disparos")
+    .eq("ativo", true)
+    .not("limite_disparos", "is", null);
+  for (const a of (aplic ?? []) as any[]) {
+    const pct = Number(a.disparos) / Number(a.limite_disparos);
+    if (pct < 0.9 || (pct < 1 && !segunda)) continue;
+    avisos.push({
+      title: pct >= 1 ? `${a.nome} passou do limite de disparos` : `${a.nome} em ${Math.round(pct * 100)}% do limite`,
+      body: `≈ ${Number(a.disparos).toLocaleString("pt-BR")} de ${Number(a.limite_disparos).toLocaleString("pt-BR")} disparos. Programe a troca ou a revisão.`,
+      url: "/equipamentos#aplicadores",
+      tag: `aplicador-${a.id}`,
+    });
+  }
+
   return avisos.slice(0, MAX_AVISOS_EXTRAS);
 }
 

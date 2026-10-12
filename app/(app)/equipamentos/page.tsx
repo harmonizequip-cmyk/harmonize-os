@@ -4,6 +4,8 @@ import EquipamentoStatusControl from "@/components/EquipamentoStatusControl";
 import BloqueiosEquipamento, { type Bloqueio } from "@/components/BloqueiosEquipamento";
 import EquipamentoInfoControl from "@/components/EquipamentoInfoControl";
 import EquipamentoPrevistasControl from "@/components/EquipamentoPrevistasControl";
+import AplicadoresCard from "@/components/AplicadoresCard";
+import { type AplicadorUso, situacaoAplicador } from "@/lib/aplicador";
 
 import { hojeLocal, resolverPeriodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
@@ -36,6 +38,13 @@ export default async function EquipamentosPage({
     .gte("data_fim", today)
     .order("data_inicio");
   const bloqueios = (bloqueiosRaw ?? []) as Bloqueio[];
+
+  // Aplicadores e disparos estimados de cada um (view aplicadores_uso).
+  const { data: aplicadoresRaw } = await supabase
+    .from("aplicadores_uso")
+    .select("id, nome, numero_serie, limite_disparos, contador_base, contador_base_em, ativo, equipment_id, montado_desde, disparos")
+    .order("nome");
+  const aplicadores = ((aplicadoresRaw ?? []) as AplicadorUso[]).map((a) => ({ ...a, disparos: Number(a.disparos) }));
 
   const { data: equipments } = await supabase
     .from("equipments")
@@ -111,6 +120,8 @@ export default async function EquipamentosPage({
           const disparosTotal = eqRentals.reduce((sum, r) => sum + Number(r.shots ?? 0), 0);
           const nextEvent = normalizedUpcoming.find((e) => e.equipment_id === eq.id);
           const eqPrevistas = normalizedPrevistas.filter((p) => p.equipment_id === eq.id);
+          const aplicador = aplicadores.find((a) => a.ativo && a.equipment_id === eq.id);
+          const situacao = aplicador ? situacaoAplicador(aplicador) : null;
 
           return (
             <div key={eq.id} className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
@@ -168,6 +179,31 @@ export default async function EquipamentosPage({
                   <EquipamentoPrevistasControl items={eqPrevistas} />
                 </div>
                 <div className="col-span-2">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Aplicador montado</p>
+                  <a href="#aplicadores" className="mt-0.5 block text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {aplicador ? (
+                      <>
+                        {aplicador.nome} · ≈ {aplicador.disparos.toLocaleString("pt-BR")} disparos
+                        {situacao?.pct != null && (
+                          <span
+                            className={`ml-1 text-xs ${
+                              situacao.situacao === "passou"
+                                ? "font-semibold text-red-600 dark:text-red-400"
+                                : situacao.situacao === "perto"
+                                  ? "font-semibold text-amber-600 dark:text-amber-400"
+                                  : "font-normal text-neutral-500"
+                            }`}
+                          >
+                            ({Math.round(situacao.pct * 100)}% do limite)
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-xs font-normal text-neutral-400">Nenhum registrado →</span>
+                    )}
+                  </a>
+                </div>
+                <div className="col-span-2">
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">Número de série</p>
                   <EquipamentoInfoControl
                     equipmentId={eq.id}
@@ -190,6 +226,8 @@ export default async function EquipamentosPage({
           </div>
         )}
       </div>
+
+      <AplicadoresCard aplicadores={aplicadores} equipamentos={(equipments ?? []).map((e) => ({ id: e.id, name: e.name }))} />
     </div>
   );
 }
