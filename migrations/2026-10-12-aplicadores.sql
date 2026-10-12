@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: ainda NÃO aplicada. Rodar no Supabase (projeto vidnlzbxaxjlmzncqhxw) com o aval do dono.
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 12/10/2026, pelo dono, e conferida por consulta de leitura (tabelas 2, view 1, coluna_revisao 1, funções 4; anon sem acesso).
 --
 -- Garantia dos aplicadores (disparos) e revisão anual dos HIPROs.
 --   A contagem de disparos do HIPRO é por aplicador, não por aparelho, e
