@@ -49,6 +49,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Datas disponíveis: um dia só é sugerido como livre quando os dois HIPROs estão livres. O dono trabalha sozinho e nem sempre consegue atender dois lugares no mesmo dia, então a regra fica e ele marca os outros dias à mão.
 - Lançamento manual de receita esconde as categorias "Locação" e "Mentoria", que são geradas pelo sistema.
 - Locação cancelada não tem despesa.
+- Parceiro não paga taxa de reserva: virar parceiro, ou a reserva passar para um parceiro, tira a taxa pendente e a tarefa de cobrança (gatilhos `clients_isentar_taxa_parceiro` e `calendar_events_isentar_taxa_parceiro`). Taxa já paga fica.
 - Locação de vários dias deve ser um evento só, com data final. Várias reservas de um dia para o mesmo atendimento confundem os avisos.
 
 ## Auditoria

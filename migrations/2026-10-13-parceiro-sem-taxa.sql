@@ -1,4 +1,5 @@
 -- ============================================================
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 13/10/2026, pelo dono, e conferida por consulta de leitura (taxas pendentes de parceiro 0, gatilhos 2, anon sem acesso).
 -- Parceiro não paga taxa de reserva, também nas reservas que já existiam.
 --   A taxa nasce no insert (definir_taxa_ao_criar_evento), olhando se o
 --   cliente é parceiro naquele momento. Quem virava parceiro depois, ou
