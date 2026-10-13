@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
@@ -42,19 +42,21 @@ export default function PendenciasClient({
   }
 
   function baixarCsv() {
-    exportarCsv<PendenciaLocacao>(
+    exportarTabela<PendenciaLocacao>(
       pendencias.locacoes,
       [
         { titulo: "Cliente", valor: (l) => l.cliente },
-        { titulo: "Data da locação", valor: (l) => formatDate(l.eventDate) },
-        { titulo: "Valor da locação", valor: (l) => l.valor },
-        { titulo: "Taxa de reserva paga", valor: (l) => l.credito },
-        { titulo: "Já pago", valor: (l) => l.pago },
-        { titulo: "Saldo em aberto", valor: (l) => l.saldo },
-        { titulo: "Dias em atraso", valor: (l) => l.diasAtraso },
+        { titulo: "Data da locação", valor: (l) => formatDate(l.eventDate), tipo: "data" },
+        { titulo: "Valor da locação", valor: (l) => l.valor, tipo: "moeda", total: true },
+        { titulo: "Taxa de reserva paga", valor: (l) => l.credito, tipo: "moeda", total: true },
+        { titulo: "Já pago", valor: (l) => l.pago, tipo: "moeda", total: true },
+        { titulo: "Saldo em aberto", valor: (l) => l.saldo, tipo: "moeda", total: true },
+        { titulo: "Dias em atraso", valor: (l) => l.diasAtraso, tipo: "inteiro" },
         { titulo: "WhatsApp", valor: (l) => l.whatsapp },
       ],
-      "pendencias-de-pagamento"
+      "pendencias-de-pagamento",
+      undefined,
+      { titulo: "Pendências de pagamento" }
     );
   }
 
@@ -77,7 +79,7 @@ export default function PendenciasClient({
           disabled={pendencias.locacoes.length === 0}
           className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
         >
-          Exportar CSV
+          Exportar planilha
         </button>
       </div>
 

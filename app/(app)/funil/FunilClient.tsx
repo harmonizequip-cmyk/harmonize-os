@@ -6,7 +6,7 @@ import { Bell, LayoutGrid, List, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
@@ -245,7 +245,7 @@ export default function FunilClient({
   const origemLabel = (valor: string | null) => ORIGENS.find((o) => o.value === valor)?.label ?? valor ?? "";
 
   function baixarCsv() {
-    exportarCsv(
+    exportarTabela(
       filtered,
       [
         { titulo: "Nome", valor: (c) => c.name },
@@ -253,11 +253,13 @@ export default function FunilClient({
         { titulo: "Etapa", valor: (c) => rotuloEtapa(c) },
         { titulo: "Origem", valor: (c) => origemLabel(c.origem) },
         { titulo: "Tags", valor: (c) => c.tags.map((t) => t.name).join(", ") },
-        { titulo: "Próximo evento", valor: (c) => (c.nextEvent ? formatDate(c.nextEvent.date_start) : "") },
-        { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes },
-        { titulo: "Em aberto", valor: (c) => c.valorPendente },
+        { titulo: "Próximo evento", valor: (c) => (c.nextEvent ? formatDate(c.nextEvent.date_start) : ""), tipo: "data" },
+        { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes, tipo: "inteiro", total: true },
+        { titulo: "Em aberto", valor: (c) => c.valorPendente, tipo: "moeda", total: true },
       ],
-      aba === "clientes" ? "funil-clientes" : "funil-leads"
+      aba === "clientes" ? "funil-clientes" : "funil-leads",
+      undefined,
+      { titulo: aba === "clientes" ? "Funil de clientes" : "Funil de leads" }
     );
   }
 
@@ -627,7 +629,7 @@ export default function FunilClient({
           disabled={filtered.length === 0}
           className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
         >
-          Exportar CSV
+          Exportar planilha
         </button>
       </div>
 

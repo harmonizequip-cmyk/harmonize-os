@@ -78,6 +78,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
 - Atalhos do ícone (manifest `shortcuts`, no máximo 5): Receber, Anotar por voz, Nova reserva, Hoje e Dias livres (`/agenda?acao=datas`, imagem de datas). Usam `?acao=`. Pendências saiu a pedido do dono (12/10/2026).
 
+## Exportar planilha
+
+- Todas as telas que exportavam CSV (Agenda, Financeiro, Locações, Clientes, Funil, Pendências, Movimentações) agora geram .xlsx com o layout da Harmonize: título, período, resumo, cabeçalho turquesa, linhas zebradas, R$, datas de verdade, filtro, cabeçalho fixo e total. Montado à mão em `lib/planilha-xlsx.ts` (fflate), entregue por `lib/exportar-planilha.ts` (`exportarTabela`): tenta o Compartilhar (Drive); se o aparelho recusar o tipo, baixa e avisa como mandar ao Drive. Usa as mesmas linhas da tela.
+
 ## Bloqueio da agenda
 
 - `bloqueios_equipamento` (tipo manutencao, recesso ou outro; datas inclusivas), escrito só por `criar_bloqueio_equipamento`, `alterar_fim_bloqueio_equipamento` e `excluir_bloqueio_equipamento`. Gatilho `trg_validar_bloqueio_equipamento` recusa reserva nova ou mudança de data/equipamento que caia num bloqueio; reservas que já existiam ficam.

@@ -7,7 +7,7 @@ import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 import NovoLancamentoModal from "./NovoLancamentoModal";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { foraDoResultadoPorCartao, rotuloFatura } from "@/lib/cartao";
@@ -125,10 +125,10 @@ export default function FinanceiroClient({
   }, [initialTransactions]);
 
   function baixarCsv() {
-    exportarCsv(
+    exportarTabela(
       initialTransactions,
       [
-        { titulo: "Data", valor: (t) => formatDate(t.date) },
+        { titulo: "Data", valor: (t) => formatDate(t.date), tipo: "data" },
         { titulo: "Tipo", valor: (t) => (t.type === "entrada" ? "Entrada" : "Saída") },
         { titulo: "Categoria", valor: (t) => t.categories?.name ?? "" },
         { titulo: "Descrição", valor: (t) => t.description },
@@ -138,12 +138,22 @@ export default function FinanceiroClient({
           valor: (t) =>
             t.rental_date ? formatDate(t.rental_date) : t.reserva_date ? `reserva ${formatDate(t.reserva_date)}` : "",
         },
-        { titulo: "Valor", valor: (t) => Number(t.amount) },
+        { titulo: "Valor", valor: (t) => Number(t.amount), tipo: "moeda" },
         { titulo: "Pagamento", valor: (t) => PAYMENT_LABELS[t.payment_method] ?? t.payment_method },
         { titulo: "Teste", valor: (t) => (t.is_test ? "sim" : "") },
       ],
       pessoal ? "financeiro-pessoal" : "financeiro",
-      periodo.rotulo
+      periodo.rotulo,
+      {
+        titulo: pessoal ? "Financeiro pessoal" : "Financeiro",
+        // Os mesmos números do quadro da tela (empréstimo e pagamento de
+        // fatura ficam fora do resultado).
+        resumo: [
+          { rotulo: "Entradas", valor: totais.entradas },
+          { rotulo: "Saídas", valor: totais.saidas },
+          { rotulo: "Resultado", valor: totais.resultado },
+        ],
+      }
     );
   }
 
@@ -267,7 +277,7 @@ export default function FinanceiroClient({
             disabled={initialTransactions.length === 0}
             className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
           >
-            Exportar CSV
+            Exportar planilha
           </button>
         }
       />

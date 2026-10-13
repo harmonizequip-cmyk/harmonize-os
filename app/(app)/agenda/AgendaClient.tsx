@@ -20,7 +20,7 @@ import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
@@ -362,19 +362,20 @@ export default function AgendaClient({
   }, [eventosFiltrados, currentMonth]);
 
   function baixarCsv() {
-    exportarCsv(
+    exportarTabela(
       resumoMes.eventos,
       [
-        { titulo: "Data", valor: (e) => formatDate(e.date_start) },
-        { titulo: "Data final", valor: (e) => (e.date_end && e.date_end > e.date_start ? formatDate(e.date_end) : "") },
+        { titulo: "Data", valor: (e) => formatDate(e.date_start), tipo: "data" },
+        { titulo: "Data final", valor: (e) => (e.date_end && e.date_end > e.date_start ? formatDate(e.date_end) : ""), tipo: "data" },
         { titulo: "Título", valor: (e) => e.title },
         { titulo: "Tipo", valor: (e) => eventMeta(e).label },
         { titulo: "Cliente", valor: (e) => e.clients?.name ?? "" },
         { titulo: "Confirmado", valor: (e) => (e.confirmed ? "Sim" : "Não") },
-        { titulo: "Valor", valor: (e) => e.value ?? "" },
+        { titulo: "Valor", valor: (e) => e.value ?? "", tipo: "moeda", total: true },
       ],
       "agenda",
-      format(currentMonth, "MMMM_yyyy", { locale: ptBR })
+      format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR }),
+      { titulo: "Agenda" }
     );
   }
 
@@ -657,7 +658,7 @@ export default function AgendaClient({
           disabled={resumoMes.total === 0}
           className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
         >
-          Exportar CSV do mês
+          Exportar planilha do mês
         </button>
       </div>
 

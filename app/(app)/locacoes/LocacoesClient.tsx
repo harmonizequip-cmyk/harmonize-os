@@ -6,7 +6,7 @@ import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 
 const PAGAMENTOS: Record<string, string> = {
   pix: "PIX",
@@ -124,24 +124,25 @@ export default function LocacoesClient({
   }, [linhas]);
 
   function baixarCsv() {
-    exportarCsv(
+    exportarTabela(
       linhas,
       [
-        { titulo: "Data", valor: (r) => formatPeriodo(r) },
+        { titulo: "Data", valor: (r) => formatPeriodo(r), tipo: "data" },
         { titulo: "Cliente", valor: (r) => r.clients?.name ?? "" },
         { titulo: "Equipamento", valor: (r) => r.equipments?.name ?? "" },
-        { titulo: "Disparos", valor: (r) => Number(r.shots ?? 0) },
-        { titulo: "Valor", valor: (r) => Number(r.calculated_value) },
-        { titulo: "Despesas", valor: (r) => (r.despesas == null ? "" : Number(r.despesas)) },
-        { titulo: "Lucro", valor: (r) => (r.lucro == null ? "" : Number(r.lucro)) },
-        { titulo: "Saldo", valor: (r) => (r.status === "cancelada" ? 0 : Number(r.saldo ?? 0)) },
+        { titulo: "Disparos", valor: (r) => Number(r.shots ?? 0), tipo: "inteiro", total: true },
+        { titulo: "Valor", valor: (r) => Number(r.calculated_value), tipo: "moeda", total: true },
+        { titulo: "Despesas", valor: (r) => (r.despesas == null ? "" : Number(r.despesas)), tipo: "moeda", total: true },
+        { titulo: "Lucro", valor: (r) => (r.lucro == null ? "" : Number(r.lucro)), tipo: "moeda", total: true },
+        { titulo: "Saldo", valor: (r) => (r.status === "cancelada" ? 0 : Number(r.saldo ?? 0)), tipo: "moeda", total: true },
         { titulo: "Situação", valor: (r) => situacao(r).label },
-        { titulo: "Pago em", valor: (r) => (r.pago_em ? formatDate(r.pago_em) : "") },
+        { titulo: "Pago em", valor: (r) => (r.pago_em ? formatDate(r.pago_em) : ""), tipo: "data" },
         { titulo: "Pagamento", valor: (r) => PAGAMENTOS[r.payment_method] ?? r.payment_method },
         { titulo: "Reagendada", valor: (r) => (r.rescheduled ? "sim" : "") },
       ],
       "locacoes",
-      periodo.rotulo
+      periodo.rotulo,
+      { titulo: "Locações" }
     );
   }
 
@@ -203,7 +204,7 @@ export default function LocacoesClient({
             disabled={linhas.length === 0}
             className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
           >
-            Exportar CSV
+            Exportar planilha
           </button>
         }
       />

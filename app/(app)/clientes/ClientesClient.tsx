@@ -7,7 +7,7 @@ import NovoClienteModal from "./NovoClienteModal";
 import { createClient } from "@/lib/supabase/client";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 
 const ETAPAS: Record<string, string> = {
@@ -55,22 +55,23 @@ export default function ClientesClient({
   const filtered = initialClients;
 
   function baixarCsv() {
-    exportarCsv(
+    exportarTabela(
       filtered,
       [
         { titulo: "Cliente", valor: (c) => c.name },
         { titulo: "Clínica", valor: (c) => c.clinic_name ?? "" },
         { titulo: "Cidade", valor: (c) => c.city ?? "" },
         { titulo: "WhatsApp", valor: (c) => c.whatsapp ?? "" },
-        { titulo: "Locações no período", valor: (c) => c.stats.count },
-        { titulo: "Total no período", valor: (c) => c.stats.total },
-        { titulo: "Última reserva", valor: (c) => (c.stats.lastDate ? formatDate(c.stats.lastDate) : "") },
-        { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes },
-        { titulo: "Em aberto", valor: (c) => c.valorPendente },
+        { titulo: "Locações no período", valor: (c) => c.stats.count, tipo: "inteiro", total: true },
+        { titulo: "Total no período", valor: (c) => c.stats.total, tipo: "moeda", total: true },
+        { titulo: "Última reserva", valor: (c) => (c.stats.lastDate ? formatDate(c.stats.lastDate) : ""), tipo: "data" },
+        { titulo: "Taxas pendentes", valor: (c) => c.taxasPendentes, tipo: "inteiro", total: true },
+        { titulo: "Em aberto", valor: (c) => c.valorPendente, tipo: "moeda", total: true },
         { titulo: "Etapa no funil", valor: (c) => c.stage ?? "" },
       ],
       "clientes",
-      periodo.rotulo
+      periodo.rotulo,
+      { titulo: "Clientes" }
     );
   }
 
@@ -138,7 +139,7 @@ export default function ClientesClient({
             disabled={filtered.length === 0}
             className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
           >
-            Exportar CSV
+            Exportar planilha
           </button>
         }
       />

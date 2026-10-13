@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
-import { exportarCsv } from "@/lib/exportar-csv";
+import { exportarTabela } from "@/lib/exportar-planilha";
 import { ACAO_META, ENTIDADE_LABEL, formatarDataHora, descreverDetalhes, type Movimentacao } from "@/lib/movimentacoes";
 
 export default function MovimentacoesClient({
@@ -22,7 +22,7 @@ export default function MovimentacoesClient({
   const filtradas = initialRows;
 
   function baixarCsv() {
-    exportarCsv(
+    exportarTabela(
       filtradas,
       [
         { titulo: "Quando", valor: (m) => formatarDataHora(m.ocorrido_em) },
@@ -33,7 +33,8 @@ export default function MovimentacoesClient({
         { titulo: "Autor", valor: (m) => m.usuario_nome },
       ],
       "movimentacoes",
-      periodo.rotulo
+      periodo.rotulo,
+      { titulo: "Movimentações" }
     );
   }
 
@@ -82,7 +83,7 @@ export default function MovimentacoesClient({
             disabled={filtradas.length === 0}
             className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
           >
-            Exportar CSV
+            Exportar planilha
           </button>
         }
       />
