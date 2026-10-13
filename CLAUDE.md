@@ -104,6 +104,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Agenda > reserva pendente de HIPRO com cliente > "🎨 Arte para a cliente divulgar" (`components/ArteDivulgacaoModal.tsx`, desenho em `lib/arte-divulgacao.ts`). Formatos Status/Story (1080x1920) e Feed (1080x1350), sem a marca da Harmonize. Textos editáveis; clínica, cidade e WhatsApp vêm do cadastro. "Mandar para a cliente" compartilha a imagem com a mensagem pronta. Abre por portal porque a janela da reserva usa backdrop-filter.
 
+## Tabela de preços (arte)
+
+- "+" > Tabela de preços e cartão do cliente no Funil > "Enviar tabela de preços" (`components/TabelaPrecosModal.tsx`, desenho em `lib/tabela-precos-arte.ts`). Valores de Configurações (faixas e taxa de reserva); estimativas por procedimento fixas em `ESTIMATIVAS_DISPAROS`. A faixa acima do limite 2 diz "sobre o total de disparos", como na tabela do dono.
+
 ## Espaço Pessoal (chave Harmonize | Pessoal)
 
 - Chave no topo de toda tela (`components/EspacoSwitch.tsx`), para quem tem a permissão `pessoal`. O espaço sai do endereço (`lib/espaco.ts`): tudo em `/pessoal` é Pessoal, e Sidebar/BottomNav trocam o menu para Início (`/pessoal`, dashboard pessoal), Lançamentos (`/pessoal/lancamentos`), Cartões (`/pessoal/cartoes`) e Relatórios (`/pessoal/relatorios`). No Pessoal o "+" da Harmonize some; o Início tem "+ Novo lançamento" com "Conta pessoal" marcada.

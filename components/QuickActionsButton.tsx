@@ -11,6 +11,7 @@ import NovoLancamentoModal from "@/app/(app)/financeiro/NovoLancamentoModal";
 import NovoEventoModal from "@/app/(app)/agenda/NovoEventoModal";
 import ReservarHiproModal from "@/app/(app)/agenda/ReservarHiproModal";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
+import TabelaPrecosModal from "@/components/TabelaPrecosModal";
 import ReceberPagamentoModal from "@/components/ReceberPagamentoModal";
 import type { PricingConfig } from "@/lib/rental-pricing";
 
@@ -45,7 +46,8 @@ type ActionKey =
   | "locacao_disparos"
   | "receber"
   | "voz"
-  | "despesa_voz";
+  | "despesa_voz"
+  | "tabela";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -63,6 +65,7 @@ const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[
   // cliente. Nomes escolhidos pra não se confundirem entre si.
   { key: "locacao_disparos", label: "Lançar locação (com disparos)", emoji: "🎯", module: "agenda" },
   { key: "locacao", label: "Reservar data (sem disparos ainda)", emoji: "📦", module: "agenda" },
+  { key: "tabela", label: "Tabela de preços (arte para mandar)", emoji: "🏷️", module: "clientes" },
 ];
 
 // Botão "+" único, disponível em toda tela (fica no layout, não em cada
@@ -220,6 +223,7 @@ export default function QuickActionsButton({
           onCreated={handleCreated}
         />
       )}
+      {activeModal === "tabela" && <TabelaPrecosModal onClose={() => setActiveModal(null)} />}
       {activeModal === "locacao_disparos" && (
         <CalculadoraLocacaoModal
           mode={{ kind: "create", clients, equipments }}

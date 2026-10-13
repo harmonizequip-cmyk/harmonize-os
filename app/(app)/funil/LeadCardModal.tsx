@@ -8,6 +8,7 @@ import { LEAD_STAGES, type LeadRow, type TagOption } from "./FunilClient";
 import { CLIENT_STAGES } from "@/lib/funil-clientes";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress, toUpperOrNull } from "@/lib/format";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
+import TabelaPrecosModal from "@/components/TabelaPrecosModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import AgendamentosDoCliente from "@/components/AgendamentosDoCliente";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
@@ -43,6 +44,7 @@ export default function LeadCardModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [tabelaOpen, setTabelaOpen] = useState(false);
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
 
   // Faixa de badges (concluídas / canceladas / reagendadas) no topo do
@@ -378,6 +380,14 @@ export default function LeadCardModal({
 
         <button
           type="button"
+          onClick={() => setTabelaOpen(true)}
+          className="mt-2 w-full rounded-xl border border-brand-pink py-2 text-xs font-medium text-brand-pink"
+        >
+          🏷️ Enviar tabela de preços
+        </button>
+
+        <button
+          type="button"
           onClick={() => setNovaTarefaOpen(true)}
           className="mt-2 w-full rounded-xl border border-brand-blue py-2 text-xs font-medium text-brand-blue"
         >
@@ -413,6 +423,16 @@ export default function LeadCardModal({
           displayName={lead.display_name}
           whatsapp={lead.whatsapp}
           onClose={() => setAvailabilityOpen(false)}
+        />
+      )}
+
+      {tabelaOpen && (
+        <TabelaPrecosModal
+          clientName={lead.name}
+          treatment={lead.treatment}
+          displayName={lead.display_name}
+          whatsapp={lead.whatsapp}
+          onClose={() => setTabelaOpen(false)}
         />
       )}
 
