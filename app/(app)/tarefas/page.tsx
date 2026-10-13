@@ -38,7 +38,7 @@ export default async function TarefasPage() {
       .select("id, client_id, type, follow_up_number, title, due_date, completed_at, event_id, clients(name, whatsapp, treatment, display_name)")
       .eq("status", "pendente")
       .order("due_date", { ascending: true }),
-    // Só as 50 mais recentes — sem limite, essa lista só cresceria pra
+    // Só as 50 mais recentes (mostradas da mais antiga para a mais recente). Sem limite, essa lista só cresceria pra
     // sempre e deixaria a tela cada vez mais pesada de carregar.
     supabase
       .from("tasks")
@@ -63,7 +63,7 @@ export default async function TarefasPage() {
     <TarefasClient
       valorTaxa={reservationFee}
       initialPendentes={(pendentes ?? []).map((t: any) => mapTask(t, eventos))}
-      initialConcluidas={(concluidas ?? []).map((t: any) => mapTask(t))}
+      initialConcluidas={(concluidas ?? []).slice().reverse().map((t: any) => mapTask(t))}
     />
   );
 }

@@ -55,7 +55,8 @@ export default function HistoricoClienteSection({ clientId }: { clientId: string
       if (error) {
         setErro("Não foi possível carregar o histórico agora.");
       } else {
-        setRows((data as Movimentacao[]) ?? []);
+        // Vem as 200 mais recentes; mostra da mais antiga para a mais recente.
+        setRows(((data as Movimentacao[]) ?? []).slice().reverse());
       }
     } finally {
       setCarregando(false);

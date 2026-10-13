@@ -242,7 +242,7 @@ export default function EditarLocacaoModal({
         .from("rental_payments")
         .select("id, forma, valor, data, pix_conta")
         .eq("rental_id", rental.id)
-        .order("data", { ascending: false }),
+        .order("data", { ascending: true }),
       supabase
         .from("rentals_situacao_pagamento")
         .select("saldo, credito_taxa")

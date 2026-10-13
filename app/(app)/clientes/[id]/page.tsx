@@ -18,7 +18,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
       "id, event_date, event_date_end, shots, calculated_value, payment_method, status, rescheduled, pago, equipment_id, notes, km_ida, valor_deslocamento, deslocamento_incluso_no_valor, equipments(name, serial_number, anvisa_registro)"
     )
     .eq("client_id", params.id)
-    .order("event_date", { ascending: false });
+    .order("event_date", { ascending: true });
 
   // A tabela da ficha continua mostrando TODAS as locações, inclusive as
   // canceladas, porque o histórico do cliente precisa delas visíveis com
