@@ -8,6 +8,7 @@ import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 
 import { hojeLocal } from "@/lib/period";
 import DespesasDaReserva from "@/components/DespesasDaReserva";
+import AjudaCustoReserva from "@/components/AjudaCustoReserva";
 // Uma linha por agendamento do cliente, já com o rótulo de situação
 // resolvido pelo banco. A função agendamentos_do_cliente é quem combina
 // os dois eixos (status da locação e marca de confirmado) num rótulo só,
@@ -344,10 +345,13 @@ export default function AgendamentosDoCliente({
                     }
                     className="text-[11px] font-medium text-brand-teal underline underline-offset-2"
                   >
-                    {despesasAbertas.has(a.event_id) ? "Esconder despesas" : "Despesas da reserva"}
+                    {despesasAbertas.has(a.event_id) ? "Esconder" : "Despesas e ajuda de custo"}
                   </button>
                   {despesasAbertas.has(a.event_id) && (
-                    <DespesasDaReserva eventId={a.event_id} clientId={clientId} dataEvento={a.data} />
+                    <>
+                      <AjudaCustoReserva eventId={a.event_id} />
+                      <DespesasDaReserva eventId={a.event_id} clientId={clientId} dataEvento={a.data} />
+                    </>
                   )}
                 </div>
               )}
