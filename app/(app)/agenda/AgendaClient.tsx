@@ -330,10 +330,12 @@ export default function AgendaClient({
     const today = parseDate(toDateKey(new Date()));
     const in7 = new Date(today);
     in7.setDate(in7.getDate() + 7);
-    return eventosFiltrados.filter((e) => {
-      const d = parseDate(e.date_start);
-      return !e.confirmed && d >= today && d <= in7;
-    });
+    return eventosFiltrados
+      .filter((e) => {
+        const d = parseDate(e.date_start);
+        return !e.confirmed && d >= today && d <= in7;
+      })
+      .sort((a, b) => a.date_start.localeCompare(b.date_start));
   }, [eventosFiltrados]);
 
   // Resumo do mês aberto no calendário, já com os filtros aplicados — é o
@@ -456,7 +458,7 @@ export default function AgendaClient({
     setSelectedDate(toDateKey(new Date()));
   }
 
-  function renderCard(e: EventRow) {
+  function renderCard(e: EventRow, comData = false) {
     const meta = eventMeta(e);
     const isPending = !e.rental_id && !!e.equipment_id && e.status === "pre_reserva";
     return (
@@ -470,6 +472,13 @@ export default function AgendaClient({
             <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${meta.dot}`} />
             <div>
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{e.title}</p>
+              {/* Na lista de confirmação os cartões são de dias diferentes,
+                  então a data do atendimento aparece em destaque. */}
+              {comData && !(e.date_end && e.date_end > e.date_start) && (
+                <p className="mt-0.5 text-xs font-semibold capitalize text-brand-blue">
+                  📅 {format(new Date(`${e.date_start}T00:00:00`), "EEEE, dd/MM/yyyy", { locale: ptBR })}
+                </p>
+              )}
               {e.date_end && e.date_end > e.date_start && (
                 <p className="mt-0.5 text-[11px] font-medium text-brand-blue">
                   {formatDate(e.date_start)} a {formatDate(e.date_end)} ({duracaoEmDias(e.date_start, e.date_end)} dias, uma reserva só)
@@ -665,7 +674,7 @@ export default function AgendaClient({
           <p className="mb-2 text-sm font-semibold text-amber-800 dark:text-amber-400">
             ⚠️ Precisam de confirmação (próximos 7 dias)
           </p>
-          <div className="space-y-2">{needsConfirmation.map(renderCard)}</div>
+          <div className="space-y-2">{needsConfirmation.map((e) => renderCard(e, true))}</div>
         </div>
       )}
 
@@ -815,7 +824,7 @@ export default function AgendaClient({
               </div>
             </div>
           ))}
-          {selectedDayEvents.map(renderCard)}
+          {selectedDayEvents.map((e) => renderCard(e))}
           {selectedDayEvents.length === 0 && (
             <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
               Nenhum evento nesse dia.
