@@ -178,7 +178,15 @@ export default function EditarEventoModal({
     });
     setReagendando(false);
     if (error) {
-      setReagendarError(error.message || "Não foi possível reagendar. Tente novamente.");
+      // Com data final, o conflito pode estar num dia do meio do período,
+      // e não no dia escolhido. Diz isso para não parecer que o sistema
+      // olhou a data errada.
+      const fimPeriodo = novaDataFim || (duracaoAtual > 1 ? somarDias(novaData, duracaoAtual - 1) : "");
+      const prefixo =
+        fimPeriodo && fimPeriodo > novaData && /já está reservado/.test(error.message ?? "")
+          ? `O período de ${formatDate(novaData)} a ${formatDate(fimPeriodo)} passa por um dia ocupado. `
+          : "";
+      setReagendarError(prefixo + (error.message || "Não foi possível reagendar. Tente novamente."));
       return;
     }
     onSaved();
@@ -509,7 +517,7 @@ export default function EditarEventoModal({
           ) : showReagendar ? (
             <div className="rounded-xl border border-brand-teal/40 p-3">
               <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-                Nova data
+                Nova data (dia do atendimento)
               </label>
               <input
                 type="date"
@@ -518,7 +526,7 @@ export default function EditarEventoModal({
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
               />
               <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-                Data final (opcional)
+                Data final (só se o atendimento durar vários dias)
               </label>
               <input
                 type="date"
@@ -532,6 +540,23 @@ export default function EditarEventoModal({
                   ? `Hoje a reserva tem ${duracaoAtual} dias. Em branco, ela mantém os ${duracaoAtual} dias a partir da nova data.`
                   : "Em branco, a reserva continua de um dia só. Preencha para ela cobrir mais de um dia (uma taxa só)."}
               </p>
+              {novaDataFim && novaDataFim > novaData && (
+                <div className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                  A reserva vai ocupar de {formatDate(novaData)} a {formatDate(novaDataFim)} (
+                  {duracaoEmDias(novaData, novaDataFim)} dias).{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNovaData(novaDataFim);
+                      setNovaDataFim("");
+                      setReagendarError(null);
+                    }}
+                    className="font-semibold underline"
+                  >
+                    Era só mudar para {formatDate(novaDataFim)}? Toque aqui.
+                  </button>
+                </div>
+              )}
               {reagendarError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{reagendarError}</p>}
               <div className="mt-3 flex gap-2">
                 <button
