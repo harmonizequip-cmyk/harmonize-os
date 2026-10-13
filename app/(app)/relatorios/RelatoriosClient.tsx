@@ -205,7 +205,7 @@ export default function RelatoriosClient({
               <p>
                 A tabela hoje cobra {formatCurrency(cliff.peakValue)} para {fmtInt(cliff.peakShots)} disparos (o topo
                 da faixa intermediária). A partir de {fmtInt(cliff.cliffStartShots)} disparos, a taxa menor passa a
-                valer sobre TODO o excedente, e o valor cai para {formatCurrency(cliff.cliffStartValue)} — uma
+                valer sobre o total de disparos, e o valor cai para {formatCurrency(cliff.cliffStartValue)} — uma
                 diferença de {formatCurrency(cliff.dropAmount)}. É esse degrau que dá ao cliente um motivo concreto
                 pra rodar mais um pouco em vez de parar perto do limite.
               </p>

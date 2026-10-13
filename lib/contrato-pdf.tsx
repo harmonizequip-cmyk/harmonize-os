@@ -229,9 +229,8 @@ function ContratoDocument({ dados }: { dados: ContratoDados }) {
           exceder {flatPackageLimit.toLocaleString("pt-BR")};
         </Text>
         <Text style={styles.bullet}>
-          • Acima de {tier2Limit.toLocaleString("pt-BR")} disparos: pacote fixo de {formatCurrencyBR(flatPackageValue)}
-          {" "}acrescido de R$ {formatRatePerShot(tier3Rate)} por disparo sobre todo o excedente acima de{" "}
-          {flatPackageLimit.toLocaleString("pt-BR")} disparos.
+          • Acima de {tier2Limit.toLocaleString("pt-BR")} disparos: R$ {formatRatePerShot(tier3Rate)} por disparo sobre o
+          total de disparos realizados.
         </Text>
         <Text style={styles.paragraph}>{paragrafoValorFinal}</Text>
 

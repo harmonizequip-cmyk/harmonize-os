@@ -1212,9 +1212,10 @@ export default function CalculadoraLocacaoModal({
                         <span className="font-semibold text-brand-teal">{formatCurrency(pricing.totalValue)}</span>
                       </div>
                       <p className="mt-1 text-xs text-neutral-500">
-                        Pacote fixo até {pricing.config.flatPackageLimit.toLocaleString("pt-BR")}: {formatCurrency(pricing.flatPackageValue)}
+                        {pricing.tier3Portion > 0
+                          ? `Acima de ${pricing.config.tier2Limit.toLocaleString("pt-BR")}: ${pricing.tier3Portion.toLocaleString("pt-BR")} disparos x R$ ${pricing.config.tier3Rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 3 })} (sobre o total)`
+                          : `Pacote fixo até ${pricing.config.flatPackageLimit.toLocaleString("pt-BR")}: ${formatCurrency(pricing.flatPackageValue)}`}
                         {pricing.tier2Portion > 0 && ` · +${pricing.tier2Portion.toLocaleString("pt-BR")} a R$${pricing.config.tier2Rate.toFixed(2)}`}
-                        {pricing.tier3Portion > 0 && ` · +${pricing.tier3Portion.toLocaleString("pt-BR")} a R$${pricing.config.tier3Rate.toFixed(2)}`}
                       </p>
                     </div>
 

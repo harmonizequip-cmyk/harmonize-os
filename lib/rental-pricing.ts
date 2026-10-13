@@ -7,15 +7,14 @@
 //   - de 20.001 a 80.000 disparos: TODO o excedente acima de 20.000
 //     é cobrado a R$ 0,10/disparo
 //     Ex: 70.000 disparos -> 2.500 + (50.000 x 0,10) = R$ 7.500,00
-//   - acima de 80.000 disparos: TODO o excedente acima de 20.000
-//     (não só a parte que passou de 80.000) passa a ser cobrado a
-//     R$ 0,07/disparo — a taxa de 0,10 deixa de valer inteiramente
-//     Ex: 90.000 disparos -> 2.500 + (70.000 x 0,07) = R$ 7.400,00
+//   - acima de 80.000 disparos: R$ 0,07 por disparo sobre o TOTAL de
+//     disparos, sem o pacote fixo (como na tabela que o dono manda ao
+//     cliente; confirmado em 13/10/2026, antes era 2.500 + excedente x 0,07)
+//     Ex: 90.000 disparos -> 90.000 x 0,07 = R$ 6.300,00
 //
-// Importante: como a faixa acima de 80.000 usa uma taxa mais baixa
-// sobre TODO o excedente (não só o incremento), existe um ponto onde
-// disparar um pouco mais pode custar menos no total. Isso é
-// intencional conforme confirmado, não é bug.
+// Importante: como a faixa acima de 80.000 cobra a taxa menor sobre o
+// total, existe um ponto onde disparar um pouco mais custa menos no
+// total. Isso é intencional, não é bug (ver pricing-opportunity.ts).
 //
 // Configurável (Bloco 1): esses valores agora vivem na tabela
 // `settings` do Supabase e são editáveis em Configurações. As
@@ -106,7 +105,7 @@ export interface RentalPricingBreakdown {
   shots: number;
   flatPackagePortion: number; // disparos cobertos pelo pacote fixo
   tier2Portion: number; // disparos cobrados a tier2Rate (0 se estiver na faixa 3)
-  tier3Portion: number; // disparos cobrados a tier3Rate (0 se estiver na faixa 1 ou 2)
+  tier3Portion: number; // disparos cobrados a tier3Rate: o total, na faixa 3 (0 na faixa 1 ou 2)
   flatPackageValue: number;
   tier2Value: number;
   tier3Value: number;
@@ -136,21 +135,21 @@ export function calculateRentalValue(shots: number, config: PricingConfig = DEFA
     throw new RentalPricingError(`Quantidade mínima de disparos é ${config.minimumShots.toLocaleString("pt-BR")}.`);
   }
 
-  const flatPackagePortion = Math.min(shots, config.flatPackageLimit);
+  const flatPackagePortion = shots > config.tier2Limit ? 0 : Math.min(shots, config.flatPackageLimit);
   const excess = Math.max(0, shots - config.flatPackageLimit);
 
   let tier2Portion = 0;
   let tier3Portion = 0;
 
   if (shots > config.tier2Limit) {
-    // Acima do limite 2: todo o excedente (acima do pacote fixo) vai para a taxa menor.
-    tier3Portion = excess;
+    // Acima do limite 2: a taxa menor vale sobre o total de disparos, sem pacote fixo.
+    tier3Portion = shots;
   } else if (shots > config.flatPackageLimit) {
     // Entre o pacote fixo e o limite 2: todo o excedente vai para a taxa intermediária.
     tier2Portion = excess;
   }
 
-  const flatPackageValue = config.flatPackageValue;
+  const flatPackageValue = tier3Portion > 0 ? 0 : config.flatPackageValue;
   const tier2Value = round2(tier2Portion * config.tier2Rate);
   const tier3Value = round2(tier3Portion * config.tier3Rate);
 

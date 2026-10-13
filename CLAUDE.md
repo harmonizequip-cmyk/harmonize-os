@@ -106,7 +106,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 ## Tabela de preços (arte)
 
-- "+" > Tabela de preços e cartão do cliente no Funil > "Enviar tabela de preços" (`components/TabelaPrecosModal.tsx`, desenho em `lib/tabela-precos-arte.ts`). Valores de Configurações (faixas e taxa de reserva); estimativas por procedimento fixas em `ESTIMATIVAS_DISPAROS`. A faixa acima do limite 2 diz "sobre o total de disparos", como na tabela do dono.
+- "+" > Tabela de preços e cartão do cliente no Funil > "Enviar tabela de preços" (`components/TabelaPrecosModal.tsx`, desenho em `lib/tabela-precos-arte.ts`). Valores de Configurações (faixas e taxa de reserva); estimativas por procedimento fixas em `ESTIMATIVAS_DISPAROS`. Acima do limite 2 a taxa da faixa 3 vale sobre o total de disparos, sem pacote fixo (regra confirmada pelo dono em 13/10/2026; `calculateRentalValue`, contrato, imagem do cálculo e radar seguem a mesma regra).
 
 ## Espaço Pessoal (chave Harmonize | Pessoal)
 

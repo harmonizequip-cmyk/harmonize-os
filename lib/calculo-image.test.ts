@@ -3,16 +3,27 @@ import { calculateMentoriaValue, calculateRentalValue, DEFAULT_PRICING } from ".
 import { calcularResumoLocacao } from "./rental-calculator";
 import { descreverFaixa, montarAjustes, montarDadosCalculo, montarDadosMentoria, reais } from "./calculo-image";
 
+describe("tabela de preços do HIPRO", () => {
+  it("pacote fixo, excedente a 0,10 e, acima de 80.000, 0,07 sobre o total", () => {
+    expect(calculateRentalValue(15_000, DEFAULT_PRICING).totalValue).toBe(2500);
+    expect(calculateRentalValue(50_000, DEFAULT_PRICING).totalValue).toBe(5500);
+    expect(calculateRentalValue(80_000, DEFAULT_PRICING).totalValue).toBe(8500);
+    const p = calculateRentalValue(90_000, DEFAULT_PRICING);
+    expect(p.totalValue).toBe(6300);
+    expect(p.flatPackageValue).toBe(0);
+    expect(p.tier3Portion).toBe(90_000);
+  });
+});
+
 describe("faixa aplicada na imagem do cálculo", () => {
-  it("acima da faixa 2 descreve a faixa 3, a taxa e a conta do excedente", () => {
+  it("acima da faixa 2 descreve a faixa 3: taxa sobre o total, sem pacote fixo", () => {
     const pricing = calculateRentalValue(80_163, DEFAULT_PRICING);
     const f = descreverFaixa(pricing, null, 80_163);
     expect(f.faixaTitulo).toBe("FAIXA 3 APLICADA");
-    expect(f.faixaSubtitulo).toBe("Acima de 80.001 disparos");
+    expect(f.faixaSubtitulo).toBe("Acima de 80.000 disparos, sobre o total");
     expect(f.faixaChip).toBe("R$ 0,07");
-    expect(f.faixaLinhas[0]).toContain("Pacote fixo (até 20.000 disparos)");
-    expect(f.faixaLinhas[1]).toBe(`60.163 disparos x R$ 0,07 = ${reais(pricing.tier3Value)}`);
-    expect(f.valorDisparos).toBe(pricing.totalValue);
+    expect(f.faixaLinhas).toEqual([`80.163 disparos x R$ 0,07 = ${reais(5611.41)}`]);
+    expect(f.valorDisparos).toBe(5611.41);
   });
 
   it("na faixa 2 mostra o intervalo e o excedente", () => {

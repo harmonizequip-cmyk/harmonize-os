@@ -113,7 +113,7 @@ export default async function RelatoriosPage({
 
   // ---- 1) Degrau de incentivo de volume ----
   // Proposital: passar de tier2Limit disparos ativa uma taxa menor sobre
-  // TODO o excedente, então uma locação um pouco maior pode sair mais
+  // o total de disparos, então uma locação um pouco maior pode sair mais
   // barata que uma um pouco menor — é assim mesmo, de propósito, pra dar
   // ao cliente um motivo concreto pra rodar mais disparos em vez de parar
   // perto do limite. O que vale rastrear não é "isso é um erro", e sim

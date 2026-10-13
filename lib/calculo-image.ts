@@ -77,12 +77,11 @@ export function descreverFaixa(
   ];
 
   if (pricing.tier3Portion > 0) {
-    linhas.push(`${inteiro(pricing.tier3Portion)} disparos x ${taxaPorDisparo(cfg.tier3Rate)} = ${reais(pricing.tier3Value)}`);
     return {
       faixaTitulo: "FAIXA 3 APLICADA",
-      faixaSubtitulo: `Acima de ${inteiro(cfg.tier2Limit + 1)} disparos`,
+      faixaSubtitulo: `Acima de ${inteiro(cfg.tier2Limit)} disparos, sobre o total`,
       faixaChip: taxaPorDisparo(cfg.tier3Rate),
-      faixaLinhas: linhas,
+      faixaLinhas: [`${inteiro(pricing.tier3Portion)} disparos x ${taxaPorDisparo(cfg.tier3Rate)} = ${reais(pricing.tier3Value)}`],
       valorDisparos: pricing.totalValue,
     };
   }

@@ -291,7 +291,9 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
       linhas.push(`  Valor pela tabela normal: ${fmtMoney(resumo.subtotalTabela)}`);
       linhas.push(`  ✅ Economia: *${fmtMoney(resumo.economiaCustoManual)}*`);
     } else {
-      linhas.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(input.pricing.flatPackageValue)}`);
+      if (input.pricing.tier3Portion === 0) {
+        linhas.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(input.pricing.flatPackageValue)}`);
+      }
       if (input.pricing.tier2Portion > 0) {
         linhas.push(
           `  Excedente ${fmtInt(config.flatPackageLimit + 1)}–${fmtInt(config.tier2Limit)}: ${fmtInt(
@@ -301,7 +303,7 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
       }
       if (input.pricing.tier3Portion > 0) {
         linhas.push(
-          `  Excedente acima de ${fmtInt(config.tier2Limit)}: ${fmtInt(input.pricing.tier3Portion)} x R$ ${fmtRate(
+          `  Acima de ${fmtInt(config.tier2Limit)} (sobre o total): ${fmtInt(input.pricing.tier3Portion)} x R$ ${fmtRate(
             config.tier3Rate
           )} = ${fmtMoney(input.pricing.tier3Value)}`
         );

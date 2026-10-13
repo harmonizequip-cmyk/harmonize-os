@@ -234,7 +234,7 @@ export default function ConfiguracoesClient({
       <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
         <h2 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Preço da locação HIPRO</h2>
         <p className="mb-4 text-xs text-neutral-400">
-          Pacote fixo até um limite, depois todo o excedente vai por uma faixa só (não é progressivo).
+          Pacote fixo até o limite 1; até o limite 2, pacote + excedente pela taxa da faixa 2; acima do limite 2, a taxa da faixa 3 vale sobre o total de disparos.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
