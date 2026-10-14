@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bolhasDoHistorico, trechosMarkdown } from "./assistente";
+import { bolhasDoHistorico, colunasDaPlanilha, trechosMarkdown } from "./assistente";
 import { textoParaFala } from "./falar";
 
 describe("bolhasDoHistorico", () => {
@@ -34,6 +34,30 @@ describe("bolhasDoHistorico com WhatsApp", () => {
       texto: "Pronto.",
       whatsapp: [{ client_id: "c1", nome: "Dra. Ana", telefone: "83999990000", texto: "Olá, Dra. Ana!" }],
     });
+  });
+});
+
+describe("planilha do assistente", () => {
+  it("remonta o botão da planilha do histórico", () => {
+    const b = bolhasDoHistorico([
+      { role: "user", content: "planilha de quem deve" },
+      { role: "assistant", content: [{ type: "tool_use", id: "p1", name: "gerar_planilha", input: { titulo: "Devendo", sql: "select 1", colunas: [{ campo: "a", titulo: "A" }] } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "p1", content: '{"ok":true,"linhas":7}' }] },
+      { role: "assistant", content: [{ type: "text", text: "Pronto." }] },
+    ]);
+    expect(b[1].planilhas).toEqual([{ titulo: "Devendo", sql: "select 1", colunas: [{ campo: "a", titulo: "A" }], linhas: 7 }]);
+  });
+
+  it("converte datas, valores e só soma número", () => {
+    const cols = colunasDaPlanilha([
+      { campo: "cliente", titulo: "Cliente" },
+      { campo: "dia", titulo: "Data", tipo: "data" },
+      { campo: "valor", titulo: "Valor", tipo: "moeda", total: true },
+      { campo: "obs", titulo: "Obs", total: true },
+    ]);
+    const l = { cliente: "Ana", dia: "2026-10-15", valor: "1200.5", obs: null };
+    expect(cols.map((c) => c.valor(l))).toEqual(["Ana", "15/10/2026", 1200.5, null]);
+    expect(cols.map((c) => c.total)).toEqual([false, false, true, false]);
   });
 });
 

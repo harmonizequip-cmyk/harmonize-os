@@ -6833,7 +6833,7 @@ create trigger trg_somente_leitura before insert or update or delete on public.a
 -- Três travas contra gravação: só aceita um SELECT/WITH sem ";", a consulta
 -- vai dentro de uma subconsulta (onde INSERT/UPDATE/DELETE não entram) e a
 -- transação vira somente leitura antes de rodar.
-create or replace function public.assistente_consultar(p_sql text)
+create or replace function public.assistente_consultar(p_sql text, p_limite integer default 200)
 returns jsonb
 language plpgsql
 security invoker
@@ -6841,6 +6841,7 @@ set search_path = public
 as $$
 declare
   v_sql text := btrim(regexp_replace(coalesce(p_sql, ''), ';\s*$', ''));
+  v_limite integer := least(greatest(coalesce(p_limite, 200), 1), 5000);
   v_res jsonb;
 begin
   if not exists (
@@ -6861,15 +6862,15 @@ begin
   perform set_config('transaction_read_only', 'on', true);
 
   execute format(
-    'select coalesce(jsonb_agg(t), ''[]''::jsonb) from (select * from (%s) q limit 201) t',
-    v_sql
+    'select coalesce(jsonb_agg(t), ''[]''::jsonb) from (select * from (%s) q limit %s) t',
+    v_sql, v_limite + 1
   ) into v_res;
   return v_res;
 end;
 $$;
 
-revoke execute on function public.assistente_consultar(text) from public, anon;
-grant execute on function public.assistente_consultar(text) to authenticated, service_role;
+revoke execute on function public.assistente_consultar(text, integer) from public, anon;
+grant execute on function public.assistente_consultar(text, integer) to authenticated, service_role;
 
-comment on function public.assistente_consultar(text) is
-  'Consulta só leitura da IA do Harmonize (Edge Function assistente). Roda com o login de quem pergunta (RLS vale), aceita só um SELECT/WITH, dentro de subconsulta e em transação somente leitura. Devolve até 201 linhas em JSON.';
+comment on function public.assistente_consultar(text, integer) is
+  'Consulta só leitura da IA do Harmonize (Edge Function assistente). Roda com o login de quem pergunta (RLS vale), aceita só um SELECT/WITH, dentro de subconsulta e em transação somente leitura. Devolve até p_limite + 1 linhas em JSON (padrão 200, máximo 5000, para planilhas).';

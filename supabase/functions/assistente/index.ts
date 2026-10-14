@@ -2,9 +2,11 @@
 //
 // Quem chama: a tela /assistente, com o login de quem está no app.
 //   { "mensagem": "quem me deve?", "conversa_id": "<uuid opcional>", "cliente_id": "<uuid opcional>" }
-// Responde { conversa_id, cliente_id, resposta, whatsapp, gasto_mes_usd }.
+// Responde { conversa_id, cliente_id, resposta, whatsapp, planilhas, gasto_mes_usd }.
 // cliente_id amarra uma conversa nova a um cliente (histórico e memórias dele);
-// whatsapp traz as mensagens prontas para o botão "Abrir no WhatsApp".
+// whatsapp traz as mensagens prontas para o botão "Abrir no WhatsApp";
+// planilhas traz a consulta e as colunas: a tela roda de novo na hora de
+// baixar (dado sempre atual) e monta o .xlsx com o layout da Harmonize.
 //
 // Roda com o login de quem pergunta (não usa service_role): a RLS de cada
 // tabela vale para a IA igual vale para a tela. A IA lê o banco pela função
@@ -80,6 +82,44 @@ const FERRAMENTAS = [
     },
   },
   {
+    name: "gerar_planilha",
+    description:
+      "Prepara uma planilha (.xlsx com o layout da Harmonize) que o dono baixa com um toque. Use quando ele pedir planilha, lista para baixar ou exportar. A consulta pode trazer até 5000 linhas.",
+    input_schema: {
+      type: "object",
+      properties: {
+        titulo: { type: "string", description: "Título da planilha, ex.: Clientes que estão devendo." },
+        sql: { type: "string", description: "Uma consulta SELECT ou WITH, sem ponto e vírgula, já na ordem certa." },
+        colunas: {
+          type: "array",
+          description: "Colunas na ordem de exibição.",
+          items: {
+            type: "object",
+            properties: {
+              campo: { type: "string", description: "Nome da coluna no resultado do SQL." },
+              titulo: { type: "string", description: "Cabeçalho em português." },
+              tipo: { type: "string", enum: ["texto", "moeda", "data", "inteiro"] },
+              total: { type: "boolean", description: "Somar na linha de total (moeda ou inteiro)." },
+            },
+            required: ["campo", "titulo"],
+          },
+        },
+        grafico: {
+          type: "object",
+          description: "Opcional: gráfico de barras (ranking) na aba Gráficos.",
+          properties: {
+            titulo: { type: "string" },
+            categoria: { type: "string", description: "Campo do rótulo (ex.: cliente)." },
+            valor: { type: "string", description: "Campo numérico (ex.: total)." },
+            tipo: { type: "string", enum: ["moeda", "inteiro"] },
+          },
+          required: ["categoria", "valor"],
+        },
+      },
+      required: ["titulo", "sql", "colunas"],
+    },
+  },
+  {
     name: "preparar_whatsapp",
     description:
       "Deixa uma mensagem pronta para o dono enviar no WhatsApp da cliente (aparece um botão Abrir no WhatsApp). Não envia nada sozinho.",
@@ -147,7 +187,15 @@ function comCacheNoFim(msgs: Mensagem[]): unknown[] {
 }
 
 type Whats = { client_id: string; nome: string; telefone: string; texto: string };
-type Estado = { clienteId: string | null; whatsapp: Whats[] };
+type ColunaPedida = { campo: string; titulo: string; tipo?: string; total?: boolean };
+type Planilha = {
+  titulo: string;
+  sql: string;
+  colunas: ColunaPedida[];
+  grafico?: { titulo?: string; categoria: string; valor: string; tipo?: string };
+  linhas: number;
+};
+type Estado = { clienteId: string | null; whatsapp: Whats[]; planilhas: Planilha[] };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -176,6 +224,28 @@ async function executarFerramenta(
       const { error } = await supabase.from("assistente_memoria").insert({ texto, user_id: userId, client_id: clientId });
       if (error) return { texto: `Não guardei: ${error.message}`, erro: true };
       return { texto: clientId ? "Guardado na memória da cliente." : "Guardado.", erro: false };
+    }
+    if (nome === "gerar_planilha") {
+      const sql = String(entrada.sql ?? "");
+      const titulo = String(entrada.titulo ?? "Planilha").slice(0, 80);
+      const colunas = (Array.isArray(entrada.colunas) ? entrada.colunas : []) as ColunaPedida[];
+      if (!colunas.length) return { texto: "Faltaram as colunas.", erro: true };
+      const { data, error } = await supabase.rpc("assistente_consultar", { p_sql: sql, p_limite: 5000 });
+      if (error) return { texto: `Erro na consulta: ${error.message}`, erro: true };
+      const linhas = Array.isArray(data) ? data : [];
+      const faltando = colunas.filter((c) => linhas.length && !(c.campo in linhas[0])).map((c) => c.campo);
+      if (faltando.length) return { texto: `Campos que o SQL não trouxe: ${faltando.join(", ")}.`, erro: true };
+      const grafico = entrada.grafico as Planilha["grafico"] | undefined;
+      estado.planilhas.push({ titulo, sql, colunas, ...(grafico?.categoria && grafico?.valor ? { grafico } : {}), linhas: Math.min(linhas.length, 5000) });
+      return {
+        texto: JSON.stringify({
+          ok: true,
+          linhas: Math.min(linhas.length, 5000),
+          cortada: linhas.length > 5000,
+          amostra: linhas.slice(0, 5),
+        }),
+        erro: false,
+      };
     }
     if (nome === "vincular_cliente" || nome === "preparar_whatsapp") {
       const clientId = String(entrada.client_id ?? "");
@@ -260,7 +330,7 @@ Deno.serve(async (req) => {
   // Conversa: continua a anterior ou começa uma nova.
   let conversaId = corpo.conversa_id || null;
   let historico: Mensagem[] = [];
-  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [] };
+  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [] };
   if (conversaId) {
     const { data: conv } = await supabase
       .from("assistente_conversas")
@@ -419,6 +489,7 @@ Deno.serve(async (req) => {
     cliente_mudou: estado.clienteId !== clienteInicial,
     resposta,
     whatsapp: estado.whatsapp,
+    planilhas: estado.planilhas,
     gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,
   });
 });

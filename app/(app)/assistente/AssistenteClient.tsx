@@ -5,10 +5,19 @@ import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { falar, pararDeFalar, podeFalar } from "@/lib/falar";
-import { bolhasDoHistorico, trechosMarkdown, type Bolha, type MensagemWhatsApp } from "@/lib/assistente";
+import {
+  bolhasDoHistorico,
+  colunasDaPlanilha,
+  trechosMarkdown,
+  type Bolha,
+  type MensagemWhatsApp,
+  type PlanilhaPedida,
+} from "@/lib/assistente";
+import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { buildWhatsAppLink } from "@/lib/format";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
-import { Copy, History, MessageCircle, Mic, Plus, Send, Sparkles, Square, Trash2, UserRound, Volume2, VolumeX, X } from "lucide-react";
+import { Copy, FileSpreadsheet, History, MessageCircle, Mic, Plus, Send, Sparkles, Square, Trash2, UserRound, Volume2, VolumeX, X } from "lucide-react";
 
 const CHAVE_VOZ = "harmonize-assistente-voz";
 
@@ -17,6 +26,7 @@ const SUGESTOES = [
   "Como está o faturamento deste mês comparado ao mês passado?",
   "Tenho dia livre na semana que vem?",
   "Quais tarefas estão atrasadas?",
+  "Planilha de quanto cada cliente já gastou comigo",
 ];
 
 type ClienteRef = { name: string; display_name: string | null; treatment: string | null } | null;
@@ -27,6 +37,66 @@ const umDe = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) 
 function nomeCurto(c: ClienteRef): string {
   if (!c) return "";
   return [c.treatment, c.display_name || c.name].filter(Boolean).join(" ");
+}
+
+function BotoesPlanilha({ lista }: { lista: PlanilhaPedida[] }) {
+  const supabase = createClient();
+  const [baixando, setBaixando] = useState<number | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  // Roda a consulta de novo na hora de baixar: a planilha sai com o dado de agora.
+  async function baixar(p: PlanilhaPedida, i: number) {
+    setBaixando(i);
+    setErro(null);
+    const { data, error } = await supabase.rpc("assistente_consultar", { p_sql: p.sql, p_limite: 5000 });
+    if (error) {
+      setBaixando(null);
+      setErro("Não consegui gerar a planilha. Peça de novo ao assistente.");
+      return;
+    }
+    const linhas = ((Array.isArray(data) ? data : []) as Record<string, unknown>[]).slice(0, 5000);
+    const g = p.grafico;
+    const graficos = g
+      ? soGraficos([
+          barras(
+            g.titulo || p.titulo,
+            rankingPor(linhas, (l) => String(l[g.categoria] ?? ""), (l) => Number(l[g.valor]) || 0),
+            {
+              serie: p.colunas.find((c) => c.campo === g.valor)?.titulo ?? "Valor",
+              formato: g.tipo === "inteiro" ? "inteiro" : "moeda",
+            }
+          ),
+        ])
+      : undefined;
+    try {
+      await exportarTabela(linhas, colunasDaPlanilha(p.colunas), p.titulo, undefined, { titulo: p.titulo, graficos });
+    } catch {
+      setErro("Não consegui gerar a planilha. Tente de novo.");
+    }
+    setBaixando(null);
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {lista.map((p, i) => (
+        <button
+          key={i}
+          onClick={() => baixar(p, i)}
+          disabled={baixando !== null}
+          className="flex w-full items-center gap-3 rounded-xl border border-brand-teal/30 bg-brand-teal/10 px-3 py-2.5 text-left disabled:opacity-60"
+        >
+          <FileSpreadsheet size={22} className="flex-shrink-0 text-brand-teal-dark" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold text-neutral-800">{p.titulo}</span>
+            <span className="block text-[11px] text-neutral-500">
+              {baixando === i ? "Gerando..." : `Planilha com ${p.linhas} ${p.linhas === 1 ? "linha" : "linhas"} · toque para baixar`}
+            </span>
+          </span>
+        </button>
+      ))}
+      {erro && <p className="text-xs text-red-600">{erro}</p>}
+    </div>
+  );
 }
 
 function BotoesWhatsApp({ lista }: { lista: MensagemWhatsApp[] }) {
@@ -264,7 +334,16 @@ export default function AssistenteClient() {
     if (typeof data.gasto_mes_usd === "number") setGastoMes(data.gasto_mes_usd);
     if (data.cliente_id && data.cliente_id !== clienteRef.current) definirCliente(data.cliente_id);
     const whatsapp: MensagemWhatsApp[] = Array.isArray(data.whatsapp) ? data.whatsapp : [];
-    setBolhas((b) => [...b, { papel: "ia", texto: data.resposta, ...(whatsapp.length ? { whatsapp } : {}) }]);
+    const planilhas: PlanilhaPedida[] = Array.isArray(data.planilhas) ? data.planilhas : [];
+    setBolhas((b) => [
+      ...b,
+      {
+        papel: "ia",
+        texto: data.resposta,
+        ...(whatsapp.length ? { whatsapp } : {}),
+        ...(planilhas.length ? { planilhas } : {}),
+      },
+    ]);
 
     if (vozRef.current && podeFalar()) {
       interrompido.current = false;
@@ -424,6 +503,7 @@ export default function AssistenteClient() {
               <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-neutral-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-neutral-800">
                 {b.texto && <Texto texto={b.texto} />}
                 {b.whatsapp && <BotoesWhatsApp lista={b.whatsapp} />}
+                {b.planilhas && <BotoesPlanilha lista={b.planilhas} />}
                 {temVoz && (
                   <button
                     onClick={() => {

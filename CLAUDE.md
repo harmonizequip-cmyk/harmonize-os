@@ -155,6 +155,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Tabelas: `assistente_memoria` (o que o dono ensinou, lida a cada pergunta), `assistente_conversas` (histórico completo no formato da API), `assistente_uso` (tokens e custo estimado; "Gasto estimado este mês" na tela).
 - Por cliente: `client_id` em `assistente_memoria` (memória da cliente) e em `assistente_conversas` (conversa amarrada). Chip "Sobre: <cliente>" na tela, `/assistente?cliente=<id>` (link na ficha do cliente). A função põe no contexto o cadastro e as memórias da cliente; ferramentas `vincular_cliente` e `guardar_memoria(client_id)`.
 - Responder WhatsApp: colar a mensagem ou compartilhar texto do WhatsApp para o Harmonize (`share_target` → `sw.js`/`app/compartilhar` mandam texto sem arquivo para `/assistente?texto=`). A IA confere agenda/preços/histórico e chama `preparar_whatsapp`, que vira o botão "Abrir no WhatsApp" (o dono envia; nada sai sozinho).
+- Planilha: ferramenta `gerar_planilha` (título, SQL, colunas com tipo, gráfico de ranking opcional) vira o cartão "toque para baixar"; a tela roda o SQL de novo por `assistente_consultar(sql, 5000)` e monta o .xlsx com `exportarTabela` (mesmo layout das telas).
 - Voz grátis: escuta com `lib/reconhecer-fala.ts`, resposta lida pela voz do aparelho (`lib/falar.ts`). Pergunta feita por voz: depois de falar a resposta, já escuta a próxima. Botão de alto-falante liga/desliga (`localStorage` `harmonize-assistente-voz`).
 
 ## Pendências conhecidas
