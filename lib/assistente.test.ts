@@ -21,6 +21,22 @@ describe("bolhasDoHistorico", () => {
   });
 });
 
+describe("bolhasDoHistorico com WhatsApp", () => {
+  it("remonta o botão do WhatsApp a partir da ferramenta e do resultado", () => {
+    const b = bolhasDoHistorico([
+      { role: "user", content: "responde a Ana" },
+      { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "preparar_whatsapp", input: { client_id: "c1", texto: "Olá, Dra. Ana!" } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: '{"ok":true,"nome":"Dra. Ana","telefone":"83999990000"}' }] },
+      { role: "assistant", content: [{ type: "text", text: "Pronto." }] },
+    ]);
+    expect(b[1]).toEqual({
+      papel: "ia",
+      texto: "Pronto.",
+      whatsapp: [{ client_id: "c1", nome: "Dra. Ana", telefone: "83999990000", texto: "Olá, Dra. Ana!" }],
+    });
+  });
+});
+
 describe("trechosMarkdown", () => {
   it("separa itens de lista e negrito", () => {
     const t = trechosMarkdown("Resumo:\n- **Ana**: R$ 500\n2. Bia");

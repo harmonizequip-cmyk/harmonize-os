@@ -78,7 +78,7 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 // Compartilhar comprovante: no WhatsApp (ou na galeria), Compartilhar >
-// Harmonize. O arquivo fica guardado aqui no aparelho e a janela "Receber
+// Harmonize. Texto sem arquivo (uma mensagem) abre o assistente. O arquivo fica guardado aqui no aparelho e a janela "Receber
 // pagamento" abre já mostrando o comprovante; ao registrar, ele sobe junto
 // com o pagamento.
 const CAIXA_COMPARTILHADO = "harmonize-compartilhado";
@@ -92,6 +92,12 @@ self.addEventListener("fetch", (event) => {
       try {
         const form = await event.request.formData();
         const arquivo = form.get("arquivo");
+        // Só texto (mensagem do WhatsApp compartilhada): vai para o assistente
+        // ajudar a responder.
+        const texto = String(form.get("texto") || form.get("titulo") || "").trim();
+        if (!(arquivo && typeof arquivo !== "string") && texto) {
+          return Response.redirect("/assistente?texto=" + encodeURIComponent(texto.slice(0, 2000)), 303);
+        }
         if (arquivo && typeof arquivo !== "string") {
           const caixa = await caches.open(CAIXA_COMPARTILHADO);
           await caixa.put(

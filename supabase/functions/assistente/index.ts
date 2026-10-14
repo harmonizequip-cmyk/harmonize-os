@@ -1,13 +1,16 @@
 // Função "assistente" (Supabase Edge Function): a IA do Harmonize.
 //
 // Quem chama: a tela /assistente, com o login de quem está no app.
-//   { "mensagem": "quem me deve?", "conversa_id": "<uuid opcional>" }
-// Responde { conversa_id, resposta, gasto_mes_usd }.
+//   { "mensagem": "quem me deve?", "conversa_id": "<uuid opcional>", "cliente_id": "<uuid opcional>" }
+// Responde { conversa_id, cliente_id, resposta, whatsapp, gasto_mes_usd }.
+// cliente_id amarra uma conversa nova a um cliente (histórico e memórias dele);
+// whatsapp traz as mensagens prontas para o botão "Abrir no WhatsApp".
 //
 // Roda com o login de quem pergunta (não usa service_role): a RLS de cada
 // tabela vale para a IA igual vale para a tela. A IA lê o banco pela função
 // assistente_consultar (só SELECT, transação só leitura) e guarda o que o
-// dono ensina em assistente_memoria. Nesta etapa ela não grava nada além disso.
+// dono ensina em assistente_memoria (geral ou por cliente). Mensagem de
+// WhatsApp ela só prepara: quem envia é o dono. Nesta etapa não grava mais nada.
 //
 // Segredo: ANTHROPIC_API_KEY (Edge Functions > Secrets no painel do Supabase).
 // Opcionais: ASSISTENTE_MODELO, ASSISTENTE_LIMITE_MENSAL_USD.
@@ -57,11 +60,36 @@ const FERRAMENTAS = [
   {
     name: "guardar_memoria",
     description:
-      "Guarda algo que o dono ensinou e que vale para as próximas conversas (preferência, apelido de cliente, como ele chama as coisas). Frase curta e clara.",
+      "Guarda algo que vale para as próximas conversas. Sem client_id: preferência geral do dono (jeito de escrever, como ele chama as coisas). Com client_id: fato, preferência ou combinado de uma cliente. Frase curta e clara.",
     input_schema: {
       type: "object",
-      properties: { texto: { type: "string", description: "O que lembrar, em até 300 caracteres." } },
+      properties: {
+        texto: { type: "string", description: "O que lembrar, em até 300 caracteres." },
+        client_id: { type: "string", description: "id da cliente (clients.id), quando a memória é dela." },
+      },
       required: ["texto"],
+    },
+  },
+  {
+    name: "vincular_cliente",
+    description: "Amarra esta conversa a uma cliente (clients.id): o histórico e as memórias dela passam a vir junto.",
+    input_schema: {
+      type: "object",
+      properties: { client_id: { type: "string" } },
+      required: ["client_id"],
+    },
+  },
+  {
+    name: "preparar_whatsapp",
+    description:
+      "Deixa uma mensagem pronta para o dono enviar no WhatsApp da cliente (aparece um botão Abrir no WhatsApp). Não envia nada sozinho.",
+    input_schema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string", description: "id da cliente (clients.id)." },
+        texto: { type: "string", description: "A mensagem completa, pronta para enviar." },
+      },
+      required: ["client_id", "texto"],
     },
   },
   {
@@ -118,11 +146,17 @@ function comCacheNoFim(msgs: Mensagem[]): unknown[] {
   });
 }
 
+type Whats = { client_id: string; nome: string; telefone: string; texto: string };
+type Estado = { clienteId: string | null; whatsapp: Whats[] };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function executarFerramenta(
   supabase: SupabaseClient,
   userId: string,
   nome: string,
-  entrada: Record<string, unknown>
+  entrada: Record<string, unknown>,
+  estado: Estado
 ): Promise<{ texto: string; erro: boolean }> {
   try {
     if (nome === "consultar_banco") {
@@ -137,9 +171,33 @@ async function executarFerramenta(
     if (nome === "guardar_memoria") {
       const texto = String(entrada.texto ?? "").trim().slice(0, 500);
       if (!texto) return { texto: "Texto vazio.", erro: true };
-      const { error } = await supabase.from("assistente_memoria").insert({ texto, user_id: userId });
+      const clientId = entrada.client_id ? String(entrada.client_id) : null;
+      if (clientId && !UUID.test(clientId)) return { texto: "client_id inválido.", erro: true };
+      const { error } = await supabase.from("assistente_memoria").insert({ texto, user_id: userId, client_id: clientId });
       if (error) return { texto: `Não guardei: ${error.message}`, erro: true };
-      return { texto: "Guardado.", erro: false };
+      return { texto: clientId ? "Guardado na memória da cliente." : "Guardado.", erro: false };
+    }
+    if (nome === "vincular_cliente" || nome === "preparar_whatsapp") {
+      const clientId = String(entrada.client_id ?? "");
+      if (!UUID.test(clientId)) return { texto: "client_id inválido.", erro: true };
+      const { data: c, error } = await supabase
+        .from("clients")
+        .select("id, name, display_name, treatment, whatsapp")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (error || !c) return { texto: "Cliente não encontrada.", erro: true };
+      const nomeCliente = [c.treatment, c.display_name || c.name].filter(Boolean).join(" ");
+      if (nome === "vincular_cliente") {
+        estado.clienteId = c.id;
+        return { texto: `Conversa amarrada a ${nomeCliente}.`, erro: false };
+      }
+      const texto = String(entrada.texto ?? "").trim();
+      if (!texto) return { texto: "Mensagem vazia.", erro: true };
+      if (!c.whatsapp) return { texto: `${nomeCliente} não tem WhatsApp no cadastro. Mostre o texto para ele copiar.`, erro: true };
+      estado.whatsapp.push({ client_id: c.id, nome: nomeCliente, telefone: c.whatsapp, texto });
+      if (!estado.clienteId) estado.clienteId = c.id;
+      // O telefone fica no resultado para a tela remontar o botão ao reabrir a conversa.
+      return { texto: JSON.stringify({ ok: true, nome: nomeCliente, telefone: c.whatsapp }), erro: false };
     }
     if (nome === "esquecer_memoria") {
       const { error } = await supabase.from("assistente_memoria").delete().eq("id", String(entrada.id ?? ""));
@@ -176,7 +234,7 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!perfil?.active || perfil.somente_leitura) return json({ erro: "Seu acesso não inclui o assistente." }, 403);
 
-  let corpo: { mensagem?: string; conversa_id?: string | null };
+  let corpo: { mensagem?: string; conversa_id?: string | null; cliente_id?: string | null };
   try {
     corpo = await req.json();
   } catch {
@@ -202,23 +260,61 @@ Deno.serve(async (req) => {
   // Conversa: continua a anterior ou começa uma nova.
   let conversaId = corpo.conversa_id || null;
   let historico: Mensagem[] = [];
+  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [] };
   if (conversaId) {
-    const { data: conv } = await supabase.from("assistente_conversas").select("mensagens").eq("id", conversaId).maybeSingle();
-    if (conv) historico = (conv.mensagens as Mensagem[]) ?? [];
-    else conversaId = null;
+    const { data: conv } = await supabase
+      .from("assistente_conversas")
+      .select("mensagens, client_id")
+      .eq("id", conversaId)
+      .maybeSingle();
+    if (conv) {
+      historico = (conv.mensagens as Mensagem[]) ?? [];
+      estado.clienteId = conv.client_id ?? estado.clienteId;
+    } else conversaId = null;
   }
+  const clienteInicial = estado.clienteId;
 
   const { data: memorias } = await supabase
     .from("assistente_memoria")
     .select("id, texto")
+    .is("client_id", null)
     .order("created_at", { ascending: true })
     .limit(100);
+
+  let blocoCliente = "";
+  if (estado.clienteId) {
+    const [{ data: c }, { data: memCliente }] = await Promise.all([
+      supabase
+        .from("clients")
+        .select("id, name, display_name, treatment, clinic_name, city, state, whatsapp, parceiro, stage, notes")
+        .eq("id", estado.clienteId)
+        .maybeSingle(),
+      supabase
+        .from("assistente_memoria")
+        .select("id, texto, created_at")
+        .eq("client_id", estado.clienteId)
+        .order("created_at", { ascending: true })
+        .limit(100),
+    ]);
+    if (c) {
+      blocoCliente =
+        `\n\nEsta conversa é sobre a cliente ${[c.treatment, c.display_name || c.name].filter(Boolean).join(" ")} ` +
+        `(client_id ${c.id}; cadastro: ${c.name}${c.clinic_name ? `, clínica ${c.clinic_name}` : ""}${c.city ? `, ${c.city}${c.state ? "/" + c.state : ""}` : ""}` +
+        `${c.parceiro ? ", PARCEIRA (não paga taxa de reserva)" : ""}, etapa ${c.stage}${c.whatsapp ? ", tem WhatsApp" : ", sem WhatsApp no cadastro"}).` +
+        (c.notes ? `\nObservações do cadastro: ${String(c.notes).slice(0, 800)}` : "") +
+        (memCliente?.length
+          ? `\nMemórias desta cliente:\n${memCliente.map((m) => `- [${m.id}] ${m.texto}`).join("\n")}`
+          : "\nMemórias desta cliente: nenhuma ainda.") +
+        "\nPara responder sobre ela, consulte o que precisar (reservas, locações, pagamentos, tarefas).";
+    }
+  }
 
   const contexto =
     `Agora: ${hojeSaoPaulo()} (horário de Brasília). Quem pergunta: ${perfil.name}.\n` +
     (memorias?.length
-      ? `Memórias (o que ele já te ensinou; siga sempre):\n${memorias.map((m) => `- [${m.id}] ${m.texto}`).join("\n")}`
-      : "Memórias: nenhuma ainda.");
+      ? `Memórias gerais (o que ele já te ensinou; siga sempre):\n${memorias.map((m) => `- [${m.id}] ${m.texto}`).join("\n")}`
+      : "Memórias gerais: nenhuma ainda.") +
+    blocoCliente;
 
   const mensagens: Mensagem[] = [...historico, { role: "user", content: pergunta }];
   const enviar = () => recortarHistorico(mensagens);
@@ -279,7 +375,7 @@ Deno.serve(async (req) => {
 
     const resultados: Bloco[] = [];
     for (const u of usos) {
-      const res = await executarFerramenta(supabase, userId, u.name, u.input ?? {});
+      const res = await executarFerramenta(supabase, userId, u.name, u.input ?? {}, estado);
       resultados.push({ type: "tool_result", tool_use_id: u.id, content: res.texto, ...(res.erro ? { is_error: true } : {}) });
     }
     mensagens.push({ role: "user", content: resultados });
@@ -294,13 +390,13 @@ Deno.serve(async (req) => {
   if (conversaId) {
     await supabase
       .from("assistente_conversas")
-      .update({ mensagens, updated_at: new Date().toISOString() })
+      .update({ mensagens, client_id: estado.clienteId, updated_at: new Date().toISOString() })
       .eq("id", conversaId);
   } else {
     const titulo = pergunta.length > 60 ? pergunta.slice(0, 57) + "..." : pergunta;
     const { data: nova } = await supabase
       .from("assistente_conversas")
-      .insert({ user_id: userId, titulo, mensagens })
+      .insert({ user_id: userId, client_id: estado.clienteId, titulo, mensagens })
       .select("id")
       .single();
     conversaId = nova?.id ?? null;
@@ -317,5 +413,12 @@ Deno.serve(async (req) => {
     custo_usd: Math.round(custo * 100000) / 100000,
   });
 
-  return json({ conversa_id: conversaId, resposta, gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100 });
+  return json({
+    conversa_id: conversaId,
+    cliente_id: estado.clienteId,
+    cliente_mudou: estado.clienteId !== clienteInicial,
+    resposta,
+    whatsapp: estado.whatsapp,
+    gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,
+  });
 });

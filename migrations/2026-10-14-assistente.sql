@@ -6,8 +6,10 @@
 -- O assistente roda na Edge Function "assistente", com o login de quem
 -- pergunta (RLS vale para ele igual vale para a tela). Aqui ficam:
 --   - assistente_memoria: o que o dono ensinou ("quando eu falar a Luci é a
---     Dra. Luci Lima"). Lida a cada pergunta.
---   - assistente_conversas: histórico das conversas, por pessoa.
+--     Dra. Luci Lima"). Lida a cada pergunta. Com client_id, é memória daquele
+--     cliente (preferências, combinados, jeito de falar).
+--   - assistente_conversas: histórico das conversas, por pessoa; client_id
+--     amarra a conversa a um cliente (ex.: respostas de WhatsApp para ele).
 --   - assistente_uso: tokens e custo estimado de cada resposta (gasto do mês).
 --   - assistente_consultar(sql): roda uma consulta SELECT em modo só leitura,
 --     com os direitos de quem está logado. É assim que a IA lê os dados.
@@ -16,10 +18,12 @@
 create table if not exists public.assistente_memoria (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  client_id uuid references public.clients(id) on delete cascade,
   texto text not null check (length(trim(texto)) between 1 and 500),
   created_at timestamptz not null default now()
 );
 create index if not exists assistente_memoria_user_idx on public.assistente_memoria (user_id, created_at);
+create index if not exists assistente_memoria_cliente_idx on public.assistente_memoria (client_id) where client_id is not null;
 alter table public.assistente_memoria enable row level security;
 create policy "assistente_memoria_select" on public.assistente_memoria for select using (user_id = auth.uid());
 create policy "assistente_memoria_insert" on public.assistente_memoria for insert with check (user_id = auth.uid());
@@ -29,12 +33,14 @@ grant select, insert, delete on public.assistente_memoria to authenticated;
 create table if not exists public.assistente_conversas (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  client_id uuid references public.clients(id) on delete set null,
   titulo text not null default 'Conversa',
   mensagens jsonb not null default '[]'::jsonb check (jsonb_typeof(mensagens) = 'array'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create index if not exists assistente_conversas_user_idx on public.assistente_conversas (user_id, updated_at desc);
+create index if not exists assistente_conversas_cliente_idx on public.assistente_conversas (client_id, updated_at desc) where client_id is not null;
 alter table public.assistente_conversas enable row level security;
 create policy "assistente_conversas_select" on public.assistente_conversas for select using (user_id = auth.uid());
 create policy "assistente_conversas_insert" on public.assistente_conversas for insert with check (user_id = auth.uid());

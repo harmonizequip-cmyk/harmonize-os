@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { falar, pararDeFalar, podeFalar } from "@/lib/falar";
-import { bolhasDoHistorico, trechosMarkdown, type Bolha } from "@/lib/assistente";
-import { History, Mic, Plus, Send, Sparkles, Square, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { bolhasDoHistorico, trechosMarkdown, type Bolha, type MensagemWhatsApp } from "@/lib/assistente";
+import { buildWhatsAppLink } from "@/lib/format";
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
+import { Copy, History, MessageCircle, Mic, Plus, Send, Sparkles, Square, Trash2, UserRound, Volume2, VolumeX, X } from "lucide-react";
 
 const CHAVE_VOZ = "harmonize-assistente-voz";
 
@@ -17,8 +19,57 @@ const SUGESTOES = [
   "Quais tarefas estão atrasadas?",
 ];
 
-type Conversa = { id: string; titulo: string; updated_at: string };
-type Memoria = { id: string; texto: string };
+type ClienteRef = { name: string; display_name: string | null; treatment: string | null } | null;
+type Conversa = { id: string; titulo: string; updated_at: string; client_id: string | null; clients: ClienteRef | ClienteRef[] };
+type Memoria = { id: string; texto: string; client_id: string | null; clients: ClienteRef | ClienteRef[] };
+
+const umDe = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+function nomeCurto(c: ClienteRef): string {
+  if (!c) return "";
+  return [c.treatment, c.display_name || c.name].filter(Boolean).join(" ");
+}
+
+function BotoesWhatsApp({ lista }: { lista: MensagemWhatsApp[] }) {
+  const [copiado, setCopiado] = useState<number | null>(null);
+  return (
+    <div className="mt-2 space-y-2">
+      {lista.map((w, i) => {
+        const link = buildWhatsAppLink(w.telefone, w.texto);
+        return (
+          <div key={i} className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5">
+            <p className="whitespace-pre-wrap text-[13px] text-neutral-800">{w.texto}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {link && (
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  <MessageCircle size={14} /> Abrir no WhatsApp{w.nome ? ` (${w.nome})` : ""}
+                </a>
+              )}
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(w.texto);
+                    setCopiado(i);
+                    setTimeout(() => setCopiado(null), 2000);
+                  } catch {
+                    // sem permissão de copiar
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600"
+              >
+                <Copy size={13} /> {copiado === i ? "Copiado" : "Copiar"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function Texto({ texto }: { texto: string }) {
   const trechos = trechosMarkdown(texto);
@@ -66,9 +117,13 @@ export default function AssistenteClient() {
   const [memorias, setMemorias] = useState<Memoria[]>([]);
   const [temMicrofone, setTemMicrofone] = useState(false);
   const [temVoz, setTemVoz] = useState(false);
+  const [cliente, setCliente] = useState<{ id: string; nome: string } | null>(null);
+  const [escolhendoCliente, setEscolhendoCliente] = useState(false);
+  const [listaClientes, setListaClientes] = useState<ClientOption[]>([]);
   const pararEscuta = useRef<(() => void) | null>(null);
   // Refs porque a escuta automática roda num callback de uma renderização antiga.
   const conversaRef = useRef<string | null>(null);
+  const clienteRef = useRef<string | null>(null);
   const vozRef = useRef(true);
   const interrompido = useRef(false);
   const fimRef = useRef<HTMLDivElement>(null);
@@ -87,6 +142,15 @@ export default function AssistenteClient() {
     // Carrega as vozes do aparelho (o Chrome entrega depois do primeiro pedido).
     if (podeFalar()) window.speechSynthesis.getVoices();
     carregarGasto();
+    // Vindo da ficha do cliente (?cliente=) ou de um texto compartilhado do WhatsApp (?texto=).
+    const params = new URLSearchParams(window.location.search);
+    const idCliente = params.get("cliente");
+    if (idCliente) definirCliente(idCliente);
+    const compartilhado = params.get("texto");
+    if (compartilhado) {
+      setTexto(`Recebi esta mensagem no WhatsApp:\n"${compartilhado.slice(0, 2000)}"\n\nMe ajude a responder.`);
+    }
+    if (idCliente || compartilhado) window.history.replaceState(null, "", "/assistente");
     return () => {
       pararEscuta.current?.();
       pararDeFalar();
@@ -97,6 +161,37 @@ export default function AssistenteClient() {
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [bolhas, pensando]);
+
+  async function definirCliente(id: string | null) {
+    clienteRef.current = id;
+    if (!id) {
+      setCliente(null);
+      return;
+    }
+    const { data } = await supabase.from("clients").select("id, name, display_name, treatment").eq("id", id).maybeSingle();
+    setCliente(data ? { id: data.id, nome: nomeCurto(data) } : null);
+    if (!data) clienteRef.current = null;
+  }
+
+  async function abrirEscolhaCliente() {
+    setEscolhendoCliente(true);
+    const { data } = await supabase.from("clients").select("id, name, city, whatsapp, parceiro").eq("is_test", false).order("name");
+    setListaClientes((data as ClientOption[]) ?? []);
+  }
+
+  function escolherCliente(id: string) {
+    setEscolhendoCliente(false);
+    if (!id) return;
+    // Trocar de cliente começa uma conversa nova, amarrada a ele.
+    if (bolhas.length > 0) {
+      pararTudo();
+      setBolhas([]);
+      setConversaId(null);
+      conversaRef.current = null;
+      setErro(null);
+    }
+    definirCliente(id);
+  }
 
   async function carregarGasto() {
     const agora = new Date();
@@ -157,7 +252,7 @@ export default function AssistenteClient() {
     setBolhas((b) => [...b, { papel: "eu", texto: p }]);
     setPensando(true);
     const { data, error } = await supabase.functions.invoke("assistente", {
-      body: { mensagem: p, conversa_id: conversaRef.current },
+      body: { mensagem: p, conversa_id: conversaRef.current, cliente_id: clienteRef.current },
     });
     setPensando(false);
     if (error || !data?.resposta) {
@@ -167,7 +262,9 @@ export default function AssistenteClient() {
     setConversaId(data.conversa_id ?? null);
     conversaRef.current = data.conversa_id ?? null;
     if (typeof data.gasto_mes_usd === "number") setGastoMes(data.gasto_mes_usd);
-    setBolhas((b) => [...b, { papel: "ia", texto: data.resposta }]);
+    if (data.cliente_id && data.cliente_id !== clienteRef.current) definirCliente(data.cliente_id);
+    const whatsapp: MensagemWhatsApp[] = Array.isArray(data.whatsapp) ? data.whatsapp : [];
+    setBolhas((b) => [...b, { papel: "ia", texto: data.resposta, ...(whatsapp.length ? { whatsapp } : {}) }]);
 
     if (vozRef.current && podeFalar()) {
       interrompido.current = false;
@@ -187,13 +284,21 @@ export default function AssistenteClient() {
     conversaRef.current = null;
     setErro(null);
     setPainel(false);
+    definirCliente(null);
   }
 
   async function abrirPainel() {
     setPainel(true);
     const [{ data: c }, { data: m }] = await Promise.all([
-      supabase.from("assistente_conversas").select("id, titulo, updated_at").order("updated_at", { ascending: false }).limit(40),
-      supabase.from("assistente_memoria").select("id, texto").order("created_at", { ascending: true }),
+      supabase
+        .from("assistente_conversas")
+        .select("id, titulo, updated_at, client_id, clients(name, display_name, treatment)")
+        .order("updated_at", { ascending: false })
+        .limit(40),
+      supabase
+        .from("assistente_memoria")
+        .select("id, texto, client_id, clients(name, display_name, treatment)")
+        .order("created_at", { ascending: true }),
     ]);
     setConversas((c as Conversa[]) ?? []);
     setMemorias((m as Memoria[]) ?? []);
@@ -201,8 +306,9 @@ export default function AssistenteClient() {
 
   async function abrirConversa(id: string) {
     pararTudo();
-    const { data } = await supabase.from("assistente_conversas").select("mensagens").eq("id", id).maybeSingle();
+    const { data } = await supabase.from("assistente_conversas").select("mensagens, client_id").eq("id", id).maybeSingle();
     setBolhas(bolhasDoHistorico((data?.mensagens as never) ?? []));
+    definirCliente(data?.client_id ?? null);
     setConversaId(id);
     conversaRef.current = id;
     setErro(null);
@@ -255,6 +361,31 @@ export default function AssistenteClient() {
         </div>
       </div>
 
+      <div className="mb-3 flex items-center gap-2">
+        {cliente ? (
+          <div className="flex items-center gap-1 rounded-full border border-brand-teal/30 bg-brand-teal/10 py-1 pl-3 pr-1 text-xs font-medium text-brand-teal-dark">
+            <UserRound size={13} />
+            <button onClick={abrirEscolhaCliente} className="max-w-[60vw] truncate">
+              Sobre: {cliente.nome}
+            </button>
+            <button
+              onClick={() => (bolhas.length ? novaConversa() : definirCliente(null))}
+              aria-label="Tirar o cliente"
+              className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/60"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={abrirEscolhaCliente}
+            className="flex items-center gap-1.5 rounded-full border border-dashed border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-500 hover:border-brand-teal hover:text-brand-teal-dark"
+          >
+            <UserRound size={13} /> Sobre um cliente
+          </button>
+        )}
+      </div>
+
       <div className="flex-1 space-y-3 pb-4">
         {bolhas.length === 0 && !pensando && (
           <div className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -274,7 +405,9 @@ export default function AssistenteClient() {
               ))}
             </div>
             <p className="mt-3 text-[11px] text-neutral-400">
-              Por enquanto ele só consulta, não altera nada. Se ele entender algo errado, corrija: ele guarda o que você ensinar.
+              Para responder um cliente: cole a mensagem dele (ou compartilhe do WhatsApp para o Harmonize) e diga de quem é. Ele
+              confere agenda, preços e histórico e deixa a resposta pronta para abrir no WhatsApp. Por enquanto ele não altera nada no
+              app. Se ele entender algo errado, corrija: ele guarda o que você ensinar, inclusive sobre cada cliente.
             </p>
           </div>
         )}
@@ -289,7 +422,8 @@ export default function AssistenteClient() {
           ) : (
             <div key={i} className="flex justify-start">
               <div className="max-w-[90%] rounded-2xl rounded-bl-md border border-neutral-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-neutral-800">
-                <Texto texto={b.texto} />
+                {b.texto && <Texto texto={b.texto} />}
+                {b.whatsapp && <BotoesWhatsApp lista={b.whatsapp} />}
                 {temVoz && (
                   <button
                     onClick={() => {
@@ -379,6 +513,27 @@ export default function AssistenteClient() {
         </form>
       </div>
 
+      {escolhendoCliente && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setEscolhendoCliente(false)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-4 pb-8 shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-semibold text-neutral-800">Conversar sobre qual cliente?</p>
+              <button onClick={() => setEscolhendoCliente(false)} aria-label="Fechar" className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mb-3 text-[11px] text-neutral-400">A conversa fica guardada com o cliente, e ele usa o que você já ensinou sobre ele.</p>
+            <ClientPicker
+              clients={listaClientes}
+              value={cliente?.id ?? ""}
+              onChange={escolherCliente}
+              onClientCreated={() => {}}
+              allowCreate={false}
+            />
+          </div>
+        </div>
+      )}
+
       {painel && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setPainel(false)}>
           <div
@@ -403,6 +558,7 @@ export default function AssistenteClient() {
                 <div key={c.id} className={`flex items-center gap-1 rounded-xl ${c.id === conversaId ? "bg-neutral-100" : ""}`}>
                   <button onClick={() => abrirConversa(c.id)} className="min-w-0 flex-1 px-3 py-2 text-left">
                     <p className="truncate text-sm text-neutral-800">{c.titulo}</p>
+                    {umDe(c.clients) && <p className="truncate text-[11px] font-medium text-brand-teal-dark">{nomeCurto(umDe(c.clients))}</p>}
                     <p className="text-[11px] text-neutral-400">
                       {new Date(c.updated_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </p>
@@ -420,7 +576,10 @@ export default function AssistenteClient() {
             <div className="space-y-1">
               {memorias.map((m) => (
                 <div key={m.id} className="flex items-start gap-1 rounded-xl px-3 py-2 hover:bg-neutral-50">
-                  <p className="flex-1 text-sm text-neutral-700">{m.texto}</p>
+                  <div className="flex-1">
+                    {umDe(m.clients) && <p className="text-[11px] font-medium text-brand-teal-dark">{nomeCurto(umDe(m.clients))}</p>}
+                    <p className="text-sm text-neutral-700">{m.texto}</p>
+                  </div>
                   <button onClick={() => apagarMemoria(m.id)} aria-label="Esquecer" className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:text-red-600">
                     <Trash2 size={14} />
                   </button>

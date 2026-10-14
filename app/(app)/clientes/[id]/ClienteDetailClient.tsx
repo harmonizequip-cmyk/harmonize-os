@@ -10,6 +10,7 @@ import { hojeLocal } from "@/lib/period";
 import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
 import EditarClienteModal from "./EditarClienteModal";
+import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import EditarLocacaoModal from "./EditarLocacaoModal";
 import ReservarHiproModal from "../../agenda/ReservarHiproModal";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
@@ -143,6 +144,7 @@ export default function ClienteDetailClient({
   reagendadasPreReservaCount: number;
 }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [modalOpen, setModalOpen] = useState(false);
   const [reservaOpen, setReservaOpen] = useState(false);
   const [editClientOpen, setEditClientOpen] = useState(false);
@@ -194,6 +196,11 @@ export default function ClienteDetailClient({
             </button>
           </div>
           {client.clinic_name && <p className="text-sm text-neutral-500">{client.clinic_name}</p>}
+          {!somenteLeitura && (
+            <Link href={`/assistente?cliente=${client.id}`} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-teal-dark">
+              ✨ Conversar com o assistente sobre este cliente
+            </Link>
+          )}
         </div>
         <div className="flex gap-2">
           <button
