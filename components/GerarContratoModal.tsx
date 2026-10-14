@@ -204,76 +204,76 @@ export default function GerarContratoModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Gerar contrato</h2>
-        <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900">Gerar contrato</h2>
+        <p className="mb-4 text-xs text-neutral-500">
           Confira os dados de quem vai constar no contrato e na nota fiscal. Podem ser diferentes do cadastro do cliente —
           o que você ajustar aqui vale só para este contrato.
         </p>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Nome / Razão social
             </label>
             <input
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">CPF/CNPJ</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">CPF/CNPJ</label>
             <input
               value={documento}
               onChange={(e) => setDocumento(e.target.value)}
               placeholder="000.000.000-00 ou 00.000.000/0000-00"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Endereço (opcional)
             </label>
             <input
               value={endereco}
               onChange={(e) => setEndereco(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Responsável / Signatário
             </label>
             <input
               value={responsavel}
               onChange={(e) => setResponsavel(e.target.value)}
               placeholder="Quem assina pelo contratante"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               E-mail (opcional)
             </label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           {origem.kind === "reserva" && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Forma de pagamento combinada
               </label>
               <select
                 value={reservaPaymentMethod}
                 onChange={(e) => setReservaPaymentMethod(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               >
                 <option value="" disabled>
                   Selecione
@@ -287,8 +287,8 @@ export default function GerarContratoModal({
             </div>
           )}
 
-          <div className="rounded-xl border border-neutral-200 p-3 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
-            <p className="mb-1.5 font-medium text-neutral-700 dark:text-neutral-300">
+          <div className="rounded-xl border border-neutral-200 p-3 text-xs text-neutral-600">
+            <p className="mb-1.5 font-medium text-neutral-700">
               Dados da {origem.kind === "rental" ? "locação" : "pré-reserva"} (não editáveis aqui)
             </p>
             <p>Equipamento: {equipamentoNome}</p>
@@ -310,12 +310,12 @@ export default function GerarContratoModal({
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>

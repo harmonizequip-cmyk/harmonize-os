@@ -105,13 +105,13 @@ export default function EquipamentoStatusControl({
     <div>
       <p
         className={`mt-0.5 text-sm font-medium capitalize ${
-          emManutencao ? "text-amber-600 dark:text-amber-400" : "text-neutral-900 dark:text-neutral-100"
+          emManutencao ? "text-amber-600" : "text-neutral-900"
         }`}
       >
         {emManutencao ? "Em manutenção" : "Ativo"}
       </p>
       {emManutencao && statusMotivo && (
-        <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">Motivo: {statusMotivo}</p>
+        <p className="mt-0.5 text-[11px] text-neutral-500">Motivo: {statusMotivo}</p>
       )}
       {emManutencao && statusDesde && (
         <p className="text-[11px] text-neutral-400">Desde {formatarDataHora(statusDesde)}</p>
@@ -120,11 +120,11 @@ export default function EquipamentoStatusControl({
         <p className="text-[11px] text-neutral-400">Previsão de volta: {formatarData(statusPrevistoFim)}</p>
       )}
 
-      {error && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
 
       {avisoRetorno && !showAdiarForm && (
-        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 dark:border-amber-900/50 dark:bg-amber-900/20">
-          <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+          <p className="text-[11px] font-medium text-amber-800">
             {diasRestantes! <= 0
               ? "A previsão de retorno é hoje. Vai voltar como planejado?"
               : `Faltam ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"} para o retorno previsto (${formatarData(statusPrevistoFim!)}). Vai voltar como planejado?`}
@@ -133,7 +133,7 @@ export default function EquipamentoStatusControl({
             <button
               type="button"
               onClick={() => setShowAdiarForm(true)}
-              className="rounded-lg border border-amber-400 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:text-amber-300"
+              className="rounded-lg border border-amber-400 px-2.5 py-1 text-[11px] font-medium text-amber-800"
             >
               Adiar previsão
             </button>
@@ -142,17 +142,17 @@ export default function EquipamentoStatusControl({
       )}
 
       {showAdiarForm && (
-        <div className="mt-2 rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-          <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+        <div className="mt-2 rounded-lg bg-neutral-50 p-2">
+          <label className="mb-1 block text-[11px] font-medium text-neutral-600">
             Nova previsão de volta
           </label>
           <input
             type="date"
             value={novaPrevisao}
             onChange={(e) => setNovaPrevisao(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
           />
-          {adiarError && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{adiarError}</p>}
+          {adiarError && <p className="mt-1 text-[11px] text-red-600">{adiarError}</p>}
           <div className="mt-2 flex gap-2">
             <button
               type="button"
@@ -161,7 +161,7 @@ export default function EquipamentoStatusControl({
                 setAdiarError(null);
                 setNovaPrevisao(statusPrevistoFim ?? "");
               }}
-              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600"
             >
               Desistir
             </button>

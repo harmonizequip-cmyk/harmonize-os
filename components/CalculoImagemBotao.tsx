@@ -89,7 +89,7 @@ export default function CalculoImagemBotao({
       >
         {gerando ? "Gerando imagem..." : "🖼️ Gerar imagem do cálculo"}
       </button>
-      {erro && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-1 text-xs text-red-600">{erro}</p>}
 
       {previa && (
         <div
@@ -97,7 +97,7 @@ export default function CalculoImagemBotao({
           onClick={() => setPrevia(null)}
         >
           <div
-            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -114,7 +114,7 @@ export default function CalculoImagemBotao({
               <button
                 type="button"
                 onClick={baixar}
-                className="rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
               >
                 Baixar imagem
               </button>

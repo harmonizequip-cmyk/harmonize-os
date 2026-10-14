@@ -70,13 +70,13 @@ function situacao(r: Locacao): { label: string; classe: string } {
   if (jaAconteceu && r.saldo < Number(r.calculated_value)) {
     return {
       label: "Parcial",
-      classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+      classe: "bg-amber-100 text-amber-700",
     };
   }
   if (jaAconteceu) {
     return {
       label: "A receber",
-      classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+      classe: "bg-amber-100 text-amber-700",
     };
   }
   return { label: "Agendada", classe: "bg-brand-blue/10 text-brand-blue" };
@@ -149,10 +149,10 @@ export default function LocacoesClient({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+        <h1 className="text-xl font-semibold text-neutral-900">
           Locações realizadas
         </h1>
-        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mt-0.5 text-xs text-neutral-500">
           O que aconteceu e quanto valeu. Para ver quem confirmou, cancelou ou apagou cada registro,
           o histórico de ações fica em{" "}
           <Link href="/movimentacoes" className="text-brand-teal underline underline-offset-2">
@@ -202,7 +202,7 @@ export default function LocacoesClient({
             type="button"
             onClick={baixarCsv}
             disabled={linhas.length === 0}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
           >
             Exportar planilha
           </button>
@@ -210,38 +210,38 @@ export default function LocacoesClient({
       />
 
       {atingiuTeto && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
           Este período tem mais locações do que a tela carrega de uma vez, então os totais estão
           incompletos. Escolha um período menor.
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Recebido</p>
           <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
             {formatCurrency(totais.recebido)}
           </p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber</p>
-          <p className="mt-0.5 text-sm font-semibold text-amber-600 dark:text-amber-400 sm:text-base">
+          <p className="mt-0.5 text-sm font-semibold text-amber-600 sm:text-base">
             {formatCurrency(totais.aReceber)}
           </p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Lucro</p>
           <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
             {formatCurrency(totais.lucro)}
           </p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Disparos</p>
-          <p className="mt-0.5 text-sm font-semibold text-neutral-700 dark:text-neutral-200 sm:text-base">
+          <p className="mt-0.5 text-sm font-semibold text-neutral-700 sm:text-base">
             {totais.disparos.toLocaleString("pt-BR")}
           </p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Cancelado</p>
           <p className="mt-0.5 text-sm font-semibold text-neutral-400 sm:text-base">
             {formatCurrency(totais.cancelado)}
@@ -256,15 +256,15 @@ export default function LocacoesClient({
           return (
             <div
               key={r.id}
-              className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+              className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl"
             >
               <Link href={`/clientes/${r.client_id}`} className="block">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <p className="text-sm font-medium text-neutral-900">
                     {r.clients?.name ?? "Cliente removido"}
                   </p>
-                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  <p className="mt-0.5 text-xs text-neutral-500">
                     {formatPeriodo(r)} · {r.equipments?.name ?? "-"} ·{" "}
                     {Number(r.shots ?? 0).toLocaleString("pt-BR")} disparos
                   </p>
@@ -276,7 +276,7 @@ export default function LocacoesClient({
                 </span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                <span className="text-xs text-neutral-500">
                   {PAGAMENTOS[r.payment_method] ?? r.payment_method}
                   {r.rescheduled ? " · reagendada" : ""}
                 </span>
@@ -289,12 +289,12 @@ export default function LocacoesClient({
                 </span>
               </div>
               {s.label === "Parcial" && (
-                <p className="mt-1 text-right text-[11px] text-amber-700 dark:text-amber-400">
+                <p className="mt-1 text-right text-[11px] text-amber-700">
                   Falta {formatCurrency(Number(r.saldo))}
                 </p>
               )}
               {r.lucro != null && (
-                <p className="mt-1 text-right text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="mt-1 text-right text-[11px] text-neutral-500">
                   Lucro {formatCurrency(Number(r.lucro))} · despesas {formatCurrency(Number(r.despesas ?? 0))}
                 </p>
               )}
@@ -308,16 +308,16 @@ export default function LocacoesClient({
           );
         })}
         {linhas.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
             Nenhuma locação em {periodo.rotulo}.
           </div>
         )}
       </div>
 
       {/* Tablet e notebook */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55 sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">Cliente</th>
@@ -336,12 +336,12 @@ export default function LocacoesClient({
               return (
                 <tr
                   key={r.id}
-                  className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
+                  className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
+                  <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                     {formatPeriodo(r)}
                   </td>
-                  <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">
+                  <td className="px-4 py-3 text-neutral-900">
                     <Link
                       href={`/clientes/${r.client_id}`}
                       className="underline decoration-transparent underline-offset-2 transition hover:decoration-brand-teal"
@@ -354,10 +354,10 @@ export default function LocacoesClient({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
+                  <td className="px-4 py-3 text-neutral-600">
                     {r.equipments?.name ?? "-"}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600 dark:text-neutral-400">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600">
                     {Number(r.shots ?? 0).toLocaleString("pt-BR")}
                   </td>
                   <td
@@ -367,7 +367,7 @@ export default function LocacoesClient({
                   >
                     {formatCurrency(Number(r.calculated_value))}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600 dark:text-neutral-400">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-neutral-600">
                     {r.lucro != null ? (
                       <span title={`Despesas: ${formatCurrency(Number(r.despesas ?? 0))}`}>{formatCurrency(Number(r.lucro))}</span>
                     ) : (
@@ -379,7 +379,7 @@ export default function LocacoesClient({
                       {s.label}
                     </span>
                     {s.label === "Parcial" && (
-                      <span className="ml-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                      <span className="ml-1.5 text-[11px] text-amber-700">
                         falta {formatCurrency(Number(r.saldo))}
                       </span>
                     )}
@@ -389,7 +389,7 @@ export default function LocacoesClient({
                       </span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
+                  <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                     {PAGAMENTOS[r.payment_method] ?? r.payment_method}
                   </td>
                   <td className="min-w-[10rem] px-4 py-3">

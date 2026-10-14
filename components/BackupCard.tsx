@@ -132,8 +132,8 @@ export default function BackupCard() {
       ref={cartao}
       className={`rounded-2xl border p-4 ${
         atrasado
-          ? "border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10"
-          : "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+          ? "border-amber-300 bg-amber-50"
+          : "border-neutral-200 bg-white"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -141,12 +141,12 @@ export default function BackupCard() {
           <DatabaseBackup size={17} strokeWidth={1.75} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Backup dos dados</p>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm font-medium text-neutral-900">Backup dos dados</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
             Baixa um arquivo com clientes, reservas, locações, pagamentos, lançamentos, tarefas e histórico. Guarde no
             Google Drive. Faça toda semana.
           </p>
-          <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-300">
+          <p className="mt-1 text-xs text-neutral-600">
             {ultimo
               ? `Último backup neste aparelho: ${new Date(ultimo).toLocaleDateString("pt-BR")} (${
                   diasDesde === 0 ? "hoje" : `há ${diasDesde} dia(s)`
@@ -166,13 +166,13 @@ export default function BackupCard() {
               type="button"
               onClick={baixar}
               disabled={baixando}
-              className="rounded-xl border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+              className="rounded-xl border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 disabled:opacity-60"
             >
               Baixar backup agora
             </button>
           </div>
           {aviso && <p className="mt-2 text-xs text-brand-teal">{aviso}</p>}
-          {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
         </div>
       </div>
     </div>

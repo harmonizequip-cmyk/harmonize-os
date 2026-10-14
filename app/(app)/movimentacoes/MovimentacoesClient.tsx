@@ -41,8 +41,8 @@ export default function MovimentacoesClient({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Movimentações</h1>
-        <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+        <h1 className="text-xl font-semibold text-neutral-900">Movimentações</h1>
+        <p className="mt-0.5 text-sm text-neutral-500">
           Tudo que foi criado, editado, confirmado, reagendado, cancelado ou excluído, com data, hora e autor.
           Este histórico não pode ser editado nem apagado por ninguém. Para ver o que aconteceu e
           quanto valeu, o histórico de{" "}
@@ -81,7 +81,7 @@ export default function MovimentacoesClient({
             type="button"
             onClick={baixarCsv}
             disabled={filtradas.length === 0}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
           >
             Exportar planilha
           </button>
@@ -89,7 +89,7 @@ export default function MovimentacoesClient({
       />
 
       {atingiuTeto && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
           Este período tem mais movimentações do que a tela carrega de uma vez. Escolha um período
           menor para ver o começo dele.
         </div>
@@ -102,7 +102,7 @@ export default function MovimentacoesClient({
           return (
             <div
               key={m.id}
-              className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+              className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.classe}`}>
@@ -114,10 +114,10 @@ export default function MovimentacoesClient({
                 <span className="ml-auto text-xs text-neutral-400">{formatarDataHora(m.ocorrido_em)}</span>
               </div>
 
-              <p className="mt-1.5 text-sm text-neutral-900 dark:text-neutral-100">{m.descricao}</p>
+              <p className="mt-1.5 text-sm text-neutral-900">{m.descricao}</p>
 
               {detalhe && (
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{detalhe}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{detalhe}</p>
               )}
 
               <p className="mt-1 text-xs text-neutral-400">por {m.usuario_nome}</p>
@@ -126,7 +126,7 @@ export default function MovimentacoesClient({
         })}
 
         {filtradas.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl">
             Nenhuma movimentação em {periodo.rotulo}. Experimente um período maior, ou limpe os
             filtros.
           </div>

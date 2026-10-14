@@ -291,26 +291,26 @@ export default function AvailabilityImageModal({
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900">
           Datas disponíveis{clientName ? ` para ${clientName}` : ""}
         </h2>
-        <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mb-3 text-xs text-neutral-500">
           Dias com os dois HIPROs livres já vêm marcados. Desmarque o que não servir por logística (viagem, outro
           compromisso etc).
         </p>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <label className="mb-1 block text-xs font-medium text-neutral-600">
             Sua cidade base (opcional)
           </label>
           <input
             value={homeCity}
             onChange={(e) => updateHomeCity(e.target.value)}
             placeholder="Ex: João Pessoa"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
           />
           <p className="mt-1 text-[11px] text-neutral-400">
             Preenchendo isso, o dia seguinte a um evento em outra cidade já vem desmarcado sozinho (às vezes não dá
@@ -330,17 +330,17 @@ export default function AvailabilityImageModal({
         <div className="mb-3 flex items-center justify-between">
           <button
             onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
-            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100"
             aria-label="Mês anterior"
           >
             ‹
           </button>
-          <p className="text-sm font-semibold capitalize text-neutral-900 dark:text-neutral-100">
+          <p className="text-sm font-semibold capitalize text-neutral-900">
             {format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </p>
           <button
             onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
-            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100"
             aria-label="Próximo mês"
           >
             ›
@@ -368,10 +368,10 @@ export default function AvailabilityImageModal({
                   onClick={() => toggleDay(key)}
                   className={`rounded-xl border py-2 text-xs font-medium transition ${
                     disabled
-                      ? "cursor-not-allowed border-neutral-200 text-neutral-300 dark:border-neutral-800 dark:text-neutral-700"
+                      ? "cursor-not-allowed border-neutral-200 text-neutral-300"
                       : isSelected
                       ? "border-brand-teal bg-brand-teal/10 text-brand-teal"
-                      : "border-neutral-300 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+                      : "border-neutral-300 text-neutral-500"
                   }`}
                 >
                   {day.getDate()}
@@ -404,25 +404,25 @@ export default function AvailabilityImageModal({
             <img
               src={previewUrl}
               alt="Prévia das datas disponíveis"
-              className="w-full rounded-xl border border-neutral-200 dark:border-neutral-700"
+              className="w-full rounded-xl border border-neutral-200"
             />
 
             {isWhatsappMode && (
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                <label className="mb-1 block text-xs font-medium text-neutral-600">
                   Mensagem para o cliente
                 </label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={3}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
               </div>
             )}
 
             {shareNote && (
-              <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+              <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
                 {shareNote}
               </p>
             )}
@@ -431,7 +431,7 @@ export default function AvailabilityImageModal({
               <button
                 type="button"
                 onClick={handleDownload}
-                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
               >
                 Baixar
               </button>

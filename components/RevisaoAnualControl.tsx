@@ -32,16 +32,16 @@ export default function RevisaoAnualControl({ equipmentId, ultimaRevisao }: { eq
 
   const cor =
     r.situacao === "vencida"
-      ? "font-semibold text-red-600 dark:text-red-400"
+      ? "font-semibold text-red-600"
       : r.situacao === "perto"
-        ? "font-semibold text-amber-600 dark:text-amber-400"
-        : "text-neutral-500 dark:text-neutral-400";
+        ? "font-semibold text-amber-600"
+        : "text-neutral-500";
 
   return (
     <div>
       {r.proxima ? (
         <>
-          <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">Próxima: {formatDate(r.proxima)}</p>
+          <p className="mt-0.5 text-sm font-medium text-neutral-900">Próxima: {formatDate(r.proxima)}</p>
           <p className={`text-xs ${cor}`}>
             {r.situacao === "vencida"
               ? `Vencida há ${-r.dias!} ${r.dias === -1 ? "dia" : "dias"}`
@@ -67,7 +67,7 @@ export default function RevisaoAnualControl({ equipmentId, ultimaRevisao }: { eq
               value={data}
               max={hoje}
               onChange={(e) => setData(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
             />
           </div>
           <button
@@ -95,7 +95,7 @@ export default function RevisaoAnualControl({ equipmentId, ultimaRevisao }: { eq
           {ultimaRevisao ? "Registrar revisão feita" : "Informar última revisão"}
         </button>
       )}
-      {erro && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-1 text-[11px] text-red-600">{erro}</p>}
     </div>
   );
 }

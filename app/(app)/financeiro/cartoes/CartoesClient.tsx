@@ -53,14 +53,14 @@ const FORMAS = [
 ];
 
 const campo =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 
 function situacao(f: { total_compras: number; total_pago: number; fechamento: string; vencimento: string } | null, hoje: string) {
   if (!f || f.total_compras <= 0) return { texto: "Sem compras", cor: "text-neutral-400" };
   const falta = f.total_compras - f.total_pago;
   if (falta <= 0.009) return { texto: "Paga", cor: "text-brand-teal" };
-  if (hoje > f.vencimento) return { texto: "Vencida", cor: "text-red-600 dark:text-red-400" };
-  if (hoje > f.fechamento) return { texto: "Fechada, a pagar", cor: "text-amber-600 dark:text-amber-400" };
+  if (hoje > f.vencimento) return { texto: "Vencida", cor: "text-red-600" };
+  if (hoje > f.fechamento) return { texto: "Fechada, a pagar", cor: "text-amber-600" };
   return { texto: "Aberta", cor: "text-neutral-500" };
 }
 
@@ -190,7 +190,7 @@ export default function CartoesClient({
           <Link href={escopo === "pessoal" ? "/pessoal/lancamentos" : "/financeiro"} className="text-xs text-neutral-500">
             ← {escopo === "pessoal" ? "Lançamentos" : "Financeiro"}
           </Link>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+          <h1 className="text-xl font-semibold text-neutral-900">
             {escopo === "pessoal" ? "Cartões pessoais" : "Cartões da Harmonize"}
           </h1>
         </div>
@@ -201,21 +201,21 @@ export default function CartoesClient({
               setErro(null);
               setEditando({ scope: escopo, ativo: true });
             }}
-            className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+            className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700"
           >
             + Cartão
           </button>
         )}
       </div>
 
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="text-xs text-neutral-500">
         A compra conta como gasto no mês de cada parcela, mas só sai da conta quando você paga a fatura. O pagamento da fatura fica
         fora do resultado, para não contar duas vezes.
       </p>
 
       {editando && (
-        <div className="space-y-2 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{editando.id ? "Editar cartão" : "Novo cartão"}</p>
+        <div className="space-y-2 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-sm font-medium text-neutral-900">{editando.id ? "Editar cartão" : "Novo cartão"}</p>
           <input value={editando.nome ?? ""} onChange={(e) => setEditando({ ...editando, nome: e.target.value })} placeholder="Nome (ex: Inter PJ)" className={campo} />
           <div className="grid grid-cols-3 gap-2">
             <div>
@@ -232,13 +232,13 @@ export default function CartoesClient({
             </div>
           </div>
           {editando.id && (
-            <label className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300">
+            <label className="flex items-center gap-2 text-xs text-neutral-600">
               <input type="checkbox" checked={editando.ativo === false} onChange={(e) => setEditando({ ...editando, ativo: !e.target.checked })} />
               Não uso mais este cartão (esconde dos lançamentos)
             </label>
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={() => setEditando(null)} className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+            <button type="button" onClick={() => setEditando(null)} className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs text-neutral-600">
               Cancelar
             </button>
             <button type="button" disabled={salvando} onClick={salvarCartao} className="flex-1 rounded-lg bg-brand-teal py-2 text-xs font-medium text-white disabled:opacity-60">
@@ -268,10 +268,10 @@ export default function CartoesClient({
                   setPagando(false);
                 }}
                 className={`min-w-[150px] rounded-2xl border p-3 text-left ${
-                  selecionado === c.id ? "border-brand-teal bg-brand-teal/5" : "border-neutral-200 bg-white/70 dark:border-neutral-800 dark:bg-neutral-900/55"
+                  selecionado === c.id ? "border-brand-teal bg-brand-teal/5" : "border-neutral-200 bg-white/70"
                 }`}
               >
-                <p className="flex items-center gap-1.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-neutral-900">
                   <CreditCard size={14} /> {c.nome}
                 </p>
                 <p className="text-[11px] text-neutral-500">{c.scope === "harmonize" ? "Harmonize" : "Pessoal"} · vence dia {c.dia_vencimento}</p>
@@ -289,13 +289,13 @@ export default function CartoesClient({
       )}
 
       {cartao && ref && (
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <button type="button" onClick={() => setDeslocamento((d) => d - 1)} aria-label="Fatura anterior" className="p-1 text-neutral-500">
               <ChevronLeft size={18} />
             </button>
             <div className="text-center">
-              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <p className="text-sm font-semibold text-neutral-900">
                 Fatura de {rotuloFatura(ref)}
                 {deslocamento === 0 && <span className="ml-1 text-[11px] font-normal text-neutral-400">(atual)</span>}
               </p>
@@ -311,7 +311,7 @@ export default function CartoesClient({
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="text-[10px] uppercase tracking-wide text-neutral-400">Total</p>
-              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(fatura?.total_compras ?? 0)}</p>
+              <p className="text-sm font-semibold text-neutral-900">{formatCurrency(fatura?.total_compras ?? 0)}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-neutral-400">Pago</p>
@@ -339,7 +339,7 @@ export default function CartoesClient({
           )}
 
           {pagando && (
-            <div className="mt-3 space-y-2 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/60">
+            <div className="mt-3 space-y-2 rounded-xl bg-neutral-50 p-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-0.5 block text-[11px] text-neutral-500">Valor pago</label>
@@ -361,7 +361,7 @@ export default function CartoesClient({
                 Sai {cartao.scope === "harmonize" ? "do caixa da Harmonize" : "da conta pessoal"}. Pagamento menor que o total deixa o resto em aberto.
               </p>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setPagando(false)} className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+                <button type="button" onClick={() => setPagando(false)} className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs text-neutral-600">
                   Voltar
                 </button>
                 <button type="button" disabled={salvando} onClick={pagar} className="flex-1 rounded-lg bg-brand-teal py-2 text-xs font-medium text-white disabled:opacity-60">
@@ -372,24 +372,24 @@ export default function CartoesClient({
           )}
 
           <div className="mt-4">
-            <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">Movimentos da fatura</p>
+            <p className="text-xs font-medium text-neutral-600">Movimentos da fatura</p>
             {carregando ? (
               <p className="mt-2 text-xs text-neutral-400">Carregando...</p>
             ) : compras.length === 0 ? (
               <p className="mt-2 text-xs text-neutral-400">Nada nesta fatura.</p>
             ) : (
-              <ul className="mt-2 divide-y divide-neutral-200/70 dark:divide-neutral-800">
+              <ul className="mt-2 divide-y divide-neutral-200/70">
                 {compras.map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-xs">
                     <span className="min-w-0">
-                      <span className="block truncate text-neutral-800 dark:text-neutral-200">{c.description}</span>
+                      <span className="block truncate text-neutral-800">{c.description}</span>
                       <span className="text-[11px] text-neutral-400">
                         {formatDate(c.date)}
                         {c.categoria ? ` · ${c.categoria}` : ""}
                       </span>
                     </span>
                     <span className="flex flex-shrink-0 items-center gap-2">
-                      <span className={`font-medium ${c.cartao_mov === "pagamento" ? "text-brand-teal" : "text-neutral-800 dark:text-neutral-100"}`}>
+                      <span className={`font-medium ${c.cartao_mov === "pagamento" ? "text-brand-teal" : "text-neutral-800"}`}>
                         {c.cartao_mov === "pagamento" ? "pago " : ""}
                         {formatCurrency(c.amount)}
                       </span>
@@ -420,7 +420,7 @@ export default function CartoesClient({
         </div>
       )}
 
-      {erro && <p className="text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="text-xs text-red-600">{erro}</p>}
 
       <p className="text-[11px] text-neutral-400">
         Para lançar uma compra: Novo lançamento, saída, forma de pagamento Crédito, escolha o cartão e as parcelas.

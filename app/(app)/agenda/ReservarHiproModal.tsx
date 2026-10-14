@@ -127,10 +127,10 @@ export default function ReservarHiproModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Reservar HIPRO Day</h2>
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900">Reservar HIPRO Day</h2>
         <p className="mb-4 text-xs text-neutral-400">
           Trava a data no equipamento sem exigir contagem de disparos. Finalize com a contagem depois de realizado.
         </p>
@@ -138,8 +138,8 @@ export default function ReservarHiproModal({
         <div className="space-y-3">
           {isFixedClient ? (
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cliente</label>
-              <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Cliente</label>
+              <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
                 {fixedClientName}
               </p>
             </div>
@@ -153,11 +153,11 @@ export default function ReservarHiproModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Equipamento</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Equipamento</label>
             <select
               value={equipmentId}
               onChange={(e) => setEquipmentId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
               {equipments.map((eq) => (
                 <option key={eq.id} value={eq.id}>
@@ -168,17 +168,17 @@ export default function ReservarHiproModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
             <input
               type="date"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Data final (só se for mais de um dia)
             </label>
             <input
@@ -186,7 +186,7 @@ export default function ReservarHiproModal({
               value={dataFim}
               min={eventDate}
               onChange={(e) => setDataFim(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             {dataFim && (
               <p className="mt-1 text-xs text-neutral-500">Uma reserva só, com uma taxa de reserva só.</p>
@@ -194,41 +194,41 @@ export default function ReservarHiproModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           {/* Só destaque visual na Agenda (ver EVENT_META em
               AgendaClient.tsx) — continua reservando o equipamento
               normalmente, com a mesma proteção contra duplo-agendamento. */}
-          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+          <label className="flex items-center gap-2 text-sm text-neutral-600">
             <input
               type="checkbox"
               checked={isMentoria}
               onChange={(e) => setIsMentoria(e.target.checked)}
-              className="h-4 w-4 rounded border-neutral-300 text-brand-teal focus:ring-brand-teal dark:border-neutral-700"
+              className="h-4 w-4 rounded border-neutral-300 text-brand-teal focus:ring-brand-teal"
             />
             Esta reserva é para mentoria
           </label>
         </div>
 
         {outroEquipAviso && (
-          <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/10 dark:text-amber-400">
+          <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
             {outroEquipAviso}
           </p>
         )}
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>

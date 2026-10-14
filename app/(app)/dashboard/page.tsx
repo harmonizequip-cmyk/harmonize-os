@@ -178,7 +178,7 @@ export default async function DashboardPage({
       ? { texto: "Acima da meta máxima", cor: "text-brand-teal" }
       : locMes >= META_MIN
         ? { texto: "Dentro da meta", cor: "text-brand-teal" }
-        : { texto: `Faltam ${META_MIN - locMes} para a meta`, cor: "text-amber-600 dark:text-amber-400" };
+        : { texto: `Faltam ${META_MIN - locMes} para a meta`, cor: "text-amber-600" };
   const metaEscala = Math.max(META_MAX + 5, locMes + preMes);
 
   // Reservas de HIPRO com a taxa ainda pendente e data por vir; as que
@@ -528,7 +528,7 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">Dashboard</h1>
         <PeriodFilter />
       </div>
 
@@ -539,7 +539,7 @@ export default async function DashboardPage({
       {!!pendingConfirmations && pendingConfirmations > 0 && (
         <Link
           href="/agenda#confirmacoes"
-          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
         >
           ⚠️ {pendingConfirmations} {pendingConfirmations === 1 ? "evento precisa" : "eventos precisam"} de confirmação nos próximos 7 dias →
         </Link>
@@ -558,7 +558,7 @@ export default async function DashboardPage({
       {semDisparos.length > 0 && (
         <Link
           href="/pendencias#sem-disparos"
-          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
         >
           🧾 {semDisparos.length}{" "}
           {semDisparos.length === 1
@@ -571,7 +571,7 @@ export default async function DashboardPage({
       {aplicadoresAlerta.length > 0 && (
         <Link
           href="/equipamentos#aplicadores"
-          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
         >
           🔧 Garantia acabando: {aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", ")}. Ver
           aplicadores →
@@ -583,8 +583,8 @@ export default async function DashboardPage({
           href={`/equipamentos#revisao-${revisoesAlerta[0].code}`}
           className={
             revisoesAlerta.some((e) => e.situacao === "vencida")
-              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
-              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
           }
         >
           🛠️ Revisão anual:{" "}
@@ -600,8 +600,8 @@ export default async function DashboardPage({
           href="/pendencias#taxas"
           className={
             taxasVencidasCount > 0
-              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
-              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400"
+              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
           }
         >
           💳 {taxasAReceberCount} {taxasAReceberCount === 1 ? "taxa de reserva a receber" : "taxas de reserva a receber"} (
@@ -615,13 +615,13 @@ export default async function DashboardPage({
 
       <Link
         href="/pendencias"
-        className="flex items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal dark:border-neutral-800/60 dark:bg-neutral-900/55"
+        className="flex items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal"
       >
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber (pendências)</p>
-          <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(pendencias.total)}</p>
+          <p className="text-lg font-semibold text-amber-600">{formatCurrency(pendencias.total)}</p>
         </div>
-        <p className="text-right text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-right text-xs text-neutral-500">
           {pendencias.clientes.length === 0
             ? "Ninguém devendo"
             : `${pendencias.clientes.length} ${pendencias.clientes.length === 1 ? "cliente devendo" : "clientes devendo"} · mais antigo há ${pendencias.maiorAtraso} ${pendencias.maiorAtraso === 1 ? "dia" : "dias"}`}{" "}
@@ -631,22 +631,22 @@ export default async function DashboardPage({
 
       <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
 
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs text-neutral-500">
             Meta do mês: {META_MIN} a {META_MAX} locações (máxima: acima de {META_MAX})
           </p>
           <p className={`text-xs font-semibold ${metaStatus.cor}`}>{metaStatus.texto}</p>
         </div>
-        <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <p className="mt-1 text-lg font-semibold text-neutral-900">
           {locMes} {locMes === 1 ? "locação" : "locações"} no mês
           {preMes > 0 && (
-            <span className="ml-2 text-xs font-normal text-neutral-500 dark:text-neutral-400">
+            <span className="ml-2 text-xs font-normal text-neutral-500">
               + {preMes} {preMes === 1 ? "pré-reserva" : "pré-reservas"} ainda sem disparos
             </span>
           )}
         </p>
-        <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+        <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-neutral-200">
           <div
             className="absolute inset-y-0 left-0 bg-brand-teal"
             style={{ width: `${Math.min(100, (locMes / metaEscala) * 100)}%` }}
@@ -661,36 +661,36 @@ export default async function DashboardPage({
           <div className="absolute inset-y-0 w-px bg-neutral-500" style={{ left: `${(META_MIN / metaEscala) * 100}%` }} />
           <div className="absolute inset-y-0 w-px bg-neutral-500" style={{ left: `${(META_MAX / metaEscala) * 100}%` }} />
         </div>
-        <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+        <p className="mt-1 text-[11px] text-neutral-500">
           Traços na barra: {META_MIN} e {META_MAX}. A parte azul são pré-reservas do mês que ainda podem virar locação.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">{card.label}</p>
-            <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(card.value)}</p>
+          <div key={card.label} className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+            <p className="text-xs text-neutral-500">{card.label}</p>
+            <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(card.value)}</p>
           </div>
         ))}
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{billableRentalsCount ?? 0}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Locações</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{billableRentalsCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Ticket médio</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ticketMedio)}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Concluídas</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Concluídas</p>
           <p className="mt-1 text-lg font-semibold text-brand-teal">{concluidasCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Canceladas</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Canceladas</p>
           <p className="mt-1 text-lg font-semibold text-brand-pink">{canceladasCount ?? 0}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Reagendadas</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Reagendadas</p>
           <p className="mt-1 text-lg font-semibold text-brand-blue">{reagendadasCount}</p>
         </div>
       </div>
@@ -698,10 +698,10 @@ export default async function DashboardPage({
       {equipmentSummary.length > 0 && (
         <div>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Equipamentos</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm font-semibold text-neutral-700">Equipamentos</p>
+            <p className="text-xs text-neutral-500">
               Ocupação geral {rotuloOcupacao}:{" "}
-              <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+              <span className="font-semibold text-neutral-900">
                 {Math.round(ocupacaoGeralPct * 100)}%
               </span>{" "}
               ({ocupacaoGeral.ocupados} de {ocupacaoGeral.disponiveis} dias-máquina)
@@ -712,24 +712,24 @@ export default async function DashboardPage({
               <Link
                 key={eq.id}
                 href={`/dashboard/equipamentos/${eq.id}?${periodQuery}`}
-                className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal/40 hover:bg-white/90 dark:border-neutral-800/60 dark:bg-neutral-900/55 dark:hover:bg-neutral-900/75"
+                className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal/40 hover:bg-white/90"
               >
                 <div className="flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{eq.name}</p>
+                  <p className="text-sm font-medium text-neutral-900">{eq.name}</p>
                 </div>
                 <p className="mt-2 text-lg font-semibold text-brand-teal">{formatCurrency(eq.receita)}</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-neutral-500">
                   {eq.locacoes} {eq.locacoes === 1 ? "locação" : "locações"} no período
                 </p>
                 <div className="mt-2">
-                  <div className="flex items-baseline justify-between text-xs text-neutral-500 dark:text-neutral-400">
+                  <div className="flex items-baseline justify-between text-xs text-neutral-500">
                     <span>Ocupação</span>
-                    <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                    <span className="font-medium text-neutral-900">
                       {Math.round(eq.ocupacao.pct * 100)}% · {eq.ocupacao.ocupados} de {eq.ocupacao.disponiveis} dias
                     </span>
                   </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200">
                     <div
                       className="h-full rounded-full bg-brand-teal"
                       style={{ width: `${Math.min(100, Math.round(eq.ocupacao.pct * 100))}%` }}
@@ -737,7 +737,7 @@ export default async function DashboardPage({
                   </div>
                 </div>
                 {eq.pendente > 0 && (
-                  <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  <p className="mt-1 text-xs font-medium text-amber-600">
                     Pendente: {formatCurrency(eq.pendente)}
                   </p>
                 )}
@@ -750,7 +750,7 @@ export default async function DashboardPage({
       {upcomingGroups.length > 0 && (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Próximas locações</p>
+            <p className="text-sm font-semibold text-neutral-700">Próximas locações</p>
             <Link href="/agenda" className="text-xs text-brand-teal underline underline-offset-2">
               Ver agenda →
             </Link>
@@ -763,16 +763,16 @@ export default async function DashboardPage({
                   key={date}
                   className={`rounded-2xl border p-3 shadow-sm backdrop-blur-xl ${
                     bothHipros
-                      ? "border-brand-pink/50 bg-brand-pink/5 dark:border-brand-pink/40 dark:bg-brand-pink/10"
-                      : "border-white/60 bg-white/70 dark:border-neutral-800/60 dark:bg-neutral-900/55"
+                      ? "border-brand-pink/50 bg-brand-pink/5"
+                      : "border-white/60 bg-white/70"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                    <p className="text-xs font-medium text-neutral-500">
                       {formatWeekdayDate(date)}
                     </p>
                     {bothHipros && (
-                      <span className="rounded-full bg-brand-pink/15 px-2 py-0.5 text-[10px] font-medium text-brand-pink-dark dark:text-brand-pink">
+                      <span className="rounded-full bg-brand-pink/15 px-2 py-0.5 text-[10px] font-medium text-brand-pink-dark">
                         2 HIPROs no mesmo dia
                       </span>
                     )}
@@ -785,14 +785,14 @@ export default async function DashboardPage({
                             e.event_type === "hipro_1" ? "bg-brand-teal" : "bg-brand-blue"
                           }`}
                         />
-                        <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                        <span className="font-medium text-neutral-900">
                           {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
                         </span>
                         {e.clients?.name && (
-                          <span className="text-neutral-500 dark:text-neutral-400">· {e.clients.name}</span>
+                          <span className="text-neutral-500">· {e.clients.name}</span>
                         )}
                         {!e.confirmed && (
-                          <span className="ml-auto whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          <span className="ml-auto whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                             não confirmado
                           </span>
                         )}

@@ -61,7 +61,7 @@ export default function IndicadoPorSelect({
 
   return (
     <div ref={containerRef}>
-      <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+      <label className="mb-1 block text-xs font-medium text-neutral-600">
         Indicado por <span className="text-neutral-400">(opcional)</span>
       </label>
       <div className="flex gap-2">
@@ -76,7 +76,7 @@ export default function IndicadoPorSelect({
             setOpen(true);
           }}
           placeholder="Buscar cliente que indicou..."
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         {value && (
           <button
@@ -86,7 +86,7 @@ export default function IndicadoPorSelect({
               setQuery("");
               setOpen(false);
             }}
-            className="rounded-lg border border-neutral-300 px-3 text-xs text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+            className="rounded-lg border border-neutral-300 px-3 text-xs text-neutral-500"
           >
             Limpar
           </button>
@@ -94,7 +94,7 @@ export default function IndicadoPorSelect({
       </div>
 
       {open && (
-        <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
           {filtradas.length === 0 ? (
             <p className="px-3 py-2 text-xs text-neutral-400">Nenhum cliente encontrado.</p>
           ) : (
@@ -107,7 +107,7 @@ export default function IndicadoPorSelect({
                   setQuery("");
                   setOpen(false);
                 }}
-                className="block w-full px-3 py-2 text-left text-sm text-neutral-800 hover:bg-neutral-50 dark:text-neutral-100 dark:hover:bg-neutral-700"
+                className="block w-full px-3 py-2 text-left text-sm text-neutral-800 hover:bg-neutral-50"
               >
                 {o.name}
                 {o.city && <span className="ml-2 text-xs text-neutral-400">{o.city}</span>}

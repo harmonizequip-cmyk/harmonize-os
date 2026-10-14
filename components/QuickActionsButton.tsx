@@ -155,16 +155,16 @@ export default function QuickActionsButton({
           onClick={() => setMenuOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-t-2xl bg-white/95 p-4 pb-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
+            className="w-full max-w-md rounded-t-2xl bg-white/95 p-4 pb-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300" />
             <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Criar rápido</p>
+              <p className="text-sm font-semibold text-neutral-700">Criar rápido</p>
               <button
                 onClick={() => setMenuOpen(false)}
                 aria-label="Fechar menu"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
               >
                 <X size={16} strokeWidth={1.75} />
               </button>
@@ -174,7 +174,7 @@ export default function QuickActionsButton({
                 <button
                   key={a.key}
                   onClick={() => handlePick(a.key)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
                 >
                   <span className="text-lg">{a.emoji}</span>
                   {a.label}

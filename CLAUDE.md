@@ -78,6 +78,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
 - Atalhos do ícone (manifest `shortcuts`, no máximo 5): Receber, Nova reserva, Hoje e Dias livres (`/agenda?acao=datas`, imagem de datas). Usam `?acao=`. Pendências saiu a pedido do dono (12/10/2026).
 
+## Temas (Clássico e Suave)
+
+- O tema escuro foi retirado a pedido do dono (14/10/2026); não usar classes `dark:`. No lugar há o tema Suave: botão de paleta no topo/menu (`components/ThemeToggle.tsx`), guardado em `localStorage` `harmonize-tema` e aplicado pela classe `tema-suave` no `<html>` (script em `app/layout.tsx`). Os cinzas `neutral-*` do Tailwind saem de variáveis (`--n-50`…`--n-950`, em `app/globals.css`): o Suave troca por cinzas lilás, fundo pastel mais forte, cartões com borda lilás e item ativo da barra em degradê. Ajustes do Suave ficam só no `globals.css`.
+
 ## Exportar planilha
 
 - Todas as telas que exportavam CSV (Agenda, Financeiro, Locações, Clientes, Funil, Pendências, Movimentações) agora geram .xlsx com o layout da Harmonize: título, período, resumo, cabeçalho turquesa, linhas zebradas, R$, datas de verdade, filtro, cabeçalho fixo e total. Montado à mão em `lib/planilha-xlsx.ts` (fflate), entregue por `lib/exportar-planilha.ts` (`exportarTabela`): tenta o Compartilhar (Drive); se o aparelho recusar o tipo, baixa e avisa como mandar ao Drive. Usa as mesmas linhas da tela.

@@ -68,12 +68,12 @@ export default function ContratosClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Contratos</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">Contratos</h1>
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar por cliente..."
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:w-64"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:w-64"
         />
       </div>
 
@@ -82,21 +82,21 @@ export default function ContratosClient({
         exatos usados, para poder baixar de novo quando precisar.
       </p>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {/* Celular: cartões empilhados */}
       <div className="space-y-2 sm:hidden">
         {linhas.map((c) => (
           <div
             key={c.id}
-            className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+            className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl"
           >
             <div className="flex items-start justify-between">
               <div>
                 <Link href={`/clientes/${c.client_id}`} className="text-sm font-medium text-brand-teal underline underline-offset-2">
                   {c.clients?.name ?? c.dados.contratante.nome}
                 </Link>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{formatPeriodo(c.dados)}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{formatPeriodo(c.dados)}</p>
               </div>
               <span className="text-xs text-neutral-400">{formatDate(c.gerado_em.slice(0, 10))}</span>
             </div>
@@ -113,16 +113,16 @@ export default function ContratosClient({
           </div>
         ))}
         {linhas.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
             Nenhum contrato gerado ainda.
           </div>
         )}
       </div>
 
       {/* Tablet e notebook: tabela completa */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55 sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>
               <th className="px-4 py-3">Gerado em</th>
               <th className="px-4 py-3">Cliente</th>
@@ -133,8 +133,8 @@ export default function ContratosClient({
           </thead>
           <tbody>
             {linhas.map((c) => (
-              <tr key={c.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
+              <tr key={c.id} className="border-b border-neutral-100 last:border-0">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                   {formatDate(c.gerado_em.slice(0, 10))}
                 </td>
                 <td className="px-4 py-3">
@@ -142,7 +142,7 @@ export default function ContratosClient({
                     {c.clients?.name ?? c.dados.contratante.nome}
                   </Link>
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatPeriodo(c.dados)}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatPeriodo(c.dados)}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-brand-teal">
                   {formatValorOuApurar(c.dados)}
                 </td>

@@ -461,13 +461,13 @@ export default function EditarEventoModal({
     return (
       <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
         <div
-          className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+          className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900">
             {event.is_mentoria ? "Mentoria pendente" : "Reserva pendente"}
           </h2>
-          <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="mb-4 text-sm text-neutral-500">
             {EQUIPMENT_LABELS[event.event_type] ?? event.event_type} · {formatDate(event.date_start)}
             {event.date_end && event.date_end > event.date_start ? ` a ${formatDate(event.date_end)}` : ""}
             {event.clients?.name ? ` · ${event.clients.name}` : ""}
@@ -477,20 +477,20 @@ export default function EditarEventoModal({
               : "Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar."}
           </p>
 
-          {cancelError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{cancelError}</p>}
+          {cancelError && <p className="mb-3 text-sm text-red-600">{cancelError}</p>}
 
           {showCancelForm ? (
-            <div className="rounded-xl border border-red-200 p-3 dark:border-red-900/50">
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <div className="rounded-xl border border-red-200 p-3">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Motivo do cancelamento (opcional)
               </label>
               <textarea
                 value={cancelMotivo}
                 onChange={(e) => setCancelMotivo(e.target.value)}
                 rows={2}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
-              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
                 <input
                   type="checkbox"
                   checked={cancelNoShow}
@@ -501,7 +501,7 @@ export default function EditarEventoModal({
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => setShowCancelForm(false)}
-                  className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600"
                 >
                   Voltar
                 </button>
@@ -516,16 +516,16 @@ export default function EditarEventoModal({
             </div>
           ) : showReagendar ? (
             <div className="rounded-xl border border-brand-teal/40 p-3">
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Nova data (dia do atendimento)
               </label>
               <input
                 type="date"
                 value={novaData}
                 onChange={(e) => setNovaData(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
-              <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600">
                 Data final (só se o atendimento durar vários dias)
               </label>
               <input
@@ -533,7 +533,7 @@ export default function EditarEventoModal({
                 value={novaDataFim}
                 min={novaData}
                 onChange={(e) => setNovaDataFim(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
               <p className="mt-1 text-[11px] text-neutral-400">
                 {duracaoAtual > 1
@@ -541,7 +541,7 @@ export default function EditarEventoModal({
                   : "Em branco, a reserva continua de um dia só. Preencha para ela cobrir mais de um dia (uma taxa só)."}
               </p>
               {novaDataFim && novaDataFim > novaData && (
-                <div className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                <div className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-800">
                   A reserva vai ocupar de {formatDate(novaData)} a {formatDate(novaDataFim)} (
                   {duracaoEmDias(novaData, novaDataFim)} dias).{" "}
                   <button
@@ -557,14 +557,14 @@ export default function EditarEventoModal({
                   </button>
                 </div>
               )}
-              {reagendarError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{reagendarError}</p>}
+              {reagendarError && <p className="mt-2 text-xs text-red-600">{reagendarError}</p>}
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => {
                     setShowReagendar(false);
                     setReagendarError(null);
                   }}
-                  className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600"
                 >
                   Voltar
                 </button>
@@ -587,7 +587,7 @@ export default function EditarEventoModal({
               <div className="flex gap-2">
                 <button
                   onClick={onClose}
-                  className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
                 >
                   Fechar
                 </button>
@@ -613,7 +613,7 @@ export default function EditarEventoModal({
               {!event.is_mentoria && event.client_id && (
                 <button
                   onClick={() => setShowArte(true)}
-                  className="mt-2 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                  className="mt-2 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-700"
                 >
                   🎨 Arte para a cliente divulgar
                 </button>
@@ -628,8 +628,8 @@ export default function EditarEventoModal({
               )}
 
               {!event.is_mentoria && (
-                <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-                  <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                <div className="mt-3 rounded-xl border border-neutral-200 p-3">
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">
                     Contagem inicial do equipamento
                   </label>
                   <p className="mb-2 text-[11px] text-neutral-400">
@@ -645,7 +645,7 @@ export default function EditarEventoModal({
                       }}
                       placeholder="0"
                       aria-label="Contagem inicial do equipamento"
-                      className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                     />
                     <button
                       type="button"
@@ -670,7 +670,7 @@ export default function EditarEventoModal({
                     </p>
                   )}
                   {contagemOk && <p className="mt-1 text-xs text-brand-teal">{contagemOk}</p>}
-                  {contagemErro && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{contagemErro}</p>}
+                  {contagemErro && <p className="mt-1 text-xs text-red-600">{contagemErro}</p>}
                 </div>
               )}
 
@@ -678,8 +678,8 @@ export default function EditarEventoModal({
                 <Comprovantes pasta={`taxa/${event.id}`} titulo="Comprovantes da taxa de reserva" />
               )}
 
-              <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <div className="mt-3 rounded-xl border border-neutral-200 p-3">
+                <label className="mb-1 block text-xs font-medium text-neutral-600">
                   Ajuda de custo — deslocamento (opcional)
                 </label>
                 {loadingReservaDeslocamento ? (
@@ -687,18 +687,18 @@ export default function EditarEventoModal({
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-neutral-500 dark:text-neutral-400">R$</span>
+                      <span className="text-sm text-neutral-500">R$</span>
                       <input
                         inputMode="decimal"
                         value={valorDeslocamentoReserva}
                         onChange={(e) => setValorDeslocamentoReserva(e.target.value.replace(/[^\d,]/g, ""))}
                         placeholder="0,00"
-                        className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                        className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                       />
                       <button
                         onClick={handleSalvarDeslocamentoReserva}
                         disabled={savingDeslocamentoReserva}
-                        className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+                        className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60"
                       >
                         {savingDeslocamentoReserva ? "Salvando..." : "Salvar"}
                       </button>
@@ -707,7 +707,7 @@ export default function EditarEventoModal({
                       Valor que o cliente já pagou pelo deslocamento, mesmo antes do procedimento. Ao finalizar a
                       reserva, este valor segue junto para a locação.
                     </p>
-                    <label className="mb-1 mt-2 block text-xs font-medium text-neutral-500 dark:text-neutral-500">
+                    <label className="mb-1 mt-2 block text-xs font-medium text-neutral-500">
                       Km de ida (opcional, só para registro — não calcula o valor acima)
                     </label>
                     <input
@@ -715,23 +715,23 @@ export default function EditarEventoModal({
                       value={kmIdaReserva}
                       onChange={(e) => setKmIdaReserva(e.target.value.replace(/\D/g, ""))}
                       placeholder="0"
-                      className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                     />
                   </>
                 )}
                 {deslocamentoReservaError && (
-                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">{deslocamentoReservaError}</p>
+                  <p className="mt-2 text-xs text-red-600">{deslocamentoReservaError}</p>
                 )}
               </div>
 
               <DespesasDaReserva eventId={event.id} clientId={event.client_id} dataEvento={event.date_start} />
 
-              {contratoError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{contratoError}</p>}
+              {contratoError && <p className="mt-3 text-sm text-red-600">{contratoError}</p>}
 
               <button
                 onClick={handleAbrirContratoReserva}
                 disabled={loadingContrato}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-neutral-200 py-2.5 text-sm font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-neutral-200 py-2.5 text-sm font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal disabled:opacity-60"
               >
                 <FileText size={14} strokeWidth={1.75} />
                 {loadingContrato ? "Carregando..." : "Gerar contrato"}
@@ -739,7 +739,7 @@ export default function EditarEventoModal({
 
               <button
                 onClick={() => setShowCancelForm(true)}
-                className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+                className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600"
               >
                 Cancelar reserva
               </button>
@@ -782,20 +782,20 @@ export default function EditarEventoModal({
     return (
       <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
         <div
-          className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+          className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{event.title}</h2>
-          <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900">{event.title}</h2>
+          <p className="mb-4 text-sm text-neutral-500">
             Este evento veio de uma locação HIPRO. Para editar cliente, data, equipamento, disparos ou valor, isso é
             feito na própria locação (na ficha do cliente), para manter o financeiro e a agenda sincronizados.
           </p>
 
           {saldoLocacao !== null && (
-            <div className="mb-4 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+            <div className="mb-4 rounded-xl border border-neutral-200 p-3">
               {saldoLocacao > 0.009 ? (
                 <>
-                  <p className="mb-2 text-sm text-amber-700 dark:text-amber-400">
+                  <p className="mb-2 text-sm text-amber-700">
                     Falta receber {formatCurrency(saldoLocacao)}.
                   </p>
                   <ReceberPagamentoBotao
@@ -817,8 +817,8 @@ export default function EditarEventoModal({
             <Comprovantes pasta={`locacao/${event.rental_id}`} titulo="Comprovantes de pagamento" />
           </div>
 
-          <div className="mb-4 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <div className="mb-4 rounded-xl border border-neutral-200 p-3">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Ajuda de custo — deslocamento (opcional)
             </label>
             {loadingRental ? (
@@ -826,18 +826,18 @@ export default function EditarEventoModal({
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-neutral-500 dark:text-neutral-400">R$</span>
+                  <span className="text-sm text-neutral-500">R$</span>
                   <input
                     inputMode="decimal"
                     value={valorDeslocamento}
                     onChange={(e) => setValorDeslocamento(e.target.value.replace(/[^\d,]/g, ""))}
                     placeholder="0,00"
-                    className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                   <button
                     onClick={handleSalvarDeslocamento}
                     disabled={savingDeslocamento}
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60"
                   >
                     {savingDeslocamento ? "Salvando..." : "Salvar"}
                   </button>
@@ -848,7 +848,7 @@ export default function EditarEventoModal({
                   conta no faturamento. Deixe em branco (ou zere) para remover.
                 </p>
                 {valorDeslocamentoNumber > 0 && (
-                  <label className="mt-2 flex items-start gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  <label className="mt-2 flex items-start gap-2 text-xs text-neutral-500">
                     <input
                       type="checkbox"
                       checked={inclusoNoValor}
@@ -861,7 +861,7 @@ export default function EditarEventoModal({
                     </span>
                   </label>
                 )}
-                <label className="mb-1 mt-2 block text-xs font-medium text-neutral-500 dark:text-neutral-500">
+                <label className="mb-1 mt-2 block text-xs font-medium text-neutral-500">
                   Km de ida (opcional, só para registro — não calcula o valor acima)
                 </label>
                 <input
@@ -869,19 +869,19 @@ export default function EditarEventoModal({
                   value={kmIda}
                   onChange={(e) => setKmIda(e.target.value.replace(/\D/g, ""))}
                   placeholder="0"
-                  className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
               </>
             )}
-            {deslocamentoError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{deslocamentoError}</p>}
+            {deslocamentoError && <p className="mt-2 text-xs text-red-600">{deslocamentoError}</p>}
           </div>
 
-          {contratoError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{contratoError}</p>}
+          {contratoError && <p className="mb-3 text-sm text-red-600">{contratoError}</p>}
 
           <button
             onClick={handleAbrirContratoRental}
             disabled={loadingContrato || loadingRental}
-            className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-neutral-200 py-2.5 text-sm font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+            className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-neutral-200 py-2.5 text-sm font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal disabled:opacity-60"
           >
             <FileText size={14} strokeWidth={1.75} />
             {loadingContrato ? "Carregando..." : "Gerar contrato"}
@@ -890,7 +890,7 @@ export default function EditarEventoModal({
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
             >
               Fechar
             </button>
@@ -911,18 +911,18 @@ export default function EditarEventoModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar evento</h2>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar evento</h2>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Título</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
@@ -935,32 +935,32 @@ export default function EditarEventoModal({
           />
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
             <input
               type="date"
               value={dateStart}
               onChange={(e) => setDateStart(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>
@@ -975,7 +975,7 @@ export default function EditarEventoModal({
 
         <button
           onClick={() => setConfirmarExclusao(true)}
-          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600"
         >
           Excluir evento
         </button>

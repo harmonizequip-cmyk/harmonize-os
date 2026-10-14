@@ -64,46 +64,46 @@ export default async function EquipmentDetailPage({
 
   const SITUACAO_LABEL: Record<string, { label: string; className: string }> = {
     pago: { label: "Pago", className: "bg-brand-teal/15 text-brand-teal" },
-    parcial: { label: "Parcial", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+    parcial: { label: "Parcial", className: "bg-amber-100 text-amber-700" },
     pendente: { label: "Pendente", className: "bg-brand-pink/15 text-brand-pink" },
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <Link href="/dashboard" className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400">
+        <Link href="/dashboard" className="text-sm text-neutral-500 hover:text-neutral-700">
           ← Dashboard
         </Link>
       </div>
 
       <div>
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+        <h1 className="text-xl font-semibold text-neutral-900">
           {equipment?.name ?? "Equipamento"}
         </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-sm text-neutral-500">
           {formatDate(fromStr)} até {formatDate(toStr)}
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Total cobrado</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(totalCobrado)}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Total cobrado</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(totalCobrado)}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Pendente</p>
-          <p className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(totalPendente)}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Pendente</p>
+          <p className="mt-1 text-lg font-semibold text-amber-600">{formatCurrency(totalPendente)}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{normalizedRentals.length}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Locações</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{normalizedRentals.length}</p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+      <div className="overflow-hidden rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-neutral-200/60 text-left text-xs text-neutral-500 dark:border-neutral-800/60 dark:text-neutral-400">
+            <tr className="border-b border-neutral-200/60 text-left text-xs text-neutral-500">
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium">Data</th>
               <th className="px-4 py-3 font-medium text-right">Valor</th>
@@ -117,20 +117,20 @@ export default async function EquipmentDetailPage({
               const situacaoKey = r.situacao?.situacao ?? "pendente";
               const situacaoInfo = SITUACAO_LABEL[situacaoKey] ?? SITUACAO_LABEL.pendente;
               return (
-                <tr key={r.id} className="border-b border-neutral-200/40 last:border-0 dark:border-neutral-800/40">
-                  <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">
+                <tr key={r.id} className="border-b border-neutral-200/40 last:border-0">
+                  <td className="px-4 py-3 text-neutral-900">
                     {r.clients?.name ?? "—"}
                   </td>
-                  <td className="px-4 py-3 text-neutral-500 dark:text-neutral-400">
+                  <td className="px-4 py-3 text-neutral-500">
                     {formatDate(r.event_date)}
                   </td>
-                  <td className="px-4 py-3 text-right text-neutral-900 dark:text-neutral-100">
+                  <td className="px-4 py-3 text-right text-neutral-900">
                     {formatCurrency(Number(r.calculated_value))}
                   </td>
-                  <td className="px-4 py-3 text-right text-neutral-500 dark:text-neutral-400">
+                  <td className="px-4 py-3 text-right text-neutral-500">
                     {formatCurrency(Number(r.situacao?.total_pago ?? 0))}
                   </td>
-                  <td className="px-4 py-3 text-right font-medium text-amber-600 dark:text-amber-400">
+                  <td className="px-4 py-3 text-right font-medium text-amber-600">
                     {formatCurrency(Number(r.situacao?.saldo ?? 0))}
                   </td>
                   <td className="px-4 py-3">
@@ -143,7 +143,7 @@ export default async function EquipmentDetailPage({
             })}
             {normalizedRentals.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-neutral-500">
                   Nenhuma locação neste período.
                 </td>
               </tr>

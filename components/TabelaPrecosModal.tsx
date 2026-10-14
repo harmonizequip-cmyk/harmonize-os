@@ -90,21 +90,21 @@ export default function TabelaPrecosModal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className="text-lg font-semibold text-neutral-900">
           Tabela de preços{clientName ? ` para ${clientName}` : ""}
         </h2>
-        <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mb-3 text-xs text-neutral-500">
           Os valores vêm de Configurações: mudou lá, a arte já sai atualizada.
         </p>
         {url ? (
-          <img src={url} alt="Tabela de preços do HIPRO" className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800" />
+          <img src={url} alt="Tabela de preços do HIPRO" className="w-full rounded-xl border border-neutral-200" />
         ) : (
           <p className="py-10 text-center text-sm text-neutral-400">Montando a arte...</p>
         )}
-        <p className="mt-3 whitespace-pre-line rounded-xl bg-neutral-50 p-3 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+        <p className="mt-3 whitespace-pre-line rounded-xl bg-neutral-50 p-3 text-xs text-neutral-600">
           {mensagem}
         </p>
         {nota && <p className="mt-2 text-xs text-brand-teal">{nota}</p>}
@@ -113,7 +113,7 @@ export default function TabelaPrecosModal({
             type="button"
             onClick={baixar}
             disabled={!url}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 disabled:opacity-50"
           >
             Baixar imagem
           </button>

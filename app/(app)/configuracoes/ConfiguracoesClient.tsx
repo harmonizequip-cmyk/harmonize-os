@@ -228,68 +228,68 @@ export default function ConfiguracoesClient({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Configurações</h1>
+      <h1 className="text-xl font-semibold text-neutral-900">Configurações</h1>
 
       {/* ---- Preços ---- */}
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-        <h2 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Preço da locação HIPRO</h2>
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+        <h2 className="mb-1 text-sm font-semibold text-neutral-900">Preço da locação HIPRO</h2>
         <p className="mb-4 text-xs text-neutral-400">
           Pacote fixo até o limite 1; até o limite 2, pacote + excedente pela taxa da faixa 2; acima do limite 2, a taxa da faixa 3 vale sobre o total de disparos.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Limite do pacote fixo (disparos)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Limite do pacote fixo (disparos)</label>
             <input
               inputMode="numeric"
               value={flatPackageLimit}
               onChange={(e) => setFlatPackageLimit(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Valor do pacote fixo (R$)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Valor do pacote fixo (R$)</label>
             <input
               inputMode="decimal"
               value={flatPackageValue}
               onChange={(e) => setFlatPackageValue(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Limite da faixa 2 (disparos)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Limite da faixa 2 (disparos)</label>
             <input
               inputMode="numeric"
               value={tier2Limit}
               onChange={(e) => setTier2Limit(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa faixa 2 (R$/disparo)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Taxa faixa 2 (R$/disparo)</label>
             <input
               inputMode="decimal"
               value={tier2Rate}
               onChange={(e) => setTier2Rate(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa faixa 3 (R$/disparo)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Taxa faixa 3 (R$/disparo)</label>
             <input
               inputMode="decimal"
               value={tier3Rate}
               onChange={(e) => setTier3Rate(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Taxa de reserva (R$)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Taxa de reserva (R$)</label>
             <input
               inputMode="decimal"
               value={reservationFee}
               onChange={(e) => setReservationFee(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -298,45 +298,45 @@ export default function ConfiguracoesClient({
           Prévia: {formatCurrency(n(flatPackageValue) || 0)} até {flatPackageLimit || 0} disparos.
         </p>
 
-        <h2 className="mb-1 mt-6 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Preço da mentoria</h2>
+        <h2 className="mb-1 mt-6 text-sm font-semibold text-neutral-900">Preço da mentoria</h2>
         <p className="mb-4 text-xs text-neutral-400">
           Por paciente modelo. Pagamento em crédito usa o valor parcelado; qualquer outra forma usa o valor à vista.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Valor à vista por paciente (R$)
             </label>
             <input
               inputMode="decimal"
               value={mentoriaValorAvista}
               onChange={(e) => setMentoriaValorAvista(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Valor parcelado no crédito por paciente (R$)
             </label>
             <input
               inputMode="decimal"
               value={mentoriaValorParcelado}
               onChange={(e) => setMentoriaValorParcelado(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        <h2 className="mb-1 mt-6 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Cliente inativo</h2>
+        <h2 className="mb-1 mt-6 text-sm font-semibold text-neutral-900">Cliente inativo</h2>
         <p className="mb-2 text-xs text-neutral-400">Dias sem locação para o cliente ganhar a badge "Inativo" na lista.</p>
         <input
           inputMode="numeric"
           value={inactiveDays}
           onChange={(e) => setInactiveDays(e.target.value)}
-          className="w-full max-w-[160px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="w-full max-w-[160px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
 
-        {settingsError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{settingsError}</p>}
+        {settingsError && <p className="mt-3 text-sm text-red-600">{settingsError}</p>}
         {settingsSaved && <p className="mt-3 text-sm text-brand-teal">Salvo ✓</p>}
 
         <button
@@ -349,13 +349,13 @@ export default function ConfiguracoesClient({
       </div>
 
       {/* ---- Automações ---- */}
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-        <h2 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Automações</h2>
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+        <h2 className="mb-1 text-sm font-semibold text-neutral-900">Automações</h2>
         <p className="mb-4 text-xs text-neutral-400">
           Regras que o sistema aplica sozinho no funil de clientes.
         </p>
 
-        <label className="mb-4 flex items-start gap-2 text-sm text-neutral-800 dark:text-neutral-200">
+        <label className="mb-4 flex items-start gap-2 text-sm text-neutral-800">
           <input
             type="checkbox"
             checked={recontatoAtivo}
@@ -373,28 +373,28 @@ export default function ConfiguracoesClient({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Dias sem locação até ir para Reativar
             </label>
             <input
               inputMode="numeric"
               value={diasAteReativar}
               onChange={(e) => setDiasAteReativar(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <p className="mt-1 text-[11px] text-neutral-400">
               Contados a partir da data da última locação concluída. Quem tem reserva futura não cai em Reativar.
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Intervalo da tarefa de recontato (dias)
             </label>
             <input
               inputMode="numeric"
               value={recontatoIntervalo}
               onChange={(e) => setRecontatoIntervalo(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <p className="mt-1 text-[11px] text-neutral-400">
               Intervalo entre uma tarefa concluída e o vencimento da próxima.
@@ -402,7 +402,7 @@ export default function ConfiguracoesClient({
           </div>
         </div>
 
-        <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+        <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-neutral-500">
           Tarefas da agenda
         </h3>
         <div className="space-y-3">
@@ -432,7 +432,7 @@ export default function ConfiguracoesClient({
               descricao: "dias com a taxa pendente, contados da criação da reserva",
             },
           ].map((t) => (
-            <div key={t.titulo} className="flex items-center gap-3 rounded-xl border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+            <div key={t.titulo} className="flex items-center gap-3 rounded-xl border border-neutral-200 px-3 py-2">
               <input
                 type="checkbox"
                 checked={t.ativa}
@@ -440,7 +440,7 @@ export default function ConfiguracoesClient({
                 className="h-4 w-4 flex-shrink-0 rounded border-neutral-300"
                 aria-label={t.titulo}
               />
-              <span className="min-w-0 flex-1 text-sm text-neutral-800 dark:text-neutral-200">
+              <span className="min-w-0 flex-1 text-sm text-neutral-800">
                 {t.titulo}
                 <span className="block text-[11px] text-neutral-400">{t.descricao}</span>
               </span>
@@ -448,13 +448,13 @@ export default function ConfiguracoesClient({
                 inputMode="numeric"
                 value={t.dias}
                 onChange={(e) => t.setDias(e.target.value)}
-                className="w-16 flex-shrink-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-center text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-16 flex-shrink-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-center text-sm"
               />
             </div>
           ))}
         </div>
 
-        {autoError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{autoError}</p>}
+        {autoError && <p className="mt-3 text-sm text-red-600">{autoError}</p>}
         {autoSaved && <p className="mt-3 text-sm text-brand-teal">Salvo ✓</p>}
 
         <button
@@ -467,8 +467,8 @@ export default function ConfiguracoesClient({
       </div>
 
       {/* ---- Tags ---- */}
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-        <h2 className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Tags</h2>
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+        <h2 className="mb-3 text-sm font-semibold text-neutral-900">Tags</h2>
 
         <div className="space-y-2">
           {tags.map((tag) =>
@@ -477,7 +477,7 @@ export default function ConfiguracoesClient({
                 <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="mb-2 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="mb-2 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
                 />
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {TAG_PALETTE.map((c) => (
@@ -493,7 +493,7 @@ export default function ConfiguracoesClient({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEditingTagId(null)}
-                    className="flex items-center gap-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                    className="flex items-center gap-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600"
                   >
                     <X size={14} /> Cancelar
                   </button>
@@ -506,16 +506,16 @@ export default function ConfiguracoesClient({
                 </div>
               </div>
             ) : (
-              <div key={tag.id} className="flex items-center justify-between rounded-xl border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+              <div key={tag.id} className="flex items-center justify-between rounded-xl border border-neutral-200 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
-                  <span className="text-sm text-neutral-800 dark:text-neutral-200">{tag.name}</span>
+                  <span className="text-sm text-neutral-800">{tag.name}</span>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => startEdit(tag)} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800">
+                  <button onClick={() => startEdit(tag)} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600">
                     <Pencil size={14} />
                   </button>
-                  <button onClick={() => handleDeleteTag(tag)} className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+                  <button onClick={() => handleDeleteTag(tag)} className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -525,13 +525,13 @@ export default function ConfiguracoesClient({
           {tags.length === 0 && <p className="py-4 text-center text-xs text-neutral-400">Nenhuma tag ainda.</p>}
         </div>
 
-        <div className="mt-4 rounded-xl border border-dashed border-neutral-300 p-3 dark:border-neutral-700">
-          <p className="mb-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">Nova tag</p>
+        <div className="mt-4 rounded-xl border border-dashed border-neutral-300 p-3">
+          <p className="mb-2 text-xs font-medium text-neutral-600">Nova tag</p>
           <input
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             placeholder="Ex: VIP"
-            className="mb-2 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="mb-2 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
           />
           <div className="mb-2 flex flex-wrap gap-1.5">
             {TAG_PALETTE.map((c) => (
@@ -544,7 +544,7 @@ export default function ConfiguracoesClient({
               />
             ))}
           </div>
-          {tagError && <p className="mb-2 text-xs text-red-600 dark:text-red-400">{tagError}</p>}
+          {tagError && <p className="mb-2 text-xs text-red-600">{tagError}</p>}
           <button
             onClick={handleCreateTag}
             disabled={creatingTag || !newTagName.trim()}

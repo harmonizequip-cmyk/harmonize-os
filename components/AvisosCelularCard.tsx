@@ -111,20 +111,20 @@ export default function AvisosCelularCard() {
   const botao = "rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60";
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4">
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-teal/10 text-brand-teal">
           <BellRing size={17} strokeWidth={1.75} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Avisos no celular</p>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm font-medium text-neutral-900">Avisos no celular</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
             Chegam com o app fechado: 7h30 o resumo do dia (reservas, quem deve, tarefas atrasadas) e 18h as
             reservas de amanhã. Tocar no aviso abre a tela certa.
           </p>
 
           {!instalado && (
-            <div className="mt-2 rounded-lg bg-neutral-100 p-2 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+            <div className="mt-2 rounded-lg bg-neutral-100 p-2 text-xs text-neutral-600">
               {instalacao ? (
                 <button type="button" onClick={instalar} className="font-medium text-brand-teal underline underline-offset-2">
                   Instalar o Harmonize na tela inicial
@@ -138,12 +138,12 @@ export default function AvisosCelularCard() {
           <p className="mt-2 text-xs font-medium">
             {estado === "carregando" && <span className="text-neutral-400">Verificando este aparelho...</span>}
             {estado === "sem_suporte" && (
-              <span className="text-amber-700 dark:text-amber-400">
+              <span className="text-amber-700">
                 Este navegador não recebe avisos. No celular, use o Chrome (no iPhone, instale o app na tela inicial).
               </span>
             )}
             {estado === "bloqueado" && (
-              <span className="text-amber-700 dark:text-amber-400">
+              <span className="text-amber-700">
                 Os avisos estão bloqueados. Libere em Configurações do Chrome &gt; Configurações do site &gt; Notificações.
               </span>
             )}
@@ -166,7 +166,7 @@ export default function AvisosCelularCard() {
                   type="button"
                   onClick={desligar}
                   disabled={ocupado}
-                  className={`${botao} border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300`}
+                  className={`${botao} border border-neutral-300 text-neutral-600`}
                 >
                   Desligar
                 </button>
@@ -174,7 +174,7 @@ export default function AvisosCelularCard() {
             )}
           </div>
           {mensagem && <p className="mt-2 text-xs text-brand-teal">{mensagem}</p>}
-          {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
         </div>
       </div>
     </div>

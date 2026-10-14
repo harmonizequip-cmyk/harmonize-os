@@ -63,7 +63,7 @@ const NAV_ITEMS = [
 ];
 
 // Chave de localStorage pra lembrar a preferência de menu recolhido —
-// mesmo padrão do ThemeToggle (harmonize-theme): guarda só neste
+// mesmo padrão do ThemeToggle (harmonize-tema): guarda só neste
 // navegador/dispositivo, não sincroniza entre aparelhos, e começa sempre
 // aberto (valor default) até o useEffect ler o que foi salvo, pra não
 // depender de localStorage durante a renderização no servidor.
@@ -127,27 +127,27 @@ export default function Sidebar({
       // sempre fica exatamente em w-60 (ou w-16 recolhido), e quem sobra
       // sem espaço é o conteúdo da página, que já tem seu próprio scroll
       // horizontal onde precisa (ex: overflow-x-auto do board do Funil).
-      className={`hidden flex-shrink-0 flex-col overflow-x-hidden border-r border-white/50 bg-white/70 p-4 backdrop-blur-xl transition-[width] duration-200 ease-in-out dark:border-neutral-800/60 dark:bg-neutral-900/60 md:sticky md:top-0 md:flex md:h-screen md:overflow-y-auto ${
+      className={`hidden flex-shrink-0 flex-col overflow-x-hidden border-r border-white/50 bg-white/70 p-4 backdrop-blur-xl transition-[width] duration-200 ease-in-out md:sticky md:top-0 md:flex md:h-screen md:overflow-y-auto ${
         collapsed ? "md:w-16" : "w-60"
       }`}
     >
       <div className={`mb-8 flex items-center ${collapsed ? "flex-col gap-2" : "justify-between gap-2 px-2"}`}>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-11 w-auto dark:hidden" />
+            <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-11 w-auto" />
             <img
               src="/harmonize-logo-full-dark.png"
               alt="Harmonize"
-              className="hidden h-11 w-auto dark:block"
+              className="hidden h-11 w-auto"
             />
-            <p className="mt-2 truncate text-xs font-medium text-neutral-400 dark:text-neutral-500">{name}</p>
+            <p className="mt-2 truncate text-xs font-medium text-neutral-400">{name}</p>
           </div>
         )}
         <button
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
           title={collapsed ? "Expandir menu" : "Recolher menu"}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600"
         >
           {collapsed ? <ChevronRight size={16} strokeWidth={1.75} /> : <ChevronLeft size={16} strokeWidth={1.75} />}
         </button>
@@ -170,27 +170,27 @@ export default function Sidebar({
                 collapsed ? "justify-center px-0 py-2" : "gap-3 px-3 py-2"
               } ${
                 active
-                  ? "bg-neutral-900 font-medium text-white dark:bg-white dark:text-neutral-900"
-                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  ? "bg-neutral-900 font-medium text-white"
+                  : "text-neutral-600 hover:bg-neutral-100"
               }`}
             >
-              <Icon size={17} strokeWidth={1.75} className={active ? "" : "text-neutral-400 dark:text-neutral-500"} />
+              <Icon size={17} strokeWidth={1.75} className={active ? "" : "text-neutral-400"} />
               {!collapsed && <span>{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-2 space-y-0.5 border-t border-neutral-200 pt-2 dark:border-neutral-800">
+      <div className="mt-2 space-y-0.5 border-t border-neutral-200 pt-2">
         <ThemeToggle compact={collapsed} className={collapsed ? "mx-auto h-8 w-8" : undefined} />
         <button
           onClick={handleLogout}
           title={collapsed ? "Sair" : undefined}
-          className={`flex items-center rounded-lg text-left text-sm text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 ${
+          className={`flex items-center rounded-lg text-left text-sm text-neutral-500 transition hover:bg-neutral-100 ${
             collapsed ? "mx-auto h-8 w-8 justify-center" : "w-full gap-3 px-3 py-2"
           }`}
         >
-          <LogOut size={17} strokeWidth={1.75} className="text-neutral-400 dark:text-neutral-500" />
+          <LogOut size={17} strokeWidth={1.75} className="text-neutral-400" />
           {!collapsed && "Sair"}
         </button>
       </div>

@@ -397,10 +397,10 @@ export default function EditarLocacaoModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar locação</h2>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar locação</h2>
 
         <div className="space-y-3">
           <div>
@@ -413,11 +413,11 @@ export default function EditarLocacaoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Equipamento</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Equipamento</label>
             <select
               value={equipmentId}
               onChange={(e) => setEquipmentId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
               {equipments.map((eq) => (
                 <option key={eq.id} value={eq.id}>
@@ -428,17 +428,17 @@ export default function EditarLocacaoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
             <input
               type="date"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="flex items-center gap-2 text-xs font-medium text-neutral-600">
               <input
                 type="checkbox"
                 checked={isPeriodo}
@@ -446,37 +446,37 @@ export default function EditarLocacaoModal({
                   setIsPeriodo(e.target.checked);
                   if (!e.target.checked) setEventDateEnd("");
                 }}
-                className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-700"
+                className="h-4 w-4 rounded border-neutral-300"
               />
               Locação de período (mais de um dia)
             </label>
             {isPeriodo && (
               <div className="mt-2">
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Até</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Até</label>
                 <input
                   type="date"
                   value={eventDateEnd}
                   min={eventDate}
                   onChange={(e) => setEventDateEnd(e.target.value)}
-                  className="w-full max-w-[200px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full max-w-[200px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
               </div>
             )}
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Disparos</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Disparos</label>
             <input
               inputMode="numeric"
               value={shots}
               onChange={(e) => setShots(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400">Valor final</label>
+              <label className="block text-xs font-medium text-neutral-600">Valor final</label>
               {suggestedValue !== null && (
                 <button
                   type="button"
@@ -491,7 +491,7 @@ export default function EditarLocacaoModal({
               inputMode="decimal"
               value={valor}
               onChange={(e) => setValor(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <p className="mt-1 text-xs text-neutral-400">
               Editável à parte, já que cobranças adicionais e descontos aplicados na criação não ficam guardados separadamente.
@@ -502,9 +502,9 @@ export default function EditarLocacaoModal({
               lançar novos valores (parciais ou o restante), em formas
               diferentes, sem travar a locação como "paga" até o saldo
               zerar. Substitui o antigo campo único "Forma de pagamento". */}
-          <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+          <div className="rounded-xl border border-neutral-200 p-3">
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Pagamentos recebidos</label>
+              <label className="text-xs font-medium text-neutral-600">Pagamentos recebidos</label>
               {saldoDevedor !== null && (
                 <span className={`text-xs font-semibold ${saldoDevedor > 0 ? "text-amber-600" : "text-emerald-600"}`}>
                   {saldoDevedor > 0 ? `Saldo em aberto: ${formatCurrency(saldoDevedor)}` : "Quitada"}
@@ -519,7 +519,7 @@ export default function EditarLocacaoModal({
             ) : (
               <ul className="mb-2 space-y-1">
                 {payments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between text-sm text-neutral-700 dark:text-neutral-300">
+                  <li key={p.id} className="flex items-center justify-between text-sm text-neutral-700">
                     <span>
                       {formatCurrency(p.valor)} — {PAYMENT_METHODS.find((m) => m.value === p.forma)?.label ?? p.forma}
                       {p.pix_conta ? ` (${p.pix_conta})` : ""} · {new Date(p.data + "T00:00:00").toLocaleDateString("pt-BR")}
@@ -543,7 +543,7 @@ export default function EditarLocacaoModal({
                   value={novoValor}
                   onChange={(e) => setNovoValor(e.target.value)}
                   placeholder="0,00"
-                  className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                  className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
                 />
               </div>
               <div className="flex-1">
@@ -551,7 +551,7 @@ export default function EditarLocacaoModal({
                 <select
                   value={novaForma}
                   onChange={(e) => setNovaForma(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                  className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
                 >
                   {PAYMENT_METHODS.map((p) => (
                     <option key={p.value} value={p.value}>{p.label}</option>
@@ -564,7 +564,7 @@ export default function EditarLocacaoModal({
                   <select
                     value={novaPixConta}
                     onChange={(e) => setNovaPixConta(e.target.value)}
-                    className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                    className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
                   >
                     <option value="eder">Eder</option>
                     <option value="harmonize">Harmonize</option>
@@ -584,24 +584,24 @@ export default function EditarLocacaoModal({
           </div>
 
           {!loadingPayments && (
-            <div className="rounded-xl border border-neutral-200 p-3 text-sm dark:border-neutral-700">
-              <p className="mb-1 text-xs font-medium text-neutral-600 dark:text-neutral-400">Lucro líquido desta locação</p>
-              <div className="space-y-0.5 text-neutral-700 dark:text-neutral-300">
+            <div className="rounded-xl border border-neutral-200 p-3 text-sm">
+              <p className="mb-1 text-xs font-medium text-neutral-600">Lucro líquido desta locação</p>
+              <div className="space-y-0.5 text-neutral-700">
                 <div className="flex justify-between"><span>Recebido da locação{creditoTaxa > 0 ? " (inclui taxa de reserva)" : ""}</span><span>{formatCurrency(totalRecebido)}</span></div>
                 {ajudaCustoLancada > 0 && (
                   <div className="flex justify-between"><span>Ajuda de custo (deslocamento)</span><span>{formatCurrency(ajudaCustoLancada)}</span></div>
                 )}
                 <div className="flex justify-between"><span>Custos (gasolina etc.)</span><span>− {formatCurrency(totalDespesas)}</span></div>
-                <div className={`flex justify-between border-t border-neutral-200 pt-1 font-semibold dark:border-neutral-700 ${lucroLiquido >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                <div className={`flex justify-between border-t border-neutral-200 pt-1 font-semibold ${lucroLiquido >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                   <span>Lucro líquido</span><span>{formatCurrency(lucroLiquido)}</span>
                 </div>
               </div>
-              <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-700">
-                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Lançar custo desta locação</p>
+              <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3">
+                <p className="text-xs font-medium text-neutral-600">Lançar custo desta locação</p>
                 <select
                   value={custoCategoriaId}
                   onChange={(e) => setCustoCategoriaId(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 >
                   <option value="">Categoria do custo...</option>
                   {categoriasSaida.map((c) => (
@@ -616,12 +616,12 @@ export default function EditarLocacaoModal({
                     value={custoValor}
                     onChange={(e) => setCustoValor(e.target.value.replace(/[^\d,]/g, ""))}
                     placeholder="R$ 0,00"
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                   <select
                     value={custoForma}
                     onChange={(e) => setCustoForma(e.target.value)}
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   >
                     {PAYMENT_METHODS.map((m) => (
                       <option key={m.value} value={m.value}>
@@ -634,14 +634,14 @@ export default function EditarLocacaoModal({
                   value={custoDescricao}
                   onChange={(e) => setCustoDescricao(e.target.value)}
                   placeholder="Descrição (opcional)"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
                 {custoErro && <p className="text-xs text-red-500">{custoErro}</p>}
                 <button
                   type="button"
                   onClick={handleAddCusto}
                   disabled={custoSalvando}
-                  className="w-full rounded-lg border border-neutral-300 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+                  className="w-full rounded-lg border border-neutral-300 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60"
                 >
                   {custoSalvando ? "Lançando..." : "+ Lançar custo"}
                 </button>
@@ -650,17 +650,17 @@ export default function EditarLocacaoModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Ajuda de custo — deslocamento (opcional)
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-500 dark:text-neutral-400">R$</span>
+              <span className="text-sm text-neutral-500">R$</span>
               <input
                 inputMode="decimal"
                 value={valorDeslocamento}
                 onChange={(e) => setValorDeslocamento(e.target.value.replace(/[^\d,]/g, ""))}
                 placeholder="0,00"
-                className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
             </div>
             <p className="mt-1 text-xs text-neutral-400">
@@ -669,7 +669,7 @@ export default function EditarLocacaoModal({
               faturamento. Deixe em branco (ou zere) para remover.
             </p>
             {valorDeslocamentoNumber > 0 && (
-              <label className="mt-2 flex items-start gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+              <label className="mt-2 flex items-start gap-2 text-xs text-neutral-500">
                 <input
                   type="checkbox"
                   checked={inclusoNoValor}
@@ -682,7 +682,7 @@ export default function EditarLocacaoModal({
                 </span>
               </label>
             )}
-            <label className="mb-1 mt-2 block text-xs font-medium text-neutral-500 dark:text-neutral-500">
+            <label className="mb-1 mt-2 block text-xs font-medium text-neutral-500">
               Km de ida (opcional, só para registro — não calcula o valor acima)
             </label>
             <input
@@ -690,21 +690,21 @@ export default function EditarLocacaoModal({
               value={kmIda}
               onChange={(e) => setKmIda(e.target.value.replace(/\D/g, ""))}
               placeholder="0"
-              className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           {status === "cancelada" ? (
-            <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-400">
+            <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
               Esta locação está cancelada. Para reativar, use "Reativar" na lista de agendamentos deste cliente.
             </p>
           ) : (
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Status</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s.value} value={s.value}>
@@ -716,22 +716,22 @@ export default function EditarLocacaoModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>
@@ -746,17 +746,17 @@ export default function EditarLocacaoModal({
 
         {status !== "cancelada" && (
           showCancelForm ? (
-            <div className="mt-3 rounded-xl border border-red-200 p-3 dark:border-red-900/50">
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <div className="mt-3 rounded-xl border border-red-200 p-3">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Motivo do cancelamento (opcional)
               </label>
               <textarea
                 value={cancelMotivo}
                 onChange={(e) => setCancelMotivo(e.target.value)}
                 rows={2}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
-              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
                 <input
                   type="checkbox"
                   checked={cancelNoShow}
@@ -764,11 +764,11 @@ export default function EditarLocacaoModal({
                 />
                 O cliente não compareceu (no-show)
               </label>
-              {cancelError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{cancelError}</p>}
+              {cancelError && <p className="mt-2 text-xs text-red-600">{cancelError}</p>}
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => setShowCancelForm(false)}
-                  className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600"
                 >
                   Voltar
                 </button>
@@ -784,7 +784,7 @@ export default function EditarLocacaoModal({
           ) : (
             <button
               onClick={() => setShowCancelForm(true)}
-              className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+              className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600"
             >
               Cancelar locação
             </button>

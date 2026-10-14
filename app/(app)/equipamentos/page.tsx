@@ -108,7 +108,7 @@ export default async function EquipamentosPage({
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Equipamentos</h1>
+      <h1 className="text-xl font-semibold text-neutral-900">Equipamentos</h1>
 
       <FiltroBarra periodoPadrao="mes" rotuloPeriodo={periodo.rotulo} />
 
@@ -125,15 +125,15 @@ export default async function EquipamentosPage({
           const situacao = aplicador ? situacaoAplicador(aplicador) : null;
 
           return (
-            <div key={eq.id} className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+            <div key={eq.id} className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{eq.name}</h2>
+                <h2 className="text-lg font-semibold text-neutral-900">{eq.name}</h2>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Status</p>
+                  <p className="text-xs text-neutral-500">Status</p>
                   <EquipamentoStatusControl
                     equipmentId={eq.id}
                     status={eq.status}
@@ -143,8 +143,8 @@ export default async function EquipamentosPage({
                   />
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Próxima reserva</p>
-                  <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <p className="text-xs text-neutral-500">Próxima reserva</p>
+                  <p className="mt-0.5 text-sm font-medium text-neutral-900">
                     {nextEvent ? (
                       <>
                         {formatDate(nextEvent.date_start)}
@@ -160,32 +160,32 @@ export default async function EquipamentosPage({
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações no período</p>
-                  <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">{totalLocacoes}</p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  <p className="text-xs text-neutral-500">Locações no período</p>
+                  <p className="mt-0.5 text-sm font-medium text-neutral-900">{totalLocacoes}</p>
+                  <p className="text-xs text-neutral-500">
                     {disparosTotal.toLocaleString("pt-BR")} disparos
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Receita no período</p>
+                  <p className="text-xs text-neutral-500">Receita no período</p>
                   <p className="mt-0.5 text-sm font-medium text-brand-teal">{formatCurrency(receitaTotal)}</p>
                   {pendenteTotal > 0 && (
-                    <p className="mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    <p className="mt-0.5 text-xs font-medium text-amber-600">
                       Pendente: {formatCurrency(pendenteTotal)}
                     </p>
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Locações previstas</p>
+                  <p className="text-xs text-neutral-500">Locações previstas</p>
                   <EquipamentoPrevistasControl items={eqPrevistas} />
                 </div>
                 <div id={`revisao-${eq.code}`} className="col-span-2 scroll-mt-20">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Revisão anual</p>
+                  <p className="text-xs text-neutral-500">Revisão anual</p>
                   <RevisaoAnualControl equipmentId={eq.id} ultimaRevisao={eq.ultima_revisao ?? null} />
                 </div>
                 <div className="col-span-2">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Aplicador montado</p>
-                  <a href="#aplicadores" className="mt-0.5 block text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <p className="text-xs text-neutral-500">Aplicador montado</p>
+                  <a href="#aplicadores" className="mt-0.5 block text-sm font-medium text-neutral-900">
                     {aplicador ? (
                       <>
                         {aplicador.nome} · ≈ {aplicador.disparos.toLocaleString("pt-BR")} disparos
@@ -195,7 +195,7 @@ export default async function EquipamentosPage({
                               situacao.situacao === "fora"
                                 ? "font-normal text-neutral-500"
                                 : situacao.situacao === "perto"
-                                  ? "font-semibold text-amber-600 dark:text-amber-400"
+                                  ? "font-semibold text-amber-600"
                                   : "font-normal text-neutral-500"
                             }`}
                           >
@@ -209,7 +209,7 @@ export default async function EquipamentosPage({
                   </a>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Número de série</p>
+                  <p className="text-xs text-neutral-500">Número de série</p>
                   <EquipamentoInfoControl
                     equipmentId={eq.id}
                     serialNumber={eq.serial_number ?? null}
@@ -226,7 +226,7 @@ export default async function EquipamentosPage({
           );
         })}
         {(!equipments || equipments.length === 0) && (
-          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl">
             Nenhum equipamento cadastrado.
           </div>
         )}

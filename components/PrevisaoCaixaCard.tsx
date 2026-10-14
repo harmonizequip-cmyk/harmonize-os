@@ -19,11 +19,11 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
 
   const linha = (rotulo: string, valor: number, sinal: "+" | "-", dica?: string) => (
     <div className="flex items-baseline justify-between gap-3 text-xs">
-      <span className="text-neutral-600 dark:text-neutral-300">
+      <span className="text-neutral-600">
         {rotulo}
         {dica && <span className="block text-[10px] text-neutral-400">{dica}</span>}
       </span>
-      <span className={`shrink-0 font-medium ${sinal === "+" ? "text-brand-teal" : "text-neutral-700 dark:text-neutral-200"}`}>
+      <span className={`shrink-0 font-medium ${sinal === "+" ? "text-brand-teal" : "text-neutral-700"}`}>
         {sinal === "+" ? "+ " : "− "}
         {formatCurrency(valor)}
       </span>
@@ -31,17 +31,17 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
   );
 
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+    <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] uppercase tracking-wide text-neutral-400">Previsão de caixa</p>
-        <div className="flex rounded-lg bg-neutral-100 p-0.5 text-[11px] dark:bg-neutral-800">
+        <div className="flex rounded-lg bg-neutral-100 p-0.5 text-[11px]">
           {([30, 60] as const).map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => setDias(d)}
               className={`rounded-md px-2.5 py-1 font-medium ${
-                dias === d ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100" : "text-neutral-500"
+                dias === d ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
               }`}
             >
               {d} dias
@@ -50,10 +50,10 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
         </div>
       </div>
 
-      <p className={`mt-2 text-lg font-semibold ${positivo ? "text-brand-teal" : "text-red-600 dark:text-red-400"}`}>
+      <p className={`mt-2 text-lg font-semibold ${positivo ? "text-brand-teal" : "text-red-600"}`}>
         {positivo ? "Sobra" : "Falta"} ≈ {formatCurrency(Math.abs(p.saldo))}
       </p>
-      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">nos próximos {dias} dias, se as reservas acontecerem</p>
+      <p className="text-[11px] text-neutral-500">nos próximos {dias} dias, se as reservas acontecerem</p>
 
       <div className="mt-3 space-y-1.5">
         {linha(
@@ -74,19 +74,19 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
             {verLista ? "Esconder reservas" : "Ver as reservas da conta"}
           </button>
           {verLista && (
-            <ul className="mt-2 divide-y divide-neutral-200/70 dark:divide-neutral-800">
+            <ul className="mt-2 divide-y divide-neutral-200/70">
               {p.reservas.map((r) => (
                 <li key={r.id}>
                   <Link href="/agenda" className="flex items-baseline justify-between gap-3 py-1.5 text-xs">
                     <span className="min-w-0">
                       <span className="text-neutral-500">{formatDate(r.data)}</span>{" "}
-                      <span className="font-medium text-neutral-800 dark:text-neutral-200">{r.clienteNome ?? "Sem cliente"}</span>
+                      <span className="font-medium text-neutral-800">{r.clienteNome ?? "Sem cliente"}</span>
                       <span className="block text-[10px] text-neutral-400">
                         {r.mentoria ? "Mentoria" : r.equipamento} · {ROTULO_BASE[r.base]}
                         {r.taxaPaga > 0 ? ` · taxa paga ${formatCurrency(r.taxaPaga)}` : ""}
                       </span>
                     </span>
-                    <span className="shrink-0 text-neutral-700 dark:text-neutral-200">
+                    <span className="shrink-0 text-neutral-700">
                       {r.base === "sem" ? "?" : `≈ ${formatCurrency(r.aEntrar)}`}
                     </span>
                   </Link>

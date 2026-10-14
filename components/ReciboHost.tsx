@@ -144,9 +144,9 @@ export default function ReciboHost() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-3 sm:bottom-4">
-      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-brand-teal/30 bg-white p-4 shadow-2xl dark:bg-neutral-900">
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-brand-teal/30 bg-white p-4 shadow-2xl">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+          <p className="text-sm font-medium text-neutral-900">
             Pagamento de {reaisRecibo(pagamento.valor)} registrado.
           </p>
           <button onClick={fechar} aria-label="Fechar" className="text-neutral-400">
@@ -176,7 +176,7 @@ export default function ReciboHost() {
             <p className="mt-1 text-center text-[11px] text-neutral-400">No WhatsApp, escolha a conversa da cliente.</p>
           </>
         )}
-        {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+        {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
       </div>
     </div>
   );

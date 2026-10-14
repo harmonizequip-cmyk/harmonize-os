@@ -88,7 +88,7 @@ export default function BottomNav({
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-white/50 bg-white/75 py-2 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/70 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-white/50 bg-white/75 py-2 backdrop-blur-xl md:hidden">
         {mainItems.map((item) => {
           // "Início" do Pessoal (/pessoal) só acende na própria página.
           const active = item.href === "/pessoal" ? pathname === "/pessoal" : pathname.startsWith(item.href);
@@ -98,18 +98,18 @@ export default function BottomNav({
               key={item.href}
               href={item.href}
               className={`flex flex-col items-center rounded-xl px-3 py-1 text-[10px] transition ${
-                active ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
+                active ? "text-neutral-900" : "text-neutral-500"
               }`}
             >
               <span
                 className={`flex h-7 w-9 items-center justify-center rounded-full transition ${
-                  active ? "bg-neutral-900 dark:bg-white" : ""
+                  active ? "bg-neutral-900" : ""
                 }`}
               >
                 <Icon
                   size={17}
                   strokeWidth={1.75}
-                  className={active ? "text-white dark:text-neutral-900" : ""}
+                  className={active ? "text-white" : ""}
                 />
               </span>
               <span className="mt-0.5 font-medium">{item.label}</span>
@@ -120,15 +120,15 @@ export default function BottomNav({
         {!pessoal && <button
           onClick={() => setMenuOpen(true)}
           className={`flex flex-col items-center rounded-xl px-3 py-1 text-[10px] transition ${
-            isInMore ? "text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-neutral-400"
+            isInMore ? "text-neutral-900" : "text-neutral-500"
           }`}
         >
           <span
             className={`flex h-7 w-9 items-center justify-center rounded-full transition ${
-              isInMore ? "bg-neutral-900 dark:bg-white" : ""
+              isInMore ? "bg-neutral-900" : ""
             }`}
           >
-            <Menu size={17} strokeWidth={1.75} className={isInMore ? "text-white dark:text-neutral-900" : ""} />
+            <Menu size={17} strokeWidth={1.75} className={isInMore ? "text-white" : ""} />
           </span>
           <span className="mt-0.5 font-medium">Menu</span>
         </button>}
@@ -140,16 +140,16 @@ export default function BottomNav({
           onClick={() => setMenuOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-t-2xl bg-white/95 p-4 pb-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95"
+            className="w-full max-w-md rounded-t-2xl bg-white/95 p-4 pb-6 shadow-2xl backdrop-blur-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300" />
             <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Mais opções</p>
+              <p className="text-sm font-semibold text-neutral-700">Mais opções</p>
               <button
                 onClick={() => setMenuOpen(false)}
                 aria-label="Fechar menu"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
               >
                 <X size={16} strokeWidth={1.75} />
               </button>
@@ -166,7 +166,7 @@ export default function BottomNav({
                     className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
                       active
                         ? "bg-brand-teal/10 text-brand-teal"
-                        : "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                        : "text-neutral-700 hover:bg-neutral-100"
                     }`}
                   >
                     <Icon size={18} strokeWidth={1.75} />

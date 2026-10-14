@@ -6,7 +6,7 @@
 // carregou).
 export default function ErroDaTela({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400">
+    <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
       <p className="font-semibold">Não consegui carregar esta tela.</p>
       <p className="text-xs">
         Nada foi alterado. Confira a conexão e tente de novo. Se continuar, avise com esta mensagem:{" "}

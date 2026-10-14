@@ -23,10 +23,73 @@ body {
     radial-gradient(450px circle at 95% 90%, rgba(126, 200, 227, 0.11), transparent 60%);
 }
 
-.dark .bg-brand-mesh {
+/* ============================================================
+   TEMAS
+   Clássico (padrão): cinzas neutros do Tailwind.
+   Suave (classe tema-suave no <html>): cinzas lilás, fundo em degradê
+   pastel da marca, cartões com borda lilás e destaque em degradê.
+   Trocado no botão do menu (components/ThemeToggle.tsx).
+   ============================================================ */
+:root {
+  --n-50: 250 250 250;
+  --n-100: 245 245 245;
+  --n-200: 229 229 229;
+  --n-300: 212 212 212;
+  --n-400: 163 163 163;
+  --n-500: 115 115 115;
+  --n-600: 82 82 82;
+  --n-700: 64 64 64;
+  --n-800: 38 38 38;
+  --n-900: 23 23 23;
+  --n-950: 10 10 10;
+}
+
+.tema-suave {
+  --n-50: 251 248 253;
+  --n-100: 245 239 250;
+  --n-200: 235 226 243;
+  --n-300: 221 209 234;
+  --n-400: 166 150 184;
+  --n-500: 128 113 146;
+  --n-600: 101 87 120;
+  --n-700: 80 67 99;
+  --n-800: 61 50 80;
+  --n-900: 44 35 62;
+  --n-950: 30 23 46;
+}
+
+.tema-suave body {
+  background-color: #f7f2fb;
+}
+
+.tema-suave .bg-brand-mesh {
   background-image:
-    radial-gradient(500px circle at 8% 8%, rgba(61, 191, 184, 0.16), transparent 60%),
-    radial-gradient(450px circle at 92% 15%, rgba(232, 120, 154, 0.12), transparent 60%),
-    radial-gradient(600px circle at 25% 95%, rgba(184, 160, 208, 0.14), transparent 60%),
-    radial-gradient(450px circle at 95% 90%, rgba(126, 200, 227, 0.13), transparent 60%);
+    radial-gradient(520px circle at 0% 0%, rgba(184, 160, 208, 0.32), transparent 62%),
+    radial-gradient(480px circle at 100% 12%, rgba(232, 120, 154, 0.18), transparent 60%),
+    radial-gradient(620px circle at 15% 100%, rgba(61, 191, 184, 0.2), transparent 62%),
+    radial-gradient(480px circle at 100% 95%, rgba(126, 200, 227, 0.24), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Cartões de vidro: brancos, com borda lilás e sombra suave. */
+.tema-suave .bg-white\/70 {
+  background-color: rgb(255 255 255 / 0.82);
+}
+.tema-suave .border-white\/60,
+.tema-suave .border-white\/50 {
+  border-color: rgb(184 160 208 / 0.32);
+}
+.tema-suave .shadow-sm {
+  box-shadow: 0 6px 20px -10px rgb(126 98 168 / 0.28);
+}
+
+/* Barra de baixo e topo: destaque do item ativo em degradê da marca. */
+.tema-suave nav .bg-neutral-900 {
+  background-image: linear-gradient(135deg, #3dbfb8 0%, #7ec8e3 55%, #b8a0d0 100%);
+}
+
+.tema-suave header.bg-white\/75,
+.tema-suave nav.bg-white\/75 {
+  background-color: rgb(255 255 255 / 0.7);
+  border-color: rgb(184 160 208 / 0.35);
 }

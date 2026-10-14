@@ -95,17 +95,17 @@ export default function AcessoVisualizacaoCard() {
   }
 
   const campo =
-    "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+    "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue">
           <Eye size={17} strokeWidth={1.75} />
         </span>
         <div>
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Acesso só de visualização</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Vê tudo (menos Configurações), sem poder alterar nada e sem avisos.</p>
+          <p className="text-sm font-medium text-neutral-900">Acesso só de visualização</p>
+          <p className="text-xs text-neutral-500">Vê tudo (menos Configurações), sem poder alterar nada e sem avisos.</p>
         </div>
       </div>
 
@@ -113,12 +113,12 @@ export default function AcessoVisualizacaoCard() {
         <ul className="mt-3 space-y-1.5">
           {acessos.map((a) => (
             <li key={a.id} className="flex items-center justify-between gap-2 text-xs">
-              <span className="min-w-0 truncate text-neutral-700 dark:text-neutral-300">
+              <span className="min-w-0 truncate text-neutral-700">
                 {a.name} · {a.email}
                 {!a.active && <span className="ml-1 text-neutral-400">(sem acesso)</span>}
               </span>
               {a.active ? (
-                <button type="button" onClick={() => remover(a)} className="text-[11px] text-red-600 underline dark:text-red-400">
+                <button type="button" onClick={() => remover(a)} className="text-[11px] text-red-600 underline">
                   tirar acesso
                 </button>
               ) : (
@@ -147,7 +147,7 @@ export default function AcessoVisualizacaoCard() {
             <button
               type="button"
               onClick={() => setAberto(false)}
-              className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs text-neutral-600"
             >
               Cancelar
             </button>
@@ -168,13 +168,13 @@ export default function AcessoVisualizacaoCard() {
             setAberto(true);
             setMensagem(null);
           }}
-          className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+          className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700"
         >
           + Dar acesso de visualização
         </button>
       )}
       {mensagem && <p className="mt-2 text-xs text-brand-teal">{mensagem}</p>}
-      {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
     </div>
   );
 }

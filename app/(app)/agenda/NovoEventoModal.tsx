@@ -58,10 +58,10 @@ export default function NovoEventoModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Novo evento</h2>
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900">Novo evento</h2>
         <p className="mb-4 text-xs text-neutral-400">
           Para HIPRO 1, HIPRO 2 ou mentoria (que também usa o equipamento), use "Reservar HIPRO" — isso trava a
           data no equipamento e evita conflito de agenda. Use este aqui só para compromisso que não depende de
@@ -70,12 +70,12 @@ export default function NovoEventoModal({
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Título</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Reunião, visita técnica..."
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
@@ -88,32 +88,32 @@ export default function NovoEventoModal({
           />
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
             <input
               type="date"
               value={dateStart}
               onChange={(e) => setDateStart(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>

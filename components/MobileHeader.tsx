@@ -21,13 +21,13 @@ export default function MobileHeader() {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-white/50 bg-white/75 px-4 py-2 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/70 md:hidden">
+    <header className="flex items-center justify-between border-b border-white/50 bg-white/75 px-4 py-2 backdrop-blur-xl md:hidden">
       <div className="w-fit">
-        <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-8 w-auto dark:hidden" />
+        <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-8 w-auto" />
         <img
           src="/harmonize-logo-full-dark.png"
           alt="Harmonize"
-          className="hidden h-8 w-auto dark:block"
+          className="hidden h-8 w-auto"
         />
       </div>
       <div className="flex items-center gap-1">
@@ -36,7 +36,7 @@ export default function MobileHeader() {
         <button
           onClick={handleLogout}
           aria-label="Sair"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100"
         >
           <LogOut size={18} strokeWidth={1.75} />
         </button>

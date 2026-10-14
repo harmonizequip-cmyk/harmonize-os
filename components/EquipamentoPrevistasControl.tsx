@@ -14,7 +14,7 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
 
   if (items.length === 0) {
     return (
-      <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">0</p>
+      <p className="mt-0.5 text-sm font-medium text-neutral-900">0</p>
     );
   }
 
@@ -34,17 +34,17 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-neutral-900"
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <h3 className="text-sm font-semibold text-neutral-900">
                 Locações previstas
               </h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                className="text-neutral-400 hover:text-neutral-600"
               >
                 ✕
               </button>
@@ -54,12 +54,12 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-xl border border-neutral-200/60 px-3 py-2 text-sm dark:border-neutral-800/60"
+                  className="flex items-center justify-between rounded-xl border border-neutral-200/60 px-3 py-2 text-sm"
                 >
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  <span className="font-medium text-neutral-900">
                     {item.client_name ?? "Cliente não identificado"}
                   </span>
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                  <span className="text-xs text-neutral-500">
                     {formatDate(item.event_date)}
                   </span>
                 </div>

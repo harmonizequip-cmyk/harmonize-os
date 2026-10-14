@@ -23,14 +23,14 @@ export default async function ConfiguracoesPage() {
     <div className="space-y-6">
       <Link
         href="/configuracoes/dados-teste"
-        className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4 transition hover:border-brand-teal dark:border-neutral-800 dark:bg-neutral-900"
+        className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4 transition hover:border-brand-teal"
       >
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
           <FlaskConical size={17} strokeWidth={1.75} />
         </span>
         <span className="min-w-0">
-          <span className="block text-sm font-medium text-neutral-900 dark:text-neutral-100">Dados de teste</span>
-          <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="block text-sm font-medium text-neutral-900">Dados de teste</span>
+          <span className="block text-xs text-neutral-500">
             Ligar o modo teste, marcar o que é teste e limpar depois
           </span>
         </span>

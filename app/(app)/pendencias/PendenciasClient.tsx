@@ -61,14 +61,14 @@ export default function PendenciasClient({
   }
 
   const card =
-    "rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55";
+    "rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Pendências de pagamento</h1>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <h1 className="text-xl font-semibold text-neutral-900">Pendências de pagamento</h1>
+          <p className="text-xs text-neutral-500">
             Locações que já aconteceram e ainda têm saldo a receber, já descontando taxa de reserva paga e
             pagamentos parciais.
           </p>
@@ -77,19 +77,19 @@ export default function PendenciasClient({
           type="button"
           onClick={baixarCsv}
           disabled={pendencias.locacoes.length === 0}
-          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
         >
           Exportar planilha
         </button>
       </div>
 
       {semDisparos.length > 0 && (
-        <div id="sem-disparos" className="scroll-mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/40 dark:bg-amber-900/10">
+        <div id="sem-disparos" className="scroll-mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
           <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-400">
+            <p className="text-sm font-semibold text-amber-800">
               Atendimentos sem disparos lançados ({semDisparos.length})
             </p>
-            <p className="text-xs text-amber-800/80 dark:text-amber-400/80">
+            <p className="text-xs text-amber-800/80">
               A data já passou e ninguém lançou os disparos, então ainda não viraram cobrança. Abra na agenda e
               use "Finalizar com disparos". Se não aconteceu, cancele a reserva.
             </p>
@@ -98,17 +98,17 @@ export default function PendenciasClient({
             <Link
               key={r.chave}
               href={`/agenda?date=${r.de}`}
-              className="flex items-baseline justify-between gap-2 rounded-xl bg-white/70 p-2.5 dark:bg-neutral-900/55"
+              className="flex items-baseline justify-between gap-2 rounded-xl bg-white/70 p-2.5"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{r.cliente}</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="truncate text-sm font-medium text-neutral-900">{r.cliente}</p>
+                <p className="text-xs text-neutral-500">
                   {r.equipamento ? `${r.equipamento} · ` : ""}
                   {r.de === r.ate ? formatDate(r.de) : `${formatDate(r.de)} a ${formatDate(r.ate)} (${r.dias} dias)`} ·
                   terminou há {r.diasDesde} {r.diasDesde === 1 ? "dia" : "dias"}
                 </p>
               </div>
-              <span className="whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400">
+              <span className="whitespace-nowrap text-xs font-medium text-amber-700">
                 Abrir na agenda →
               </span>
             </Link>
@@ -121,15 +121,15 @@ export default function PendenciasClient({
           id="taxas"
           className={`scroll-mt-4 space-y-2 rounded-2xl border p-3 ${
             taxas.some((t) => t.vencida)
-              ? "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-900/10"
-              : "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-900/10"
+              ? "border-red-200 bg-red-50/70"
+              : "border-amber-200 bg-amber-50/70"
           }`}
         >
           <div>
-            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+            <p className="text-sm font-semibold text-red-700">
               Taxas de reserva a receber ({taxas.length})
             </p>
-            <p className="text-xs text-red-700/80 dark:text-red-400/80">
+            <p className="text-xs text-red-700/80">
               Reservas com a taxa ainda sem pagar e data por vir. Vencida = mais de {diasCobrancaTaxa} dias sem
               pagar. Ao receber, toque em "Taxa recebida".
             </p>
@@ -146,21 +146,21 @@ export default function PendenciasClient({
               })
             );
             return (
-              <div key={t.eventId} className="rounded-xl bg-white/70 p-2.5 dark:bg-neutral-900/55">
+              <div key={t.eventId} className="rounded-xl bg-white/70 p-2.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900">
                     {t.cliente}
                     {t.vencida && (
-                      <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                      <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
                         vencida
                       </span>
                     )}
                   </p>
                   {t.valor > 0 && (
-                    <p className="text-sm font-semibold text-red-700 dark:text-red-400">{formatCurrency(t.valor)}</p>
+                    <p className="text-sm font-semibold text-red-700">{formatCurrency(t.valor)}</p>
                   )}
                 </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-neutral-500">
                   Reserva para {formatDate(t.dataEvento)} · taxa sem pagar há {t.diasSemPagar}{" "}
                   {t.diasSemPagar === 1 ? "dia" : "dias"}
                 </p>
@@ -179,7 +179,7 @@ export default function PendenciasClient({
                     )}
                     <Link
                       href={`/agenda?date=${t.dataEvento}`}
-                      className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                      className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600"
                     >
                       Abrir na agenda
                     </Link>
@@ -194,25 +194,25 @@ export default function PendenciasClient({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className={`${card} col-span-2 sm:col-span-1`}>
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Total a receber</p>
-          <p className="mt-0.5 text-lg font-semibold text-amber-600 dark:text-amber-400">
+          <p className="mt-0.5 text-lg font-semibold text-amber-600">
             {formatCurrency(pendencias.total)}
           </p>
         </div>
         <div className={card}>
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Clientes devendo</p>
-          <p className="mt-0.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+          <p className="mt-0.5 text-lg font-semibold text-neutral-800">
             {pendencias.clientes.length}
           </p>
         </div>
         <div className={card}>
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Locações em aberto</p>
-          <p className="mt-0.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+          <p className="mt-0.5 text-lg font-semibold text-neutral-800">
             {pendencias.locacoes.length}
           </p>
         </div>
         <div className={card}>
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Maior atraso</p>
-          <p className="mt-0.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+          <p className="mt-0.5 text-lg font-semibold text-neutral-800">
             {pendencias.maiorAtraso} {pendencias.maiorAtraso === 1 ? "dia" : "dias"}
           </p>
         </div>
@@ -223,12 +223,12 @@ export default function PendenciasClient({
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar cliente..."
-          className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         />
         <select
           value={ordem}
           onChange={(e) => setOrdem(e.target.value as Ordem)}
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
         >
           <option value="valor">Maior valor primeiro</option>
           <option value="atraso">Mais antigo primeiro</option>
@@ -236,11 +236,11 @@ export default function PendenciasClient({
       </div>
 
       {pendencias.clientes.length === 0 ? (
-        <div className={`${card} p-6 text-center text-sm text-neutral-500 dark:text-neutral-400`}>
+        <div className={`${card} p-6 text-center text-sm text-neutral-500`}>
           Nenhum cliente devendo. Todas as locações que já aconteceram estão pagas. 🎉
         </div>
       ) : clientes.length === 0 ? (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">Nenhum cliente encontrado para essa busca.</p>
+        <p className="text-sm text-neutral-500">Nenhum cliente encontrado para essa busca.</p>
       ) : (
         <div className="space-y-2">
           {clientes.map((c) => {
@@ -256,31 +256,31 @@ export default function PendenciasClient({
               <div key={c.clientId} className={card}>
                 <button type="button" onClick={() => alternar(c.clientId)} className="flex w-full items-center gap-3 text-left">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{c.cliente}</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    <p className="truncate text-sm font-medium text-neutral-900">{c.cliente}</p>
+                    <p className="text-xs text-neutral-500">
                       {c.locacoes.length} {c.locacoes.length === 1 ? "locação" : "locações"} · mais antiga há{" "}
                       {c.maiorAtraso} {c.maiorAtraso === 1 ? "dia" : "dias"}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(c.total)}</p>
+                  <p className="text-sm font-semibold text-amber-600">{formatCurrency(c.total)}</p>
                   <span className="text-xs text-neutral-400">{aberto ? "▲" : "▼"}</span>
                 </button>
 
                 {aberto && (
-                  <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                  <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3">
                     {c.locacoes.map((l) => (
                       <div key={l.rentalId} className="space-y-1.5">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700">
                           {formatDate(l.eventDate)}
                           {l.eventDateEnd && l.eventDateEnd !== l.eventDate ? ` a ${formatDate(l.eventDateEnd)}` : ""}
                           <span className="ml-2 text-neutral-400">há {l.diasAtraso} {l.diasAtraso === 1 ? "dia" : "dias"}</span>
                         </span>
-                        <span className="text-neutral-500 dark:text-neutral-400">
+                        <span className="text-neutral-500">
                           {formatCurrency(l.valor)}
                           {l.credito > 0 && ` · taxa paga ${formatCurrency(l.credito)}`}
                           {l.pago > 0 && ` · pago ${formatCurrency(l.pago)}`}
-                          <span className="ml-2 font-medium text-amber-600 dark:text-amber-400">
+                          <span className="ml-2 font-medium text-amber-600">
                             falta {formatCurrency(l.saldo)}
                           </span>
                         </span>
@@ -305,7 +305,7 @@ export default function PendenciasClient({
                       )}
                       <Link
                         href={`/clientes/${c.clientId}`}
-                        className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                        className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600"
                       >
                         Abrir cliente
                       </Link>

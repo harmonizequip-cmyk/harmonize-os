@@ -12,7 +12,7 @@ export default function EsteMesCard({ meta, rotuloMes }: { meta: MetaDoMes | nul
     return (
       <Link
         href="/configuracoes"
-        className="block rounded-2xl border border-dashed border-neutral-300 bg-white/60 p-4 text-sm text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-300"
+        className="block rounded-2xl border border-dashed border-neutral-300 bg-white/60 p-4 text-sm text-neutral-600"
       >
         💰 Cadastre as contas fixas do mês em Configurações para ver quanto falta faturar →
       </Link>
@@ -22,10 +22,10 @@ export default function EsteMesCard({ meta, rotuloMes }: { meta: MetaDoMes | nul
   return (
     <Link
       href="/locacoes?period=mes"
-      className="block rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+      className="block rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+        <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           Este mês · {rotuloMes}
         </p>
         <p className="text-xs text-neutral-400">contas {formatCurrency(meta.totalFixas)}</p>
@@ -35,17 +35,17 @@ export default function EsteMesCard({ meta, rotuloMes }: { meta: MetaDoMes | nul
         <p className="mt-1 text-lg font-semibold text-brand-teal">
           Contas do mês cobertas ✓
           {meta.excedente > 0 && (
-            <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">
+            <span className="text-sm font-normal text-neutral-500">
               {" "}
               · sobra de {formatCurrency(meta.excedente)}
             </span>
           )}
         </p>
       ) : (
-        <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          Faltam <span className="text-amber-600 dark:text-amber-400">{formatCurrency(meta.falta)}</span>
+        <p className="mt-1 text-lg font-semibold text-neutral-900">
+          Faltam <span className="text-amber-600">{formatCurrency(meta.falta)}</span>
           {meta.locacoesQueFaltam != null && (
-            <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">
+            <span className="text-sm font-normal text-neutral-500">
               {" "}
               · cerca de {meta.locacoesQueFaltam} {meta.locacoesQueFaltam === 1 ? "locação" : "locações"}
             </span>
@@ -53,17 +53,17 @@ export default function EsteMesCard({ meta, rotuloMes }: { meta: MetaDoMes | nul
         </p>
       )}
 
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-200">
         <div className="h-full rounded-full bg-brand-teal" style={{ width: `${Math.round(meta.progresso * 100)}%` }} />
       </div>
 
-      <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="mt-2 text-xs text-neutral-500">
         Locações do mês já renderam {formatCurrency(meta.sobraDoMes)} (valor menos as despesas delas).
         {meta.totalPessoal > 0 &&
           ` Contas: ${formatCurrency(meta.totalNegocio)} do negócio + ${formatCurrency(meta.totalPessoal)} pessoais.`}
       </p>
       {!coberto && meta.previsaoDasReservas != null && meta.previsaoDasReservas > 0 && (
-        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mt-1 text-xs text-neutral-500">
           As reservas já marcadas para o resto do mês devem render cerca de {formatCurrency(meta.previsaoDasReservas)}
           {meta.faltaDepoisDasReservas === 0
             ? ": se todas acontecerem, as contas fecham."

@@ -55,10 +55,10 @@ function fmtPct(n: number): string {
 }
 
 const ACCENT_CLASSES: Record<string, string> = {
-  teal: "border-brand-teal/30 bg-brand-teal/5 text-brand-teal dark:border-brand-teal/20 dark:bg-brand-teal/10",
-  amber: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400",
-  pink: "border-brand-pink/30 bg-brand-pink/5 text-brand-pink-dark dark:border-brand-pink/20 dark:bg-brand-pink/10 dark:text-brand-pink",
-  blue: "border-brand-blue/30 bg-brand-blue/5 text-brand-blue dark:border-brand-blue/20 dark:bg-brand-blue/10",
+  teal: "border-brand-teal/30 bg-brand-teal/5 text-brand-teal",
+  amber: "border-amber-200 bg-amber-50 text-amber-700",
+  pink: "border-brand-pink/30 bg-brand-pink/5 text-brand-pink-dark",
+  blue: "border-brand-blue/30 bg-brand-blue/5 text-brand-blue",
 };
 
 // Card padrão dos relatórios: sempre mostra a conclusão em uma linha
@@ -88,14 +88,14 @@ function Card({
           <p className="text-sm font-semibold">
             {icon} {title}
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">{summary}</p>
+          <p className="mt-1 text-xs leading-relaxed text-neutral-600">{summary}</p>
         </div>
         {children && (
           <span className="mt-0.5 flex-shrink-0 text-xs text-neutral-400">{open ? "▲" : "▼"}</span>
         )}
       </button>
       {open && children && (
-        <div className="border-t border-black/5 p-4 pt-3 dark:border-white/10">{children}</div>
+        <div className="border-t border-black/5 p-4 pt-3">{children}</div>
       )}
     </div>
   );
@@ -164,8 +164,8 @@ export default function RelatoriosClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Relatórios</h1>
-        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <h1 className="text-xl font-semibold text-neutral-900">Relatórios</h1>
+        <p className="mt-1 text-xs text-neutral-500">
           Diferente do radar do Dashboard (dias livres × leads parados, pra ação imediata), esta tela cruza pontos
           estruturais do negócio — coisas que valem revisar de vez em quando, não todo dia. Tudo calculado em cima
           dos dados reais, atualizado a cada vez que você abre a tela.
@@ -176,7 +176,7 @@ export default function RelatoriosClient({
 
       {financeiro && (
         <section className="space-y-3">
-          <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Financeiro da Harmonize</p>
+          <p className="text-sm font-semibold text-neutral-700">Financeiro da Harmonize</p>
           {financeiro}
         </section>
       )}
@@ -184,7 +184,7 @@ export default function RelatoriosClient({
       {/* Sem este aviso, um faturamento do mês ao lado de uma taxa de
           conversão de sempre parece contradição. Dizer qual bloco segue
           o quê é mais barato do que explicar o número depois. */}
-      <p className="-mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+      <p className="-mt-2 text-[11px] text-neutral-500">
         Seguem o período escolhido: faturamento, mix de receita, concentração, precificação e padrão
         de agenda. Não seguem, porque respondem sobre a situação de agora: origem dos leads, funil de
         follow-up e taxa a receber.
@@ -201,7 +201,7 @@ export default function RelatoriosClient({
               próxima.`}
             accent="teal"
           >
-            <div className="space-y-2 text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
+            <div className="space-y-2 text-xs leading-relaxed text-neutral-600">
               <p>
                 A tabela hoje cobra {formatCurrency(cliff.peakValue)} para {fmtInt(cliff.peakShots)} disparos (o topo
                 da faixa intermediária). A partir de {fmtInt(cliff.cliffStartShots)} disparos, a taxa menor passa a
@@ -252,7 +252,7 @@ export default function RelatoriosClient({
           {pendingFeeNames.length > 0 && (
             <div className="space-y-1">
               {pendingFeeNames.map((name, i) => (
-                <p key={i} className="text-xs text-neutral-700 dark:text-neutral-300">
+                <p key={i} className="text-xs text-neutral-700">
                   · {name}
                 </p>
               ))}
@@ -273,17 +273,17 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {lucroClientes.map((c, i) => (
               <div key={i} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">
+                <span className="text-neutral-700">
                   {i + 1}. {c.name} ({c.locacoes} {c.locacoes === 1 ? "locação" : "locações"})
                 </span>
-                <span className="whitespace-nowrap font-medium text-neutral-900 dark:text-neutral-100">
+                <span className="whitespace-nowrap font-medium text-neutral-900">
                   {formatCurrency(c.lucro)}
                   <span className="ml-1 font-normal text-neutral-400">de {formatCurrency(c.faturado)}</span>
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2 text-[11px] text-neutral-500">
             Só entram despesas amarradas à locação. Despesa lançada solta no Financeiro não entra nesta conta.
           </p>
         </Card>
@@ -303,16 +303,16 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {topClients.map((c, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">
+                <span className="text-neutral-700">
                   {i + 1}. {c.name}
                 </span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                <span className="font-medium text-neutral-900">
                   {formatCurrency(c.total)} · {totalRevenue > 0 ? fmtPct(c.total / totalRevenue) : "0%"}
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2 text-[11px] text-neutral-500">
             Quanto mais concentrado, maior o risco de um único cliente parar de fechar e derrubar o caixa do mês.
           </p>
         </Card>
@@ -330,8 +330,8 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {origemBreakdown.map((o) => (
               <div key={o.origem} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{rotuloOrigem(o.origem)}</span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                <span className="text-neutral-700">{rotuloOrigem(o.origem)}</span>
+                <span className="font-medium text-neutral-900">
                   {o.convertidos}/{o.total} · {fmtPct(o.taxa)}
                 </span>
               </div>
@@ -351,12 +351,12 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {followupBreakdown.map((f) => (
               <div key={f.label} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{f.label}</span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">{f.count}</span>
+                <span className="text-neutral-700">{f.label}</span>
+                <span className="font-medium text-neutral-900">{f.count}</span>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2 text-[11px] text-neutral-500">
             Se a contagem cai muito rápido de uma tentativa pra outra, vale mudar a abordagem (mensagem, canal ou
             horário) antes de chegar lá, em vez de só repetir a mesma tentativa 5 vezes.
           </p>
@@ -375,8 +375,8 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {weekdayBreakdown.map((w) => (
               <div key={w.label} className="flex items-center gap-2 text-xs">
-                <span className="w-16 flex-shrink-0 text-neutral-600 dark:text-neutral-300">{w.label}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+                <span className="w-16 flex-shrink-0 text-neutral-600">{w.label}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-neutral-100">
                   <div
                     className="h-full rounded-full bg-brand-blue"
                     style={{ width: `${(w.count / maxWeekdayCount) * 100}%` }}
@@ -386,7 +386,7 @@ export default function RelatoriosClient({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2 text-[11px] text-neutral-500">
             Dia parado é agenda livre pra oferecer com desconto, promoção relâmpago, ou pra puxar os leads parados do
             radar do Dashboard.
           </p>
@@ -405,14 +405,14 @@ export default function RelatoriosClient({
           <div className="space-y-1.5">
             {revenueMix.map((r) => (
               <div key={r.name} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-700 dark:text-neutral-300">{r.name}</span>
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                <span className="text-neutral-700">{r.name}</span>
+                <span className="font-medium text-neutral-900">
                   {formatCurrency(r.total)} · {fmtPct(r.share)}
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2 text-[11px] text-neutral-500">
             Se quase tudo depende de uma única linha, vale pensar em diversificar (mentoria, novos serviços,
             parcerias) pra não ficar refém de um único produto.
           </p>

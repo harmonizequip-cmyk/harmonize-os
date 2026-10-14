@@ -49,7 +49,7 @@ export default function EquipamentoInfoControl({
   if (!editing) {
     return (
       <div>
-        <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+        <p className="mt-0.5 text-sm font-medium text-neutral-900">
           {serialNumber || "Não informado"}
         </p>
         {anvisaRegistro && <p className="text-[11px] text-neutral-400">ANVISA: {anvisaRegistro}</p>}
@@ -65,24 +65,24 @@ export default function EquipamentoInfoControl({
   }
 
   return (
-    <div className="rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-      <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+    <div className="rounded-lg bg-neutral-50 p-2">
+      <label className="mb-1 block text-[11px] font-medium text-neutral-600">
         Número de série
       </label>
       <input
         value={serial}
         onChange={(e) => setSerial(e.target.value)}
-        className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
       />
-      <label className="mb-1 mt-2 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+      <label className="mb-1 mt-2 block text-[11px] font-medium text-neutral-600">
         Registro ANVISA
       </label>
       <input
         value={anvisa}
         onChange={(e) => setAnvisa(e.target.value)}
-        className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
       />
-      {error && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
       <div className="mt-2 flex gap-2">
         <button
           type="button"
@@ -92,7 +92,7 @@ export default function EquipamentoInfoControl({
             setSerial(serialNumber ?? "");
             setAnvisa(anvisaRegistro ?? "");
           }}
-          className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+          className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600"
         >
           Desistir
         </button>

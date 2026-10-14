@@ -48,7 +48,7 @@ export default function PeriodFilter() {
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               current === opt.key
                 ? "bg-brand-teal text-white"
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
             }`}
           >
             {opt.label}
@@ -62,14 +62,14 @@ export default function PeriodFilter() {
             type="date"
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
           />
           <span className="text-xs text-neutral-400">até</span>
           <input
             type="date"
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
           />
           <button
             onClick={applyCustomRange}

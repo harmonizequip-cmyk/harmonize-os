@@ -195,17 +195,17 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
 
   const abaClasse = (ativa: boolean) =>
     `flex-1 rounded-lg py-2 text-sm font-medium ${
-      ativa ? "bg-brand-teal text-white" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+      ativa ? "bg-brand-teal text-white" : "bg-neutral-100 text-neutral-600"
     }`;
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={fechar}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Receber pagamento</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">Receber pagamento</h2>
           <button onClick={fechar} aria-label="Fechar" className="text-neutral-400">
             <X size={20} />
           </button>
@@ -214,7 +214,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
         {comprovante && comprovanteLink && (
           <div className="mb-3 rounded-xl border border-brand-teal/40 p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+              <p className="text-xs font-medium text-neutral-600">
                 Comprovante recebido. Escolha abaixo de quem é.
               </p>
               <button onClick={descartarComprovante} className="text-[11px] text-neutral-500 underline underline-offset-2">
@@ -253,11 +253,11 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar cliente..."
-          className="mb-3 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="mb-3 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm"
         />
 
         {erro && (
-          <div className="mb-3 space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400">
+          <div className="mb-3 space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
             <p>{erro}</p>
             <button onClick={carregar} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white">
               Tentar de novo
@@ -274,14 +274,14 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
               </p>
             )}
             {alugueisVistos.map((a) => (
-              <div key={a.id} className="space-y-2 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+              <div key={a.id} className="space-y-2 rounded-xl border border-neutral-200 p-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900">
                     {a.cliente}
                   </p>
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(a.saldo)}</p>
+                  <p className="text-sm font-semibold text-amber-600">{formatCurrency(a.saldo)}</p>
                 </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-neutral-500">
                   {a.equipamento ? `${a.equipamento} · ` : ""}
                   {a.periodo}
                   {a.vencido ? " · já aconteceu" : " · ainda por vir"}
@@ -301,14 +301,14 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
               </p>
             )}
             {taxasVistas.map((t) => (
-              <div key={t.id} className="space-y-2 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+              <div key={t.id} className="space-y-2 rounded-xl border border-neutral-200 p-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900">
                     {t.cliente}
                   </p>
-                  {t.valor > 0 && <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(t.valor)}</p>}
+                  {t.valor > 0 && <p className="text-sm font-semibold text-amber-600">{formatCurrency(t.valor)}</p>}
                 </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">Reserva para {formatDate(t.dataEvento)}</p>
+                <p className="text-xs text-neutral-500">Reserva para {formatDate(t.dataEvento)}</p>
                 <TaxaRecebidaBotao eventId={t.id} valor={t.valor} onDone={() => aoReceber(`taxa/${t.id}`, t.cliente)} />
               </div>
             ))}

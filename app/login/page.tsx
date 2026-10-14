@@ -48,7 +48,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-brand-mesh flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
+    <div className="bg-brand-mesh flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 rounded-3xl border border-white/60 bg-white p-8 shadow-2xl shadow-brand-teal/10"

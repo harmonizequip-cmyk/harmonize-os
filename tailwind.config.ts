@@ -6,6 +6,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Tons neutros por variável (app/globals.css): o tema Clássico usa o
+        // cinza padrão; o tema Suave troca por cinzas lilás da marca.
+        neutral: Object.fromEntries(
+          [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((n) => [n, `rgb(var(--n-${n}) / <alpha-value>)`])
+        ),
         // Identidade visual Harmonize já estabelecida em outras ferramentas
         brand: {
           teal: "#3DBFB8",

@@ -110,27 +110,27 @@ export default function EditarClienteModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Editar cliente</h2>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar cliente</h2>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Nome</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tratamento</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Tratamento</label>
               <select
                 value={treatment}
                 onChange={(e) => setTreatment(e.target.value as typeof treatment)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               >
                 <option value="">-</option>
                 <option value="Dr.">Dr.</option>
@@ -138,12 +138,12 @@ export default function EditarClienteModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome de exibição</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Nome de exibição</label>
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Ex: Camila Lima"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -151,40 +151,40 @@ export default function EditarClienteModal({
             Usados nas mensagens ao cliente (ex: pedido de confirmação no WhatsApp). Sem os dois, a mensagem usa uma saudação genérica.
           </p>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Clínica / Empresa</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Clínica / Empresa</label>
             <input
               value={clinicName}
               onChange={(e) => setClinicName(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">WhatsApp</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">WhatsApp</label>
             <input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
               placeholder="(83) 90000-0000"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">E-mail</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">E-mail</label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cidade</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Cidade</label>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Endereço (opcional)</label>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -195,16 +195,16 @@ export default function EditarClienteModal({
                 }
               }}
               placeholder="Rua, número, bairro"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">CPF/CNPJ</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">CPF/CNPJ</label>
             <input
               value={documentNumber}
               onChange={(e) => setDocumentNumber(e.target.value)}
               placeholder="000.000.000-00 ou 00.000.000/0000-00"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <p className="mt-1 text-[11px] text-neutral-400">Usado na geração do contrato de locação.</p>
           </div>
@@ -220,31 +220,31 @@ export default function EditarClienteModal({
           )}
 
           {showDadosContrato && (
-            <div className="space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <div className="space-y-3 rounded-xl border border-neutral-200 p-3">
+              <p className="text-[11px] text-neutral-500">
                 Preencha só se quem assina o contrato e recebe a nota fiscal for diferente do nome/endereço acima (ex:
                 uma empresa). Fica valendo como padrão, mas ainda dá pra ajustar a cada contrato gerado.
               </p>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                <label className="mb-1 block text-xs font-medium text-neutral-600">
                   Nome/Razão social para contrato e NF-e
                 </label>
                 <input
                   value={contratoNome}
                   onChange={(e) => setContratoNome(e.target.value)}
                   placeholder="Deixe em branco para usar o nome acima"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                <label className="mb-1 block text-xs font-medium text-neutral-600">
                   Endereço para contrato e NF-e
                 </label>
                 <input
                   value={contratoEndereco}
                   onChange={(e) => setContratoEndereco(e.target.value)}
                   placeholder="Deixe em branco para usar o endereço do cadastro"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -253,26 +253,26 @@ export default function EditarClienteModal({
           <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} excludeId={client.id} />
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           {/* "Taxa de reserva" saiu: era uma taxa por cliente, e cada
               data reservada tem a sua. A taxa de cada agendamento fica na
               lista de Agendamentos. Aqui ficou o que é do cliente mesmo. */}
-          <label className="flex items-start gap-2.5 rounded-lg border border-neutral-300 p-3 dark:border-neutral-700">
+          <label className="flex items-start gap-2.5 rounded-lg border border-neutral-300 p-3">
             <input
               type="checkbox"
               checked={parceiro}
               onChange={(e) => setParceiro(e.target.checked)}
               className="mt-0.5 h-4 w-4 accent-brand-teal"
             />
-            <span className="text-xs text-neutral-600 dark:text-neutral-400">
-              <span className="block text-sm font-medium text-neutral-800 dark:text-neutral-100">
+            <span className="text-xs text-neutral-600">
+              <span className="block text-sm font-medium text-neutral-800">
                 Parceiro
               </span>
               Reserva data sem pagar a taxa de compromisso.
@@ -280,12 +280,12 @@ export default function EditarClienteModal({
           </label>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>
@@ -300,7 +300,7 @@ export default function EditarClienteModal({
 
         <button
           onClick={() => setConfirmarExclusao(true)}
-          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600"
         >
           Excluir lead/cliente
         </button>

@@ -60,16 +60,16 @@ export default function ModoFila({
 
   const casca = (conteudo: React.ReactNode) => (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 sm:items-center">
-      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs font-medium text-neutral-500">
             {t ? `Tarefa ${pos + 1} de ${fila.length}` : "Fila"} · {feitas} {feitas === 1 ? "feita" : "feitas"}
           </p>
           <button onClick={onFechar} aria-label="Fechar" className="text-neutral-400">
             <X size={20} />
           </button>
         </div>
-        <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+        <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-neutral-100">
           <div
             className="h-full rounded-full bg-brand-teal transition-all"
             style={{ width: `${fila.length ? (Math.min(pos, fila.length) / fila.length) * 100 : 100}%` }}
@@ -84,8 +84,8 @@ export default function ModoFila({
     return casca(
       <div className="py-6 text-center">
         <p className="text-3xl">🎉</p>
-        <p className="mt-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">Fila zerada.</p>
-        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mt-2 text-sm font-medium text-neutral-900">Fila zerada.</p>
+        <p className="mt-1 text-xs text-neutral-500">
           {feitas} {feitas === 1 ? "tarefa feita" : "tarefas feitas"} agora.
         </p>
         <button onClick={onFechar} className="mt-4 rounded-xl bg-brand-teal px-6 py-2.5 text-sm font-medium text-white">
@@ -112,14 +112,14 @@ export default function ModoFila({
   return casca(
     <>
       <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[11px] font-medium text-brand-blue">{TIPOS[t.type]}</span>
-      <p className="mt-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">{t.client_name ?? t.title}</p>
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="mt-2 text-base font-semibold text-neutral-900">{t.client_name ?? t.title}</p>
+      <p className="text-xs text-neutral-500">
         {t.title} · {formatDate(t.due_date)}
-        {atrasada && <span className="ml-1 font-medium text-red-600 dark:text-red-400">atrasada</span>}
+        {atrasada && <span className="ml-1 font-medium text-red-600">atrasada</span>}
       </p>
 
       {mensagem && (
-        <p className="mt-3 whitespace-pre-line rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        <p className="mt-3 whitespace-pre-line rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
           {mensagem}
         </p>
       )}
@@ -136,7 +136,7 @@ export default function ModoFila({
             💬 Abrir no WhatsApp
           </a>
         ) : (
-          mensagem && <p className="text-xs text-amber-700 dark:text-amber-400">Sem WhatsApp no cadastro.</p>
+          mensagem && <p className="text-xs text-amber-700">Sem WhatsApp no cadastro.</p>
         )}
         {taxaPendente && (
           <TaxaRecebidaBotao eventId={t.event_id as string} valor={valorTaxa} onDone={() => seguir(async () => onFeito(t.id))} />
@@ -159,7 +159,7 @@ export default function ModoFila({
             <button
               disabled={ocupado}
               onClick={() => seguir(() => onRespondeu(t.id, false))}
-              className={`${botao} bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400`}
+              className={`${botao} bg-amber-100 text-amber-700`}
             >
               🔁 Sem resposta
             </button>
@@ -178,14 +178,14 @@ export default function ModoFila({
         <button
           disabled={ocupado}
           onClick={() => seguir(() => onAdiar(t.id, somarDias(hojeLocal(), 3)), false)}
-          className={`${botao} border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300`}
+          className={`${botao} border border-neutral-300 text-neutral-600`}
         >
           📅 Daqui a 3 dias
         </button>
         <button
           disabled={ocupado}
           onClick={() => seguir()}
-          className={`${botao} border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300`}
+          className={`${botao} border border-neutral-300 text-neutral-600`}
         >
           Pular
         </button>

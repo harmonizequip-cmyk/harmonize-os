@@ -74,20 +74,20 @@ export default function DigitalCard() {
   const botao = "rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60";
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4">
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-teal/10 text-brand-teal">
           <Fingerprint size={17} strokeWidth={1.75} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Entrar com a digital</p>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm font-medium text-neutral-900">Entrar com a digital</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
             Cadastre este celular uma vez. Depois, para entrar, é só a digital (ou o desbloqueio de tela), sem
             e-mail e senha. A digital não sai do celular. A senha continua valendo.
           </p>
 
           {!suporte ? (
-            <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+            <p className="mt-2 text-xs font-medium text-amber-700">
               Este navegador não aceita digital. No celular, use o Chrome.
             </p>
           ) : (
@@ -102,7 +102,7 @@ export default function DigitalCard() {
             <ul className="mt-3 space-y-1.5">
               {aparelhos.map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="min-w-0 truncate text-neutral-700 dark:text-neutral-300">
+                  <span className="min-w-0 truncate text-neutral-700">
                     {a.friendly_name ?? "Aparelho"} · desde {dataCurta(a.created_at)}
                     {a.last_used_at ? ` · último uso ${dataCurta(a.last_used_at)}` : ""}
                   </span>
@@ -119,7 +119,7 @@ export default function DigitalCard() {
           )}
 
           {mensagem && <p className="mt-2 text-xs text-brand-teal">{mensagem}</p>}
-          {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
         </div>
       </div>
     </div>

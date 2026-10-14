@@ -266,19 +266,19 @@ export default function DadosTesteClient({
       <div>
         <Link
           href="/configuracoes"
-          className="text-xs text-neutral-500 underline underline-offset-2 dark:text-neutral-400"
+          className="text-xs text-neutral-500 underline underline-offset-2"
         >
           ← Configurações
         </Link>
-        <h1 className="mt-1 text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dados de teste</h1>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+        <h1 className="mt-1 text-xl font-semibold text-neutral-900">Dados de teste</h1>
+        <p className="mt-1 text-sm text-neutral-500">
           Registros marcados como teste continuam aparecendo no Financeiro e na Agenda, mas não entram no Dashboard nem
           nos Relatórios.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -292,14 +292,14 @@ export default function DadosTesteClient({
       <section
         className={`rounded-2xl border p-4 ${
           testMode
-            ? "border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/20"
-            : "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+            ? "border-amber-300 bg-amber-50"
+            : "border-neutral-200 bg-white"
         }`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Modo teste</h2>
-            <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+            <h2 className="text-sm font-semibold text-neutral-900">Modo teste</h2>
+            <p className="mt-1 text-xs text-neutral-600">
               {testMode
                 ? "Ligado: tudo que você criar agora nasce como teste, inclusive o lançamento e o evento de agenda que uma locação cria junto."
                 : "Desligado: tudo que você criar conta normalmente nos relatórios."}
@@ -309,7 +309,7 @@ export default function DadosTesteClient({
             onClick={() => toggleTestMode(!testMode)}
             aria-label={testMode ? "Desligar modo teste" : "Ligar modo teste"}
             className={`relative h-7 w-12 flex-shrink-0 rounded-full transition ${
-              testMode ? "bg-amber-500" : "bg-neutral-300 dark:bg-neutral-700"
+              testMode ? "bg-amber-500" : "bg-neutral-300"
             }`}
           >
             <span
@@ -320,7 +320,7 @@ export default function DadosTesteClient({
           </button>
         </div>
         {testMode && (
-          <p className="mt-3 flex items-start gap-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+          <p className="mt-3 flex items-start gap-2 text-xs font-medium text-amber-800">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             Lembre de desligar quando terminar. Com a chave ligada, uma venda real lançada por engano fica fora dos
             relatórios.
@@ -329,11 +329,11 @@ export default function DadosTesteClient({
       </section>
 
       {/* ---- Marcar como teste algo que já existe ---- */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-        <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+      <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-neutral-900">
           Marcar como teste algo que já está no sistema
         </h2>
-        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mt-1 text-xs text-neutral-500">
           Serve para limpar o que você testou antes desta tela existir. Busque por nome de cliente ou descrição do
           lançamento.
         </p>
@@ -345,13 +345,13 @@ export default function DadosTesteClient({
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && runSearch()}
               placeholder="Nome do cliente ou descrição..."
-              className="w-full rounded-xl border border-neutral-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-xl border border-neutral-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal"
             />
           </div>
           <button
             onClick={runSearch}
             disabled={searching}
-            className="rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+            className="rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white disabled:opacity-50"
           >
             {searching ? <Loader2 size={15} className="animate-spin" /> : "Buscar"}
           </button>
@@ -366,15 +366,15 @@ export default function DadosTesteClient({
             {hits.map((hit) => (
               <li
                 key={`${hit.table}-${hit.id}`}
-                className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"
+                className="rounded-xl border border-neutral-200 p-3"
               >
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{hit.label}</p>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{hit.detail}</p>
+                <p className="text-sm font-medium text-neutral-900">{hit.label}</p>
+                <p className="text-[11px] text-neutral-500">{hit.detail}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     disabled={busyId === hit.id}
                     onClick={() => markAsTest(hit, false)}
-                    className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-300"
+                    className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 disabled:opacity-50"
                   >
                     Marcar como teste
                   </button>
@@ -397,7 +397,7 @@ export default function DadosTesteClient({
       {/* ---- O que está marcado como teste ---- */}
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          <h2 className="text-sm font-semibold text-neutral-900">
             Marcados como teste {records.length > 0 && `(${records.length})`}
           </h2>
           {records.length > 0 && (
@@ -426,20 +426,20 @@ export default function DadosTesteClient({
                 {group.items.map((record) => (
                   <li
                     key={record.id}
-                    className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/40 dark:bg-amber-900/10"
+                    className="rounded-xl border border-amber-200 bg-amber-50/60 p-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                        <p className="truncate text-sm font-medium text-neutral-900">
                           {record.label}
                         </p>
-                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <p className="text-[11px] text-neutral-500">
                           {record.detail}
                           {record.date && ` · ${formatDate(record.date)}`}
                         </p>
                       </div>
                       {record.amount !== null && (
-                        <span className="flex-shrink-0 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                        <span className="flex-shrink-0 text-sm font-medium text-neutral-700">
                           {formatCurrency(record.amount)}
                         </span>
                       )}
@@ -456,7 +456,7 @@ export default function DadosTesteClient({
                       <button
                         disabled={busyId === record.id}
                         onClick={() => askDeleteRecord(record)}
-                        className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400"
+                        className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-50"
                       >
                         <Trash2 size={13} />
                         Excluir
@@ -473,9 +473,9 @@ export default function DadosTesteClient({
       {/* ---- Confirmação por senha ---- */}
       {pending && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 dark:bg-neutral-900">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{pending.title}</h3>
+              <h3 className="text-sm font-semibold text-neutral-900">{pending.title}</h3>
               <button
                 onClick={() => {
                   setPending(null);
@@ -488,8 +488,8 @@ export default function DadosTesteClient({
                 <X size={18} />
               </button>
             </div>
-            <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{pending.warning}</p>
-            <label className="mt-4 block text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            <p className="mt-2 text-xs text-neutral-600">{pending.warning}</p>
+            <label className="mt-4 block text-xs font-medium text-neutral-700">
               Digite sua senha de acesso para confirmar
             </label>
             <input
@@ -498,7 +498,7 @@ export default function DadosTesteClient({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && confirmPending()}
-              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal"
             />
             {passwordError && <p className="mt-1 text-xs text-red-600">{passwordError}</p>}
             <div className="mt-4 flex gap-2">
@@ -508,7 +508,7 @@ export default function DadosTesteClient({
                   setPassword("");
                   setPasswordError(null);
                 }}
-                className="flex-1 rounded-xl border border-neutral-200 py-2 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="flex-1 rounded-xl border border-neutral-200 py-2 text-sm font-medium text-neutral-600"
               >
                 Cancelar
               </button>

@@ -32,9 +32,9 @@ const rotuloMes = (ref: string) => {
 
 function Cartao({ titulo, children, dica }: { titulo: string; children: React.ReactNode; dica?: string }) {
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-      <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{titulo}</p>
-      {dica && <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">{dica}</p>}
+    <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+      <p className="text-sm font-semibold text-neutral-900">{titulo}</p>
+      {dica && <p className="mt-0.5 text-[11px] text-neutral-500">{dica}</p>}
       <div className="mt-3">{children}</div>
     </div>
   );
@@ -49,19 +49,19 @@ function Barras({ itens, cor }: { itens: CategoriaSoma[]; cor: string }) {
         {itens.slice(0, 10).map((i) => (
           <li key={i.categoria}>
             <div className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="truncate text-neutral-700 dark:text-neutral-300">{i.categoria}</span>
-              <span className="shrink-0 font-medium text-neutral-900 dark:text-neutral-100">
+              <span className="truncate text-neutral-700">{i.categoria}</span>
+              <span className="shrink-0 font-medium text-neutral-900">
                 {formatCurrency(i.total)} <span className="font-normal text-neutral-400">· {Math.round(i.pct * 100)}%</span>
               </span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200">
               <div className={`h-full rounded-full ${cor}`} style={{ width: `${Math.max(2, Math.round(i.pct * 100))}%` }} />
             </div>
           </li>
         ))}
       </ul>
       {itens.length > 10 && <p className="mt-2 text-[11px] text-neutral-400">+ {itens.length - 10} categorias menores</p>}
-      <p className="mt-2 border-t border-neutral-200/70 pt-2 text-xs font-medium text-neutral-700 dark:border-neutral-800 dark:text-neutral-200">
+      <p className="mt-2 border-t border-neutral-200/70 pt-2 text-xs font-medium text-neutral-700">
         Total: {formatCurrency(total)}
       </p>
     </>
@@ -152,7 +152,7 @@ export default function RelatorioFinanceiro({
             {faturasRecentes.length > 0 && (
               <>
                 <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Faturas recentes</p>
-                <ul className="divide-y divide-neutral-200/70 dark:divide-neutral-800">
+                <ul className="divide-y divide-neutral-200/70">
                   {faturasRecentes
                     .slice()
                     .reverse()
@@ -160,12 +160,12 @@ export default function RelatorioFinanceiro({
                       const falta = f.total_compras - f.total_pago;
                       return (
                         <li key={f.cartao + f.fatura_ref} className="flex justify-between gap-2 py-1.5 text-xs">
-                          <span className="text-neutral-700 dark:text-neutral-300">
+                          <span className="text-neutral-700">
                             {f.cartao} · {rotuloFatura(f.fatura_ref)}
                           </span>
                           <span className="shrink-0">
-                            <span className="font-medium text-neutral-900 dark:text-neutral-100">{formatCurrency(f.total_compras)}</span>
-                            <span className={`ml-1 ${falta > 0.009 ? "text-amber-600 dark:text-amber-400" : "text-brand-teal"}`}>
+                            <span className="font-medium text-neutral-900">{formatCurrency(f.total_compras)}</span>
+                            <span className={`ml-1 ${falta > 0.009 ? "text-amber-600" : "text-brand-teal"}`}>
                               {falta > 0.009 ? `falta ${formatCurrency(falta)}` : "paga"}
                             </span>
                           </span>
@@ -178,13 +178,13 @@ export default function RelatorioFinanceiro({
             {faturasFuturas.length > 0 && (
               <>
                 <p className="mb-1 mt-3 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Próximas faturas</p>
-                <ul className="divide-y divide-neutral-200/70 dark:divide-neutral-800">
+                <ul className="divide-y divide-neutral-200/70">
                   {faturasFuturas.map((f) => (
                     <li key={f.cartao + f.fatura_ref} className="flex justify-between gap-2 py-1.5 text-xs">
-                      <span className="text-neutral-700 dark:text-neutral-300">
+                      <span className="text-neutral-700">
                         {f.cartao} · vence {formatDate(f.vencimento)}
                       </span>
-                      <span className="shrink-0 font-medium text-neutral-900 dark:text-neutral-100">
+                      <span className="shrink-0 font-medium text-neutral-900">
                         {formatCurrency(f.total_compras - f.total_pago)}
                       </span>
                     </li>
@@ -201,12 +201,12 @@ export default function RelatorioFinanceiro({
           {emprestimos.length === 0 ? (
             <p className="text-xs text-neutral-400">Nenhum empréstimo lançado.</p>
           ) : (
-            <ul className="divide-y divide-neutral-200/70 dark:divide-neutral-800">
+            <ul className="divide-y divide-neutral-200/70">
               {emprestimos.map((e) => (
                 <li key={e.devedor} className="py-1.5 text-xs">
                   <div className="flex justify-between gap-2">
-                    <span className="font-medium text-neutral-800 dark:text-neutral-200">{e.devedor}</span>
-                    <span className={`shrink-0 whitespace-nowrap ${e.saldo > 0 ? "font-semibold text-amber-600 dark:text-amber-400" : "text-brand-teal"}`}>
+                    <span className="font-medium text-neutral-800">{e.devedor}</span>
+                    <span className={`shrink-0 whitespace-nowrap ${e.saldo > 0 ? "font-semibold text-amber-600" : "text-brand-teal"}`}>
                       {e.saldo > 0 ? `deve ${formatCurrency(e.saldo)}` : "quitado"}
                     </span>
                   </div>

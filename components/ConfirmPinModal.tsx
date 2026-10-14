@@ -32,10 +32,10 @@ export default function ConfirmPinModal({
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
       <div
-        className="w-full max-w-xs rounded-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85"
+        className="w-full max-w-xs rounded-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="mb-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">{title}</p>
+        <p className="mb-3 text-sm font-medium text-neutral-900">{title}</p>
         <input
           type="password"
           inputMode="numeric"
@@ -48,13 +48,13 @@ export default function ConfirmPinModal({
           }}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="••••"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-center text-lg tracking-[0.5em] dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-center text-lg tracking-[0.5em]"
         />
-        {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
         <div className="mt-4 flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>

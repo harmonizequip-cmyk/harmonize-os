@@ -69,13 +69,13 @@ export default function AvisosDesligadosFaixa() {
   if (!mostrar) return null;
 
   return (
-    <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/15">
+    <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3">
       <div className="flex items-start gap-2">
-        <BellOff size={18} className="mt-0.5 flex-shrink-0 text-amber-700 dark:text-amber-400" />
+        <BellOff size={18} className="mt-0.5 flex-shrink-0 text-amber-700" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Os avisos do Harmonize estão desligados neste celular.</p>
+          <p className="text-sm font-medium text-amber-900">Os avisos do Harmonize estão desligados neste celular.</p>
           {mostrar === "bloqueado" ? (
-            <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+            <p className="mt-0.5 text-xs text-amber-800">
               As notificações estão bloqueadas. Segure o ícone do Harmonize, toque em (i) Informações do app &gt;
               Notificações e libere. Depois abra o app de novo.
             </p>
@@ -89,12 +89,12 @@ export default function AvisosDesligadosFaixa() {
               >
                 {ocupado ? "Ligando..." : "Ativar avisos"}
               </button>
-              <button type="button" onClick={adiar} className="text-xs text-amber-800 underline underline-offset-2 dark:text-amber-300">
+              <button type="button" onClick={adiar} className="text-xs text-amber-800 underline underline-offset-2">
                 agora não
               </button>
             </div>
           )}
-          {erro && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="mt-1 text-xs text-red-600">{erro}</p>}
         </div>
       </div>
     </div>

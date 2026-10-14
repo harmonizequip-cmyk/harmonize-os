@@ -185,7 +185,7 @@ export default function ClienteDetailClient({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{client.name}</h1>
+            <h1 className="text-xl font-semibold text-neutral-900">{client.name}</h1>
             <button
               onClick={() => setEditClientOpen(true)}
               className="text-xs text-brand-teal underline underline-offset-2"
@@ -211,26 +211,26 @@ export default function ClienteDetailClient({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl sm:grid-cols-4">
         <div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">WhatsApp</p>
-          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.whatsapp ?? "-"}</p>
+          <p className="text-xs text-neutral-500">WhatsApp</p>
+          <p className="mt-0.5 text-sm text-neutral-900">{client.whatsapp ?? "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">E-mail</p>
-          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.email ?? "-"}</p>
+          <p className="text-xs text-neutral-500">E-mail</p>
+          <p className="mt-0.5 text-sm text-neutral-900">{client.email ?? "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Cidade</p>
-          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.city ?? "-"}</p>
+          <p className="text-xs text-neutral-500">Cidade</p>
+          <p className="mt-0.5 text-sm text-neutral-900">{client.city ?? "-"}</p>
         </div>
         <div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Endereço</p>
-          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.address ?? "-"}</p>
+          <p className="text-xs text-neutral-500">Endereço</p>
+          <p className="mt-0.5 text-sm text-neutral-900">{client.address ?? "-"}</p>
         </div>
         <div className="col-span-2 sm:col-span-4">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Indicação</p>
-          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">
+          <p className="text-xs text-neutral-500">Indicação</p>
+          <p className="mt-0.5 text-sm text-neutral-900">
             {indicador ? (
               <>
                 Indicado por{" "}
@@ -257,12 +257,12 @@ export default function ClienteDetailClient({
           </p>
         </div>
         <div className="col-span-2 sm:col-span-4">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Observação</p>
-          <p className="mt-0.5 text-sm text-neutral-900 dark:text-neutral-100">{client.notes ?? "-"}</p>
+          <p className="text-xs text-neutral-500">Observação</p>
+          <p className="mt-0.5 text-sm text-neutral-900">{client.notes ?? "-"}</p>
         </div>
 
         {(client.whatsapp || client.address) && (
-          <div className="col-span-2 flex gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:col-span-4">
+          <div className="col-span-2 flex gap-2 border-t border-neutral-100 pt-3 sm:col-span-4">
             {buildWhatsAppLink(client.whatsapp) && (
               <button
                 type="button"
@@ -295,21 +295,21 @@ export default function ClienteDetailClient({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Total de locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{totalLocacoes}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Total de locações</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{totalLocacoes}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Total faturado</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(totalFaturado)}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Total faturado</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(totalFaturado)}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Ticket médio</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(ticketMedio)}</p>
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Ticket médio</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ticketMedio)}</p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Última locação</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+          <p className="text-xs text-neutral-500">Última locação</p>
+          <p className="mt-1 text-lg font-semibold text-neutral-900">
             {ultimaLocacao ? formatDate(ultimaLocacao) : "-"}
           </p>
         </div>
@@ -337,7 +337,7 @@ export default function ClienteDetailClient({
 
       {preReservas.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Próximos agendamentos</h2>
+          <h2 className="text-sm font-semibold text-neutral-700">Próximos agendamentos</h2>
           <p className="-mt-1 text-xs text-neutral-400">
             Ainda sem disparos contados. O contrato já pode ser gerado agora, antes do procedimento.
           </p>
@@ -347,12 +347,12 @@ export default function ClienteDetailClient({
             {preReservas.map((pr) => (
               <div
                 key={pr.id}
-                className="rounded-xl border border-dashed border-brand-teal/40 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-brand-teal/30 dark:bg-neutral-900/55"
+                className="rounded-xl border border-dashed border-brand-teal/40 bg-white/70 p-3 shadow-sm backdrop-blur-xl"
               >
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                <p className="text-sm font-medium text-neutral-900">
                   {pr.equipments?.name ?? "-"}
                 </p>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{formatPeriodo(pr)}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{formatPeriodo(pr)}</p>
                 {pr.taxa_status === "pendente" && (
                   <div className="mt-2">
                     <TaxaRecebidaBotao eventId={pr.id} />
@@ -361,7 +361,7 @@ export default function ClienteDetailClient({
                 <button
                   type="button"
                   onClick={() => setContratoOrigem({ kind: "reserva", reserva: pr })}
-                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal dark:border-neutral-700 dark:text-neutral-300"
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal"
                 >
                   <FileText size={13} strokeWidth={1.75} />
                   Gerar contrato
@@ -371,9 +371,9 @@ export default function ClienteDetailClient({
           </div>
 
           {/* Tablet e notebook: tabela */}
-          <div className="hidden overflow-x-auto rounded-2xl border border-dashed border-brand-teal/40 bg-white/70 shadow-sm backdrop-blur-xl dark:border-brand-teal/30 dark:bg-neutral-900/55 sm:block">
+          <div className="hidden overflow-x-auto rounded-2xl border border-dashed border-brand-teal/40 bg-white/70 shadow-sm backdrop-blur-xl sm:block">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+              <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
                 <tr>
                   <th className="px-4 py-3">Data</th>
                   <th className="px-4 py-3">HIPRO</th>
@@ -382,11 +382,11 @@ export default function ClienteDetailClient({
               </thead>
               <tbody>
                 {preReservas.map((pr) => (
-                  <tr key={pr.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
-                    <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
+                  <tr key={pr.id} className="border-b border-neutral-100 last:border-0">
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                       {formatPeriodo(pr)}
                     </td>
-                    <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{pr.equipments?.name ?? "-"}</td>
+                    <td className="px-4 py-3 text-neutral-900">{pr.equipments?.name ?? "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       {pr.taxa_status === "pendente" && (
                         <div className="mb-2 min-w-[12rem] text-left">
@@ -396,7 +396,7 @@ export default function ClienteDetailClient({
                       <button
                         type="button"
                         onClick={() => setContratoOrigem({ kind: "reserva", reserva: pr })}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal dark:border-neutral-700 dark:text-neutral-300"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal"
                       >
                         <FileText size={13} strokeWidth={1.75} />
                         Gerar contrato
@@ -416,12 +416,12 @@ export default function ClienteDetailClient({
           <div
             key={r.id}
             onClick={() => setEditingRental(r)}
-            className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55"
+            className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{r.equipments?.name ?? "-"}</p>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-sm font-medium text-neutral-900">{r.equipments?.name ?? "-"}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">
                   {formatPeriodo(r)} · {r.shots.toLocaleString("pt-BR")} disparos
                 </p>
               </div>
@@ -431,7 +431,7 @@ export default function ClienteDetailClient({
                     ? "bg-brand-pink/10 text-brand-pink"
                     : situacaoDe(r) === "realizada"
                       ? "bg-brand-teal/10 text-brand-teal"
-                      : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                      : "bg-neutral-100 text-neutral-500"
                 }`}
               >
                 {situacaoDe(r).replace("_", " ")}
@@ -439,14 +439,14 @@ export default function ClienteDetailClient({
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+              <span className="text-xs text-neutral-500">
                 {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
               </span>
               <span className="font-medium text-brand-teal">{formatCurrency(Number(r.calculated_value))}</span>
             </div>
             {temSaldo(r) && (
               <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                <p className="mb-1 text-[11px] text-amber-700 dark:text-amber-400">
+                <p className="mb-1 text-[11px] text-amber-700">
                   {(r.totalPago ?? 0) > 0 ? `Já recebido ${formatCurrency(r.totalPago ?? 0)}. ` : ""}
                   Falta {formatCurrency(Number(r.saldo))}.
                 </p>
@@ -460,7 +460,7 @@ export default function ClienteDetailClient({
                   e.stopPropagation();
                   setContratoOrigem({ kind: "rental", rental: r });
                 }}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal dark:border-neutral-700 dark:text-neutral-300"
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal"
               >
                 <FileText size={13} strokeWidth={1.75} />
                 Gerar contrato
@@ -469,16 +469,16 @@ export default function ClienteDetailClient({
           </div>
         ))}
         {rentals.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
             Nenhuma locação registrada ainda.
           </div>
         )}
       </div>
 
       {/* Tablet e notebook: tabela completa */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55 sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">HIPRO</th>
@@ -495,15 +495,15 @@ export default function ClienteDetailClient({
               <tr
                 key={r.id}
                 onClick={() => setEditingRental(r)}
-                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
+                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
               >
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatPeriodo(r)}</td>
-                <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">{r.equipments?.name ?? "-"}</td>
-                <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{r.shots.toLocaleString("pt-BR")}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatPeriodo(r)}</td>
+                <td className="px-4 py-3 text-neutral-900">{r.equipments?.name ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-600">{r.shots.toLocaleString("pt-BR")}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-brand-teal">
                   {formatCurrency(Number(r.calculated_value))}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                   {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
@@ -513,7 +513,7 @@ export default function ClienteDetailClient({
                         ? "bg-brand-pink/10 text-brand-pink"
                         : situacaoDe(r) === "realizada"
                           ? "bg-brand-teal/10 text-brand-teal"
-                          : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                          : "bg-neutral-100 text-neutral-500"
                     }`}
                   >
                     {situacaoDe(r).replace("_", " ")}
@@ -531,7 +531,7 @@ export default function ClienteDetailClient({
                         e.stopPropagation();
                         setContratoOrigem({ kind: "rental", rental: r });
                       }}
-                      className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal dark:border-neutral-700 dark:text-neutral-300"
+                      className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal"
                     >
                       <FileText size={13} strokeWidth={1.75} />
                       Gerar

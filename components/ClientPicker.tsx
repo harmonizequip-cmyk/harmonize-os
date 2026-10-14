@@ -108,7 +108,7 @@ export default function ClientPicker({
   return (
     <div ref={containerRef}>
       {label && (
-        <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+        <label className="mb-1 block text-xs font-medium text-neutral-600">
           {label} {optional && <span className="text-neutral-400">(opcional)</span>}
         </label>
       )}
@@ -124,11 +124,11 @@ export default function ClientPicker({
           setOpen(true);
         }}
         placeholder="Buscar por nome, cidade ou telefone..."
-        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
       />
 
       {open && (
-        <div className="mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg">
           {!creating ? (
             <>
               <div className="max-h-64 overflow-y-auto">
@@ -140,7 +140,7 @@ export default function ClientPicker({
                       setQuery("");
                       setOpen(false);
                     }}
-                    className="block w-full px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                    className="block w-full px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50"
                   >
                     {noneLabel}
                   </button>
@@ -153,7 +153,7 @@ export default function ClientPicker({
                     key={c.id}
                     type="button"
                     onClick={() => selectClient(c)}
-                    className="block w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                    className="block w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
                   >
                     {c.name}
                     {c.city && <span className="ml-1 text-xs text-neutral-400">· {c.city}</span>}
@@ -167,7 +167,7 @@ export default function ClientPicker({
                   setCreating(true);
                   setNewName(query.trim());
                 }}
-                className="block w-full border-t border-neutral-200 px-3 py-2 text-left text-sm font-medium text-brand-teal hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-700"
+                className="block w-full border-t border-neutral-200 px-3 py-2 text-left text-sm font-medium text-brand-teal hover:bg-neutral-50"
               >
                 + Cadastrar novo cliente/lead
               </button>
@@ -180,13 +180,13 @@ export default function ClientPicker({
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Nome"
                 autoFocus
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
               <input
                 value={newWhatsapp}
                 onChange={(e) => setNewWhatsapp(e.target.value)}
                 placeholder="WhatsApp (opcional)"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
               <div className="flex gap-2 text-xs">
                 <button
@@ -195,7 +195,7 @@ export default function ClientPicker({
                   className={`flex-1 rounded-lg border py-1.5 font-medium ${
                     newStage === "cliente"
                       ? "border-brand-teal bg-brand-teal/10 text-brand-teal"
-                      : "border-neutral-300 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+                      : "border-neutral-300 text-neutral-500"
                   }`}
                 >
                   Cliente
@@ -206,13 +206,13 @@ export default function ClientPicker({
                   className={`flex-1 rounded-lg border py-1.5 font-medium ${
                     newStage === "lead"
                       ? "border-brand-teal bg-brand-teal/10 text-brand-teal"
-                      : "border-neutral-300 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+                      : "border-neutral-300 text-neutral-500"
                   }`}
                 >
                   Lead
                 </button>
               </div>
-              {createError && <p className="text-xs text-red-600 dark:text-red-400">{createError}</p>}
+              {createError && <p className="text-xs text-red-600">{createError}</p>}
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -220,7 +220,7 @@ export default function ClientPicker({
                     setCreating(false);
                     setCreateError(null);
                   }}
-                  className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600"
                 >
                   Cancelar
                 </button>

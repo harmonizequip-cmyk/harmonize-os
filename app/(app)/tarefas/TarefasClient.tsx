@@ -180,7 +180,7 @@ export default function TarefasClient({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Tarefas</h1>
+      <h1 className="text-xl font-semibold text-neutral-900">Tarefas</h1>
 
       {filaDeHoje.length > 0 && (
         <button
@@ -205,7 +205,7 @@ export default function TarefasClient({
         placeholder="Buscar por título ou cliente..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+        className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal sm:max-w-sm"
       />
 
       <section>
@@ -226,17 +226,17 @@ export default function TarefasClient({
                 <div
                   key={task.id}
                   id={`task-${task.id}`}
-                  className="overflow-hidden rounded-xl border border-brand-blue/20 bg-brand-blue/5 dark:border-brand-blue/15 dark:bg-brand-blue/10"
+                  className="overflow-hidden rounded-xl border border-brand-blue/20 bg-brand-blue/5"
                 >
                   <button
                     onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
                     className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
                   >
                     <span className="text-xs">
-                      <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
-                      <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">{formatDate(task.due_date)}</span>
+                      <span className="font-medium text-neutral-900">{task.title}</span>
+                      <span className="ml-1.5 text-neutral-500">{formatDate(task.due_date)}</span>
                       {atrasada && (
-                        <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                        <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
                           Atrasada
                         </span>
                       )}
@@ -253,7 +253,7 @@ export default function TarefasClient({
                     <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
                   </button>
                   {expanded && (
-                    <div className="border-t border-brand-blue/10 px-3 py-2 dark:border-brand-blue/15">
+                    <div className="border-t border-brand-blue/10 px-3 py-2">
                       {/* Ação do tipo da tarefa: o aviso nunca leva a uma tela
                           sem a ação. WhatsApp com a mensagem pronta (a pessoa
                           lê antes de enviar) e, na taxa, a baixa direto aqui. */}
@@ -306,7 +306,7 @@ export default function TarefasClient({
                             <button
                               disabled={busy}
                               onClick={() => registerContactAttempt(task.id, false)}
-                              className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                              className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50"
                             >
                               🔁 Sem resposta
                             </button>
@@ -320,7 +320,7 @@ export default function TarefasClient({
                               setAdiarData(task.due_date);
                               setAdiarErro(null);
                             }}
-                            className="rounded-lg border border-neutral-300 px-3 text-xs font-medium text-neutral-500 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-400"
+                            className="rounded-lg border border-neutral-300 px-3 text-xs font-medium text-neutral-500 disabled:opacity-50"
                           >
                             📅 Adiar
                           </button>
@@ -328,17 +328,17 @@ export default function TarefasClient({
                       </div>
 
                       {adiarTaskId === task.id && (
-                        <div className="mt-2 rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-                          <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        <div className="mt-2 rounded-lg bg-neutral-50 p-2">
+                          <label className="mb-1 block text-[11px] font-medium text-neutral-600">
                             Nova data
                           </label>
                           <input
                             type="date"
                             value={adiarData}
                             onChange={(e) => setAdiarData(e.target.value)}
-                            className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                            className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                           />
-                          {adiarErro && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{adiarErro}</p>}
+                          {adiarErro && <p className="mt-1 text-[11px] text-red-600">{adiarErro}</p>}
                           <div className="mt-2 flex gap-2">
                             <button
                               type="button"
@@ -346,7 +346,7 @@ export default function TarefasClient({
                                 setAdiarTaskId(null);
                                 setAdiarErro(null);
                               }}
-                              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600"
                             >
                               Desistir
                             </button>
@@ -354,7 +354,7 @@ export default function TarefasClient({
                               type="button"
                               disabled={busy}
                               onClick={() => adiarTarefa(task.id)}
-                              className="flex-1 rounded-lg bg-neutral-900 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+                              className="flex-1 rounded-lg bg-neutral-900 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                             >
                               {busy ? "Salvando..." : "Confirmar nova data"}
                             </button>
@@ -371,7 +371,7 @@ export default function TarefasClient({
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+        <h2 className="mb-2 text-sm font-semibold text-neutral-500">
           ✅ Concluídas {filteredConcluidas.length > 0 && `(últimas ${filteredConcluidas.length})`}
         </h2>
         {filteredConcluidas.length === 0 ? (
@@ -388,14 +388,14 @@ export default function TarefasClient({
                 <div
                   key={task.id}
                   id={`task-${task.id}`}
-                  className="overflow-hidden rounded-xl bg-neutral-100/70 dark:bg-neutral-800/40"
+                  className="overflow-hidden rounded-xl bg-neutral-100/70"
                 >
                   <button
                     onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
                     className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs"
                   >
                     <div>
-                      <p className="font-medium text-neutral-500 line-through decoration-neutral-400 dark:text-neutral-400">
+                      <p className="font-medium text-neutral-500 line-through decoration-neutral-400">
                         {task.title}
                       </p>
                       {task.client_name && <p className="text-[10px] text-neutral-400">{task.client_name}</p>}
@@ -405,15 +405,15 @@ export default function TarefasClient({
                     </span>
                   </button>
                   {expanded && (
-                    <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
+                    <div className="border-t border-neutral-200 px-3 py-2">
                       <button
                         disabled={busy}
                         onClick={() => desfazerConclusao(task.id)}
-                        className="w-full rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+                        className="w-full rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
                       >
                         {busy ? "Desfazendo..." : "↩️ Desfazer conclusão (foi engano)"}
                       </button>
-                      {erro && <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+                      {erro && <p className="mt-1.5 text-[11px] text-red-600">{erro}</p>}
                     </div>
                   )}
                 </div>

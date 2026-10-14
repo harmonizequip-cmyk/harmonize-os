@@ -71,22 +71,22 @@ export default function HistoricoClienteSection({ clientId }: { clientId: string
   }
 
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+    <div className="rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl">
       <button
         type="button"
         onClick={handleToggle}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
-        <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+        <span className="text-sm font-medium text-neutral-900">
           Histórico do cliente
         </span>
         <span className="text-xs text-neutral-400">{aberto ? "ocultar ▲" : "ver tudo que já aconteceu ▼"}</span>
       </button>
 
       {aberto && (
-        <div className="border-t border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <div className="border-t border-neutral-100 px-4 py-3">
           {carregando && <p className="py-4 text-center text-sm text-neutral-400">Carregando histórico...</p>}
-          {erro && <p className="text-sm text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="text-sm text-red-600">{erro}</p>}
 
           {!carregando && !erro && rows.length === 0 && (
             <p className="py-2 text-sm text-neutral-400">Nenhuma movimentação registrada ainda para este cliente.</p>
@@ -98,14 +98,14 @@ export default function HistoricoClienteSection({ clientId }: { clientId: string
                 const meta = ACAO_META[m.acao] ?? { label: m.acao, classe: "bg-neutral-100 text-neutral-600" };
                 const detalhe = descreverDetalhes(m);
                 return (
-                  <li key={m.id} className="rounded-xl border border-neutral-100 p-2.5 text-sm dark:border-neutral-800">
+                  <li key={m.id} className="rounded-xl border border-neutral-100 p-2.5 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.classe}`}>{meta.label}</span>
                       <span className="text-xs text-neutral-400">{ENTIDADE_LABEL[m.entidade] ?? m.entidade}</span>
                       <span className="ml-auto text-xs text-neutral-400">{formatarDataHora(m.ocorrido_em)}</span>
                     </div>
-                    <p className="mt-1 text-neutral-700 dark:text-neutral-300">{m.descricao}</p>
-                    {detalhe && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{detalhe}</p>}
+                    <p className="mt-1 text-neutral-700">{m.descricao}</p>
+                    {detalhe && <p className="mt-0.5 text-xs text-neutral-500">{detalhe}</p>}
                     <p className="mt-1 text-[11px] text-neutral-400">por {m.usuario_nome}</p>
                   </li>
                 );

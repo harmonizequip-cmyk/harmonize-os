@@ -67,7 +67,7 @@ function vinculoLocacao(t: TransactionRow) {
     return <span className="ml-1 text-xs font-normal text-neutral-400">· reserva {formatDate(t.reserva_date)}</span>;
   }
   if (t.type === "saida" && t.client_id && !t.rental_id && !t.calendar_event_id) {
-    return <span className="ml-1 text-xs font-normal text-amber-600 dark:text-amber-400">· sem locação</span>;
+    return <span className="ml-1 text-xs font-normal text-amber-600">· sem locação</span>;
   }
   return null;
 }
@@ -180,18 +180,18 @@ export default function FinanceiroClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{pessoal ? "Financeiro pessoal" : "Financeiro"}</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">{pessoal ? "Financeiro pessoal" : "Financeiro"}</h1>
         <div className="flex gap-2">
           <Link
             href={pessoal ? "/pessoal/cartoes" : "/financeiro/cartoes"}
-            className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+            className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700"
           >
             Cartões
           </Link>
           {!pessoal && (
             <Link
               href="/financeiro/emprestimos"
-              className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+              className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700"
             >
               Empréstimos
             </Link>
@@ -208,22 +208,22 @@ export default function FinanceiroClient({
       </div>
 
       {pessoal && resumoPessoal && (
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Saldo da conta pessoal</p>
           <p className={`text-xl font-semibold ${resumoPessoal.saldo >= 0 ? "text-brand-teal" : "text-brand-pink"}`}>
             {formatCurrency(resumoPessoal.saldo)}
           </p>
-          <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+          <p className="text-[11px] text-neutral-500">
             Tudo que entrou menos tudo que saiu, desde o primeiro lançamento. Retiradas da Harmonize entram aqui sozinhas.
           </p>
           {resumoPessoal.fixas.length > 0 && (
-            <div className="mt-3 border-t border-neutral-200/70 pt-2 dark:border-neutral-800">
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+            <div className="mt-3 border-t border-neutral-200/70 pt-2">
+              <p className="text-xs font-medium text-neutral-600">
                 Contas fixas pessoais do mês: {formatCurrency(resumoPessoal.fixas.reduce((s, f) => s + f.valor, 0))}
               </p>
               <ul className="mt-1 space-y-0.5">
                 {resumoPessoal.fixas.map((f) => (
-                  <li key={f.nome} className="flex justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <li key={f.nome} className="flex justify-between text-[11px] text-neutral-500">
                     <span>{f.nome}</span>
                     <span>{formatCurrency(f.valor)}</span>
                   </li>
@@ -275,7 +275,7 @@ export default function FinanceiroClient({
             type="button"
             onClick={baixarCsv}
             disabled={initialTransactions.length === 0}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
           >
             Exportar planilha
           </button>
@@ -283,7 +283,7 @@ export default function FinanceiroClient({
       />
 
       {atingiuTeto && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
           Este período tem mais lançamentos do que a tela carrega de uma vez, então os totais abaixo
           estão incompletos. Escolha um período menor.
         </div>
@@ -293,19 +293,19 @@ export default function FinanceiroClient({
           sempre. Dizer isso na tela evita ler "Resultado" como o caixa
           da empresa quando há um filtro de categoria ligado. */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Entradas</p>
           <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
             {formatCurrency(totais.entradas)}
           </p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Saídas</p>
           <p className="mt-0.5 text-sm font-semibold text-brand-pink sm:text-base">
             {formatCurrency(totais.saidas)}
           </p>
         </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Resultado</p>
           <p
             className={`mt-0.5 text-sm font-semibold sm:text-base ${
@@ -317,12 +317,12 @@ export default function FinanceiroClient({
         </div>
       </div>
       {totais.faturasPagas > 0 && (
-        <Link href={pessoal ? "/pessoal/cartoes" : "/financeiro/cartoes"} className="block text-xs text-neutral-500 dark:text-neutral-400">
+        <Link href={pessoal ? "/pessoal/cartoes" : "/financeiro/cartoes"} className="block text-xs text-neutral-500">
           Fora do resultado: faturas de cartão pagas {formatCurrency(totais.faturasPagas)} (as compras já contaram) →
         </Link>
       )}
       {(totais.emprestado > 0 || totais.devolvido > 0) && (
-        <Link href="/financeiro/emprestimos" className="block text-xs text-neutral-500 dark:text-neutral-400">
+        <Link href="/financeiro/emprestimos" className="block text-xs text-neutral-500">
           Fora do resultado: empréstimos {formatCurrency(totais.emprestado)} saíram
           {totais.devolvido > 0 ? `, ${formatCurrency(totais.devolvido)} voltaram` : ""} →
         </Link>
@@ -334,23 +334,23 @@ export default function FinanceiroClient({
           <div
             key={t.id}
             onClick={() => abrirLancamento(t)}
-            className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55"
+            className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                <p className="text-sm font-medium text-neutral-900">
                   {t.description}
                   {t.is_test && (
-                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-700">
                       TESTE
                     </span>
                   )}
                 </p>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="mt-0.5 text-xs text-neutral-500">
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
                   {t.clients?.name ? ` · ${t.clients.name}` : ""}
                   {vinculoLocacao(t)}
-                  {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">· custo de atendimento</span>}
+                  {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600">· custo de atendimento</span>}
                 </p>
               </div>
               <span
@@ -362,7 +362,7 @@ export default function FinanceiroClient({
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">{PAYMENT_LABELS[t.payment_method] ?? t.payment_method}</span>
+              <span className="text-xs text-neutral-500">{PAYMENT_LABELS[t.payment_method] ?? t.payment_method}</span>
               <span
                 className={`font-medium ${t.type === "entrada" ? "text-brand-teal" : "text-brand-pink"}`}
               >
@@ -372,16 +372,16 @@ export default function FinanceiroClient({
           </div>
         ))}
         {initialTransactions.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
             Nenhum lançamento em {periodo.rotulo}.
           </div>
         )}
       </div>
 
       {/* Tablet e notebook: tabela completa */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55 sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-xl sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+          <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">Tipo</th>
@@ -396,9 +396,9 @@ export default function FinanceiroClient({
               <tr
                 key={t.id}
                 onClick={() => abrirLancamento(t)}
-                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
+                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
               >
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">{formatDate(t.date)}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(t.date)}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -408,11 +408,11 @@ export default function FinanceiroClient({
                     {t.type === "entrada" ? "Entrada" : "Saída"}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{t.categories?.name ?? "-"}</td>
-                <td className="px-4 py-3 text-neutral-900 dark:text-neutral-100">
+                <td className="px-4 py-3 text-neutral-600">{t.categories?.name ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-900">
                   {t.description}
                   {t.is_test && (
-                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
                       TESTE
                     </span>
                   )}
@@ -420,7 +420,7 @@ export default function FinanceiroClient({
                     <span className="ml-1 text-xs font-normal text-neutral-400">· {t.clients.name}</span>
                   )}
                   {vinculoLocacao(t)}
-                  {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">· custo de atendimento</span>}
+                  {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600">· custo de atendimento</span>}
                 </td>
                 <td
                   className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
@@ -429,7 +429,7 @@ export default function FinanceiroClient({
                 >
                   {formatCurrency(Number(t.amount))}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600 dark:text-neutral-400">
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                   {PAYMENT_LABELS[t.payment_method] ?? t.payment_method}
                 </td>
               </tr>

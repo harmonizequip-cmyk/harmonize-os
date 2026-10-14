@@ -85,11 +85,11 @@ export default function ConfirmarExclusaoModal({
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onCancel}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/95 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-2xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/95 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-red-700 dark:text-red-400">Excluir para sempre</h2>
-        <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <h2 className="mb-1 text-lg font-semibold text-red-700">Excluir para sempre</h2>
+        <p className="mb-4 text-xs text-neutral-500">
           Esta ação não tem desfazer. Confira abaixo o que sai junto.
         </p>
 
@@ -98,29 +98,29 @@ export default function ConfirmarExclusaoModal({
         )}
 
         {erro && !preview && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {erro}
           </div>
         )}
 
         {preview && (
           <>
-            <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+            <div className="rounded-xl border border-neutral-200 p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Registro</p>
-              <p className="mt-0.5 text-sm font-medium text-neutral-900 dark:text-neutral-100">{preview.alvo}</p>
+              <p className="mt-0.5 text-sm font-medium text-neutral-900">{preview.alvo}</p>
             </div>
 
             {preview.aviso && (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                 ⚠️ {preview.aviso}
               </div>
             )}
 
-            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/40 dark:bg-red-900/10">
-              <p className="text-xs font-medium text-red-800 dark:text-red-400">Vai apagar junto:</p>
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+              <p className="text-xs font-medium text-red-800">Vai apagar junto:</p>
               <ul className="mt-1 space-y-0.5">
                 {preview.itens.map((item) => (
-                  <li key={item} className="text-sm text-red-700 dark:text-red-400">
+                  <li key={item} className="text-sm text-red-700">
                     · {item}
                   </li>
                 ))}
@@ -132,15 +132,15 @@ export default function ConfirmarExclusaoModal({
                   antes, eles divergem, e é justamente aí que importa ver
                   os dois. */}
               {(preview.valor_locacoes > 0 || preview.valor_lancamentos > 0) && (
-                <div className="mt-2 space-y-0.5 border-t border-red-200 pt-2 dark:border-red-900/40">
+                <div className="mt-2 space-y-0.5 border-t border-red-200 pt-2">
                   {preview.valor_locacoes > 0 && (
-                    <div className="flex items-center justify-between text-xs text-red-800 dark:text-red-400">
+                    <div className="flex items-center justify-between text-xs text-red-800">
                       <span>Sai do faturamento</span>
                       <span className="font-semibold">{formatCurrency(preview.valor_locacoes)}</span>
                     </div>
                   )}
                   {preview.valor_lancamentos > 0 && (
-                    <div className="flex items-center justify-between text-xs text-red-800 dark:text-red-400">
+                    <div className="flex items-center justify-between text-xs text-red-800">
                       <span>Sai do caixa</span>
                       <span className="font-semibold">{formatCurrency(preview.valor_lancamentos)}</span>
                     </div>
@@ -150,7 +150,7 @@ export default function ConfirmarExclusaoModal({
             </div>
 
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Para confirmar, escreva {PALAVRA_CONFIRMACAO}
               </label>
               <input
@@ -159,16 +159,16 @@ export default function ConfirmarExclusaoModal({
                 onChange={(e) => setTexto(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && podeApagar && handleApagar()}
                 placeholder={PALAVRA_CONFIRMACAO}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-center text-sm tracking-widest dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-center text-sm tracking-widest"
               />
             </div>
 
-            {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+            {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
 
             <div className="mt-4 flex gap-2">
               <button
                 onClick={onCancel}
-                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
               >
                 Cancelar
               </button>
@@ -190,7 +190,7 @@ export default function ConfirmarExclusaoModal({
         {!preview && !carregando && (
           <button
             onClick={onCancel}
-            className="mt-4 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="mt-4 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Fechar
           </button>

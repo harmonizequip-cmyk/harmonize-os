@@ -32,8 +32,8 @@ export default async function DadosTestePage() {
   if (!profile?.is_admin) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dados de teste</h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <h1 className="text-xl font-semibold text-neutral-900">Dados de teste</h1>
+        <p className="text-sm text-neutral-500">
           Esta área é restrita a administradores.
         </p>
         <Link href="/configuracoes" className="text-sm text-brand-blue underline underline-offset-2">
@@ -55,8 +55,8 @@ export default async function DadosTestePage() {
   if (settingsError) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dados de teste</h1>
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+        <h1 className="text-xl font-semibold text-neutral-900">Dados de teste</h1>
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
           <p className="font-medium">A migração do modo teste ainda não foi aplicada no banco.</p>
           <p className="mt-1">
             Rode o arquivo <code className="font-mono">migrations/2026-09-21-modo-teste.sql</code> no SQL Editor do

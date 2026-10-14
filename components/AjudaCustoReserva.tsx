@@ -57,8 +57,8 @@ export default function AjudaCustoReserva({ eventId }: { eventId: string }) {
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-      <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+    <div className="mt-2 rounded-xl border border-neutral-200 p-3">
+      <label className="mb-1 block text-xs font-medium text-neutral-600">
         Ajuda de custo: deslocamento (opcional)
       </label>
       {carregando ? (
@@ -66,7 +66,7 @@ export default function AjudaCustoReserva({ eventId }: { eventId: string }) {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">R$</span>
+            <span className="text-sm text-neutral-500">R$</span>
             <input
               inputMode="decimal"
               value={valor}
@@ -75,7 +75,7 @@ export default function AjudaCustoReserva({ eventId }: { eventId: string }) {
                 setOk(false);
               }}
               placeholder="0,00"
-              className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <span className="text-xs text-neutral-500">km ida</span>
             <input
@@ -86,13 +86,13 @@ export default function AjudaCustoReserva({ eventId }: { eventId: string }) {
                 setOk(false);
               }}
               placeholder="0"
-              className="w-16 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-16 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <button
               type="button"
               onClick={salvar}
               disabled={salvando}
-              className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300"
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-600 disabled:opacity-60"
             >
               {salvando ? "Salvando..." : "Salvar"}
             </button>
@@ -104,7 +104,7 @@ export default function AjudaCustoReserva({ eventId }: { eventId: string }) {
           {ok && <p className="mt-1 text-xs text-brand-teal">Salvo.</p>}
         </>
       )}
-      {erro && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-1 text-xs text-red-600">{erro}</p>}
     </div>
   );
 }

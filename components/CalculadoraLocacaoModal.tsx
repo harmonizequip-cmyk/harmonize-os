@@ -861,14 +861,14 @@ export default function CalculadoraLocacaoModal({
   if (summary) {
     return (
       <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
-        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl">
-          <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl">
+          <h2 className="mb-1 text-lg font-semibold text-neutral-900">
             {mode.kind === "create" ? "Locação salva ✅" : isMentoria ? "Mentoria finalizada ✅" : "Locação finalizada ✅"}
           </h2>
           <p className="mb-2 text-sm text-neutral-500">Copie o resumo abaixo ou envie direto no WhatsApp.</p>
           {warning && <p className="mb-3 text-xs text-amber-600">{warning}</p>}
 
-          <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+          <pre className="whitespace-pre-wrap rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
             {summary}
           </pre>
 
@@ -889,8 +889,8 @@ export default function CalculadoraLocacaoModal({
           </div>
 
           {/* Despesa da locação (leva O): ligada a ESTA locação */}
-          <div className="mt-5 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-            <p className="mb-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          <div className="mt-5 rounded-xl border border-neutral-200 p-3">
+            <p className="mb-2 text-sm font-medium text-neutral-700">
               + Lançar despesa desta locação <span className="font-normal text-neutral-400">(combustível, hospedagem, insumos...)</span>
             </p>
             {despesasLancadas.length > 0 && (
@@ -909,7 +909,7 @@ export default function CalculadoraLocacaoModal({
                 <select
                   value={despCategoriaId}
                   onChange={(e) => setDespCategoriaId(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 >
                   <option value="">Categoria da despesa...</option>
                   {categoriasSaida.map((c) => (
@@ -924,12 +924,12 @@ export default function CalculadoraLocacaoModal({
                     value={despValor}
                     onChange={(e) => setDespValor(e.target.value)}
                     placeholder="R$ 0,00"
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                   <select
                     value={despForma}
                     onChange={(e) => setDespForma(e.target.value)}
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   >
                     {PAYMENT_METHODS.map((p) => (
                       <option key={p.value} value={p.value}>
@@ -942,9 +942,9 @@ export default function CalculadoraLocacaoModal({
                   value={despDescricao}
                   onChange={(e) => setDespDescricao(e.target.value)}
                   placeholder="Descrição (opcional)"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
-                {despErro && <p className="text-xs text-red-600 dark:text-red-400">{despErro}</p>}
+                {despErro && <p className="text-xs text-red-600">{despErro}</p>}
                 <button
                   type="button"
                   onClick={handleAddDespesa}
@@ -974,10 +974,10 @@ export default function CalculadoraLocacaoModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className="mb-1 text-lg font-semibold text-neutral-900">
           {mode.kind === "create" ? "Nova locação" : isMentoria ? "Finalizar mentoria" : "Finalizar reserva"}
         </h2>
         {mode.kind === "finalize" && (
@@ -998,13 +998,13 @@ export default function CalculadoraLocacaoModal({
         )}
 
         {pendingReservations.length > 0 && !linkedReservationId && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/10 dark:text-amber-400">
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
             <p className="font-medium">
               ⚠️ {activeClientName} já tem {pendingReservations.length > 1 ? "pré-reservas pendentes" : "uma pré-reserva pendente"}. Antes de continuar, confira se não é a mesma reserva:
             </p>
             <ul className="mt-2 space-y-2">
               {pendingReservations.map((r) => (
-                <li key={r.id} className="rounded-lg border border-amber-200 bg-white/60 p-2 dark:border-amber-900/40 dark:bg-neutral-900/30">
+                <li key={r.id} className="rounded-lg border border-amber-200 bg-white/60 p-2">
                   <div className="flex items-center justify-between gap-2">
                     <span>
                       {r.equipmentName} · {formatDate(r.date_start)}
@@ -1039,7 +1039,7 @@ export default function CalculadoraLocacaoModal({
         )}
 
         {outroEquipAviso && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/10 dark:text-amber-400">
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
             {outroEquipAviso}
           </div>
         )}
@@ -1050,7 +1050,7 @@ export default function CalculadoraLocacaoModal({
           </div>
         )}
         {feePending && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
             💳 A taxa de reserva desta data está pendente. Marque "Cobrar taxa de reserva agora" mais abaixo se for cobrar junto.
           </div>
         )}
@@ -1059,12 +1059,12 @@ export default function CalculadoraLocacaoModal({
           {mode.kind === "create" && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Equipamento</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Equipamento</label>
                 <select
                   value={equipmentId}
                   onChange={(e) => setEquipmentId(e.target.value)}
                   disabled={!!linkedReservationId}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60"
                 >
                   {equipmentsList.map((eq) => (
                     <option key={eq.id} value={eq.id}>
@@ -1074,13 +1074,13 @@ export default function CalculadoraLocacaoModal({
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
                 <input
                   type="date"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
                   disabled={!!linkedReservationId}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60"
                 />
               </div>
               {linkedReservationId && (
@@ -1090,7 +1090,7 @@ export default function CalculadoraLocacaoModal({
               )}
               {!linkedReservationId && (
                 <div className="col-span-2">
-                  <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  <label className="flex items-center gap-2 text-xs font-medium text-neutral-600">
                     <input
                       type="checkbox"
                       checked={isPeriodo}
@@ -1098,19 +1098,19 @@ export default function CalculadoraLocacaoModal({
                         setIsPeriodo(e.target.checked);
                         if (!e.target.checked) setEventDateEnd("");
                       }}
-                      className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-700"
+                      className="h-4 w-4 rounded border-neutral-300"
                     />
                     Locação de período (mais de um dia)
                   </label>
                   {isPeriodo && (
                     <div className="mt-2">
-                      <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Até</label>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">Até</label>
                       <input
                         type="date"
                         value={eventDateEnd}
                         min={eventDate}
                         onChange={(e) => setEventDateEnd(e.target.value)}
-                        className="w-full max-w-[200px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                        className="w-full max-w-[200px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                       />
                       <p className="mt-1 text-[11px] text-neutral-400">
                         O equipamento fica bloqueado na Agenda em todos os dias do período, igual a uma reserva de um dia só.
@@ -1123,8 +1123,8 @@ export default function CalculadoraLocacaoModal({
           )}
 
           {/* ---- Contagem do equipamento / pacientes modelo ---- */}
-          <div className="rounded-2xl bg-white/60 p-4 shadow-sm dark:bg-neutral-800/40">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          <div className="rounded-2xl bg-white/60 p-4 shadow-sm">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
               {isMentoria ? "Pacientes modelo" : "Contagem do equipamento"}
             </p>
 
@@ -1135,7 +1135,7 @@ export default function CalculadoraLocacaoModal({
                   value={patientCount}
                   onChange={(e) => setPatientCount(onlyDigits(e.target.value))}
                   placeholder="Ex: 1"
-                  className="w-full max-w-[140px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full max-w-[140px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 />
                 <p className="mt-1 text-xs text-neutral-400">Normalmente 1 (individual); já aconteceu até 3 na mesma mentoria.</p>
               </div>
@@ -1148,7 +1148,7 @@ export default function CalculadoraLocacaoModal({
                     value={initialCount}
                     onChange={(e) => setInitialCount(e.target.value)}
                     placeholder="0"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <span className="pb-2 text-neutral-400">→</span>
@@ -1159,7 +1159,7 @@ export default function CalculadoraLocacaoModal({
                     value={finalCount}
                     onChange={(e) => setFinalCount(e.target.value)}
                     placeholder="0"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
@@ -1175,7 +1175,7 @@ export default function CalculadoraLocacaoModal({
                 );
               })()}
             {!isMentoria && contagensInvertidas && (
-              <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700">
                 As contagens estavam invertidas. Para o cálculo, a menor ({initialNumber.toLocaleString("pt-BR")}) vale
                 como inicial e a maior ({finalNumber.toLocaleString("pt-BR")}) como final: {shots.toLocaleString("pt-BR")}{" "}
                 disparos.
@@ -1185,13 +1185,13 @@ export default function CalculadoraLocacaoModal({
 
           {/* ---- Resumo do cálculo ---- */}
           {(pricing || mentoriaCalc) && (
-            <div className="rounded-2xl bg-white/60 p-4 shadow-sm dark:bg-neutral-800/40">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Resumo do cálculo</p>
+            <div className="rounded-2xl bg-white/60 p-4 shadow-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Resumo do cálculo</p>
 
               {isMentoria && mentoriaCalc ? (
                 <div className="rounded-xl bg-brand-lilac/10 p-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-300">Valor da mentoria</span>
+                    <span className="text-neutral-600">Valor da mentoria</span>
                     <span className="font-semibold text-brand-lilac">{formatCurrency(mentoriaCalc.totalValue)}</span>
                   </div>
                   <p className="mt-1 text-xs text-neutral-500">
@@ -1203,12 +1203,12 @@ export default function CalculadoraLocacaoModal({
                 pricing && (
                   <>
                     <div className="mb-3 flex items-center justify-between text-sm">
-                      <span className="text-neutral-500 dark:text-neutral-400">Disparos realizados</span>
-                      <span className="font-semibold text-neutral-700 dark:text-neutral-200">{shots.toLocaleString("pt-BR")}</span>
+                      <span className="text-neutral-500">Disparos realizados</span>
+                      <span className="font-semibold text-neutral-700">{shots.toLocaleString("pt-BR")}</span>
                     </div>
                     <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-neutral-600 dark:text-neutral-300">Valor dos disparos (tabela)</span>
+                        <span className="text-neutral-600">Valor dos disparos (tabela)</span>
                         <span className="font-semibold text-brand-teal">{formatCurrency(pricing.totalValue)}</span>
                       </div>
                       <p className="mt-1 text-xs text-neutral-500">
@@ -1221,7 +1221,7 @@ export default function CalculadoraLocacaoModal({
 
                     {/* Custo por disparo negociado manualmente */}
                     <div className="mt-3">
-                      <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                      <label className="flex items-center gap-2 text-xs font-medium text-neutral-600">
                         <input
                           type="checkbox"
                           checked={usarCustoManual}
@@ -1237,7 +1237,7 @@ export default function CalculadoraLocacaoModal({
                             value={custoManualInput}
                             onChange={(e) => setCustoManualInput(limparCampoCustoPorDisparo(e.target.value))}
                             placeholder="Ex: 0,065"
-                            className="w-full max-w-[180px] rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                            className="w-full max-w-[180px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                           />
                           {custoManualPorDisparo != null && resumo && (
                             <div className="mt-2 space-y-1 rounded-lg border border-dashed border-brand-teal/30 bg-brand-teal/5 p-2.5 text-xs">
@@ -1268,14 +1268,14 @@ export default function CalculadoraLocacaoModal({
 
               {/* Deslocamento */}
               <div className="mt-3">
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Deslocamento — km de ida</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Deslocamento — km de ida</label>
                 <div className="flex items-center gap-2">
                   <input
                     inputMode="numeric"
                     value={kmIda}
                     onChange={(e) => setKmIda(onlyDigits(e.target.value))}
                     placeholder="0"
-                    className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                   {valorDeslocamentoPreview > 0 && (
                     <span className="text-xs text-neutral-500">
@@ -1289,8 +1289,8 @@ export default function CalculadoraLocacaoModal({
 
           {/* ---- Ajustes finais ---- */}
           {resumo && (
-            <div className="rounded-2xl bg-white/60 p-4 shadow-sm dark:bg-neutral-800/40">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Ajustes finais</p>
+            <div className="rounded-2xl bg-white/60 p-4 shadow-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Ajustes finais</p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1300,24 +1300,24 @@ export default function CalculadoraLocacaoModal({
                     value={aluguelValor}
                     onChange={(e) => setAluguelValor(e.target.value)}
                     placeholder="R$ 0,00"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between">
                     <label className="text-xs font-medium text-brand-pink">- Desconto</label>
-                    <div className="flex rounded-lg border border-neutral-300 p-0.5 dark:border-neutral-700">
+                    <div className="flex rounded-lg border border-neutral-300 p-0.5">
                       <button
                         type="button"
                         onClick={() => setDescontoTipo("valor")}
-                        className={`rounded px-2 py-0.5 text-xs font-medium transition ${descontoTipo === "valor" ? "bg-brand-teal text-white" : "text-neutral-500 dark:text-neutral-400"}`}
+                        className={`rounded px-2 py-0.5 text-xs font-medium transition ${descontoTipo === "valor" ? "bg-brand-teal text-white" : "text-neutral-500"}`}
                       >
                         R$
                       </button>
                       <button
                         type="button"
                         onClick={() => setDescontoTipo("percentual")}
-                        className={`rounded px-2 py-0.5 text-xs font-medium transition ${descontoTipo === "percentual" ? "bg-brand-teal text-white" : "text-neutral-500 dark:text-neutral-400"}`}
+                        className={`rounded px-2 py-0.5 text-xs font-medium transition ${descontoTipo === "percentual" ? "bg-brand-teal text-white" : "text-neutral-500"}`}
                       >
                         %
                       </button>
@@ -1328,21 +1328,21 @@ export default function CalculadoraLocacaoModal({
                     value={descontoValor}
                     onChange={(e) => setDescontoValor(e.target.value)}
                     placeholder={descontoTipo === "percentual" ? "Ex: 10" : "R$ 0,00"}
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
 
               {/* Itens personalizados */}
               <div className="mt-3">
-                <p className="mb-1 text-xs font-medium text-neutral-600 dark:text-neutral-400">Itens personalizados</p>
+                <p className="mb-1 text-xs font-medium text-neutral-600">Itens personalizados</p>
                 <div className="space-y-2">
                   <input
                     value={novoItemDesc}
                     onChange={(e) => setNovoItemDesc(e.target.value)}
                     placeholder="Descrição (ex: Insumo extra)"
                     maxLength={40}
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                   <div className="flex gap-2">
                     <input
@@ -1350,20 +1350,20 @@ export default function CalculadoraLocacaoModal({
                       value={novoItemValor}
                       onChange={(e) => setNovoItemValor(e.target.value)}
                       placeholder="R$ 0,00"
-                      className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                     />
-                    <div className="flex rounded-lg border border-neutral-300 p-0.5 dark:border-neutral-700">
+                    <div className="flex rounded-lg border border-neutral-300 p-0.5">
                       <button
                         type="button"
                         onClick={() => setNovoItemTipo("mais")}
-                        className={`rounded px-2.5 py-1 text-sm font-medium transition ${novoItemTipo === "mais" ? "bg-brand-teal text-white" : "text-neutral-500 dark:text-neutral-400"}`}
+                        className={`rounded px-2.5 py-1 text-sm font-medium transition ${novoItemTipo === "mais" ? "bg-brand-teal text-white" : "text-neutral-500"}`}
                       >
                         +
                       </button>
                       <button
                         type="button"
                         onClick={() => setNovoItemTipo("menos")}
-                        className={`rounded px-2.5 py-1 text-sm font-medium transition ${novoItemTipo === "menos" ? "bg-brand-pink text-white" : "text-neutral-500 dark:text-neutral-400"}`}
+                        className={`rounded px-2.5 py-1 text-sm font-medium transition ${novoItemTipo === "menos" ? "bg-brand-pink text-white" : "text-neutral-500"}`}
                       >
                         −
                       </button>
@@ -1376,7 +1376,7 @@ export default function CalculadoraLocacaoModal({
                 {itensPersonalizados.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {itensPersonalizados.map((it) => (
-                      <li key={it.id} className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-300">
+                      <li key={it.id} className="flex items-center justify-between text-xs text-neutral-600">
                         <span>
                           {it.tipo === "mais" ? "+" : "−"} {it.desc}: {formatCurrency(it.valor)}
                         </span>
@@ -1391,7 +1391,7 @@ export default function CalculadoraLocacaoModal({
 
               {(feePending || feeWouldApplyOnCreate) && (
                 <div className="mt-3">
-                  <label className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  <label className="flex items-center gap-2 text-xs font-medium text-neutral-600">
                     <input type="checkbox" checked={chargeFeeNow} onChange={(e) => setChargeFeeNow(e.target.checked)} className="h-4 w-4 rounded border-neutral-300" />
                     Cobrar taxa de reserva agora ({formatCurrency(fee)})
                   </label>
@@ -1407,7 +1407,7 @@ export default function CalculadoraLocacaoModal({
 
               {previewWhatsappText && (
                 <div className="mt-3 space-y-2">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Envie os cálculos para o cliente conferir antes de registrar o pagamento.</p>
+                  <p className="text-xs text-neutral-500">Envie os cálculos para o cliente conferir antes de registrar o pagamento.</p>
                   <div className="flex gap-2">
                     {previewWhatsappLink && (
                       <button
@@ -1421,7 +1421,7 @@ export default function CalculadoraLocacaoModal({
                     <button
                       type="button"
                       onClick={handleCopyPreview}
-                      className="flex-1 rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                      className="flex-1 rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-600"
                     >
                       {previewCopied ? "Copiado!" : "Copiar texto"}
                     </button>
@@ -1434,11 +1434,11 @@ export default function CalculadoraLocacaoModal({
 
           {/* ---- Pagamento ---- */}
           {resumo && (
-            <div className="rounded-2xl bg-white/60 p-4 shadow-sm dark:bg-neutral-800/40">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Pagamento</p>
+            <div className="rounded-2xl bg-white/60 p-4 shadow-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Pagamento</p>
 
               {pagamentos.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-neutral-300 p-3 text-center text-xs text-neutral-500 dark:border-neutral-700">
+                <div className="rounded-xl border border-dashed border-neutral-300 p-3 text-center text-xs text-neutral-500">
                   Esta locação fica em aberto — nada será registrado como pago agora.
                   <button type="button" onClick={addPagamento} className="mt-2 block w-full rounded-lg border border-brand-teal py-1.5 font-medium text-brand-teal">
                     + Adicionar um pagamento
@@ -1447,7 +1447,7 @@ export default function CalculadoraLocacaoModal({
               ) : (
                 <div className="space-y-3">
                   {pagamentos.map((p, idx) => (
-                    <div key={p.id} className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+                    <div key={p.id} className="rounded-xl border border-neutral-200 p-3">
                       <div className="mb-2 flex items-center justify-between">
                         <span className="text-xs font-medium text-neutral-500">Pagamento {idx + 1}</span>
                         {pagamentos.length > 1 && (
@@ -1460,7 +1460,7 @@ export default function CalculadoraLocacaoModal({
                         <select
                           value={p.forma}
                           onChange={(e) => updatePagamento(p.id, { forma: e.target.value, pixConta: e.target.value === "pix" ? p.pixConta || "harmonize" : "" })}
-                          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                         >
                           {PAYMENT_METHODS.map((pm) => (
                             <option key={pm.value} value={pm.value}>
@@ -1477,13 +1477,13 @@ export default function CalculadoraLocacaoModal({
                               updatePagamento(p.id, { valorTexto: texto, valor: parseDecimal(texto) });
                             }}
                             placeholder="R$ 0,00"
-                            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                           />
                           <button
                             type="button"
                             title="Preencher com o total"
                             onClick={() => preencherValorTotal(p.id)}
-                            className="rounded-lg border border-neutral-300 px-2 text-xs text-neutral-500 dark:border-neutral-700"
+                            className="rounded-lg border border-neutral-300 px-2 text-xs text-neutral-500"
                           >
                             tot.
                           </button>
@@ -1493,7 +1493,7 @@ export default function CalculadoraLocacaoModal({
                         <select
                           value={p.pixConta}
                           onChange={(e) => updatePagamento(p.id, { pixConta: e.target.value as PixContaValue })}
-                          className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                         >
                           <option value="">Conta PIX que recebeu...</option>
                           {PIX_CONTAS.map((c) => (
@@ -1504,14 +1504,14 @@ export default function CalculadoraLocacaoModal({
                         </select>
                       )}
                       <div className="mt-2">
-                        <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                        <label className="mb-1 block text-[11px] font-medium text-neutral-500">
                           Data em que caiu/recebeu (não precisa ser o dia do HIPRO)
                         </label>
                         <input
                           type="date"
                           value={p.data}
                           onChange={(e) => updatePagamento(p.id, { data: e.target.value })}
-                          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                         />
                       </div>
                     </div>
@@ -1523,7 +1523,7 @@ export default function CalculadoraLocacaoModal({
                     <button
                       type="button"
                       onClick={() => setPagamentos([])}
-                      className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-medium text-neutral-500 dark:border-neutral-700"
+                      className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-medium text-neutral-500"
                     >
                       Deixar em aberto
                     </button>
@@ -1539,20 +1539,20 @@ export default function CalculadoraLocacaoModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-4 flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600">
             Cancelar
           </button>
           <button

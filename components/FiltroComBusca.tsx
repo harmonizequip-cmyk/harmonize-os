@@ -46,21 +46,21 @@ export default function FiltroComBusca({
         }}
         onChange={(e) => setConsulta(e.target.value)}
         placeholder={rotuloVazio}
-        className={`w-48 rounded-lg border px-2 py-1.5 text-xs dark:bg-neutral-800 dark:text-neutral-100 ${
+        className={`w-48 rounded-lg border px-2 py-1.5 text-xs ${
           valor
-            ? "border-brand-teal text-brand-teal dark:border-brand-teal"
-            : "border-neutral-300 text-neutral-600 placeholder:text-neutral-600 dark:border-neutral-700 dark:text-neutral-300 dark:placeholder:text-neutral-300"
+            ? "border-brand-teal text-brand-teal"
+            : "border-neutral-300 text-neutral-600 placeholder:text-neutral-600"
         }`}
       />
       {aberto && (
-        <div className="absolute left-0 z-30 mt-1 max-h-64 w-72 max-w-[85vw] overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="absolute left-0 z-30 mt-1 max-h-64 w-72 max-w-[85vw] overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg">
           <button
             type="button"
             onClick={() => {
               onChange(null);
               setAberto(false);
             }}
-            className="block w-full px-3 py-2 text-left text-xs text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+            className="block w-full px-3 py-2 text-left text-xs text-neutral-500 hover:bg-neutral-50"
           >
             {rotuloVazio}
           </button>
@@ -73,7 +73,7 @@ export default function FiltroComBusca({
                 onChange(o.valor);
                 setAberto(false);
               }}
-              className="block w-full px-3 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-700"
+              className="block w-full px-3 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-50"
             >
               {o.label}
             </button>

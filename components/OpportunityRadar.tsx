@@ -63,7 +63,7 @@ export default function OpportunityRadar({
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-brand-teal/30 bg-brand-teal/5 dark:border-brand-teal/20 dark:bg-brand-teal/10">
+      <div className="overflow-hidden rounded-2xl border border-brand-teal/30 bg-brand-teal/5">
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-brand-teal"
@@ -78,20 +78,20 @@ export default function OpportunityRadar({
         {open && (
           <div className="space-y-3 border-t border-brand-teal/20 p-3 pt-2">
             <div>
-              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
                 Datas livres (os 2 HIPROs)
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {visibleDays.map((d) => (
                   <span
                     key={d}
-                    className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-900/50 dark:text-neutral-300"
+                    className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
                   >
                     {formatShortDate(d)}
                   </span>
                 ))}
                 {extraDays > 0 && (
-                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-neutral-400 dark:bg-neutral-900/50">
+                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-neutral-400">
                     +{extraDays}
                   </span>
                 )}
@@ -99,24 +99,24 @@ export default function OpportunityRadar({
             </div>
 
             <div>
-              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
                 Leads parados pra reativar
               </p>
               <div className="space-y-1.5">
                 {sortedLeads.map((lead) => (
                   <div
                     key={lead.id}
-                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
+                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-neutral-900 dark:text-neutral-100">
+                      <p className="truncate text-xs font-medium text-neutral-900">
                         {lead.name}
                       </p>
-                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      <p className="text-[11px] text-neutral-500">
                         {STAGE_LABELS[lead.stage] ?? lead.stage}
                         {lead.city ? ` · ${lead.city}` : ""}
                         {lead.nearbyRoute && (
-                          <span className="ml-1 rounded-full bg-brand-pink/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-pink-dark dark:text-brand-pink">
+                          <span className="ml-1 rounded-full bg-brand-pink/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-pink-dark">
                             📍 já vai estar na região
                           </span>
                         )}

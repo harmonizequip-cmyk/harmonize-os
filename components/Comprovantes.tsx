@@ -76,9 +76,9 @@ export default function Comprovantes({ pasta, titulo = "Comprovantes" }: { pasta
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+    <div className="mt-3 rounded-xl border border-neutral-200 p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{titulo}</p>
+        <p className="text-xs font-medium text-neutral-600">{titulo}</p>
         <button
           type="button"
           disabled={enviando}
@@ -118,7 +118,7 @@ export default function Comprovantes({ pasta, titulo = "Comprovantes" }: { pasta
           ))}
         </ul>
       )}
-      {erro && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-1 text-xs text-red-600">{erro}</p>}
     </div>
   );
 }

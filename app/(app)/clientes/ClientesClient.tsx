@@ -98,7 +98,7 @@ export default function ClientesClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Clientes</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">Clientes</h1>
         <button
           onClick={() => setModalOpen(true)}
           className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
@@ -137,7 +137,7 @@ export default function ClientesClient({
             type="button"
             onClick={baixarCsv}
             disabled={filtered.length === 0}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
           >
             Exportar planilha
           </button>
@@ -148,7 +148,7 @@ export default function ClientesClient({
           colunas de Locações e Total contam só o recorte escolhido. Sem
           esta linha, um cliente antigo aparecendo com zero locações
           pareceria erro de cadastro. */}
-      <p className="-mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+      <p className="-mt-2 text-[11px] text-neutral-500">
         Locações e Total contam {periodo.rotulo}. A lista mostra todos os clientes, inclusive quem
         não alugou nesse recorte.
       </p>
@@ -157,17 +157,17 @@ export default function ClientesClient({
         {filtered.map((c) => (
           <div
             key={c.id}
-            className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55"
+            className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
           >
             <Link href={`/clientes/${c.id}`}>
-              <p className="font-medium text-neutral-900 dark:text-neutral-100">{c.name}</p>
-              {c.clinic_name && <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{c.clinic_name}</p>}
+              <p className="font-medium text-neutral-900">{c.name}</p>
+              {c.clinic_name && <p className="mt-0.5 text-sm text-neutral-500">{c.clinic_name}</p>}
               <p className="mt-0.5 text-xs text-neutral-400">{c.city ?? "-"}</p>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-neutral-50 p-2.5 text-xs dark:bg-neutral-800/60">
+              <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-neutral-50 p-2.5 text-xs">
                 <div>
                   <p className="text-neutral-400">Locações</p>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-200">{c.stats.count}</p>
+                  <p className="font-medium text-neutral-700">{c.stats.count}</p>
                 </div>
                 <div>
                   <p className="text-neutral-400">Total</p>
@@ -175,11 +175,11 @@ export default function ClientesClient({
                 </div>
                 <div>
                   <p className="text-neutral-400">Indicações</p>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-200">—</p>
+                  <p className="font-medium text-neutral-700">—</p>
                 </div>
                 <div>
                   <p className="text-neutral-400">Última reserva</p>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-200">
+                  <p className="font-medium text-neutral-700">
                     {c.stats.lastDate ? formatDate(c.stats.lastDate) : "-"}
                   </p>
                 </div>
@@ -204,7 +204,7 @@ export default function ClientesClient({
                     className={`rounded-full px-2 py-1 text-[11px] font-medium ${
                       c.nextEvent.confirmed
                         ? "bg-brand-teal/10 text-brand-teal"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "bg-amber-100 text-amber-700"
                     }`}
                   >
                     📅 {formatDate(c.nextEvent.date_start)} · {c.nextEvent.confirmed ? "Confirmado" : "Não confirmado"}
@@ -214,7 +214,7 @@ export default function ClientesClient({
                     "marcar paga" daqui não diria qual delas. Os botões por
                     agendamento ficam na ficha do cliente. */}
                 {c.taxasPendentes > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700">
                     💳 {c.taxasPendentes === 1 ? "Taxa pendente" : `${c.taxasPendentes} taxas pendentes`}
                     {c.valorPendente > 0 ? ` · ${formatCurrency(c.valorPendente)}` : ""}
                   </span>
@@ -267,7 +267,7 @@ export default function ClientesClient({
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl">
             Nenhum cliente encontrado.
           </div>
         )}

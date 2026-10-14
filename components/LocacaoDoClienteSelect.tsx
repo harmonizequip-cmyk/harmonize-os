@@ -142,13 +142,13 @@ export default function LocacaoDoClienteSelect({
 
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+      <label className="mb-1 block text-xs font-medium text-neutral-600">
         Locação ou reserva deste cliente
       </label>
       {opcoes === null ? (
         <p className="text-xs text-neutral-400">Carregando locações...</p>
       ) : opcoes.length === 0 && !foraDaLista ? (
-        <p className="rounded-lg bg-neutral-100 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <p className="rounded-lg bg-neutral-100 px-3 py-2 text-xs text-neutral-500">
           Este cliente ainda não tem reserva nem locação. A despesa fica ligada só ao cliente; quando houver uma
           reserva, edite este lançamento para ligar os dois.
         </p>
@@ -157,7 +157,7 @@ export default function LocacaoDoClienteSelect({
           <select
             value={chave}
             onChange={(e) => escolher(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
           >
             <option value="">Nenhuma (despesa avulsa do cliente)</option>
             {foraDaLista && <option value={chave}>Vínculo atual (cancelado ou antigo)</option>}

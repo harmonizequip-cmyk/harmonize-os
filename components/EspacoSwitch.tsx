@@ -30,11 +30,11 @@ export default function EspacoSwitch() {
 
   const estilo = (ativo: boolean) =>
     `flex-1 rounded-lg py-1.5 text-center text-xs font-semibold transition ${
-      ativo ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100" : "text-neutral-500 dark:text-neutral-400"
+      ativo ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
     }`;
   return (
     <div className="mb-4">
-      <div className="flex rounded-xl bg-neutral-200/70 p-1 dark:bg-neutral-800">
+      <div className="flex rounded-xl bg-neutral-200/70 p-1">
         <button type="button" onClick={() => ir("harmonize")} className={estilo(!pessoal)}>
           Harmonize
         </button>

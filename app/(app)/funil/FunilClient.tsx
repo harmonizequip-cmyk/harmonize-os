@@ -435,9 +435,9 @@ export default function FunilClient({
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Funil de vendas</h1>
+      <h1 className="text-xl font-semibold text-neutral-900">Funil de vendas</h1>
 
-      <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/60 sm:w-fit">
+      <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 sm:w-fit">
         {(
           [
             { key: "leads", label: "Leads", total: totalLeads },
@@ -450,8 +450,8 @@ export default function FunilClient({
             onClick={() => setAba(t.key)}
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition sm:flex-none ${
               aba === t.key
-                ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
-                : "text-neutral-500 dark:text-neutral-400"
+                ? "bg-white text-neutral-900 shadow-sm"
+                : "text-neutral-500"
             }`}
           >
             {t.label} <span className="ml-1 text-xs text-neutral-400">{t.total}</span>
@@ -459,12 +459,12 @@ export default function FunilClient({
         ))}
       </div>
 
-      <div className="sticky top-0 z-20 -mx-4 space-y-2 bg-neutral-50 px-4 pb-2 pt-2 dark:bg-neutral-950 md:static md:mx-0 md:space-y-4 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
+      <div className="sticky top-0 z-20 -mx-4 space-y-2 bg-neutral-50 px-4 pb-2 pt-2 md:static md:mx-0 md:space-y-4 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
         {pendingConfirmationLeads.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-lg dark:border-amber-900/40 dark:bg-amber-900/10 md:shadow-none">
+          <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-lg md:shadow-none">
             <button
               onClick={() => setConfirmAlertOpen((v) => !v)}
-              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-amber-800 dark:text-amber-400"
+              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-amber-800"
             >
               <span>
                 ⚠️ {pendingConfirmationLeads.length}{" "}
@@ -476,16 +476,16 @@ export default function FunilClient({
               <span className="text-xs">{confirmAlertOpen ? "▲" : "▼"}</span>
             </button>
             {confirmAlertOpen && (
-              <div className="max-h-[45vh] space-y-1.5 overflow-y-auto border-t border-amber-200/60 p-3 pt-2 dark:border-amber-900/30 md:max-h-none md:overflow-visible">
+              <div className="max-h-[45vh] space-y-1.5 overflow-y-auto border-t border-amber-200/60 p-3 pt-2 md:max-h-none md:overflow-visible">
                 {pendingConfirmationLeads.map((lead) => (
                   <div
                     key={lead.id}
-                    className="rounded-xl bg-white/70 px-3 py-2 dark:bg-neutral-900/40"
+                    className="rounded-xl bg-white/70 px-3 py-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
-                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <p className="text-xs font-medium text-neutral-900">{lead.name}</p>
+                        <p className="text-[11px] text-neutral-500">
                           {formatDate(lead.nextEvent!.date_start)}
                         </p>
                         <p className="text-[10px] text-neutral-400">
@@ -514,7 +514,7 @@ export default function FunilClient({
           </div>
         )}
 
-        <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 shadow-lg dark:border-brand-blue/20 dark:bg-brand-blue/10 md:shadow-none">
+        <div className="overflow-hidden rounded-2xl border border-brand-blue/30 bg-brand-blue/5 shadow-lg md:shadow-none">
           <div className="flex items-center justify-between gap-2 p-3 text-sm text-brand-blue">
             {tasks.length > 0 ? (
               <button
@@ -545,18 +545,18 @@ export default function FunilClient({
                 const busy = taskBusyId === task.id;
                 const expanded = expandedTaskId === task.id;
                 return (
-                  <div key={task.id} className="overflow-hidden rounded-xl bg-white/80 dark:bg-neutral-900/50">
+                  <div key={task.id} className="overflow-hidden rounded-xl bg-white/80">
                     <button
                       onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
                       className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
                     >
                       <span className="text-xs">
-                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{task.title}</span>
-                        <span className="ml-1.5 text-neutral-500 dark:text-neutral-400">
+                        <span className="font-medium text-neutral-900">{task.title}</span>
+                        <span className="ml-1.5 text-neutral-500">
                           {formatDate(task.due_date)}
                         </span>
                         {atrasada && (
-                          <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                          <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
                             Atrasada
                           </span>
                         )}
@@ -567,7 +567,7 @@ export default function FunilClient({
                       <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
                     </button>
                     {expanded && (
-                      <div className="flex gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+                      <div className="flex gap-2 border-t border-neutral-100 px-3 py-2">
                         {task.type !== "contato_inicial" && task.type !== "followup" ? (
                           <button
                             disabled={busy}
@@ -588,7 +588,7 @@ export default function FunilClient({
                             <button
                               disabled={busy}
                               onClick={() => registerContactAttempt(task.id, false)}
-                              className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                              className="flex-1 rounded-lg bg-amber-100 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50"
                             >
                               🔁 Sem resposta
                             </button>
@@ -609,12 +609,12 @@ export default function FunilClient({
           placeholder="Buscar por nome ou cidade..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+          className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal sm:max-w-sm"
         />
         <select
           value={origemFilter ?? ""}
           onChange={(e) => setOrigemFilter(e.target.value || null)}
-          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-2 text-xs text-neutral-600"
         >
           <option value="">Todas as origens</option>
           {ORIGENS.map((o) => (
@@ -627,7 +627,7 @@ export default function FunilClient({
           type="button"
           onClick={baixarCsv}
           disabled={filtered.length === 0}
-          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
         >
           Exportar planilha
         </button>
@@ -659,7 +659,7 @@ export default function FunilClient({
         </p>
       )}
 
-      <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/60 w-fit">
+      <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 w-fit">
         {(
           [
             { key: "lista", label: "Lista", Icone: List },
@@ -672,8 +672,8 @@ export default function FunilClient({
             onClick={() => trocarVisao(key)}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
               visao === key
-                ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
-                : "text-neutral-500 dark:text-neutral-400"
+                ? "bg-white text-neutral-900 shadow-sm"
+                : "text-neutral-500"
             }`}
           >
             <Icone size={14} />
@@ -713,7 +713,7 @@ export default function FunilClient({
                   className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     ativa
                       ? "border-brand-teal bg-brand-teal text-white"
-                      : "border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                      : "border-neutral-200 bg-white text-neutral-600"
                   }`}
                 >
                   <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
@@ -732,7 +732,7 @@ export default function FunilClient({
               <div
                 key={lead.id}
                 onClick={() => setSelected(lead)}
-                className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal dark:border-neutral-800/60 dark:bg-neutral-900/55"
+                className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal"
               >
                 <LeadCardContent
                   lead={lead}
@@ -745,7 +745,7 @@ export default function FunilClient({
                   tarefasAbertas={tarefasAbertas === lead.id}
                 />
                 {tarefasAbertas === lead.id && (
-                  <div className="mt-2 space-y-2 border-t border-neutral-100 pt-2 dark:border-neutral-800" onClick={(e) => e.stopPropagation()}>
+                  <div className="mt-2 space-y-2 border-t border-neutral-100 pt-2" onClick={(e) => e.stopPropagation()}>
                     {tasks
                       .filter((t) => t.client_id === lead.id)
                       .sort((a, b) => a.due_date.localeCompare(b.due_date))
@@ -761,12 +761,12 @@ export default function FunilClient({
                         const link = mensagem ? buildWhatsAppLink(lead.whatsapp, mensagem) : null;
                         const deFunil = task.type === "contato_inicial" || task.type === "followup";
                         return (
-                          <div key={task.id} className="rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-                            <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+                          <div key={task.id} className="rounded-lg bg-neutral-50 p-2">
+                            <p className="text-xs font-medium text-neutral-800">
                               {task.title}
                               <span className="ml-1.5 font-normal text-neutral-500">{formatDate(task.due_date)}</span>
                               {task.due_date < hojeLocal() && (
-                                <span className="ml-1.5 text-[10px] font-medium text-red-600 dark:text-red-400">atrasada</span>
+                                <span className="ml-1.5 text-[10px] font-medium text-red-600">atrasada</span>
                               )}
                             </p>
                             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -792,7 +792,7 @@ export default function FunilClient({
                                   <button
                                     disabled={busy}
                                     onClick={() => registerContactAttempt(task.id, false)}
-                                    className="rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
+                                    className="rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 disabled:opacity-50"
                                   >
                                     🔁 Sem resposta
                                   </button>
@@ -872,11 +872,11 @@ export default function FunilClient({
       {moverLead && (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setMoverLead(null)}>
           <div
-            className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+            className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Mover {moverLead.name}</p>
-            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Escolha a nova etapa.</p>
+            <p className="text-sm font-semibold text-neutral-900">Mover {moverLead.name}</p>
+            <p className="mb-3 text-xs text-neutral-500">Escolha a nova etapa.</p>
             <div className="space-y-1.5">
               {LEAD_STAGES.map((st) => (
                 <button
@@ -886,7 +886,7 @@ export default function FunilClient({
                   className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm ${
                     st.key === moverLead.stage
                       ? "border-brand-teal bg-brand-teal/10 font-medium text-brand-teal"
-                      : "border-neutral-200 text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                      : "border-neutral-200 text-neutral-700"
                   }`}
                 >
                   <span className={`h-2 w-2 rounded-full ${st.dot}`} />
@@ -898,7 +898,7 @@ export default function FunilClient({
             <button
               type="button"
               onClick={() => setMoverLead(null)}
-              className="mt-3 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="mt-3 w-full rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
             >
               Cancelar
             </button>
@@ -927,18 +927,18 @@ export default function FunilClient({
           onClick={() => setPedidoLead(null)}
         >
           <div
-            className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
+            className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900">
               Pedir confirmação no WhatsApp
             </h2>
-            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="mb-3 text-xs text-neutral-500">
               {pedidoLead.name} · {pedidoLead.nextEvent ? formatDate(pedidoLead.nextEvent.date_start) : ""}
             </p>
 
             {pedidoCadastroIncompleto && (
-              <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700">
                 ⚠️ Não consegui tirar o nome deste cliente do cadastro, então a saudação vai genérica. Ajuste o
                 texto abaixo antes de enviar, se quiser.
               </p>
@@ -948,13 +948,13 @@ export default function FunilClient({
               value={pedidoMessage}
               onChange={(e) => setPedidoMessage(e.target.value)}
               rows={4}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 onClick={() => setPedidoLead(null)}
-                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
               >
                 Agora não
               </button>
@@ -995,12 +995,12 @@ function FunilColumn({
     <div
       ref={setNodeRef}
       className={`w-[82vw] max-w-[340px] flex-shrink-0 snap-start rounded-2xl p-3 transition sm:w-64 sm:max-w-none sm:snap-align-none ${
-        isOver ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100 dark:bg-neutral-800/60"
+        isOver ? "bg-brand-teal/10 ring-2 ring-brand-teal/40" : "bg-neutral-100"
       }`}
     >
       <div className="mb-3 flex items-center gap-2 px-1">
         <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
-        <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{stage.label}</p>
+        <p className="text-sm font-semibold text-neutral-700">{stage.label}</p>
         <span
           title={
             sinoTotal === 0
@@ -1010,9 +1010,9 @@ function FunilColumn({
           }
           className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
             sinoTotal === 0
-              ? "text-neutral-300 dark:text-neutral-600"
+              ? "text-neutral-300"
               : sinoAtrasadas > 0
-              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-red-100 text-red-600"
               : "bg-brand-blue/10 text-brand-blue"
           }`}
         >
@@ -1055,7 +1055,7 @@ function LeadCard({
       onClick={onOpen}
       className={`${
         arrastavel ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
-      } rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55 ${
+      } rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand ${
         isDragging ? "opacity-30" : ""
       }`}
     >
@@ -1095,19 +1095,19 @@ function LeadCardContent({
     <div
       className={
         floating
-          ? "w-[82vw] max-w-[340px] rounded-xl border border-brand-teal/60 bg-white p-3 shadow-2xl dark:bg-neutral-900 sm:w-64 sm:max-w-none"
+          ? "w-[82vw] max-w-[340px] rounded-xl border border-brand-teal/60 bg-white p-3 shadow-2xl sm:w-64 sm:max-w-none"
           : ""
       }
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 text-sm font-medium text-neutral-900 dark:text-neutral-100">{lead.name}</p>
+        <p className="min-w-0 text-sm font-medium text-neutral-900">{lead.name}</p>
         {lead.parceiro && (
           <span className="flex-shrink-0 rounded-full bg-brand-lilac/15 px-2 py-0.5 text-[11px] font-semibold text-brand-lilac">
             🤝 Parceiro
           </span>
         )}
       </div>
-      {lead.city && <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{lead.city}</p>}
+      {lead.city && <p className="mt-0.5 text-xs text-neutral-500">{lead.city}</p>}
 
       {tarefa && (
         <span
@@ -1122,7 +1122,7 @@ function LeadCardContent({
           }
           className={`mt-1 flex w-fit max-w-full flex-wrap items-center gap-x-1 rounded-2xl px-2 py-0.5 text-[11px] font-medium ${
             tarefa.maisAntiga < hojeLocal()
-              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-red-100 text-red-600"
               : "bg-brand-blue/10 text-brand-blue"
           }`}
         >
@@ -1143,7 +1143,7 @@ function LeadCardContent({
           className={`mt-1.5 block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold ${
             lead.nextEvent.confirmed
               ? "bg-brand-teal/10 text-brand-teal"
-              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              : "bg-amber-100 text-amber-700"
           }`}
         >
           📅 Próximo agendamento: {diaDaSemana(lead.nextEvent.date_start)} {formatDate(lead.nextEvent.date_start)}
@@ -1167,8 +1167,8 @@ function LeadCardContent({
         <span
           className={`mt-1 block w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${
             (lead.taxasVencidas ?? 0) > 0
-              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              ? "bg-red-100 text-red-600"
+              : "bg-amber-100 text-amber-700"
           }`}
         >
           💳 {lead.taxasPendentes === 1 ? "Taxa pendente" : `${lead.taxasPendentes} taxas pendentes`}
@@ -1203,7 +1203,7 @@ function LeadCardContent({
                 e.stopPropagation();
                 onMover();
               }}
-              className="flex-1 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-lg border border-neutral-200 py-1.5 text-xs font-medium text-neutral-600"
             >
               Mover ▾
             </button>
@@ -1214,7 +1214,7 @@ function LeadCardContent({
                 e.stopPropagation();
                 onAvancar?.();
               }}
-              className="flex-1 rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal dark:bg-neutral-800 dark:text-neutral-300"
+              className="flex-1 rounded-lg bg-neutral-100 py-1.5 text-xs font-medium text-neutral-600 hover:bg-brand-teal/10 hover:text-brand-teal"
             >
               Avançar →
             </button>

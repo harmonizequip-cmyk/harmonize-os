@@ -173,12 +173,12 @@ export default function DespesasDaReserva({
   const total = despesas.filter((d) => d.pessoal !== "meu").reduce((s, d) => s + d.amount, 0);
   const listaCategorias = pagoCom === "meu" ? categoriasPessoais : categorias;
   const campo =
-    "rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+    "rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 
   return (
-    <div className="mt-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+    <div className="mt-3 rounded-xl border border-neutral-200 p-3">
       <div className="flex items-baseline justify-between">
-        <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Despesas desta reserva</p>
+        <p className="text-xs font-medium text-neutral-600">Despesas desta reserva</p>
         {total > 0 && <p className="text-xs font-semibold text-brand-pink">{formatCurrency(total)}</p>}
       </div>
       <p className="mt-0.5 text-[11px] text-neutral-400">
@@ -193,17 +193,17 @@ export default function DespesasDaReserva({
             <ul className="mt-2 space-y-1">
               {despesas.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="min-w-0 truncate text-neutral-700 dark:text-neutral-300">
+                  <span className="min-w-0 truncate text-neutral-700">
                     {formatDate(d.date)} · {d.categoria ?? d.description}
                     {d.categoria && d.description !== d.categoria ? ` · ${d.description}` : ""}
                     {d.pessoal && (
-                      <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">
                         {d.pessoal === "custo" ? "do bolso" : "pessoal, fora do lucro"}
                       </span>
                     )}
                   </span>
                   <span className="flex flex-shrink-0 items-center gap-2">
-                    <span className="font-medium text-neutral-800 dark:text-neutral-100">{formatCurrency(d.amount)}</span>
+                    <span className="font-medium text-neutral-800">{formatCurrency(d.amount)}</span>
                     <button type="button" onClick={() => desvincular(d.id)} className="text-[11px] text-neutral-400 underline">
                       desvincular
                     </button>
@@ -266,7 +266,7 @@ export default function DespesasDaReserva({
           </button>
 
           {avulsas.length > 0 && (
-            <div className="mt-3 border-t border-neutral-200 pt-2 dark:border-neutral-700">
+            <div className="mt-3 border-t border-neutral-200 pt-2">
               <button
                 type="button"
                 onClick={() => setMostrarAvulsas((v) => !v)}
@@ -278,12 +278,12 @@ export default function DespesasDaReserva({
                 <ul className="mt-2 space-y-1">
                   {avulsas.map((d) => (
                     <li key={d.id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="min-w-0 truncate text-neutral-600 dark:text-neutral-400">
+                      <span className="min-w-0 truncate text-neutral-600">
                         {formatDate(d.date)} · {d.categoria ?? "-"} · {d.description}
                         {d.cliente ? "" : " · sem cliente"}
                       </span>
                       <span className="flex flex-shrink-0 items-center gap-2">
-                        <span className="font-medium text-neutral-800 dark:text-neutral-100">{formatCurrency(d.amount)}</span>
+                        <span className="font-medium text-neutral-800">{formatCurrency(d.amount)}</span>
                         <button
                           type="button"
                           onClick={() => vincular(d.id)}
@@ -301,7 +301,7 @@ export default function DespesasDaReserva({
         </>
       )}
 
-      {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
     </div>
   );
 }

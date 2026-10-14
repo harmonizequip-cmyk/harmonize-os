@@ -466,13 +466,13 @@ export default function AgendaClient({
       <div
         key={e.id}
         onClick={() => setEditingEvent(e)}
-        className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand dark:border-neutral-800/60 dark:bg-neutral-900/55"
+        className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
             <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${meta.dot}`} />
             <div>
-              <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{e.title}</p>
+              <p className="text-sm font-medium text-neutral-900">{e.title}</p>
               {/* Na lista de confirmação os cartões são de dias diferentes,
                   então a data do atendimento aparece em destaque. */}
               {comData && !(e.date_end && e.date_end > e.date_start) && (
@@ -485,15 +485,15 @@ export default function AgendaClient({
                   {formatDate(e.date_start)} a {formatDate(e.date_end)} ({duracaoEmDias(e.date_start, e.date_end)} dias, uma reserva só)
                 </p>
               )}
-              <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <p className="mt-0.5 text-xs text-neutral-500">
                 {meta.label}
                 {ehPreReserva(e) && (
-                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                     Pré-reserva
                   </span>
                 )}
                 {ehPreReserva(e) && taxaVencida(e.created_at, hojeLocal(), diasTaxa) && (
-                  <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                  <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
                     Taxa vencida
                   </span>
                 )}
@@ -530,7 +530,7 @@ export default function AgendaClient({
             className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
               e.confirmed
                 ? "bg-brand-teal/10 text-brand-teal"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                : "bg-amber-100 text-amber-700"
             }`}
           >
             {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
@@ -565,11 +565,11 @@ export default function AgendaClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Agenda</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">Agenda</h1>
         <div className="flex gap-2 self-start sm:self-auto">
           <Link
             href="/agenda-hoje"
-            className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600"
           >
             Próximas locações
           </Link>
@@ -581,7 +581,7 @@ export default function AgendaClient({
           </button>
           <button
             onClick={goToToday}
-            className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600"
           >
             Hoje
           </button>
@@ -593,10 +593,10 @@ export default function AgendaClient({
           placeholder="Buscar evento por título ou cliente..."
           value={eventSearch}
           onChange={(e) => setEventSearch(e.target.value)}
-          className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 sm:max-w-sm"
+          className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal sm:max-w-sm"
         />
         {eventSearchTerm && (
-          <div className="mt-1 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800 sm:max-w-sm">
+          <div className="mt-1 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg sm:max-w-sm">
             {eventMatches.length === 0 ? (
               <p className="px-3 py-2 text-sm text-neutral-400">Nenhum evento bate com essa busca.</p>
             ) : (
@@ -604,9 +604,9 @@ export default function AgendaClient({
                 <button
                   key={e.id}
                   onClick={() => goToEvent(e)}
-                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-700"
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50"
                 >
-                  <span className="font-medium text-neutral-800 dark:text-neutral-100">{e.title}</span>
+                  <span className="font-medium text-neutral-800">{e.title}</span>
                   <span className="ml-2 text-xs text-neutral-400">
                     {formatDate(e.date_start)}
                     {e.clients?.name ? ` · ${e.clients.name}` : ""}
@@ -622,7 +622,7 @@ export default function AgendaClient({
         <select
           value={tipoFiltro ?? ""}
           onChange={(e) => setTipoFiltro(e.target.value || null)}
-          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600"
         >
           <option value="">Todos os tipos</option>
           {tiposDisponiveis.map(([tipo, label]) => (
@@ -634,7 +634,7 @@ export default function AgendaClient({
         <select
           value={confirmadoFiltro}
           onChange={(e) => setConfirmadoFiltro(e.target.value as "todos" | "sim" | "nao")}
-          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600"
         >
           <option value="todos">Confirmado e não confirmado</option>
           <option value="sim">Só confirmados</option>
@@ -656,13 +656,13 @@ export default function AgendaClient({
           type="button"
           onClick={baixarCsv}
           disabled={resumoMes.total === 0}
-          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
         >
           Exportar planilha do mês
         </button>
       </div>
 
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="text-xs text-neutral-500">
         {resumoMes.total === 0
           ? `Nenhum evento em ${format(currentMonth, "MMMM", { locale: ptBR })}${filtroAtivo ? " com esse filtro" : ""}.`
           : `${resumoMes.total} ${resumoMes.total === 1 ? "evento" : "eventos"} em ${format(currentMonth, "MMMM", {
@@ -671,29 +671,29 @@ export default function AgendaClient({
       </p>
 
       {needsConfirmation.length > 0 && (
-        <div id="confirmacoes" className="scroll-mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
-          <p className="mb-2 text-sm font-semibold text-amber-800 dark:text-amber-400">
+        <div id="confirmacoes" className="scroll-mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-amber-800">
             ⚠️ Precisam de confirmação (próximos 7 dias)
           </p>
           <div className="space-y-2">{needsConfirmation.map((e) => renderCard(e, true))}</div>
         </div>
       )}
 
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl">
         <div className="mb-3 flex items-center justify-between">
           <button
             onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
-            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100"
             aria-label="Mês anterior"
           >
             ‹
           </button>
-          <p className="text-sm font-semibold capitalize text-neutral-900 dark:text-neutral-100">
+          <p className="text-sm font-semibold capitalize text-neutral-900">
             {format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </p>
           <button
             onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
-            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            className="rounded-lg px-2 py-1 text-neutral-500 hover:bg-neutral-100"
             aria-label="Próximo mês"
           >
             ›
@@ -702,7 +702,7 @@ export default function AgendaClient({
 
         <div className="grid grid-cols-7 gap-y-1 text-center">
           {WEEKDAY_LABELS.map((w, i) => (
-            <div key={i} className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+            <div key={i} className="text-[11px] font-medium text-neutral-400">
               {w}
             </div>
           ))}
@@ -732,8 +732,8 @@ export default function AgendaClient({
                     : today
                     ? "font-semibold text-brand-teal"
                     : inMonth
-                    ? "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                    : "text-neutral-300 dark:text-neutral-700"
+                    ? "text-neutral-700 hover:bg-neutral-100"
+                    : "text-neutral-300"
                 }`}
               >
                 {day.getDate()}
@@ -744,7 +744,7 @@ export default function AgendaClient({
               <div key={key} className="relative mx-auto flex h-10 w-10 items-center justify-center">
                 {bloqueiosPorDia.has(key) && (
                   <span
-                    className="pointer-events-none absolute bottom-0 left-1/2 h-[3px] w-5 -translate-x-1/2 rounded-full bg-neutral-400 dark:bg-neutral-500"
+                    className="pointer-events-none absolute bottom-0 left-1/2 h-[3px] w-5 -translate-x-1/2 rounded-full bg-neutral-400"
                     title="HIPRO bloqueado"
                   />
                 )}
@@ -753,7 +753,7 @@ export default function AgendaClient({
                     className="flex h-9 w-9 items-center justify-center rounded-full p-[2px]"
                     style={{ background: anelCor ?? undefined }}
                   >
-                    <div className="flex h-full w-full items-center justify-center rounded-full bg-white dark:bg-neutral-900">
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-white">
                       {numero}
                     </div>
                   </div>
@@ -773,7 +773,7 @@ export default function AgendaClient({
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm font-medium text-neutral-500">
             {formatDate(selectedDate)}
           </p>
           <button
@@ -800,7 +800,7 @@ export default function AgendaClient({
                 setAddChooserOpen(false);
                 setModalOpen(true);
               }}
-              className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-xl border border-neutral-300 py-2 text-xs font-medium text-neutral-600"
             >
               Outro evento
             </button>
@@ -811,14 +811,14 @@ export default function AgendaClient({
           {(bloqueiosPorDia.get(selectedDate) ?? []).map((b) => (
             <div
               key={b.id}
-              className="flex items-start gap-2 rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-200"
+              className="flex items-start gap-2 rounded-xl border border-neutral-300 bg-neutral-100 p-3 text-xs text-neutral-700"
             >
               <span>🔒</span>
               <div className="min-w-0">
                 <p className="font-medium">
                   {b.equipamento} bloqueado · {ROTULO_BLOQUEIO_AGENDA[b.tipo] ?? "Bloqueado"}
                 </p>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="text-[11px] text-neutral-500">
                   {formatDate(b.data_inicio)} a {formatDate(b.data_fim)}
                   {b.motivo ? ` · ${b.motivo}` : ""} · não aceita reserva nesses dias
                 </p>
@@ -827,7 +827,7 @@ export default function AgendaClient({
           ))}
           {selectedDayEvents.map((e) => renderCard(e))}
           {selectedDayEvents.length === 0 && (
-            <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl dark:border-neutral-700/60 dark:bg-neutral-900/40">
+            <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
               Nenhum evento nesse dia.
             </div>
           )}
@@ -880,18 +880,18 @@ export default function AgendaClient({
           onClick={() => setPedidoEvent(null)}
         >
           <div
-            className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/95 sm:rounded-3xl"
+            className="w-full max-w-md rounded-t-2xl bg-white/95 p-5 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900">
               Pedir confirmação no WhatsApp
             </h2>
-            <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="mb-3 text-xs text-neutral-500">
               {pedidoEvent.clients?.name ?? "Cliente"} · {formatDate(pedidoEvent.date_start)}
             </p>
 
             {pedidoCadastroIncompleto && (
-              <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <p className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700">
                 ⚠️ Não consegui tirar o nome deste cliente do cadastro, então a saudação vai genérica. Ajuste o
                 texto abaixo antes de enviar, se quiser.
               </p>
@@ -901,13 +901,13 @@ export default function AgendaClient({
               value={pedidoMessage}
               onChange={(e) => setPedidoMessage(e.target.value)}
               rows={4}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 onClick={() => setPedidoEvent(null)}
-                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
               >
                 Agora não
               </button>

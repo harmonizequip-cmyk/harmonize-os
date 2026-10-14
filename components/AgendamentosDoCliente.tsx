@@ -50,7 +50,7 @@ interface Saldo {
 const SITUACAO_META: Record<string, { label: string; classe: string }> = {
   agendado: {
     label: "Agendado",
-    classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    classe: "bg-amber-100 text-amber-700",
   },
   confirmado: { label: "Confirmado", classe: "bg-brand-teal/10 text-brand-teal" },
   realizado: { label: "Realizado", classe: "bg-brand-blue/10 text-brand-blue" },
@@ -60,12 +60,12 @@ const SITUACAO_META: Record<string, { label: string; classe: string }> = {
 const TAXA_META: Record<string, { label: string; classe: string }> = {
   pendente: {
     label: "Taxa pendente",
-    classe: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    classe: "bg-amber-100 text-amber-700",
   },
   paga: { label: "Taxa paga", classe: "bg-brand-teal/10 text-brand-teal" },
   perdida: {
     label: "Taxa perdida",
-    classe: "bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300",
+    classe: "bg-neutral-200 text-neutral-600",
   },
 };
 
@@ -83,9 +83,9 @@ const BOTAO_PRIMARIO =
 const BOTAO_AZUL =
   "rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60";
 const BOTAO_NEUTRO =
-  "rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-300";
+  "rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-60";
 const BOTAO_VERMELHO =
-  "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-60 dark:border-red-900/50 dark:text-red-400";
+  "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-60";
 
 function hoje(): string {
   return hojeLocal();
@@ -252,13 +252,13 @@ export default function AgendamentosDoCliente({
       </p>
 
       {erro && (
-        <div className="mb-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400">
+        <div className="mb-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
           {erro}
         </div>
       )}
 
       {itens.length === 0 && (
-        <p className="rounded-xl border border-dashed border-neutral-300/70 py-4 text-center text-xs text-neutral-400 dark:border-neutral-700/60">
+        <p className="rounded-xl border border-dashed border-neutral-300/70 py-4 text-center text-xs text-neutral-400">
           Nenhum agendamento para este cliente ainda.
         </p>
       )}
@@ -285,7 +285,7 @@ export default function AgendamentosDoCliente({
           return (
             <div
               key={a.event_id}
-              className="rounded-xl border border-neutral-200 p-2.5 dark:border-neutral-700"
+              className="rounded-xl border border-neutral-200 p-2.5"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.classe}`}>
@@ -304,16 +304,16 @@ export default function AgendamentosDoCliente({
                     className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                       a.pago
                         ? "bg-brand-teal/10 text-brand-teal"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "bg-amber-100 text-amber-700"
                     }`}
                   >
                     {a.pago ? "Pago" : "A receber"}
                   </span>
                 )}
-                <span className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                <span className="text-xs font-medium text-neutral-800">
                   {a.equipamento}
                 </span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                <span className="text-xs text-neutral-500">
                   {formatDate(a.data)}
                 </span>
                 {a.valor != null && (
@@ -359,7 +359,7 @@ export default function AgendamentosDoCliente({
               {/* O crédito da taxa é a parte que mais gera dúvida na hora
                   de cobrar, então aparece escrito, com a conta feita. */}
               {a.rental_id && !a.pago && !cancelado && situacaoPag && (credito > 0 || jaRecebido > 0) && (
-                <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="mt-1 text-[11px] text-neutral-500">
                   {credito > 0 ? `A taxa de ${formatCurrency(credito)} já está paga e entra como crédito. ` : ""}
                   {jaRecebido > 0 ? `Já recebido: ${formatCurrency(jaRecebido)}. ` : ""}
                   Faltam <span className="font-medium text-brand-teal">{formatCurrency(aReceber)}</span>.
@@ -367,20 +367,20 @@ export default function AgendamentosDoCliente({
               )}
 
               {a.pago && a.pago_em && (
-                <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="mt-1 text-[11px] text-neutral-500">
                   Pagamento registrado em {formatDate(a.pago_em)}.
                 </p>
               )}
 
               {a.taxa_status === "perdida" && (
-                <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="mt-1 text-[11px] text-neutral-500">
                   O cliente cancelou depois de pagar a taxa, então o valor ficou como receita e não
                   vira crédito. Reativar o agendamento devolve a taxa.
                 </p>
               )}
 
               {cancelado && (a.no_show || a.cancellation_reason) && (
-                <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="mt-1 text-[11px] text-neutral-500">
                   {a.no_show ? "Não compareceu." : "Cancelado."}
                   {a.cancellation_reason ? ` Motivo: ${a.cancellation_reason}` : ""}
                 </p>
@@ -392,7 +392,7 @@ export default function AgendamentosDoCliente({
                     type="date"
                     value={novaData}
                     onChange={(e) => setNovaData(e.target.value)}
-                    className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                   />
                   <button
                     type="button"
@@ -415,8 +415,8 @@ export default function AgendamentosDoCliente({
                   </button>
                 </div>
               ) : pagando === a.event_id ? (
-                <div className="mt-2 rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-                  <p className="mb-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <div className="mt-2 rounded-lg bg-neutral-50 p-2">
+                  <p className="mb-2 text-[11px] text-neutral-500">
                     Saldo em aberto: {formatCurrency(aReceber)}
                     {credito > 0 ? ` (já descontado o crédito de ${formatCurrency(credito)})` : ""}
                     {jaRecebido > 0 ? `, já recebido ${formatCurrency(jaRecebido)}` : ""}. Pode lançar menos, se o
@@ -428,12 +428,12 @@ export default function AgendamentosDoCliente({
                       onChange={(e) => setValorPagamento(e.target.value)}
                       inputMode="decimal"
                       aria-label="Valor recebido"
-                      className="w-28 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="w-28 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                     />
                     <select
                       value={formaPagamento}
                       onChange={(e) => setFormaPagamento(e.target.value)}
-                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                     >
                       {FORMAS.map((f) => (
                         <option key={f.value} value={f.value}>
@@ -446,7 +446,7 @@ export default function AgendamentosDoCliente({
                         value={pixConta}
                         onChange={(e) => setPixConta(e.target.value)}
                         aria-label="Conta PIX que recebeu"
-                        className="min-w-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                        className="min-w-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                       >
                         {PIX_CONTAS.map((c) => (
                           <option key={c.value} value={c.value}>
@@ -459,7 +459,7 @@ export default function AgendamentosDoCliente({
                       type="date"
                       value={dataPagamento}
                       onChange={(e) => setDataPagamento(e.target.value)}
-                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                     />
                     <button
                       type="button"
@@ -578,7 +578,7 @@ export default function AgendamentosDoCliente({
                       cancelado, onde não há nada a receber nem taxa a
                       mexer: a taxa paga já virou perdida no banco. */}
                   {!cancelado && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-neutral-100 pt-1.5 dark:border-neutral-700/50">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-neutral-100 pt-1.5">
                       <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
                         Dinheiro
                       </span>

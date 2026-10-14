@@ -126,7 +126,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
   }
 
   const campo =
-    "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+    "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 
   return (
     <div className="space-y-4">
@@ -135,7 +135,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
           <Link href="/financeiro" className="text-xs text-neutral-500">
             ← Financeiro
           </Link>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Empréstimos</h1>
+          <h1 className="text-xl font-semibold text-neutral-900">Empréstimos</h1>
         </div>
         {!somenteLeitura && <button
           onClick={() => abrir("concedido", nomes[0] ?? "__outro__")}
@@ -145,17 +145,17 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
         </button>}
       </div>
 
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
+      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-xl">
         <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber de volta</p>
-        <p className="mt-0.5 text-2xl font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(totalAReceber)}</p>
-        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mt-0.5 text-2xl font-semibold text-amber-600">{formatCurrency(totalAReceber)}</p>
+        <p className="mt-1 text-xs text-neutral-500">
           Empréstimo sai do caixa, mas não é despesa: fica fora do Resultado, do quadro &quot;Este mês&quot; e dos
           relatórios. A devolução também não conta como faturamento.
         </p>
       </div>
 
       {devedores.length === 0 && (
-        <div className="rounded-xl border border-dashed border-neutral-300 py-8 text-center text-sm text-neutral-400 dark:border-neutral-700">
+        <div className="rounded-xl border border-dashed border-neutral-300 py-8 text-center text-sm text-neutral-400">
           Nenhum empréstimo lançado ainda.
         </div>
       )}
@@ -163,21 +163,21 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
       {devedores.map((d) => (
         <div
           key={d.devedor}
-          className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+          className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl"
         >
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{d.devedor}</p>
+            <p className="text-sm font-semibold text-neutral-900">{d.devedor}</p>
             <span
               className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 d.saldo > 0
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  ? "bg-amber-100 text-amber-700"
                   : "bg-brand-teal/10 text-brand-teal"
               }`}
             >
               {d.saldo > 0 ? `Deve ${formatCurrency(d.saldo)}` : "Quitado"}
             </span>
           </div>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="mt-1 text-xs text-neutral-500">
             Emprestado {formatCurrency(d.concedido)} · devolvido {formatCurrency(d.devolvido)}
           </p>
 
@@ -191,16 +191,16 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
             </button>
             <button
               onClick={() => abrir("concedido", d.devedor)}
-              className="rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+              className="rounded-xl border border-neutral-300 py-2 text-sm font-medium text-neutral-700"
             >
               Emprestar mais
             </button>
           </div>
 
-          <div className="mt-3 space-y-1.5 border-t border-neutral-200 pt-2 dark:border-neutral-800">
+          <div className="mt-3 space-y-1.5 border-t border-neutral-200 pt-2">
             {d.movimentos.map((m) => (
               <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
-                <button type="button" onClick={() => abrirEdicao(m)} className="min-w-0 text-left text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-300">
+                <button type="button" onClick={() => abrirEdicao(m)} className="min-w-0 text-left text-neutral-600 underline-offset-2 hover:underline">
                   {formatDate(m.data)} · {m.tipo === "concedido" ? "Emprestado" : "Devolvido"}
                   {m.descricao ? ` · ${m.descricao}` : ""}
                   {m.semCaixa && <span className="ml-1 text-neutral-400">(só pendência)</span>}
@@ -216,7 +216,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
                       remover(m.id, `${m.tipo === "concedido" ? "Empréstimo" : "Devolução"} de ${formatCurrency(m.valor)} em ${formatDate(m.data)}`)
                     }
                     disabled={removendo === m.id}
-                    className="text-red-600 disabled:opacity-50 dark:text-red-400"
+                    className="text-red-600 disabled:opacity-50"
                     aria-label="Apagar"
                   >
                     ✕
@@ -231,21 +231,21 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
       {form && (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setForm(null)}>
           <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             {form.editId && (
-              <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <p className="mb-3 text-sm font-semibold text-neutral-900">
                 Editar {form.tipo === "concedido" ? "empréstimo" : "devolução"}
               </p>
             )}
-            <div className={`mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800 ${form.editId ? "hidden" : ""}`}>
+            <div className={`mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1 ${form.editId ? "hidden" : ""}`}>
               {(["concedido", "devolucao"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setForm({ ...form, tipo: t })}
                   className={`rounded-lg py-2 text-sm font-medium ${
-                    form.tipo === t ? "bg-white text-neutral-900 shadow dark:bg-neutral-700 dark:text-neutral-100" : "text-neutral-500"
+                    form.tipo === t ? "bg-white text-neutral-900 shadow" : "text-neutral-500"
                   }`}
                 >
                   {t === "concedido" ? "Emprestei" : "Recebi de volta"}
@@ -253,7 +253,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
               ))}
             </div>
 
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               {form.tipo === "concedido" ? "Para quem" : "De quem"}
             </label>
             <select value={form.devedor} onChange={(e) => setForm({ ...form, devedor: e.target.value })} className={campo}>
@@ -270,16 +270,16 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
 
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Valor (R$)</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Valor (R$)</label>
                 <input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" className={campo} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
                 <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={campo} />
               </div>
             </div>
 
-            <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma</label>
+            <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600">Forma</label>
             <select value={forma} onChange={(e) => setForma(e.target.value)} className={campo}>
               {FORMAS.map((f) => (
                 <option key={f.value} value={f.value}>
@@ -288,7 +288,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
               ))}
             </select>
 
-            <label className="mt-3 flex items-start gap-2 rounded-xl border border-neutral-200 p-2.5 text-sm text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
+            <label className="mt-3 flex items-start gap-2 rounded-xl border border-neutral-200 p-2.5 text-sm text-neutral-700">
               <input type="checkbox" checked={semCaixa} onChange={(e) => setSemCaixa(e.target.checked)} className="mt-0.5 h-4 w-4" />
               <span>
                 Só registrar a pendência
@@ -296,10 +296,10 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
               </span>
             </label>
 
-            <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 mt-3 block text-xs font-medium text-neutral-600">Observação</label>
             <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" className={campo} />
 
-            {erro && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{erro}</p>}
+            {erro && <p className="mt-3 text-sm text-red-600">{erro}</p>}
 
             {form.editId && (
               <button
@@ -309,13 +309,13 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
                   await remover(id, `${form.tipo === "concedido" ? "Empréstimo" : "Devolução"} de ${valor ? `R$ ${valor}` : ""} em ${formatDate(data)}`);
                   setForm(null);
                 }}
-                className="mt-4 w-full rounded-xl border border-red-300 py-2.5 text-sm font-medium text-red-600 dark:border-red-900/50 dark:text-red-400"
+                className="mt-4 w-full rounded-xl border border-red-300 py-2.5 text-sm font-medium text-red-600"
               >
                 Apagar este lançamento
               </button>
             )}
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <button onClick={() => setForm(null)} className="rounded-xl border border-neutral-300 py-2.5 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+              <button onClick={() => setForm(null)} className="rounded-xl border border-neutral-300 py-2.5 text-sm text-neutral-600">
                 Cancelar
               </button>
               <button onClick={salvar} disabled={salvando} className="rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white disabled:opacity-60">

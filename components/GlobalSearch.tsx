@@ -115,30 +115,30 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
         aria-label="Buscar"
         className={
           compact
-            ? "flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-            : "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            ? "flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100"
+            : "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-500 transition hover:bg-neutral-100"
         }
       >
-        <Search size={compact ? 18 : 17} strokeWidth={1.75} className={compact ? "" : "text-neutral-400 dark:text-neutral-500"} />
+        <Search size={compact ? 18 : 17} strokeWidth={1.75} className={compact ? "" : "text-neutral-400"} />
         {!compact && <span>Buscar</span>}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/40 p-4 pt-16 sm:pt-24" onClick={close}>
           <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-neutral-900"
+            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-3">
               <Search size={18} className="text-neutral-400" />
               <input
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar cliente, tarefa, evento..."
-                className="flex-1 bg-transparent text-sm outline-none dark:text-neutral-100"
+                className="flex-1 bg-transparent text-sm outline-none"
               />
-              <button onClick={close} aria-label="Fechar" className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300">
+              <button onClick={close} aria-label="Fechar" className="text-neutral-400 hover:text-neutral-600">
                 <X size={18} />
               </button>
             </div>
@@ -157,7 +157,7 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
                     <button
                       key={c.id}
                       onClick={() => goTo(`/clientes/${c.id}`)}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
                     >
                       {c.name}
                       {c.whatsapp && <span className="ml-2 text-xs text-neutral-400">{c.whatsapp}</span>}
@@ -173,7 +173,7 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
                     <button
                       key={t.id}
                       onClick={() => goTo(`/tarefas?highlight=${t.id}`)}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
                     >
                       {t.title}
                       {t.client_name && <span className="ml-2 text-xs text-neutral-400">{t.client_name}</span>}
@@ -189,7 +189,7 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
                     <button
                       key={e.id}
                       onClick={() => goTo(`/agenda?date=${e.date_start}`)}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
                     >
                       {e.title}
                       {e.client_name && <span className="ml-2 text-xs text-neutral-400">{e.client_name}</span>}

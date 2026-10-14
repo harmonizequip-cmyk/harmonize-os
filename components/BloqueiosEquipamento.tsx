@@ -124,11 +124,11 @@ export default function BloqueiosEquipamento({
   }
 
   const campo =
-    "w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+    "w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs";
 
   return (
-    <div className="mt-4 border-t border-neutral-200/70 pt-3 dark:border-neutral-800">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+    <div className="mt-4 border-t border-neutral-200/70 pt-3">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-600">
         <Lock size={13} /> Agenda bloqueada
       </p>
 
@@ -139,21 +139,21 @@ export default function BloqueiosEquipamento({
           {bloqueios.map((b) => {
             const emCurso = b.data_inicio <= hoje && b.data_fim >= hoje;
             return (
-              <li key={b.id} className="rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
-                <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
+              <li key={b.id} className="rounded-lg bg-neutral-50 p-2">
+                <p className="text-xs font-medium text-neutral-800">
                   <span
                     className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${
                       b.tipo === "manutencao"
-                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        : "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-neutral-200 text-neutral-700"
                     }`}
                   >
                     {ROTULO_BLOQUEIO[b.tipo]}
                   </span>
                   {formatDate(b.data_inicio)} a {formatDate(b.data_fim)}
-                  {emCurso && <span className="ml-1.5 text-[10px] font-semibold text-red-600 dark:text-red-400">agora</span>}
+                  {emCurso && <span className="ml-1.5 text-[10px] font-semibold text-red-600">agora</span>}
                 </p>
-                <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                <p className="mt-0.5 text-[11px] text-neutral-500">
                   Volta a aceitar reservas em {formatDate(somarDias(b.data_fim, 1))}
                   {b.motivo ? ` · ${b.motivo}` : ""}
                 </p>
@@ -202,12 +202,12 @@ export default function BloqueiosEquipamento({
         <button
           type="button"
           onClick={() => setAberto(true)}
-          className="mt-2 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+          className="mt-2 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700"
         >
           Bloquear período
         </button>
       ) : (
-        <div className="mt-2 space-y-2 rounded-lg bg-neutral-50 p-2.5 dark:bg-neutral-800/50">
+        <div className="mt-2 space-y-2 rounded-lg bg-neutral-50 p-2.5">
           <div className="flex gap-1.5">
             {(["manutencao", "recesso", "outro"] as const).map((t) => (
               <button
@@ -217,7 +217,7 @@ export default function BloqueiosEquipamento({
                 className={`flex-1 rounded-lg border py-1.5 text-[11px] font-medium ${
                   tipo === t
                     ? "border-brand-teal bg-brand-teal text-white"
-                    : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                    : "border-neutral-300 text-neutral-600"
                 }`}
               >
                 {ROTULO_BLOQUEIO[t]}
@@ -248,7 +248,7 @@ export default function BloqueiosEquipamento({
           />
 
           {conflitos && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800">
               <p className="font-medium">
                 Já {conflitos.length === 1 ? "existe 1 reserva" : `existem ${conflitos.length} reservas`} nesse período:
               </p>
@@ -263,13 +263,13 @@ export default function BloqueiosEquipamento({
             </div>
           )}
 
-          {erro && <p className="text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="text-[11px] text-red-600">{erro}</p>}
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={limpar}
-              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs font-medium text-neutral-600"
             >
               Desistir
             </button>
@@ -284,7 +284,7 @@ export default function BloqueiosEquipamento({
           </div>
         </div>
       )}
-      {erro && !aberto && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && !aberto && <p className="mt-1 text-[11px] text-red-600">{erro}</p>}
     </div>
   );
 }

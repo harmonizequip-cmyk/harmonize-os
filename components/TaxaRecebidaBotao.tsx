@@ -83,7 +83,7 @@ export default function TaxaRecebidaBotao({
 
   return (
     <div className="space-y-2 rounded-xl border border-brand-teal/40 bg-brand-teal/5 p-2.5">
-      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+      <p className="text-[11px] text-neutral-500">
         Como a taxa{valor && valor > 0 ? ` de ${formatCurrency(valor)}` : ""} foi paga?
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -91,7 +91,7 @@ export default function TaxaRecebidaBotao({
           value={forma}
           onChange={(e) => setForma(e.target.value)}
           aria-label="Forma de pagamento da taxa"
-          className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
         >
           {FORMAS.map((f) => (
             <option key={f.value} value={f.value}>
@@ -104,7 +104,7 @@ export default function TaxaRecebidaBotao({
           value={data}
           onChange={(e) => setData(e.target.value)}
           aria-label="Dia em que o dinheiro entrou"
-          className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
         />
         <button
           type="button"
@@ -121,12 +121,12 @@ export default function TaxaRecebidaBotao({
             setAberto(false);
             setErro(null);
           }}
-          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600"
         >
           Cancelar
         </button>
       </div>
-      {erro && <p className="text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="text-xs text-red-600">{erro}</p>}
     </div>
   );
 }

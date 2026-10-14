@@ -32,19 +32,19 @@ export default function CompletarOrigem({ clientes }: { clientes: { id: string; 
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/40 dark:bg-amber-900/10">
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
       {restantes.length === 0 ? (
         <p className="text-xs font-medium text-brand-teal">Pronto: todos os clientes que já alugaram têm origem.</p>
       ) : (
         <>
-          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+          <p className="text-xs font-medium text-amber-800">
             {restantes.length} {restantes.length === 1 ? "cliente que já alugou está" : "clientes que já alugaram estão"} sem
             origem. Toque em como cada um chegou:
           </p>
           <ul className="mt-2 space-y-2">
             {restantes.map((c) => (
               <li key={c.id}>
-                <p className="truncate text-xs text-neutral-800 dark:text-neutral-200">{c.name}</p>
+                <p className="truncate text-xs text-neutral-800">{c.name}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {ORIGENS.map((o) => (
                     <button
@@ -63,7 +63,7 @@ export default function CompletarOrigem({ clientes }: { clientes: { id: string; 
           </ul>
         </>
       )}
-      {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
     </div>
   );
 }

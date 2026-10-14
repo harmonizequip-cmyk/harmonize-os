@@ -81,8 +81,8 @@ export default async function AgendaHojePage() {
   );
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-4 dark:bg-neutral-950">
-      <h1 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Próximos agendamentos</h1>
+    <div className="min-h-screen bg-neutral-50 p-4">
+      <h1 className="mb-4 text-lg font-semibold text-neutral-900">Próximos agendamentos</h1>
 
       {lista.length === 0 && (
         <p className="text-sm text-neutral-400">Nenhum agendamento futuro.</p>
@@ -92,26 +92,26 @@ export default async function AgendaHojePage() {
         {lista.map((r) => (
           <li
             key={r.id}
-            className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+            className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm"
           >
             <div className="flex items-center justify-between gap-2">
               {r.clientId ? (
                 <Link
                   href={`/clientes/${r.clientId}`}
-                  className="text-sm font-medium text-neutral-900 underline decoration-transparent underline-offset-2 hover:decoration-brand-teal dark:text-neutral-100"
+                  className="text-sm font-medium text-neutral-900 underline decoration-transparent underline-offset-2 hover:decoration-brand-teal"
                 >
                   {r.cliente ?? "-"}
                 </Link>
               ) : (
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{r.cliente ?? "-"}</p>
+                <p className="text-sm font-medium text-neutral-900">{r.cliente ?? "-"}</p>
               )}
               {r.pendente && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                   sem disparos ainda
                 </span>
               )}
             </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs text-neutral-500">
               {r.equipamento ? `${r.equipamento} · ` : ""}
               {r.data_fim && r.data_fim !== r.data_inicio
                 ? `${formatDate(r.data_inicio)} a ${formatDate(r.data_fim)}`
@@ -122,7 +122,7 @@ export default async function AgendaHojePage() {
               {r.rentalId && r.saldo > 0.009 && <ReceberPagamentoBotao rentalId={r.rentalId} saldo={r.saldo} />}
               <Link
                 href={`/agenda?date=${r.data_inicio}`}
-                className="block rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                className="block rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600"
               >
                 {r.pendente ? "Abrir na agenda (finalizar com disparos)" : "Abrir na agenda"}
               </Link>

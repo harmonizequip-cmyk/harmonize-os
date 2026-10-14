@@ -254,14 +254,14 @@ export default function NovoLancamentoModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-3 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className="mb-3 text-lg font-semibold text-neutral-900">
           {pessoal ? "Novo lançamento pessoal" : "Novo lançamento"}
         </h2>
 
-        <label className="mb-4 flex items-center gap-2 rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
+        <label className="mb-4 flex items-center gap-2 rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-700">
           <input
             type="checkbox"
             checked={pessoal}
@@ -276,8 +276,8 @@ export default function NovoLancamentoModal({
         </label>
 
         {!pessoal && (
-          <div className="-mt-2 mb-4 rounded-xl border border-neutral-200 px-3 py-2 dark:border-neutral-700">
-            <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-200">
+          <div className="-mt-2 mb-4 rounded-xl border border-neutral-200 px-3 py-2">
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
               <input
                 type="checkbox"
                 checked={!!emprestimo}
@@ -295,7 +295,7 @@ export default function NovoLancamentoModal({
                       type="button"
                       onClick={() => setEmprestimo(d)}
                       className={`rounded-lg border py-1.5 text-xs font-medium ${
-                        emprestimo === d ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                        emprestimo === d ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-300 text-neutral-600"
                       }`}
                     >
                       {d.replace("LASER DREAM ", "").replace("CAMPINA GRANDE", "Campina Grande").replace("JOÃO PESSOA", "João Pessoa")}
@@ -305,7 +305,7 @@ export default function NovoLancamentoModal({
                 <p className="mt-1.5 text-[11px] text-neutral-400">
                   {type === "saida" ? "Saída = empréstimo concedido." : "Entrada = devolução do empréstimo."} Fica fora do resultado e aparece em Empréstimos.
                 </p>
-                <label className="mt-1.5 flex items-center gap-2 text-[11px] text-neutral-600 dark:text-neutral-300">
+                <label className="mt-1.5 flex items-center gap-2 text-[11px] text-neutral-600">
                   <input type="checkbox" checked={emprestimoSemCaixa} onChange={(e) => setEmprestimoSemCaixa(e.target.checked)} />
                   Só registrar a pendência (não mexe no saldo)
                 </label>
@@ -327,7 +327,7 @@ export default function NovoLancamentoModal({
               {ouvindo ? "Ouvindo... toque para parar" : "Falar a despesa"}
             </button>
             {ouvindo && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              <p className="mt-1 text-xs text-red-600">
                 {parcial || "Ex: gasolina 150 reais no pix ontem"}
               </p>
             )}
@@ -370,7 +370,7 @@ export default function NovoLancamentoModal({
                   ? t === "entrada"
                     ? "bg-brand-teal text-white"
                     : "bg-brand-pink text-white"
-                  : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                  : "bg-neutral-100 text-neutral-600"
               }`}
             >
               {t === "entrada" ? "Entrada" : "Saída"}
@@ -380,11 +380,11 @@ export default function NovoLancamentoModal({
 
         <div className="space-y-3">
           <div className={emprestimo ? "hidden" : ""}>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Categoria</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Categoria</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
               <option value="">Selecione</option>
               {filteredCategories.map((c) => (
@@ -396,22 +396,22 @@ export default function NovoLancamentoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Descrição</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Descrição</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Valor (R$)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Valor (R$)</label>
             <input
               inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0,00"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
@@ -442,7 +442,7 @@ export default function NovoLancamentoModal({
           )}
 
           {pessoal && vinculadoALocacao && (
-            <div className="space-y-1.5 rounded-xl bg-neutral-50 p-3 text-sm dark:bg-neutral-800/60">
+            <div className="space-y-1.5 rounded-xl bg-neutral-50 p-3 text-sm">
               {[
                 [true, "Custo do atendimento pago do bolso", "Entra no lucro da locação (ex.: gasolina da viagem)"],
                 [false, "Gasto meu durante o atendimento", "Só no pessoal, não mexe no lucro"],
@@ -458,7 +458,7 @@ export default function NovoLancamentoModal({
                     className="mt-1"
                   />
                   <span>
-                    <span className="text-neutral-800 dark:text-neutral-200">{titulo as string}</span>
+                    <span className="text-neutral-800">{titulo as string}</span>
                     <span className="block text-[11px] text-neutral-400">{dica as string}</span>
                   </span>
                 </label>
@@ -467,7 +467,7 @@ export default function NovoLancamentoModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Forma de pagamento</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Forma de pagamento</label>
             <select
               value={paymentMethod}
               onChange={(e) => {
@@ -475,7 +475,7 @@ export default function NovoLancamentoModal({
                 setCartaoId("");
                 setParcelas(1);
               }}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
               {PAYMENT_METHODS.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -486,13 +486,13 @@ export default function NovoLancamentoModal({
           </div>
 
           {noCartao && (
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/60">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-neutral-50 p-3">
               <div className="col-span-2">
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cartão</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Cartão</label>
                 <select
                   value={cartaoId}
                   onChange={(e) => setCartaoId(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 >
                   <option value="">Selecione</option>
                   {cartoesDoLado.map((c) => (
@@ -503,11 +503,11 @@ export default function NovoLancamentoModal({
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Parcelas</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Parcelas</label>
                 <select
                   value={parcelas}
                   onChange={(e) => setParcelas(Number(e.target.value))}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                 >
                   {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={n}>
@@ -525,32 +525,32 @@ export default function NovoLancamentoModal({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>

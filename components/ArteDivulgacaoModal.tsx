@@ -13,7 +13,7 @@ import { canvasToPngFile } from "@/lib/availability-image";
 import { drawArteDivulgacao, telefoneArte, type FormatoArte } from "@/lib/arte-divulgacao";
 
 const campo =
-  "w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+  "w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm";
 const rotulo = "mb-0.5 block text-[11px] text-neutral-500";
 
 export default function ArteDivulgacaoModal({
@@ -97,20 +97,20 @@ export default function ArteDivulgacaoModal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-neutral-900 sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Arte para divulgar</h2>
+          <h2 className="text-base font-semibold text-neutral-900">Arte para divulgar</h2>
           <button onClick={onClose} aria-label="Fechar" className="text-neutral-400">
             <X size={20} />
           </button>
         </div>
-        <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mb-3 text-xs text-neutral-500">
           A cliente posta no status e no Instagram para encher a agenda do dia. Sem a marca da Harmonize.
         </p>
 
-        <div className="mb-3 flex rounded-lg bg-neutral-100 p-0.5 text-xs dark:bg-neutral-800">
+        <div className="mb-3 flex rounded-lg bg-neutral-100 p-0.5 text-xs">
           {(
             [
               ["story", "Status / Story"],
@@ -122,7 +122,7 @@ export default function ArteDivulgacaoModal({
               type="button"
               onClick={() => setFormato(f)}
               className={`flex-1 rounded-md py-1.5 font-medium ${
-                formato === f ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100" : "text-neutral-500"
+                formato === f ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
               }`}
             >
               {nome}

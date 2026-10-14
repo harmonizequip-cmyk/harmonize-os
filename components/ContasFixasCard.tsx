@@ -77,28 +77,28 @@ export default function ContasFixasCard({ inicial }: { inicial: DespesaFixa[] })
   }
 
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55">
-      <h2 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Contas fixas do mês</h2>
+    <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+      <h2 className="mb-1 text-sm font-semibold text-neutral-900">Contas fixas do mês</h2>
       <p className="mb-4 text-xs text-neutral-400">
         O que precisa ser pago todo mês. O Dashboard mostra quanto falta as locações renderem para cobrir isso.
       </p>
 
       <div className="space-y-2">
         {linhas.map((l) => (
-          <div key={l.chave} className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-700">
+          <div key={l.chave} className="rounded-xl border border-neutral-200 p-2">
             <div className="flex gap-2">
               <input
                 value={l.nome}
                 onChange={(e) => alterar(l.chave, { nome: e.target.value })}
                 placeholder="Ex: Parcela HIPRO 1"
-                className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
               <input
                 inputMode="decimal"
                 value={l.valor}
                 onChange={(e) => alterar(l.chave, { valor: e.target.value })}
                 placeholder="0,00"
-                className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-right text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-right text-sm"
               />
             </div>
             <div className="mt-2 flex items-center justify-between">
@@ -111,7 +111,7 @@ export default function ContasFixasCard({ inicial }: { inicial: DespesaFixa[] })
                     className={`rounded-full px-3 py-1 text-xs font-medium ${
                       l.tipo === t
                         ? "bg-brand-teal text-white"
-                        : "border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                        : "border border-neutral-300 text-neutral-600"
                     }`}
                   >
                     {t === "negocio" ? "Negócio" : "Pessoal"}
@@ -121,7 +121,7 @@ export default function ContasFixasCard({ inicial }: { inicial: DespesaFixa[] })
               <button
                 type="button"
                 onClick={() => setLinhas((prev) => prev.filter((x) => x.chave !== l.chave))}
-                className="text-xs text-red-600 dark:text-red-400"
+                className="text-xs text-red-600"
               >
                 Remover
               </button>
@@ -133,17 +133,17 @@ export default function ContasFixasCard({ inicial }: { inicial: DespesaFixa[] })
       <button
         type="button"
         onClick={adicionar}
-        className="mt-2 w-full rounded-xl border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+        className="mt-2 w-full rounded-xl border border-dashed border-neutral-300 py-2 text-sm text-neutral-600"
       >
         + Adicionar conta
       </button>
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className="text-neutral-500">Total por mês</span>
-        <span className="font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(total)}</span>
+        <span className="font-semibold text-neutral-900">{formatCurrency(total)}</span>
       </div>
 
-      {erro && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{erro}</p>}
+      {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
       <button
         type="button"
         onClick={salvar}

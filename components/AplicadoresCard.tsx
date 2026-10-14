@@ -20,7 +20,7 @@ interface Equip {
 type Painel = { id: string; tipo: "ler" | "trocar" | "editar" } | null;
 
 const campo =
-  "w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+  "w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs";
 const rotulo = "mb-0.5 block text-[10px] text-neutral-500";
 const botaoSalvar = "rounded-lg bg-brand-teal px-3 py-1.5 text-[11px] font-medium text-white disabled:opacity-60";
 
@@ -175,10 +175,10 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
   return (
     <div
       id="aplicadores"
-      className="scroll-mt-20 rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-neutral-800/60 dark:bg-neutral-900/55"
+      className="scroll-mt-20 rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl"
     >
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Aplicadores</h2>
-      <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+      <h2 className="text-lg font-semibold text-neutral-900">Aplicadores</h2>
+      <p className="mt-0.5 text-xs text-neutral-500">
         Disparos estimados: última leitura do contador + locações do HIPRO onde ele está (mentoria não entra). Leia o contador de vez
         em quando para acertar a conta.
       </p>
@@ -196,41 +196,41 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
             const lugar = nomeEquip(a.equipment_id);
             const aberto = painel?.id === a.id ? painel.tipo : null;
             return (
-              <li key={a.id} className="rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/50">
+              <li key={a.id} className="rounded-xl bg-neutral-50 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    <p className="text-sm font-medium text-neutral-900">
                       {a.nome}
                       {a.numero_serie && <span className="ml-1.5 text-[11px] font-normal text-neutral-400">nº {a.numero_serie}</span>}
                     </p>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    <p className="text-[11px] text-neutral-500">
                       {lugar ? `No ${lugar} desde ${formatDate(a.montado_desde as string)}` : "Na reserva"}
                     </p>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      lugar ? "bg-brand-teal/10 text-brand-teal" : "bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
+                      lugar ? "bg-brand-teal/10 text-brand-teal" : "bg-neutral-200 text-neutral-600"
                     }`}
                   >
                     {lugar ?? "Reserva"}
                   </span>
                 </div>
 
-                <p className="mt-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                <p className="mt-2 text-base font-semibold text-neutral-900">
                   ≈ {a.disparos.toLocaleString("pt-BR")} <span className="text-xs font-normal text-neutral-500">disparos</span>
                 </p>
                 {s.pct != null ? (
                   <>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-200">
                       <div className={`h-full rounded-full ${COR_BARRA[s.situacao]}`} style={{ width: `${Math.min(100, Math.round(s.pct * 100))}%` }} />
                     </div>
                     <p
                       className={`mt-1 text-[11px] ${
                         s.situacao === "fora"
-                          ? "font-medium text-neutral-600 dark:text-neutral-300"
+                          ? "font-medium text-neutral-600"
                           : s.situacao === "perto"
-                            ? "font-semibold text-amber-600 dark:text-amber-400"
-                            : "text-neutral-500 dark:text-neutral-400"
+                            ? "font-semibold text-amber-600"
+                            : "text-neutral-500"
                       }`}
                     >
                       {s.situacao === "fora" ? "Fora da garantia" : `${Math.round(s.pct * 100)}% da garantia`} de {a.garantia_disparos!.toLocaleString("pt-BR")}
@@ -355,22 +355,22 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
                         type="button"
                         disabled={salvando}
                         onClick={() => editar(a, false)}
-                        className="ml-auto text-[11px] text-red-600 underline dark:text-red-400"
+                        className="ml-auto text-[11px] text-red-600 underline"
                       >
                         desativar
                       </button>
                     </div>
                   </div>
                 )}
-                {aberto && erro && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+                {aberto && erro && <p className="mt-1 text-[11px] text-red-600">{erro}</p>}
               </li>
             );
           })}
       </ul>
 
       {novo ? (
-        <div className="mt-3 space-y-2 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/50">
-          <p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Novo aplicador</p>
+        <div className="mt-3 space-y-2 rounded-xl bg-neutral-50 p-3">
+          <p className="text-xs font-medium text-neutral-700">Novo aplicador</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className={rotulo}>Nome</label>
@@ -407,9 +407,9 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
               />
             </div>
           </div>
-          {erro && <p className="text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="text-[11px] text-red-600">{erro}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={() => setNovo(false)} className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+            <button type="button" onClick={() => setNovo(false)} className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-xs text-neutral-600">
               Desistir
             </button>
             <button type="button" disabled={salvando} onClick={cadastrar} className="flex-1 rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white disabled:opacity-60">
@@ -421,7 +421,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
         <button
           type="button"
           onClick={abrirNovo}
-          className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+          className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700"
         >
           + Cadastrar aplicador
         </button>
@@ -448,7 +448,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
           )}
         </div>
       )}
-      {!painel && !novo && erro && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{erro}</p>}
+      {!painel && !novo && erro && <p className="mt-1 text-[11px] text-red-600">{erro}</p>}
     </div>
   );
 }

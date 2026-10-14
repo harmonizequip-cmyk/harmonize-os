@@ -16,7 +16,7 @@ export default async function RelatoriosPessoaisPage({
   const fin = await carregarFinanceiro(supabase, "pessoal", periodo);
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Relatórios pessoais</h1>
+      <h1 className="text-xl font-semibold text-neutral-900">Relatórios pessoais</h1>
       <FiltroBarra periodoPadrao="mes" rotuloPeriodo={periodo.rotulo} />
       <RelatorioFinanceiro escopo="pessoal" rotuloPeriodo={periodo.rotulo} {...fin} />
     </div>

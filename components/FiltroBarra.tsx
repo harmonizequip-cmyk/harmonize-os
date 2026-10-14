@@ -114,7 +114,7 @@ export default function FiltroBarra({
   }
 
   return (
-    <div className="mb-4 space-y-2.5 rounded-2xl border border-neutral-200 bg-white/60 p-3 dark:border-neutral-700 dark:bg-neutral-900/40">
+    <div className="mb-4 space-y-2.5 rounded-2xl border border-neutral-200 bg-white/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
         {OPCOES_PERIODO.map((opt) => (
           <button
@@ -124,7 +124,7 @@ export default function FiltroBarra({
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               periodoAtual === opt.chave
                 ? "bg-brand-teal text-white"
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
             }`}
           >
             {opt.label}
@@ -139,14 +139,14 @@ export default function FiltroBarra({
             type="date"
             value={de}
             onChange={(e) => setDe(e.target.value)}
-            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
           />
           <span className="text-xs text-neutral-400">até</span>
           <input
             type="date"
             value={ate}
             onChange={(e) => setAte(e.target.value)}
-            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
           />
           <button
             type="button"
@@ -174,10 +174,10 @@ export default function FiltroBarra({
               key={campo.chave}
               value={searchParams.get(campo.chave) ?? ""}
               onChange={(e) => aplicar({ [campo.chave]: e.target.value || null })}
-              className={`rounded-lg border px-2 py-1.5 text-xs dark:bg-neutral-800 dark:text-neutral-100 ${
+              className={`rounded-lg border px-2 py-1.5 text-xs ${
                 searchParams.get(campo.chave)
-                  ? "border-brand-teal text-brand-teal dark:border-brand-teal"
-                  : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                  ? "border-brand-teal text-brand-teal"
+                  : "border-neutral-300 text-neutral-600"
               }`}
             >
               <option value="">{campo.rotuloVazio}</option>
@@ -195,7 +195,7 @@ export default function FiltroBarra({
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder={buscaPlaceholder}
-              className="min-w-[10rem] flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="min-w-[10rem] flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
             />
           )}
 
@@ -203,7 +203,7 @@ export default function FiltroBarra({
             <button
               type="button"
               onClick={limpar}
-              className="text-xs text-neutral-500 underline underline-offset-2 dark:text-neutral-400"
+              className="text-xs text-neutral-500 underline underline-offset-2"
             >
               Limpar filtros
             </button>
@@ -213,7 +213,7 @@ export default function FiltroBarra({
 
       {/* A linha de baixo é o que evita a dúvida mais comum diante de uma
           tela com poucos resultados: está vazio ou está filtrado? */}
-      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+      <p className="text-[11px] text-neutral-500">
         {rotuloPeriodo && <span>Período: {rotuloPeriodo}</span>}
         {contagem && (
           <span>

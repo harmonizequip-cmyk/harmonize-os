@@ -88,10 +88,10 @@ export default function NovoLeadModal({
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:bg-neutral-900/85 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">Novo lead</h2>
+        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Novo lead</h2>
 
         <div className="space-y-3">
           {temContatos && (
@@ -105,20 +105,20 @@ export default function NovoLeadModal({
             </button>
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Nome</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Tratamento</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Tratamento</label>
               <select
                 value={treatment}
                 onChange={(e) => setTreatment(e.target.value as typeof treatment)}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               >
                 <option value="">-</option>
                 <option value="Dr.">Dr.</option>
@@ -126,12 +126,12 @@ export default function NovoLeadModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Nome de exibição</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Nome de exibição</label>
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Ex: Camila Lima"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -139,24 +139,24 @@ export default function NovoLeadModal({
             Usados nas mensagens ao cliente. Sem os dois, a mensagem usa uma saudação genérica.
           </p>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">WhatsApp</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">WhatsApp</label>
             <input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
               placeholder="(83) 90000-0000"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Cidade</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Cidade</label>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Endereço (opcional)</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Endereço (opcional)</label>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -167,15 +167,15 @@ export default function NovoLeadModal({
                 }
               }}
               placeholder="Rua, número, bairro"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Origem</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Origem</label>
             <select
               value={origem}
               onChange={(e) => setOrigem(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
               {ORIGENS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -186,19 +186,19 @@ export default function NovoLeadModal({
           </div>
           {origem === "indicacao" && <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} />}
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Observação</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
           {/* Era "Cobrar taxa de reserva (R$ 250)". Cobrar deixou de ser
               decisão do cadastro: a taxa nasce pendente sozinha quando uma
               data futura é reservada, porque é a data que ela garante. O
               que se decide aqui é o contrário, quem não paga. */}
-          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <label className="flex items-center gap-2 text-sm text-neutral-600">
             <input
               type="checkbox"
               checked={parceiro}
@@ -209,12 +209,12 @@ export default function NovoLeadModal({
           </label>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+            className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600"
           >
             Cancelar
           </button>
