@@ -6731,3 +6731,40 @@ $$;
 
 revoke execute on function public.registrar_emprestimo(text, text, numeric, payment_method_type, date, text, boolean) from public, anon;
 grant execute on function public.registrar_emprestimo(text, text, numeric, payment_method_type, date, text, boolean) to authenticated, service_role;
+
+-- ============================================================
+-- Endurecimento de segurança (migrations/2026-10-14-endurecer-seguranca.sql):
+-- gatilhos sem EXECUTE para quem está logado, disponibilidade_publica fechada,
+-- search_path fixo e nenhum acesso de anon às tabelas.
+-- ============================================================
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as assinatura
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.prorettype = 'trigger'::regtype
+  loop
+    execute format('revoke execute on function %s from public, anon, authenticated', r.assinatura);
+  end loop;
+end $$;
+
+revoke execute on function public.disponibilidade_publica(date, date) from public, anon, authenticated;
+
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as assinatura
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname in ('formatar_reais', 'keep_client_forever', 'set_became_client_at', 'hoje_local', 'trg_rentals_marca_reagendamento')
+  loop
+    execute format('alter function %s set search_path = public', r.assinatura);
+  end loop;
+end $$;
+
+revoke all on all tables in schema public from anon;
+revoke all on all sequences in schema public from anon;
+alter default privileges in schema public revoke all on tables from anon;
+alter default privileges in schema public revoke all on sequences from anon;
