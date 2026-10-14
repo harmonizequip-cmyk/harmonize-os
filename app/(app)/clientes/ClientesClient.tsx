@@ -106,12 +106,20 @@ export default function ClientesClient({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-neutral-900">Clientes</h1>
+        <div className="flex gap-2">
+        <Link
+          href="/clientes/cadastros"
+          className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+        >
+          📝 Cadastros recebidos
+        </Link>
         <button
           onClick={() => setModalOpen(true)}
           className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
         >
           + Novo cliente
         </button>
+        </div>
       </div>
 
       <FiltroBarra

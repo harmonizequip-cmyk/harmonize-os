@@ -13,6 +13,7 @@ export const ORIGENS = [
   { value: "indicacao", label: "Indicação" },
   { value: "instagram", label: "Instagram" },
   { value: "whatsapp", label: "WhatsApp" },
+  { value: "formulario", label: "Formulário" },
   { value: "outro", label: "Outro" },
 ];
 

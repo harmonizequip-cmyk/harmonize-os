@@ -385,6 +385,12 @@ export default async function DashboardPage(
     .map(([tipo, qtd]) => `${qtd} ${ROTULO_TAREFA[tipo] ?? tipo}`)
     .join(", ");
 
+  // Respostas do formulário da Academy esperando revisão.
+  const { count: cadastrosNovos } = await supabase
+    .from("cadastros_recebidos")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pendente");
+
   const in7Str = somaDias(7).toISOString().slice(0, 10);
   const { count: pendingConfirmations } = await supabase
     .from("calendar_events")
@@ -536,6 +542,15 @@ export default async function DashboardPage(
       <EsteMesCard meta={metaDoMes} rotuloMes={rotuloMesAtual} />
 
       <PrevisaoCaixaCard p30={previsao30} p60={previsao60} />
+
+      {!!cadastrosNovos && cadastrosNovos > 0 && (
+        <Link
+          href="/clientes/cadastros"
+          className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+        >
+          📝 {cadastrosNovos} {cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"} para conferir →
+        </Link>
+      )}
 
       {!!pendingConfirmations && pendingConfirmations > 0 && (
         <Link
