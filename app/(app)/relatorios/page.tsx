@@ -21,11 +21,12 @@ function oneOf<T>(value: T | T[] | null | undefined): T | null {
 // origem que converte de verdade. Tudo calculado em cima do banco
 // real a cada acesso, nunca hardcoded.
 // ============================================================
-export default async function RelatoriosPage({
-  searchParams,
-}: {
-  searchParams: { period?: string; from?: string; to?: string };
-}) {
+export default async function RelatoriosPage(
+  props: {
+    searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const settings = await fetchSettings(supabase);
 

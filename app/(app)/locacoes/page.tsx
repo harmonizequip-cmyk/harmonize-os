@@ -12,20 +12,21 @@ import LocacoesClient from "./LocacoesClient";
 const TETO = 2000;
 const LOTE = 100;
 
-export default async function LocacoesPage({
-  searchParams,
-}: {
-  searchParams: {
-    period?: string;
-    from?: string;
-    to?: string;
-    equipamento?: string;
-    pagamento?: string;
-    cliente?: string;
-    situacao?: string;
-    q?: string;
-  };
-}) {
+export default async function LocacoesPage(
+  props: {
+    searchParams: Promise<{
+      period?: string;
+      from?: string;
+      to?: string;
+      equipamento?: string;
+      pagamento?: string;
+      cliente?: string;
+      situacao?: string;
+      q?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
 
   const periodo = resolverPeriodo(searchParams.period ?? "mes", searchParams.from, searchParams.to);

@@ -171,16 +171,3 @@ export function calculateRentalValue(shots: number, config: PricingConfig = DEFA
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
-
-// ------------------------------------------------------------
-// Casos de verificação (rodar com: npx tsx lib/rental-pricing.ts)
-// ------------------------------------------------------------
-if (require.main === module) {
-  const cases = [15_000, 20_000, 20_001, 50_000, 70_000, 80_000, 90_000, 100_000];
-  for (const shots of cases) {
-    const r = calculateRentalValue(shots);
-    console.log(
-      `${shots.toLocaleString("pt-BR")} disparos -> R$ ${r.totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-    );
-  }
-}

@@ -1,6 +1,10 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+// No Next.js 15+ cookies() devolve uma Promise. O cliente do Supabase aceita
+// leitura e escrita assíncronas, então a função continua síncrona por fora
+// (as telas seguem chamando createClient() como antes) e espera os cookies
+// por dentro.
 export function createClient() {
   const cookieStore = cookies();
 
@@ -9,20 +13,20 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        async get(name: string) {
+          return (await cookieStore).get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
+        async set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options });
+            (await cookieStore).set({ name, value, ...options });
           } catch {
             // chamado a partir de um Server Component sem permissão de escrita;
             // o middleware é responsável por renovar a sessão nesse caso.
           }
         },
-        remove(name: string, options: CookieOptions) {
+        async remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value: "", ...options });
+            (await cookieStore).set({ name, value: "", ...options });
           } catch {
             // idem acima
           }

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import ClienteDetailClient from "./ClienteDetailClient";
 
-export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
+export default async function ClienteDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createClient();
 
   const { data: client } = await supabase.from("clients").select("*").eq("id", params.id).single();

@@ -30,11 +30,12 @@ function formatWeekdayDate(dateStr: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { period?: string; from?: string; to?: string };
-}) {
+export default async function DashboardPage(
+  props: {
+    searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const { from, to } = resolvePeriod(searchParams.period, searchParams.from, searchParams.to);
   const fromStr = from.toISOString().slice(0, 10);

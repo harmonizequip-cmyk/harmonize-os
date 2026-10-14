@@ -6,7 +6,8 @@ import { carregarLancamentos, type FiltrosFinanceiro } from "../../financeiro/ca
 // Financeiro pessoal: mesma tela do Financeiro, com os lançamentos de
 // scope = 'pessoal', o saldo de sempre da conta e as contas fixas pessoais
 // (Configurações > contas fixas do tipo pessoal).
-export default async function PessoalPage({ searchParams }: { searchParams: FiltrosFinanceiro }) {
+export default async function PessoalPage(props: { searchParams: Promise<FiltrosFinanceiro> }) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const [d, settings, { data: todos }] = await Promise.all([
     carregarLancamentos(supabase, searchParams, "pessoal"),

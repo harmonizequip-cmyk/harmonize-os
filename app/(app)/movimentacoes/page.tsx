@@ -12,18 +12,19 @@ import MovimentacoesClient from "./MovimentacoesClient";
 // somente leitura.
 const TETO = 2000;
 
-export default async function MovimentacoesPage({
-  searchParams,
-}: {
-  searchParams: {
-    period?: string;
-    from?: string;
-    to?: string;
-    acao?: string;
-    entidade?: string;
-    q?: string;
-  };
-}) {
+export default async function MovimentacoesPage(
+  props: {
+    searchParams: Promise<{
+      period?: string;
+      from?: string;
+      to?: string;
+      acao?: string;
+      entidade?: string;
+      q?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
 
   // Este histórico só cresce, então antes o limite de 500 linhas ia, com o

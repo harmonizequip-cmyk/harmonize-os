@@ -15,11 +15,12 @@ const EQUIPMENT_COLORS: Record<string, string> = {
   hipro_2: "bg-brand-blue",
 };
 
-export default async function EquipamentosPage({
-  searchParams,
-}: {
-  searchParams: { period?: string; from?: string; to?: string };
-}) {
+export default async function EquipamentosPage(
+  props: {
+    searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const today = hojeLocal();
   // Locações, disparos e receita seguem o período escolhido (padrão: este

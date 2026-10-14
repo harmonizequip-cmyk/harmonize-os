@@ -6,11 +6,12 @@ import { carregarFinanceiro } from "@/lib/carregar-relatorio-financeiro";
 
 // Relatórios do espaço Pessoal: para onde foi o dinheiro, de onde entrou,
 // mês a mês e cartões pessoais.
-export default async function RelatoriosPessoaisPage({
-  searchParams,
-}: {
-  searchParams: { period?: string; from?: string; to?: string };
-}) {
+export default async function RelatoriosPessoaisPage(
+  props: {
+    searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
   const periodo = resolverPeriodo(searchParams.period ?? "mes", searchParams.from, searchParams.to);
   const fin = await carregarFinanceiro(supabase, "pessoal", periodo);

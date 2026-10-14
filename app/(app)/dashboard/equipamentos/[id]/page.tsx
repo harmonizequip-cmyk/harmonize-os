@@ -10,13 +10,14 @@ function formatDate(dateStr: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default async function EquipmentDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { from?: string; to?: string };
-}) {
+export default async function EquipmentDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createClient();
 
   const { data: equipment } = await supabase

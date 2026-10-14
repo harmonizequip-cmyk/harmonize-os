@@ -2,18 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import { hojeLocal, resolverPeriodo } from "@/lib/period";
 import ClientesClient from "./ClientesClient";
 
-export default async function ClientesPage({
-  searchParams,
-}: {
-  searchParams: {
-    period?: string;
-    from?: string;
-    to?: string;
-    cidade?: string;
-    situacao?: string;
-    q?: string;
-  };
-}) {
+export default async function ClientesPage(
+  props: {
+    searchParams: Promise<{
+      period?: string;
+      from?: string;
+      to?: string;
+      cidade?: string;
+      situacao?: string;
+      q?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient();
 
   // AQUI O PERÍODO NÃO ESCONDE CLIENTE, ELE MEDE.

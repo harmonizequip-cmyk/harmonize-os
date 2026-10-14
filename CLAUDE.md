@@ -4,7 +4,8 @@ Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e men
 
 ## Onde as coisas estão
 
-- Código: Next.js (App Router) + TypeScript + Tailwind, Supabase (Postgres, RLS, RPCs `security definer`).
+- Código: Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Tailwind, Supabase (Postgres, RLS, RPCs `security definer`). Versões de next/react fixas no `package.json` (sem `^`), porque o `package-lock.json` não vai para o git.
+- Next 16: `params`, `searchParams` e `cookies()` são Promises (`await props.searchParams`); o controle de login fica em `proxy.ts` (antigo middleware). Nada de `require`/`module` em código que vai para o navegador: o Turbopack não aceita (já quebrou uma tela).
 - Repositório oficial: `harmonizequip-cmyk/harmonize-os`, branch `main`. Existe uma cópia antiga em `edercampos1985-svg/harmonize-os`: nunca publicar lá.
 - Deploy: Vercel, projeto `harmonize-os`, publica a cada push em `main`. Site: harmonize-os.vercel.app.
 - Banco: projeto Supabase `vidnlzbxaxjlmzncqhxw`. `schema.sql` é o retrato do banco e `migrations/` guarda cada mudança. Toda migration precisa ser aplicada no banco E refletida em `schema.sql`.
@@ -144,7 +145,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Cabeçalhos em `next.config.js`: CSP (só o próprio site e `*.supabase.co`; `wasm-unsafe-eval` pelo PDF do contrato), HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy e Permissions-Policy (microfone só `self`). Serviço externo novo precisa entrar na CSP, senão é bloqueado sem aviso.
 - Banco: funções de gatilho sem EXECUTE para `authenticated`, `disponibilidade_publica` fechada, `anon` sem acesso a tabelas/views (também para tabelas futuras), `search_path` fixo (migration `2026-10-14-endurecer-seguranca.sql`).
-- Em aberto: Next.js 14 tem avisos corrigidos só no 15/16 (atualização à parte); ligar "Leaked password protection" no Auth; cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
+- Next.js atualizado para 16.3.8 em 14/10/2026 (`npm audit` sem vulnerabilidades). Em aberto: ligar "Leaked password protection" no Auth; cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
 
 ## Pendências conhecidas
 
