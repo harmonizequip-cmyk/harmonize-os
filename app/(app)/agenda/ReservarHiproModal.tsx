@@ -48,6 +48,39 @@ export default function ReservarHiproModal({
   const clientId = isFixedClient ? fixedClientId! : selectedClientId;
   const clientName = isFixedClient ? fixedClientName ?? "" : localClients.find((c) => c.id === clientId)?.name ?? "";
 
+  // Equipamento ocupado no período (reserva não cancelada ou bloqueio): ao
+  // trocar a data, se o escolhido já está ocupado e o outro está livre, já
+  // deixa o livre selecionado. Escolher à mão depois continua valendo.
+  const [ocupados, setOcupados] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    if (!eventDate) return;
+    const fim = dataFim && dataFim > eventDate ? dataFim : eventDate;
+    Promise.all([
+      supabase
+        .from("calendar_events")
+        .select("equipment_id")
+        .neq("status", "cancelada")
+        .not("equipment_id", "is", null)
+        .lte("date_start", fim)
+        .gte("date_end", eventDate),
+      supabase.from("bloqueios_equipamento").select("equipment_id").lte("data_inicio", fim).gte("data_fim", eventDate),
+    ]).then(([{ data: evs }, { data: blq }]) => {
+      if (!active) return;
+      const ids = new Set<string>([...(evs ?? []), ...(blq ?? [])].map((r: any) => r.equipment_id).filter(Boolean));
+      setOcupados(ids);
+      setEquipmentId((atual) => {
+        if (!ids.has(atual)) return atual;
+        const livre = equipments.find((eq) => !ids.has(eq.id));
+        return livre ? livre.id : atual;
+      });
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventDate, dataFim]);
+
   // E7: aviso (não bloqueia) quando o mesmo cliente já tem outro HIPRO
   // reservado no mesmo dia — cenário mais provável de ser engano de
   // digitação do que um caso real de dois procedimentos no mesmo dia.
@@ -162,6 +195,7 @@ export default function ReservarHiproModal({
               {equipments.map((eq) => (
                 <option key={eq.id} value={eq.id}>
                   {eq.name}
+                  {ocupados.has(eq.id) ? " (já ocupado nesta data)" : ""}
                 </option>
               ))}
             </select>
