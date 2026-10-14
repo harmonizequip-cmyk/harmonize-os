@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acharParecidos, dividirCidadeEstado, mensagemConviteAcademy, notaDoCadastro, tratamentoSugerido, type CadastroRecebido, type ClienteParaComparar } from "./cadastro-formulario";
+import { acharParecidos, dividirCidadeEstado, notaDoCadastro, tratamentoSugerido, type CadastroRecebido, type ClienteParaComparar } from "./cadastro-formulario";
 
 const cad = (p: Partial<CadastroRecebido>): CadastroRecebido => ({
   id: "x", respondido_em: null, recebido_em: "", nome: null, profissao: null, whatsapp: null, email: null, empresa: null, estabelecimento: null, cidade_estado: null, ...p,
@@ -33,14 +33,11 @@ describe("acharParecidos", () => {
 });
 
 describe("textos do cadastro", () => {
-  it("nota, tratamento e convite", () => {
+  it("nota e tratamento", () => {
     expect(notaDoCadastro(cad({ profissao: "Biomédica", estabelecimento: "Clínica" }))).toBe("Formulário Academy: Profissão: Biomédica · Estabelecimento: Clínica");
     expect(tratamentoSugerido(cad({ profissao: "Médica" }))).toBe("Dra.");
     expect(tratamentoSugerido(cad({ profissao: "Biomédico" }))).toBe("Dr.");
     expect(tratamentoSugerido(cad({ nome: "Dra. Ana", profissao: "Esteticista" }))).toBe("Dra.");
     expect(tratamentoSugerido(cad({ profissao: "Esteticista" }))).toBe("");
-    const m = mensagemConviteAcademy("ANA LIMA", "Dra.");
-    expect(m.startsWith("Olá, Dra. Ana!")).toBe(true);
-    expect(m).toContain("academy.contourline.com.br/invites/xOP09Q/join");
   });
 });

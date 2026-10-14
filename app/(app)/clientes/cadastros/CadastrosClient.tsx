@@ -3,13 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { buildWhatsAppLink } from "@/lib/format";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import {
   acharParecidos,
   digitos,
   dividirCidadeEstado,
-  mensagemConviteAcademy,
+  LINK_ACADEMY,
   notaDoCadastro,
   tratamentoSugerido,
   type CadastroRecebido,
@@ -32,6 +31,26 @@ const ROTULOS: Record<Campo, string> = {
   city: "Cidade",
   state: "UF",
 };
+
+function CopiarBotao({ rotulo, texto }: { rotulo: string; texto: string }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(texto);
+          setOk(true);
+          setTimeout(() => setOk(false), 2000);
+        } catch {
+          // sem permissão de copiar
+        }
+      }}
+      className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700"
+    >
+      {ok ? "Copiado ✓" : rotulo}
+    </button>
+  );
+}
 
 type Feito = { clientId: string; nome: string; treatment: string | null; whatsapp: string | null; novo: boolean };
 
@@ -161,18 +180,23 @@ function Cartao({
   }
 
   if (feito) {
-    const link = buildWhatsAppLink(feito.whatsapp, mensagemConviteAcademy(feito.nome, feito.treatment));
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
         <p className="text-sm font-semibold text-emerald-800">
           ✓ {feito.novo ? "Lead criado" : "Cadastro atualizado"}: {feito.nome}
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {link && (
-            <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
-              Mandar convite da Academy no WhatsApp
+        {/* O link da Academy é só do dono: ele mesmo cadastra a cliente, nunca vai para ela. */}
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-white p-3">
+          <p className="mb-2 text-xs font-medium text-neutral-600">Liberar na Contourline Academy</p>
+          <div className="flex flex-wrap gap-2">
+            {cad.nome && <CopiarBotao rotulo="Copiar nome" texto={cad.nome} />}
+            {cad.email && <CopiarBotao rotulo="Copiar e-mail" texto={cad.email} />}
+            <a href={LINK_ACADEMY} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+              Abrir cadastro da Academy
             </a>
-          )}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/clientes/${feito.clientId}`} className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700">
             Abrir ficha
           </Link>

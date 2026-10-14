@@ -1,8 +1,7 @@
 // Cadastros que chegam do formulário (Google Forms da Contourline Academy):
-// achar o cliente que já existe, separar cidade e UF e montar o convite.
+// achar o cliente que já existe e separar cidade e UF.
 
-import { saudacaoCurta } from "./saudacao";
-
+// Link de cadastro da Academy: só o dono usa (ele cadastra a cliente). Nunca mandar para a cliente.
 export const LINK_ACADEMY = "https://academy.contourline.com.br/invites/xOP09Q/join";
 
 export interface CadastroRecebido {
@@ -113,11 +112,4 @@ export function tratamentoSugerido(cad: CadastroRecebido): "Dr." | "Dra." | "" {
   if (/\b(MEDICA|BIOMEDICA|ODONTOLOGA|CIRURGIA DENTISTA)\b/.test(p)) return "Dra.";
   if (/\b(MEDICO|BIOMEDICO|ODONTOLOGO|CIRURGIAO DENTISTA)\b/.test(p)) return "Dr.";
   return "";
-}
-
-export function mensagemConviteAcademy(nome: string | null, tratamento: string | null): string {
-  return (
-    `${saudacaoCurta({ name: nome, treatment: tratamento })} 😊\n\nRecebi seu cadastro. Para acessar a Contourline Academy, entre por este link e crie seu acesso:\n${LINK_ACADEMY}\n\n` +
-    `Qualquer dúvida, me chama por aqui.`
-  );
 }

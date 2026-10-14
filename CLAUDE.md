@@ -161,7 +161,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 ## Cadastros do formulário (Contourline Academy)
 
 - Formulário Google "CADASTRO CONTOURLINE ACADEMY" (planilha de respostas no Drive do dono: nome, profissão, WhatsApp, e-mail, empresa, estabelecimento, cidade/estado). O Apps Script da planilha (`scripts/apps-script-formulario.gs`, segredo só no script e no cofre `formulario_cadastro_segredo`) manda cada resposta para a Edge Function `cadastro-formulario` (sem JWT; confere o segredo por `formulario_segredo()`), que guarda em `cadastros_recebidos` (chave = carimbo|nome|email, sem duplicar) e avisa no celular.
-- Tela Clientes > "Cadastros recebidos" (`/clientes/cadastros`, aviso no Dashboard): acha o parecido (WhatsApp, e-mail ou nome; `lib/cadastro-formulario.ts`), mostra atual → novo e só grava o que for marcado, por `confirmar_cadastro_recebido` (cria lead com origem `formulario` ou atualiza) ou `descartar_cadastro_recebido`. Profissão e estabelecimento vão para as observações. Depois oferece o WhatsApp com o convite da Academy (`LINK_ACADEMY`).
+- Tela Clientes > "Cadastros recebidos" (`/clientes/cadastros`, aviso no Dashboard): acha o parecido (WhatsApp, e-mail ou nome; `lib/cadastro-formulario.ts`), mostra atual → novo e só grava o que for marcado, por `confirmar_cadastro_recebido` (cria lead com origem `formulario` ou atualiza) ou `descartar_cadastro_recebido`. Profissão e estabelecimento vão para as observações. Depois mostra "Liberar na Contourline Academy" (copiar nome, copiar e-mail, abrir `LINK_ACADEMY`): quem cadastra na Academy é o dono; o link nunca vai para a cliente.
 
 ## Pendências conhecidas
 
