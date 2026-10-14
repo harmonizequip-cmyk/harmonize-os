@@ -1,7 +1,7 @@
 "use client";
 
-// Troca entre o tema Clássico (padrão) e o Suave (cinzas lilás e fundo
-// pastel da marca). A escolha fica guardada no aparelho; o script do
+// Troca entre o tema Clássico (padrão) e o Aurora (brilho da marca no
+// topo, cartões brancos e barra flutuante). A escolha fica guardada no aparelho; o script do
 // app/layout.tsx aplica antes da tela aparecer, sem piscar.
 
 import { useEffect, useState } from "react";
@@ -16,24 +16,24 @@ export default function ThemeToggle({
   className?: string;
   compact?: boolean;
 }) {
-  const [suave, setSuave] = useState(false);
+  const [aurora, setAurora] = useState(false);
 
   useEffect(() => {
-    setSuave(document.documentElement.classList.contains("tema-suave"));
+    setAurora(document.documentElement.classList.contains("tema-aurora"));
   }, []);
 
   function toggle() {
-    const next = !suave;
-    setSuave(next);
-    document.documentElement.classList.toggle("tema-suave", next);
+    const next = !aurora;
+    setAurora(next);
+    document.documentElement.classList.toggle("tema-aurora", next);
     try {
-      localStorage.setItem(CHAVE_TEMA, next ? "suave" : "classico");
+      localStorage.setItem(CHAVE_TEMA, next ? "aurora" : "classico");
     } catch {
       // localStorage indisponível, segue sem persistir
     }
   }
 
-  const rotulo = suave ? "Tema Clássico" : "Tema Suave";
+  const rotulo = aurora ? "Tema Clássico" : "Tema Aurora";
 
   if (compact) {
     return (

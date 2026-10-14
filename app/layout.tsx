@@ -33,8 +33,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                if (localStorage.getItem('harmonize-tema') === 'suave') {
-                  document.documentElement.classList.add('tema-suave');
+                if (localStorage.getItem('harmonize-tema') === 'aurora') {
+                  document.documentElement.classList.add('tema-aurora');
                 }
               } catch (e) {}
             `,

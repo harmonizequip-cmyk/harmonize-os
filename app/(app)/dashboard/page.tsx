@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
-import { resolvePeriod, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
+import { resolvePeriod, resolverPeriodo, hojeLocal, somarDias, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { formatCurrency } from "@/lib/format";
 import { fetchSettings } from "@/lib/settings";
 import { buscarPendencias, buscarTaxasAReceber, buscarReservasSemDisparos } from "@/lib/pendencias";
@@ -806,7 +806,12 @@ export default async function DashboardPage({
         </div>
       )}
 
-      <DashboardCharts transactions={normalizedRows} />
+      <DashboardCharts
+        transactions={normalizedRows}
+        inicio={from.toISOString().slice(0, 10)}
+        ate={[to.toISOString().slice(0, 10), hojeLocal()].sort()[0]}
+        rotuloPeriodo={resolverPeriodo(searchParams.period, searchParams.from, searchParams.to).rotulo}
+      />
     </div>
   );
 }

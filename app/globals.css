@@ -26,8 +26,8 @@ body {
 /* ============================================================
    TEMAS
    Clássico (padrão): cinzas neutros do Tailwind.
-   Suave (classe tema-suave no <html>): cinzas lilás, fundo em degradê
-   pastel da marca, cartões com borda lilás e destaque em degradê.
+   Aurora (classe tema-aurora no <html>): cinzas frios, brilho da marca no
+   topo, cartões brancos com sombra e barra de baixo flutuante.
    Trocado no botão do menu (components/ThemeToggle.tsx).
    ============================================================ */
 :root {
@@ -44,52 +44,94 @@ body {
   --n-950: 10 10 10;
 }
 
-.tema-suave {
-  --n-50: 251 248 253;
-  --n-100: 245 239 250;
-  --n-200: 235 226 243;
-  --n-300: 221 209 234;
-  --n-400: 166 150 184;
-  --n-500: 128 113 146;
-  --n-600: 101 87 120;
-  --n-700: 80 67 99;
-  --n-800: 61 50 80;
-  --n-900: 44 35 62;
-  --n-950: 30 23 46;
+.tema-aurora {
+  /* Cinzas frios e limpos (ardósia). */
+  --n-50: 248 250 252;
+  --n-100: 241 245 249;
+  --n-200: 226 232 240;
+  --n-300: 203 213 225;
+  --n-400: 148 163 184;
+  --n-500: 100 116 139;
+  --n-600: 71 85 105;
+  --n-700: 51 65 85;
+  --n-800: 30 41 59;
+  --n-900: 15 23 42;
+  --n-950: 2 6 23;
 }
 
-.tema-suave body {
-  background-color: #f7f2fb;
+.tema-aurora body {
+  background-color: #f3f6fa;
 }
 
-.tema-suave .bg-brand-mesh {
+/* Aurora: brilho turquesa, azul e lilás descendo do topo da tela. */
+.tema-aurora .bg-brand-mesh {
   background-image:
-    radial-gradient(520px circle at 0% 0%, rgba(184, 160, 208, 0.32), transparent 62%),
-    radial-gradient(480px circle at 100% 12%, rgba(232, 120, 154, 0.18), transparent 60%),
-    radial-gradient(620px circle at 15% 100%, rgba(61, 191, 184, 0.2), transparent 62%),
-    radial-gradient(480px circle at 100% 95%, rgba(126, 200, 227, 0.24), transparent 60%);
+    radial-gradient(1000px 420px at 50% -160px, rgba(61, 191, 184, 0.38), transparent 70%),
+    radial-gradient(640px 340px at 105% -40px, rgba(184, 160, 208, 0.42), transparent 70%),
+    radial-gradient(560px 300px at -5% -20px, rgba(126, 200, 227, 0.4), transparent 70%),
+    radial-gradient(700px 500px at 50% 115%, rgba(232, 120, 154, 0.08), transparent 70%);
   background-attachment: fixed;
 }
 
-/* Cartões de vidro: brancos, com borda lilás e sombra suave. */
-.tema-suave .bg-white\/70 {
-  background-color: rgb(255 255 255 / 0.82);
+/* Cartões: brancos de verdade, sem borda, com sombra de elevação. */
+.tema-aurora .bg-white\/70,
+.tema-aurora .bg-white\/80 {
+  background-color: #fff;
 }
-.tema-suave .border-white\/60,
-.tema-suave .border-white\/50 {
-  border-color: rgb(184 160 208 / 0.32);
+.tema-aurora .border-white\/60,
+.tema-aurora .border-white\/50 {
+  border-color: transparent;
 }
-.tema-suave .shadow-sm {
-  box-shadow: 0 6px 20px -10px rgb(126 98 168 / 0.28);
+.tema-aurora .shadow-sm {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -14px rgb(15 23 42 / 0.16);
+}
+.tema-aurora .rounded-2xl {
+  border-radius: 1.5rem;
+}
+.tema-aurora h1 {
+  letter-spacing: -0.02em;
 }
 
-/* Barra de baixo e topo: destaque do item ativo em degradê da marca. */
-.tema-suave nav .bg-neutral-900 {
+/* Topo de vidro, transparente sobre a aurora. */
+.tema-aurora header.bg-white\/75 {
+  background-color: rgb(243 246 250 / 0.55);
+  border-color: transparent;
+}
+
+/* Barra de baixo flutuante, com o item ativo no degradê da marca. */
+.tema-aurora nav.fixed.bottom-0 {
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  border-radius: 26px;
+  border: 1px solid rgb(255 255 255 / 0.8);
+  background-color: rgb(255 255 255 / 0.88);
+  box-shadow: 0 14px 34px -14px rgb(15 23 42 / 0.3);
+}
+.tema-aurora nav .bg-neutral-900 {
   background-image: linear-gradient(135deg, #3dbfb8 0%, #7ec8e3 55%, #b8a0d0 100%);
+  box-shadow: 0 6px 14px -6px rgb(61 191 184 / 0.7);
+}
+.tema-aurora nav .text-neutral-900 {
+  color: #1f7a75;
 }
 
-.tema-suave header.bg-white\/75,
-.tema-suave nav.bg-white\/75 {
-  background-color: rgb(255 255 255 / 0.7);
-  border-color: rgb(184 160 208 / 0.35);
+/* ============================================================
+   Gráficos do Dashboard (components/DashboardCharts.tsx): entrada animada.
+   ============================================================ */
+@keyframes graf-traco { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes graf-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes graf-cresce-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes graf-cresce-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes graf-pulso { 0%, 100% { transform: scale(1); opacity: 0.18; } 50% { transform: scale(1.7); opacity: 0; } }
+.graf-traco { stroke-dasharray: 1; animation: graf-traco 1.1s cubic-bezier(0.65, 0, 0.35, 1) both; }
+.graf-fade { animation: graf-fade 0.9s ease-out 0.3s both; }
+.graf-sobe, .graf-desce { transform-box: fill-box; animation: graf-cresce-y 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.graf-sobe { transform-origin: bottom; }
+.graf-desce { transform-origin: top; }
+.graf-barra { transform-origin: left; animation: graf-cresce-x 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.graf-anel { transition: stroke-dasharray 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.graf-pulso { transform-box: fill-box; transform-origin: center; animation: graf-pulso 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .graf-traco, .graf-fade, .graf-sobe, .graf-desce, .graf-barra, .graf-pulso { animation: none; }
 }
