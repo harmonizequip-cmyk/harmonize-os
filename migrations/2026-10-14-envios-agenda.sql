@@ -1,7 +1,7 @@
 -- ============================================================
 -- ENVIOS DA AGENDA (imagem das datas livres + mensagem, de 15 em 15 dias)
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (14/10/2026, conferida: tabela, função, gatilho, anon sem acesso)
 --
 -- Cada vez que o dono marca "Enviado" num cartão do assistente, fica aqui
 -- quem recebeu, quando e a mensagem usada. Serve para:
