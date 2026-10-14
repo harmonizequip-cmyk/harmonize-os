@@ -1,4 +1,5 @@
 -- ============================================================
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 14/10/2026, pelo dono, e conferida por consulta de leitura (gatilhos abertos 0, disponibilidade fechada, anon sem tabelas, search_path fixo nas 5 funções, acesso de quem está logado intacto).
 -- Endurecimento de segurança (checklist de 24 pontos, 14/10/2026).
 -- Não altera nenhum dado. Só tira acessos que ninguém usa:
 --   1. Funções de gatilho: são disparadas pelo banco, não chamadas pelo app.
