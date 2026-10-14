@@ -218,7 +218,7 @@ function avisoAgendaDoMes(hoje: string): Aviso | null {
     title = `Atualização da agenda de ${mes}`;
     body = "15 dias depois da abertura: as datas que sobraram, só para quem ainda não agendou.";
   } else return null;
-  const url = `/assistente?pergunta=${encodeURIComponent(pergunta)}`;
+  const url = `/assistente?auto=1&pergunta=${encodeURIComponent(pergunta)}`;
   return { title, body, url, tag: `agenda-mes-${hoje}`, actions: [{ action: "agenda", title: "Montar os envios", url }] };
 }
 

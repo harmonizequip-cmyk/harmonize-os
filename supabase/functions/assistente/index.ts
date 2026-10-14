@@ -501,7 +501,7 @@ Deno.serve(async (req) => {
       headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: MODELO,
-        max_tokens: 2500,
+        max_tokens: 8000,
         system: [
           { type: "text", text: CONHECIMENTO, cache_control: { type: "ephemeral" } },
           { type: "text", text: contexto },

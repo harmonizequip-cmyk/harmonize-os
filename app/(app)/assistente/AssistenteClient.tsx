@@ -220,7 +220,9 @@ export default function AssistenteClient() {
     const idCliente = params.get("cliente");
     if (idCliente) definirCliente(idCliente);
     const pergunta = params.get("pergunta");
-    if (pergunta) setTexto(pergunta.slice(0, 500));
+    // Aviso dos dias 5 e 20 (?auto=1): já pergunta sozinho e os cartões aparecem.
+    if (pergunta && params.get("auto") === "1") setTimeout(() => enviar(pergunta.slice(0, 500)), 0);
+    else if (pergunta) setTexto(pergunta.slice(0, 500));
     const compartilhado = params.get("texto");
     if (compartilhado) {
       setTexto(`Recebi esta mensagem no WhatsApp:\n"${compartilhado.slice(0, 2000)}"\n\nMe ajude a responder.`);
@@ -511,7 +513,7 @@ export default function AssistenteClient() {
                 {b.texto && <Texto texto={b.texto} />}
                 {b.whatsapp && <BotoesWhatsApp lista={b.whatsapp} />}
                 {b.planilhas && <BotoesPlanilha lista={b.planilhas} />}
-                {b.agendas?.map((a, j) => <CartaoAgenda key={j} agenda={a} />)}
+                {b.agendas?.map((a, j) => <CartaoAgenda key={j} agenda={a} onPedir={(p) => enviar(p)} />)}
                 {temVoz && (
                   <button
                     onClick={() => {
