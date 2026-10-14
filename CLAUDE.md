@@ -71,12 +71,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Reinstalar o app zera a permissão de notificação e mata a inscrição. `RegistrarServiceWorker` refaz a inscrição sozinho quando a permissão existe; quando não existe, `AvisosDesligadosFaixa` (topo de toda tela) mostra "Ativar avisos", porque o Android só pede permissão depois de um toque.
 - Compartilhar comprovante: manifest `share_target` manda para `/compartilhar`; o `sw.js` guarda o arquivo no cache `harmonize-compartilhado` e abre "Receber pagamento", que sobe o comprovante para a pasta `comprovantes` do Storage (`locacao/<id>` ou `taxa/<id>`).
 - Foto do contador: retirada das telas a pedido do dono (10/10/2026). A pasta `fotos-contador` continua no Storage, sem uso.
-- Anotar por voz: "+" > Anotar por voz ou atalho `/dashboard?acao=voz`. Abre a Nova tarefa escutando (`lib/reconhecer-fala.ts`) e `lib/voz.ts` tira da frase a data e o cliente. Na dúvida entre clientes, oferece as opções em vez de escolher.
+- Anotar por voz: só pelo microfone dentro da Nova tarefa (atalhos do "+" e do ícone retirados a pedido do dono em 14/10/2026). Escuta (`lib/reconhecer-fala.ts`) e `lib/voz.ts` tira da frase a data e o cliente. Na dúvida entre clientes, oferece as opções em vez de escolher.
 - Despesa por voz: "+" > Despesa por voz abre o Novo lançamento escutando; `interpretarDespesa` (`lib/voz.ts`) tira valor, forma de pagamento, data, categoria (por sinônimos: gasolina→Combustível, almoço→Alimentação, hotel→Hospedagem...) e cliente.
 - Novo lead: "Puxar dos contatos do celular" (`lib/contatos.ts`, só Chrome no Android).
 - Sem internet: `components/GuardarAgendaOffline.tsx` guarda no localStorage (`harmonize-agenda-offline`) os atendimentos de hoje a 7 dias; o `sw.js` mostra `public/sem-internet.html` quando uma tela não abre por falta de rede.
 - Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
-- Atalhos do ícone (manifest `shortcuts`, no máximo 5): Receber, Anotar por voz, Nova reserva, Hoje e Dias livres (`/agenda?acao=datas`, imagem de datas). Usam `?acao=`. Pendências saiu a pedido do dono (12/10/2026).
+- Atalhos do ícone (manifest `shortcuts`, no máximo 5): Receber, Nova reserva, Hoje e Dias livres (`/agenda?acao=datas`, imagem de datas). Usam `?acao=`. Pendências saiu a pedido do dono (12/10/2026).
 
 ## Exportar planilha
 
