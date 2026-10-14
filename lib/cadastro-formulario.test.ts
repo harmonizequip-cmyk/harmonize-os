@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acharParecidos, dividirCidadeEstado, notaDoCadastro, tratamentoSugerido, type CadastroRecebido, type ClienteParaComparar } from "./cadastro-formulario";
+import { acharParecidos, linkAcademyPreenchido, dividirCidadeEstado, notaDoCadastro, tratamentoSugerido, type CadastroRecebido, type ClienteParaComparar } from "./cadastro-formulario";
 
 const cad = (p: Partial<CadastroRecebido>): CadastroRecebido => ({
   id: "x", respondido_em: null, recebido_em: "", nome: null, profissao: null, whatsapp: null, email: null, empresa: null, estabelecimento: null, cidade_estado: null, ...p,
@@ -39,5 +39,12 @@ describe("textos do cadastro", () => {
     expect(tratamentoSugerido(cad({ profissao: "Biomédico" }))).toBe("Dr.");
     expect(tratamentoSugerido(cad({ nome: "Dra. Ana", profissao: "Esteticista" }))).toBe("Dra.");
     expect(tratamentoSugerido(cad({ profissao: "Esteticista" }))).toBe("");
+  });
+});
+
+describe("linkAcademyPreenchido", () => {
+  it("leva nome e e-mail no endereço", () => {
+    expect(linkAcademyPreenchido("Ana Lima", "Ana@X.com")).toBe("https://academy.contourline.com.br/invites/xOP09Q/join?name=Ana+Lima&email=ana%40x.com");
+    expect(linkAcademyPreenchido(null, null)).toBe("https://academy.contourline.com.br/invites/xOP09Q/join");
   });
 });

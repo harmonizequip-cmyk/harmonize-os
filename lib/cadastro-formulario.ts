@@ -113,3 +113,16 @@ export function tratamentoSugerido(cad: CadastroRecebido): "Dr." | "Dra." | "" {
   if (/\b(MEDICO|BIOMEDICO|ODONTOLOGO|CIRURGIAO DENTISTA)\b/.test(p)) return "Dr.";
   return "";
 }
+
+/**
+ * Link da Academy já com nome e e-mail. A página tem só "Seu nome" e "Seu
+ * melhor email"; se a plataforma aceitar os campos pelo endereço, abre
+ * preenchida. Se não aceitar, ignora e abre vazia (os botões de copiar ficam).
+ */
+export function linkAcademyPreenchido(nome: string | null, email: string | null): string {
+  const p = new URLSearchParams();
+  if (nome) p.set("name", nome.trim());
+  if (email) p.set("email", email.trim().toLowerCase());
+  const q = p.toString();
+  return q ? `${LINK_ACADEMY}?${q}` : LINK_ACADEMY;
+}

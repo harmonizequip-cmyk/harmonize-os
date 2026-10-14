@@ -8,7 +8,7 @@ import {
   acharParecidos,
   digitos,
   dividirCidadeEstado,
-  LINK_ACADEMY,
+  linkAcademyPreenchido,
   notaDoCadastro,
   tratamentoSugerido,
   type CadastroRecebido,
@@ -191,7 +191,7 @@ function Cartao({
           <div className="flex flex-wrap gap-2">
             {cad.nome && <CopiarBotao rotulo="Copiar nome" texto={cad.nome} />}
             {cad.email && <CopiarBotao rotulo="Copiar e-mail" texto={cad.email} />}
-            <a href={LINK_ACADEMY} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+            <a href={linkAcademyPreenchido(cad.nome, cad.email)} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
               Abrir cadastro da Academy
             </a>
           </div>
