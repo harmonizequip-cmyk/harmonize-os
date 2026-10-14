@@ -19,7 +19,7 @@
 // Segredo: ANTHROPIC_API_KEY (Edge Functions > Secrets no painel do Supabase).
 // Opcionais: ASSISTENTE_MODELO, ASSISTENTE_LIMITE_MENSAL_USD.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { CONHECIMENTO } from "./conhecimento.ts";
+import { CONHECIMENTO, INSIGHTS } from "./conhecimento.ts";
 
 const SITE = "https://harmonize-os.vercel.app";
 const CORS = {
@@ -170,6 +170,47 @@ const FERRAMENTAS = [
   },
 ];
 
+// Modo Cérebro: só lê o banco e grava insights.
+const CATEGORIAS = ["prospeccao", "relacionamento", "vendas", "financeiro", "agenda", "marketing", "operacao"];
+const FERRAMENTAS_INSIGHTS = [
+  FERRAMENTAS[0],
+  {
+    name: "registrar_insights",
+    description: "Grava os insights da rodada (de 8 a 12) na tela Cérebro. Uma chamada com todos.",
+    input_schema: {
+      type: "object",
+      properties: {
+        itens: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              categoria: { type: "string", enum: CATEGORIAS },
+              titulo: { type: "string", description: "Frase forte e específica, até 160 caracteres." },
+              texto: { type: "string", description: "O que os dados mostram e por que importa (2 a 4 frases)." },
+              acao: { type: "string", description: "Próximo passo concreto para esta semana, com mensagem pronta quando for abordagem." },
+              evidencia: { type: "string", description: "Números exatos que sustentam, ou 'ideia de mercado, sem dado próprio'." },
+              impacto: { type: "integer", enum: [1, 2, 3] },
+              client_ids: { type: "array", items: { type: "string" }, description: "Clientes envolvidas (clients.id), até 15." },
+            },
+            required: ["categoria", "titulo", "texto", "acao", "impacto"],
+          },
+        },
+      },
+      required: ["itens"],
+    },
+  },
+];
+const FOCOS: Record<string, string> = {
+  prospeccao: "Foque em prospecção: como achar e converter clientes novas.",
+  relacionamento: "Foque em relacionamento: reativação, fidelização, indicação.",
+  vendas: "Foque em vendas: ticket, pacotes, conversão do funil.",
+  financeiro: "Foque no financeiro: lucro, custos, recebimento, caixa.",
+  agenda: "Foque na agenda: ocupação, dias vazios, rotas, cancelamentos.",
+  marketing: "Foque em marketing: conteúdo, posicionamento, eventos, parcerias.",
+  operacao: "Foque em operação: deslocamento, equipamentos, rotina do Eder.",
+};
+
 function json(corpo: unknown, status = 200) {
   return new Response(JSON.stringify(corpo), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
@@ -246,7 +287,7 @@ type Planilha = {
 };
 type ItemAgenda = { client_id: string; nome: string; telefone: string; texto: string; ultimo_envio: string | null };
 type Agenda = { inicio: string; fim: string; itens: ItemAgenda[] };
-type Estado = { clienteId: string | null; whatsapp: Whats[]; planilhas: Planilha[]; agendas: Agenda[] };
+type Estado = { clienteId: string | null; whatsapp: Whats[]; planilhas: Planilha[]; agendas: Agenda[]; insights: number };
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -299,6 +340,26 @@ async function executarFerramenta(
         }),
         erro: false,
       };
+    }
+    if (nome === "registrar_insights") {
+      const itens = (Array.isArray(entrada.itens) ? entrada.itens : []).slice(0, 15) as Record<string, unknown>[];
+      const linhas = itens
+        .map((i) => ({
+          user_id: userId,
+          categoria: CATEGORIAS.includes(String(i.categoria)) ? String(i.categoria) : "operacao",
+          titulo: String(i.titulo ?? "").trim().slice(0, 160),
+          texto: String(i.texto ?? "").trim().slice(0, 1500),
+          acao: i.acao ? String(i.acao).trim().slice(0, 1200) : null,
+          evidencia: i.evidencia ? String(i.evidencia).trim().slice(0, 800) : null,
+          impacto: [1, 2, 3].includes(Number(i.impacto)) ? Number(i.impacto) : 2,
+          client_ids: (Array.isArray(i.client_ids) ? i.client_ids : []).map(String).filter((id) => UUID.test(id)).slice(0, 15),
+        }))
+        .filter((l) => l.titulo && l.texto);
+      if (!linhas.length) return { texto: "Nenhum insight válido.", erro: true };
+      const { error } = await supabase.from("insights").insert(linhas);
+      if (error) return { texto: `Não gravei: ${error.message}`, erro: true };
+      estado.insights += linhas.length;
+      return { texto: `Gravados ${linhas.length} insights.`, erro: false };
     }
     if (nome === "preparar_envio_agenda") {
       const inicio = String(entrada.inicio ?? "");
@@ -406,13 +467,16 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!perfil?.active || perfil.somente_leitura) return json({ erro: "Seu acesso não inclui o assistente." }, 403);
 
-  let corpo: { mensagem?: string; conversa_id?: string | null; cliente_id?: string | null };
+  let corpo: { mensagem?: string; conversa_id?: string | null; cliente_id?: string | null; modo?: string; foco?: string };
   try {
     corpo = await req.json();
   } catch {
     return json({ erro: "Pedido inválido." }, 400);
   }
-  const pergunta = String(corpo.mensagem ?? "").trim().slice(0, 4000);
+  const modoInsights = corpo.modo === "insights";
+  const pergunta = modoInsights
+    ? `Gere uma nova rodada de insights para a Harmonize. ${FOCOS[String(corpo.foco)] ?? "Olhe tudo, de forma ampla."}`
+    : String(corpo.mensagem ?? "").trim().slice(0, 4000);
   if (!pergunta) return json({ erro: "Escreva ou fale a pergunta." }, 400);
 
   // Trava de gasto do mês (além do limite que fica no console da Anthropic).
@@ -430,9 +494,9 @@ Deno.serve(async (req) => {
   }
 
   // Conversa: continua a anterior ou começa uma nova.
-  let conversaId = corpo.conversa_id || null;
+  let conversaId = modoInsights ? null : corpo.conversa_id || null;
   let historico: Mensagem[] = [];
-  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [] };
+  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0 };
   if (conversaId) {
     const { data: conv } = await supabase
       .from("assistente_conversas")
@@ -494,8 +558,9 @@ Deno.serve(async (req) => {
   const uso = { entrada: 0, saida: 0, cacheLeitura: 0, cacheEscrita: 0 };
   let resposta = "";
 
-  for (let rodada = 0; rodada <= MAX_RODADAS; rodada++) {
-    const ultimaRodada = rodada === MAX_RODADAS;
+  const maxRodadas = modoInsights ? 11 : MAX_RODADAS;
+  for (let rodada = 0; rodada <= maxRodadas; rodada++) {
+    const ultimaRodada = rodada === maxRodadas;
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
@@ -504,9 +569,10 @@ Deno.serve(async (req) => {
         max_tokens: 8000,
         system: [
           { type: "text", text: CONHECIMENTO, cache_control: { type: "ephemeral" } },
+          ...(modoInsights ? [{ type: "text", text: INSIGHTS }] : []),
           { type: "text", text: contexto },
         ],
-        tools: FERRAMENTAS,
+        tools: modoInsights ? FERRAMENTAS_INSIGHTS : FERRAMENTAS,
         // Na última rodada, sem ferramentas: responde com o que já tem.
         ...(ultimaRodada ? { tool_choice: { type: "none" } } : {}),
         messages: comCacheNoFim(enviar()),
@@ -559,7 +625,10 @@ Deno.serve(async (req) => {
   const custo = (uso.entrada * pe + uso.saida * ps + uso.cacheLeitura * pcl + uso.cacheEscrita * pce) / 1_000_000;
 
   // Guarda a conversa inteira (inclusive as consultas, para a IA lembrar do contexto).
-  if (conversaId) {
+  // A rodada do Cérebro não vira conversa: o resultado fica na tabela insights.
+  if (modoInsights) {
+    // nada a guardar
+  } else if (conversaId) {
     await supabase
       .from("assistente_conversas")
       .update({ mensagens: semRaciocinio(mensagens), client_id: estado.clienteId, updated_at: new Date().toISOString() })
@@ -593,6 +662,7 @@ Deno.serve(async (req) => {
     whatsapp: estado.whatsapp,
     planilhas: estado.planilhas,
     agendas: estado.agendas,
+    insights_criados: estado.insights,
     gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,
   });
 });

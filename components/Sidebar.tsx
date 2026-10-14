@@ -28,6 +28,7 @@ import {
   PiggyBank,
   CreditCard,
   Sparkles,
+  Brain,
 } from "lucide-react";
 
 // Menu do espaço Pessoal (chave Harmonize | Pessoal no topo).
@@ -41,6 +42,7 @@ const PESSOAL_ITEMS = [
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard" },
+  { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard" },
   { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
   { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },

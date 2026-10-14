@@ -165,6 +165,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - O cartão gera a imagem das datas livres (`lib/agenda-imagens.ts`, mesma arte da Agenda, uma por mês do período) e, por cliente: "Enviar com imagem" (Compartilhar com imagem e texto; o texto também vai para a área de transferência), "Só texto" (wa.me) e "Marcar enviado" (`registrar_envio_agenda`, grava em `agenda_envios`). Sem "Marcar enviado" a atualização não sabe que ela recebeu.
 - Dias 20 e 5, junto do resumo das 7h30, sai o aviso que abre `/assistente?auto=1&pergunta=...`: a tela já manda o pedido e os cartões (lotes de 15, botão "Montar as próximas") aparecem sozinhos. Pergunta sobre envio da agenda sempre vira cartão, nunca lista em texto.
 
+## Cérebro (insights)
+
+- Tela `/insights` ("Cérebro" no menu, `app/(app)/insights/InsightsClient.tsx`, regras em `lib/insights.ts`). "Gerar novos insights" (com foco opcional por categoria) chama a Edge Function `assistente` com `modo: "insights"`: ela usa o texto `INSIGHTS` de `conhecimento.ts`, faz até 8 consultas agregadas, cruza com conhecimento de mercado e grava de 8 a 12 insights pela ferramenta `registrar_insights` (não vira conversa).
+- Tabela `insights` (RLS por `user_id`, como `assistente_memoria`): categoria (prospeccao, relacionamento, vendas, financeiro, agenda, marketing, operacao), título, texto, `acao` (próximo passo, com mensagem pronta), `evidencia` (números), `impacto` 1 a 3, `client_ids`, `status` (novo, feito, arquivado) e `util`. A IA lê os anteriores para não repetir e usa "útil/não útil" para calibrar.
+- Cada cartão tem "Colocar em prática com o assistente" (`/assistente?auto=1&pergunta=...`), "Fiz", "Arquivar" e 👍/👎.
+
 ## Cadastros do formulário (Contourline Academy)
 
 - Formulário Google "CADASTRO CONTOURLINE ACADEMY" (planilha de respostas no Drive do dono: nome, profissão, WhatsApp, e-mail, empresa, estabelecimento, cidade/estado). O Apps Script da planilha (`scripts/apps-script-formulario.gs`, segredo só no script e no cofre `formulario_cadastro_segredo`) manda cada resposta para a Edge Function `cadastro-formulario` (sem JWT; confere o segredo por `formulario_segredo()`), que guarda em `cadastros_recebidos` (chave = carimbo|nome|email, sem duplicar) e avisa no celular.

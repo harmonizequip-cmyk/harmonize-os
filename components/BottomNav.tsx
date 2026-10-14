@@ -24,6 +24,7 @@ import {
   PiggyBank,
   CreditCard,
   Sparkles,
+  Brain,
 } from "lucide-react";
 
 // Os 4 atalhos de uso diário, nessa ordem. O 5º e último botão não é um
@@ -49,6 +50,7 @@ const PESSOAL_ITEMS = [
 // resumidos no Dashboard), Relatórios e Configurações.
 const MORE_ITEMS = [
   { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard" },
+  { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
   // Histórico de locações realizadas: os FATOS. Fica ao lado de
