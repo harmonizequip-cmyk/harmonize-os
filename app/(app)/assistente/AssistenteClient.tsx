@@ -29,7 +29,7 @@ const SUGESTOES = [
   "Tenho dia livre na semana que vem?",
   "Quais tarefas estão atrasadas?",
   "Planilha de quanto cada cliente já gastou comigo",
-  "Para quem mando a agenda dos próximos 15 dias?",
+  "Manda a agenda do mês que vem",
 ];
 
 type ClienteRef = { name: string; display_name: string | null; treatment: string | null } | null;

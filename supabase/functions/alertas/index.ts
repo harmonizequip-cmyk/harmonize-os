@@ -198,20 +198,28 @@ async function avisoDiasLivres(hoje: string): Promise<Aviso | null> {
   };
 }
 
-// Dias 1 e 16: lembrete de mandar a agenda da quinzena. Abre o assistente
-// já com a pergunta; ele monta a lista, as mensagens e a imagem.
-const PERGUNTA_AGENDA = "Para quem mando a agenda dos próximos 15 dias?";
-function avisoAgendaQuinzena(hoje: string): Aviso | null {
+// Agenda por mês, em duas rodadas: dia 20 abre o mês seguinte inteiro e,
+// 15 dias depois (dia 5), vai a atualização do mesmo mês com as datas que
+// sobraram, só para quem ainda não agendou. O aviso abre o assistente já com
+// a pergunta; ele separa as clientes, escreve as mensagens e junta a imagem.
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+function avisoAgendaDoMes(hoje: string): Aviso | null {
   const dia = Number(hoje.slice(8, 10));
-  if (dia !== 1 && dia !== 16) return null;
-  const url = `/assistente?pergunta=${encodeURIComponent(PERGUNTA_AGENDA)}`;
-  return {
-    title: "Hora de mandar a agenda da quinzena",
-    body: "O assistente separa as clientes, escreve uma mensagem diferente para cada uma e junta a imagem das datas livres.",
-    url,
-    tag: `agenda-quinzena-${hoje}`,
-    actions: [{ action: "agenda", title: "Montar os envios", url }],
-  };
+  const mesAtual = Number(hoje.slice(5, 7)) - 1;
+  let pergunta: string, title: string, body: string;
+  if (dia === 20) {
+    const mes = MESES[(mesAtual + 1) % 12];
+    pergunta = `Manda a abertura da agenda de ${mes}`;
+    title = `Hora de abrir a agenda de ${mes}`;
+    body = "O assistente separa quem ainda não agendou, escreve uma mensagem diferente para cada uma e junta a imagem do mês.";
+  } else if (dia === 5) {
+    const mes = MESES[mesAtual];
+    pergunta = `Manda a atualização da agenda de ${mes} para quem ainda não agendou`;
+    title = `Atualização da agenda de ${mes}`;
+    body = "15 dias depois da abertura: as datas que sobraram, só para quem ainda não agendou.";
+  } else return null;
+  const url = `/assistente?pergunta=${encodeURIComponent(pergunta)}`;
+  return { title, body, url, tag: `agenda-mes-${hoje}`, actions: [{ action: "agenda", title: "Montar os envios", url }] };
 }
 
 // Domingo à noite: o que aconteceu de segunda a domingo, comparado com a
@@ -515,12 +523,12 @@ Deno.serve(async (req) => {
     }];
   } else if (tipo === "resumo") {
     const livres = await avisoDiasLivres(hoje);
-    const quinzena = avisoAgendaQuinzena(hoje);
+    const agendaMes = avisoAgendaDoMes(hoje);
     avisos = [
       await montarResumo(hoje),
       ...(await avisosDoDia(hoje)),
       ...(livres ? [livres] : []),
-      ...(quinzena ? [quinzena] : []),
+      ...(agendaMes ? [agendaMes] : []),
     ];
   } else if (tipo === "vespera") {
     const v = await montarVespera(hoje);

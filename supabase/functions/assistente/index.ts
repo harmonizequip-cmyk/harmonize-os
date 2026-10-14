@@ -128,8 +128,8 @@ const FERRAMENTAS = [
     input_schema: {
       type: "object",
       properties: {
-        inicio: { type: "string", description: "Primeiro dia do período da agenda (AAAA-MM-DD), normalmente hoje ou amanhã." },
-        fim: { type: "string", description: "Último dia do período (AAAA-MM-DD), normalmente 15 dias depois." },
+        inicio: { type: "string", description: "Primeiro dia do período (AAAA-MM-DD): dia 1 do mês na abertura, hoje na atualização." },
+        fim: { type: "string", description: "Último dia do período (AAAA-MM-DD): o último dia do mês." },
         itens: {
           type: "array",
           description: "Uma entrada por cliente, no máximo 30.",

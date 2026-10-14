@@ -158,11 +158,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Planilha: ferramenta `gerar_planilha` (título, SQL, colunas com tipo, gráfico de ranking opcional) vira o cartão "toque para baixar"; a tela roda o SQL de novo por `assistente_consultar(sql, 5000)` e monta o .xlsx com `exportarTabela` (mesmo layout das telas).
 - Voz grátis: escuta com `lib/reconhecer-fala.ts`, resposta lida pela voz do aparelho (`lib/falar.ts`). Pergunta feita por voz: depois de falar a resposta, já escuta a próxima. Botão de alto-falante liga/desliga (`localStorage` `harmonize-assistente-voz`).
 
-## Envio da agenda (de 15 em 15 dias)
+## Envio da agenda (abertura no dia 20, atualização no dia 5)
 
-- No assistente, "Para quem mando a agenda dos próximos 15 dias?": a IA escolhe as clientes (com WhatsApp, fora desqualificado, sem envio nos últimos 15 dias, sem reserva no período, no máximo 30), lê as mensagens anteriores e escreve uma diferente para cada uma (nunca repetir, nem no mesmo lote). Ferramenta `preparar_envio_agenda` vira o cartão `app/(app)/assistente/CartaoAgenda.tsx`.
-- O cartão gera a imagem das datas livres (`lib/agenda-imagens.ts`, mesma arte da Agenda, uma por mês do período) e, por cliente: "Enviar com imagem" (Compartilhar com imagem e texto; o texto também vai para a área de transferência), "Só texto" (wa.me) e "Marcar enviado" (`registrar_envio_agenda`, grava em `agenda_envios`).
-- Dias 1 e 16, junto do resumo das 7h30, sai o aviso que abre `/assistente?pergunta=...` já com a pergunta.
+- Agenda sempre por mês inteiro, em duas rodadas: dia 20 abre o mês seguinte; 15 dias depois (dia 5) vai a atualização do mesmo mês com as datas que sobraram, só para quem recebeu a abertura e ainda não agendou. Quem tem reserva não cancelada de hoje em diante (qualquer data) fica fora das duas. Regras na seção "Mandar a agenda" de `supabase/functions/assistente/conhecimento.ts`.
+- A IA lê as mensagens anteriores (`agenda_envios`) e escreve uma diferente para cada cliente (nunca repetir, nem no mesmo lote; a função recusa texto igual no lote). Ferramenta `preparar_envio_agenda` vira o cartão `app/(app)/assistente/CartaoAgenda.tsx`.
+- O cartão gera a imagem das datas livres (`lib/agenda-imagens.ts`, mesma arte da Agenda, uma por mês do período) e, por cliente: "Enviar com imagem" (Compartilhar com imagem e texto; o texto também vai para a área de transferência), "Só texto" (wa.me) e "Marcar enviado" (`registrar_envio_agenda`, grava em `agenda_envios`). Sem "Marcar enviado" a atualização não sabe que ela recebeu.
+- Dias 20 e 5, junto do resumo das 7h30, sai o aviso que abre `/assistente?pergunta=...` com o pedido pronto.
 
 ## Cadastros do formulário (Contourline Academy)
 
