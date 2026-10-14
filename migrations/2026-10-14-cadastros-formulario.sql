@@ -1,7 +1,7 @@
 -- ============================================================
 -- CADASTROS DO FORMULÁRIO (Google Forms "CADASTRO CONTOURLINE ACADEMY")
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (14/10/2026, conferida: tabela, 3 funções, segredo no cofre, anon sem acesso)
 --
 -- Cada resposta nova do formulário chega pela Edge Function
 -- "cadastro-formulario" (chamada pelo Apps Script da planilha de respostas)
