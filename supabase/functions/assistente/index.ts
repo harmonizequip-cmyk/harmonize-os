@@ -166,6 +166,28 @@ function inicioDoMesIso(): string {
   return `${ano}-${mes}-01T00:00:00-03:00`;
 }
 
+/**
+ * Tira o raciocínio interno (blocos "thinking") das respostas antigas. Ele fica
+ * preso ao texto do sistema da pergunta em que nasceu (que tem a hora), e a API
+ * recusa a conversa se ele voltar numa pergunta seguinte. Dentro da mesma
+ * pergunta (rodadas de consulta) ele continua, porque o sistema é o mesmo.
+ */
+function semRaciocinio(msgs: Mensagem[]): Mensagem[] {
+  const saida: Mensagem[] = [];
+  for (const m of msgs) {
+    if (m.role !== "assistant" || !Array.isArray(m.content)) {
+      saida.push(m);
+      continue;
+    }
+    const blocos = m.content.filter((b) => {
+      const t = (b as { type: string }).type;
+      return t !== "thinking" && t !== "redacted_thinking";
+    });
+    saida.push({ role: "assistant", content: blocos.length ? blocos : [{ type: "text", text: "(sem texto)" }] });
+  }
+  return saida;
+}
+
 /** Corta o histórico mantendo o começo numa pergunta de texto (nunca num resultado de ferramenta solto). */
 function recortarHistorico(msgs: Mensagem[]): Mensagem[] {
   if (msgs.length <= MAX_MENSAGENS_HISTORICO) return msgs;
@@ -338,7 +360,7 @@ Deno.serve(async (req) => {
       .eq("id", conversaId)
       .maybeSingle();
     if (conv) {
-      historico = (conv.mensagens as Mensagem[]) ?? [];
+      historico = semRaciocinio((conv.mensagens as Mensagem[]) ?? []);
       estado.clienteId = conv.client_id ?? estado.clienteId;
     } else conversaId = null;
   }
@@ -460,13 +482,13 @@ Deno.serve(async (req) => {
   if (conversaId) {
     await supabase
       .from("assistente_conversas")
-      .update({ mensagens, client_id: estado.clienteId, updated_at: new Date().toISOString() })
+      .update({ mensagens: semRaciocinio(mensagens), client_id: estado.clienteId, updated_at: new Date().toISOString() })
       .eq("id", conversaId);
   } else {
     const titulo = pergunta.length > 60 ? pergunta.slice(0, 57) + "..." : pergunta;
     const { data: nova } = await supabase
       .from("assistente_conversas")
-      .insert({ user_id: userId, client_id: estado.clienteId, titulo, mensagens })
+      .insert({ user_id: userId, client_id: estado.clienteId, titulo, mensagens: semRaciocinio(mensagens) })
       .select("id")
       .single();
     conversaId = nova?.id ?? null;
