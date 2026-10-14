@@ -61,6 +61,25 @@ describe("planilha do assistente", () => {
   });
 });
 
+describe("agenda do assistente", () => {
+  it("remonta o cartão da agenda com o texto de cada cliente", () => {
+    const b = bolhasDoHistorico([
+      { role: "user", content: "manda a agenda" },
+      {
+        role: "assistant",
+        content: [
+          { type: "tool_use", id: "g1", name: "preparar_envio_agenda", input: { inicio: "2026-10-15", fim: "2026-10-30", itens: [{ client_id: "c1", texto: "Oi Ana" }] } },
+        ],
+      },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "g1", content: '{"ok":true,"itens":[{"client_id":"c1","nome":"Dra. Ana","telefone":"8399","ultimo_envio":null}]}' }] },
+      { role: "assistant", content: [{ type: "text", text: "Pronto." }] },
+    ]);
+    expect(b[1].agendas).toEqual([
+      { inicio: "2026-10-15", fim: "2026-10-30", itens: [{ client_id: "c1", nome: "Dra. Ana", telefone: "8399", ultimo_envio: null, texto: "Oi Ana" }] },
+    ]);
+  });
+});
+
 describe("trechosMarkdown", () => {
   it("separa itens de lista e negrito", () => {
     const t = trechosMarkdown("Resumo:\n- **Ana**: R$ 500\n2. Bia");

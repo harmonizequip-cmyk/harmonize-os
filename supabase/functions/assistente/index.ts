@@ -2,11 +2,13 @@
 //
 // Quem chama: a tela /assistente, com o login de quem está no app.
 //   { "mensagem": "quem me deve?", "conversa_id": "<uuid opcional>", "cliente_id": "<uuid opcional>" }
-// Responde { conversa_id, cliente_id, resposta, whatsapp, planilhas, gasto_mes_usd }.
+// Responde { conversa_id, cliente_id, resposta, whatsapp, planilhas, agendas, gasto_mes_usd }.
 // cliente_id amarra uma conversa nova a um cliente (histórico e memórias dele);
 // whatsapp traz as mensagens prontas para o botão "Abrir no WhatsApp";
 // planilhas traz a consulta e as colunas: a tela roda de novo na hora de
-// baixar (dado sempre atual) e monta o .xlsx com o layout da Harmonize.
+// baixar (dado sempre atual) e monta o .xlsx com o layout da Harmonize;
+// agendas traz o período e uma mensagem por cliente: a tela gera a imagem das
+// datas livres e mostra "Enviar com imagem" e "Marcar enviado" para cada uma.
 //
 // Roda com o login de quem pergunta (não usa service_role): a RLS de cada
 // tabela vale para a IA igual vale para a tela. A IA lê o banco pela função
@@ -120,6 +122,31 @@ const FERRAMENTAS = [
     },
   },
   {
+    name: "preparar_envio_agenda",
+    description:
+      "Monta o cartão de envio da agenda (imagem das datas livres + mensagem) para várias clientes de uma vez. A tela gera a imagem e mostra, para cada cliente, os botões Enviar com imagem e Marcar enviado. Cada mensagem tem que ser diferente das outras do lote e das que a cliente já recebeu (consulte agenda_envios antes).",
+    input_schema: {
+      type: "object",
+      properties: {
+        inicio: { type: "string", description: "Primeiro dia do período da agenda (AAAA-MM-DD), normalmente hoje ou amanhã." },
+        fim: { type: "string", description: "Último dia do período (AAAA-MM-DD), normalmente 15 dias depois." },
+        itens: {
+          type: "array",
+          description: "Uma entrada por cliente, no máximo 30.",
+          items: {
+            type: "object",
+            properties: {
+              client_id: { type: "string" },
+              texto: { type: "string", description: "Mensagem que vai junto da imagem, única para esta cliente." },
+            },
+            required: ["client_id", "texto"],
+          },
+        },
+      },
+      required: ["inicio", "fim", "itens"],
+    },
+  },
+  {
     name: "preparar_whatsapp",
     description:
       "Deixa uma mensagem pronta para o dono enviar no WhatsApp da cliente (aparece um botão Abrir no WhatsApp). Não envia nada sozinho.",
@@ -217,7 +244,11 @@ type Planilha = {
   grafico?: { titulo?: string; categoria: string; valor: string; tipo?: string };
   linhas: number;
 };
-type Estado = { clienteId: string | null; whatsapp: Whats[]; planilhas: Planilha[] };
+type ItemAgenda = { client_id: string; nome: string; telefone: string; texto: string; ultimo_envio: string | null };
+type Agenda = { inicio: string; fim: string; itens: ItemAgenda[] };
+type Estado = { clienteId: string | null; whatsapp: Whats[]; planilhas: Planilha[]; agendas: Agenda[] };
+
+const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -265,6 +296,55 @@ async function executarFerramenta(
           linhas: Math.min(linhas.length, 5000),
           cortada: linhas.length > 5000,
           amostra: linhas.slice(0, 5),
+        }),
+        erro: false,
+      };
+    }
+    if (nome === "preparar_envio_agenda") {
+      const inicio = String(entrada.inicio ?? "");
+      const fim = String(entrada.fim ?? "");
+      if (!DATA.test(inicio) || !DATA.test(fim) || fim < inicio) return { texto: "Período inválido (use AAAA-MM-DD).", erro: true };
+      const pedidos = (Array.isArray(entrada.itens) ? entrada.itens : []).slice(0, 30) as { client_id?: string; texto?: string }[];
+      const ids = pedidos.map((i) => String(i.client_id ?? "")).filter((id) => UUID.test(id));
+      if (!ids.length) return { texto: "Nenhuma cliente válida.", erro: true };
+      const [{ data: clientes }, { data: envios }] = await Promise.all([
+        supabase.from("clients").select("id, name, display_name, treatment, whatsapp").in("id", ids),
+        supabase.from("agenda_envios").select("client_id, enviado_em").in("client_id", ids).order("enviado_em", { ascending: false }),
+      ]);
+      const ultimo = new Map<string, string>();
+      for (const e of envios ?? []) if (!ultimo.has(e.client_id)) ultimo.set(e.client_id, e.enviado_em);
+      const porId = new Map((clientes ?? []).map((c) => [c.id, c]));
+      const itens: ItemAgenda[] = [];
+      const semWhats: string[] = [];
+      const vistos = new Set<string>();
+      for (const p of pedidos) {
+        const c = porId.get(String(p.client_id ?? ""));
+        const texto = String(p.texto ?? "").trim();
+        if (!c || !texto || vistos.has(c.id)) continue;
+        vistos.add(c.id);
+        const nomeC = [c.treatment, c.display_name || c.name].filter(Boolean).join(" ");
+        if (!c.whatsapp) {
+          semWhats.push(nomeC);
+          continue;
+        }
+        itens.push({ client_id: c.id, nome: nomeC, telefone: c.whatsapp, texto, ultimo_envio: ultimo.get(c.id) ?? null });
+      }
+      // Duas mensagens iguais no mesmo lote denunciam envio em massa.
+      const textos = new Set<string>();
+      for (const i of itens) {
+        const k = i.texto.toLowerCase().replace(/\s+/g, " ");
+        if (textos.has(k)) return { texto: `A mensagem de ${i.nome} repete a de outra cliente. Reescreva diferente.`, erro: true };
+        textos.add(k);
+      }
+      if (!itens.length) return { texto: `Nenhuma cliente com WhatsApp. Sem WhatsApp: ${semWhats.join(", ") || "-"}.`, erro: true };
+      estado.agendas.push({ inicio, fim, itens });
+      return {
+        texto: JSON.stringify({
+          ok: true,
+          inicio,
+          fim,
+          itens: itens.map((i) => ({ client_id: i.client_id, nome: i.nome, telefone: i.telefone, ultimo_envio: i.ultimo_envio })),
+          sem_whatsapp: semWhats,
         }),
         erro: false,
       };
@@ -352,7 +432,7 @@ Deno.serve(async (req) => {
   // Conversa: continua a anterior ou começa uma nova.
   let conversaId = corpo.conversa_id || null;
   let historico: Mensagem[] = [];
-  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [] };
+  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [] };
   if (conversaId) {
     const { data: conv } = await supabase
       .from("assistente_conversas")
@@ -512,6 +592,7 @@ Deno.serve(async (req) => {
     resposta,
     whatsapp: estado.whatsapp,
     planilhas: estado.planilhas,
+    agendas: estado.agendas,
     gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,
   });
 });

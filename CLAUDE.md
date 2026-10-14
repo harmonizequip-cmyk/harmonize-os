@@ -158,6 +158,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Planilha: ferramenta `gerar_planilha` (título, SQL, colunas com tipo, gráfico de ranking opcional) vira o cartão "toque para baixar"; a tela roda o SQL de novo por `assistente_consultar(sql, 5000)` e monta o .xlsx com `exportarTabela` (mesmo layout das telas).
 - Voz grátis: escuta com `lib/reconhecer-fala.ts`, resposta lida pela voz do aparelho (`lib/falar.ts`). Pergunta feita por voz: depois de falar a resposta, já escuta a próxima. Botão de alto-falante liga/desliga (`localStorage` `harmonize-assistente-voz`).
 
+## Envio da agenda (de 15 em 15 dias)
+
+- No assistente, "Para quem mando a agenda dos próximos 15 dias?": a IA escolhe as clientes (com WhatsApp, fora desqualificado, sem envio nos últimos 15 dias, sem reserva no período, no máximo 30), lê as mensagens anteriores e escreve uma diferente para cada uma (nunca repetir, nem no mesmo lote). Ferramenta `preparar_envio_agenda` vira o cartão `app/(app)/assistente/CartaoAgenda.tsx`.
+- O cartão gera a imagem das datas livres (`lib/agenda-imagens.ts`, mesma arte da Agenda, uma por mês do período) e, por cliente: "Enviar com imagem" (Compartilhar com imagem e texto; o texto também vai para a área de transferência), "Só texto" (wa.me) e "Marcar enviado" (`registrar_envio_agenda`, grava em `agenda_envios`).
+- Dias 1 e 16, junto do resumo das 7h30, sai o aviso que abre `/assistente?pergunta=...` já com a pergunta.
+
 ## Cadastros do formulário (Contourline Academy)
 
 - Formulário Google "CADASTRO CONTOURLINE ACADEMY" (planilha de respostas no Drive do dono: nome, profissão, WhatsApp, e-mail, empresa, estabelecimento, cidade/estado). O Apps Script da planilha (`scripts/apps-script-formulario.gs`, segredo só no script e no cofre `formulario_cadastro_segredo`) manda cada resposta para a Edge Function `cadastro-formulario` (sem JWT; confere o segredo por `formulario_segredo()`), que guarda em `cadastros_recebidos` (chave = carimbo|nome|email, sem duplicar) e avisa no celular.

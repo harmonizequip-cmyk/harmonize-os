@@ -198,6 +198,22 @@ async function avisoDiasLivres(hoje: string): Promise<Aviso | null> {
   };
 }
 
+// Dias 1 e 16: lembrete de mandar a agenda da quinzena. Abre o assistente
+// já com a pergunta; ele monta a lista, as mensagens e a imagem.
+const PERGUNTA_AGENDA = "Para quem mando a agenda dos próximos 15 dias?";
+function avisoAgendaQuinzena(hoje: string): Aviso | null {
+  const dia = Number(hoje.slice(8, 10));
+  if (dia !== 1 && dia !== 16) return null;
+  const url = `/assistente?pergunta=${encodeURIComponent(PERGUNTA_AGENDA)}`;
+  return {
+    title: "Hora de mandar a agenda da quinzena",
+    body: "O assistente separa as clientes, escreve uma mensagem diferente para cada uma e junta a imagem das datas livres.",
+    url,
+    tag: `agenda-quinzena-${hoje}`,
+    actions: [{ action: "agenda", title: "Montar os envios", url }],
+  };
+}
+
 // Domingo à noite: o que aconteceu de segunda a domingo, comparado com a
 // semana anterior, e quanto falta para as contas fixas do mês.
 async function montarSemana(hoje: string): Promise<Aviso> {
@@ -499,7 +515,13 @@ Deno.serve(async (req) => {
     }];
   } else if (tipo === "resumo") {
     const livres = await avisoDiasLivres(hoje);
-    avisos = [await montarResumo(hoje), ...(await avisosDoDia(hoje)), ...(livres ? [livres] : [])];
+    const quinzena = avisoAgendaQuinzena(hoje);
+    avisos = [
+      await montarResumo(hoje),
+      ...(await avisosDoDia(hoje)),
+      ...(livres ? [livres] : []),
+      ...(quinzena ? [quinzena] : []),
+    ];
   } else if (tipo === "vespera") {
     const v = await montarVespera(hoje);
     avisos = v ? [v, ...(await confirmacoesDeAmanha(hoje))] : [];

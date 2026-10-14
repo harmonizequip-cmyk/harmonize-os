@@ -12,7 +12,9 @@ import {
   type Bolha,
   type MensagemWhatsApp,
   type PlanilhaPedida,
+  type AgendaPedida,
 } from "@/lib/assistente";
+import CartaoAgenda from "./CartaoAgenda";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -27,6 +29,7 @@ const SUGESTOES = [
   "Tenho dia livre na semana que vem?",
   "Quais tarefas estão atrasadas?",
   "Planilha de quanto cada cliente já gastou comigo",
+  "Para quem mando a agenda dos próximos 15 dias?",
 ];
 
 type ClienteRef = { name: string; display_name: string | null; treatment: string | null } | null;
@@ -216,11 +219,13 @@ export default function AssistenteClient() {
     const params = new URLSearchParams(window.location.search);
     const idCliente = params.get("cliente");
     if (idCliente) definirCliente(idCliente);
+    const pergunta = params.get("pergunta");
+    if (pergunta) setTexto(pergunta.slice(0, 500));
     const compartilhado = params.get("texto");
     if (compartilhado) {
       setTexto(`Recebi esta mensagem no WhatsApp:\n"${compartilhado.slice(0, 2000)}"\n\nMe ajude a responder.`);
     }
-    if (idCliente || compartilhado) window.history.replaceState(null, "", "/assistente");
+    if (idCliente || compartilhado || pergunta) window.history.replaceState(null, "", "/assistente");
     return () => {
       pararEscuta.current?.();
       pararDeFalar();
@@ -335,6 +340,7 @@ export default function AssistenteClient() {
     if (data.cliente_id && data.cliente_id !== clienteRef.current) definirCliente(data.cliente_id);
     const whatsapp: MensagemWhatsApp[] = Array.isArray(data.whatsapp) ? data.whatsapp : [];
     const planilhas: PlanilhaPedida[] = Array.isArray(data.planilhas) ? data.planilhas : [];
+    const agendas: AgendaPedida[] = Array.isArray(data.agendas) ? data.agendas : [];
     setBolhas((b) => [
       ...b,
       {
@@ -342,6 +348,7 @@ export default function AssistenteClient() {
         texto: data.resposta,
         ...(whatsapp.length ? { whatsapp } : {}),
         ...(planilhas.length ? { planilhas } : {}),
+        ...(agendas.length ? { agendas } : {}),
       },
     ]);
 
@@ -504,6 +511,7 @@ export default function AssistenteClient() {
                 {b.texto && <Texto texto={b.texto} />}
                 {b.whatsapp && <BotoesWhatsApp lista={b.whatsapp} />}
                 {b.planilhas && <BotoesPlanilha lista={b.planilhas} />}
+                {b.agendas?.map((a, j) => <CartaoAgenda key={j} agenda={a} />)}
                 {temVoz && (
                   <button
                     onClick={() => {
