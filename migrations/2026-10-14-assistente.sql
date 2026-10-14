@@ -1,7 +1,7 @@
 -- ============================================================
 -- ASSISTENTE (IA dentro do Harmonize), etapa 1: só perguntas.
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (14/10/2026, conferida: 3 tabelas, 2 colunas por cliente, 3 gatilhos, consulta só para logado)
 --
 -- O assistente roda na Edge Function "assistente", com o login de quem
 -- pergunta (RLS vale para ele igual vale para a tela). Aqui ficam:
