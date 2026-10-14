@@ -13,7 +13,7 @@ export default async function FunilPage() {
     .select(
       "id, name, city, address, whatsapp, stage, is_client, data_evento, origem, indicado_por, notes, parceiro, treatment, display_name, client_tags(tags(id, name, color))"
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true }); // sem tarefa nem data, o mais antigo primeiro
 
   const { data: allTags } = await supabase.from("tags").select("id, name, color").order("name");
 

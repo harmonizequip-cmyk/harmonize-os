@@ -298,6 +298,17 @@ export default function FunilClient({
       const stageLeads = filtered
         .filter((c) => etapaDe(c) === stage.key)
         .sort((a, b) => {
+          // Agendado: o atendimento mais próximo no topo (19/10 antes de
+          // 20/10), sem olhar tarefa; quem não tem data desce.
+          if (stage.key === "agendado") {
+            const da = a.nextEvent?.date_start ?? a.data_evento;
+            const db = b.nextEvent?.date_start ?? b.data_evento;
+            if (da !== db) {
+              if (!da) return 1;
+              if (!db) return -1;
+              return da.localeCompare(db);
+            }
+          }
           // Primeiro a tarefa pendente mais antiga (a mais atrasada
           // no topo); quem concluiu as tarefas, ou não tem nenhuma,
           // desce. Empate ou ausência de tarefa cai na regra abaixo.

@@ -137,7 +137,7 @@ async function confirmacoesDeAmanha(hoje: string): Promise<Aviso[]> {
     .is("confirmation_message_sent_at", null)
     .not("client_id", "is", null)
     .eq("date_start", amanha)
-    .order("event_type")
+    .order("created_at", { ascending: true })
     .limit(MAX_CONFIRMACOES);
   return (data ?? []).map((e: any) => {
     const c = umDe<any>(e.clients);
@@ -321,7 +321,8 @@ async function avisosDoDia(hoje: string): Promise<Aviso[]> {
     .neq("status", "cancelada")
     .eq("is_test", false)
     .eq("date_end", hoje)
-    .lt("date_start", hoje);
+    .lt("date_start", hoje)
+    .order("date_start", { ascending: true });
   for (const e of fins ?? []) {
     const c = umDe<any>((e as any).clients);
     avisos.push({
@@ -348,7 +349,10 @@ async function avisosDoDia(hoje: string): Promise<Aviso[]> {
       lista.push({ data: r.event_date, saldo: saldo.get(r.id) ?? 0, dias: diasEntre(fim, hoje) });
       porCliente.set(r.client_id, lista);
     }
-    const devedores = Array.from(porCliente.entries()).filter(([, l]) => l.some((x) => DIAS_DE_COBRANCA.includes(x.dias)));
+    // Do atraso mais antigo para o mais recente.
+    const devedores = Array.from(porCliente.entries())
+      .filter(([, l]) => l.some((x) => DIAS_DE_COBRANCA.includes(x.dias)))
+      .sort(([, a], [, b]) => Math.max(...b.map((x) => x.dias)) - Math.max(...a.map((x) => x.dias)));
     if (devedores.length) {
       const { data: clientes } = await admin
         .from("clients")
@@ -384,7 +388,8 @@ async function avisosDoDia(hoje: string): Promise<Aviso[]> {
     .eq("taxa_status", "pendente")
     .neq("status", "cancelada")
     .not("equipment_id", "is", null)
-    .gte("date_start", hoje);
+    .gte("date_start", hoje)
+    .order("date_start", { ascending: true });
   for (const t of taxas ?? []) {
     const criada = new Date(new Date((t as any).created_at).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
     if (somarDias(criada, prazo) !== hoje) continue;
@@ -513,7 +518,10 @@ Deno.serve(async (req) => {
   const falhas: string[] = [];
   for (const i of inscricoes ?? []) {
     let morto = false;
-    for (const aviso of avisos) {
+    // O celular põe o último aviso recebido no topo. Envio de trás para a
+    // frente para a gaveta ficar na ordem certa: resumo em cima e, embaixo
+    // dele, do mais antigo para o mais recente.
+    for (const aviso of [...avisos].reverse()) {
       try {
         await webpush.sendNotification(
           { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } },
