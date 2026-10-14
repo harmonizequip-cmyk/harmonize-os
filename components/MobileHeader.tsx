@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Sparkles } from "lucide-react";
+import { useSomenteLeitura } from "./SomenteLeitura";
 
 // O menu de navegação (antigo botão de hambúrguer aqui no topo) mudou para
 // o último botão da BottomNav — ver components/BottomNav.tsx. Manter os
@@ -13,6 +15,7 @@ import { LogOut } from "lucide-react";
 export default function MobileHeader() {
   const router = useRouter();
   const supabase = createClient();
+  const somenteLeitura = useSomenteLeitura();
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -31,6 +34,15 @@ export default function MobileHeader() {
         />
       </div>
       <div className="flex items-center gap-1">
+        {!somenteLeitura && (
+          <Link
+            href="/assistente"
+            aria-label="Assistente"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-teal-dark transition hover:bg-neutral-100"
+          >
+            <Sparkles size={18} strokeWidth={1.75} />
+          </Link>
+        )}
         <GlobalSearch compact />
         <ThemeToggle compact className="h-8 w-8" />
         <button

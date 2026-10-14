@@ -147,9 +147,27 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Banco: funções de gatilho sem EXECUTE para `authenticated`, `disponibilidade_publica` fechada, `anon` sem acesso a tabelas/views (também para tabelas futuras), `search_path` fixo (migration `2026-10-14-endurecer-seguranca.sql`).
 - Next.js atualizado para 16.3.8 em 14/10/2026 (`npm audit` sem vulnerabilidades). Em aberto: ligar "Leaked password protection" no Auth; cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
 
+## Assistente (IA)
+
+- Tela `/assistente` (ícone ✨ no topo do celular e item no menu): chat com a IA da Anthropic, modelo `claude-sonnet-5-5` (troca pelo segredo `ASSISTENTE_MODELO`). Etapa 1: só consulta, não altera nada. Etapa 2 (ações com confirmação) e 3 (logística com Maps) ainda não feitas.
+- Edge Function `assistente` (`supabase/functions/assistente`): roda com o login de quem pergunta (RLS vale), lê o banco por `assistente_consultar(sql)` (security invoker, só SELECT/WITH sem ";", dentro de subconsulta, transação só leitura, bloqueia vault/auth/pg_/push/webauthn). O que ela sabe do app está em `conhecimento.ts`: mudou regra ou tabela, atualizar lá e publicar a função.
+- Segredos da função (Edge Functions > Secrets): `ANTHROPIC_API_KEY` (o dono cola, nunca no chat nem no git), `ASSISTENTE_LIMITE_MENSAL_USD` (padrão 20; a função recusa ao passar).
+- Tabelas: `assistente_memoria` (o que o dono ensinou, lida a cada pergunta), `assistente_conversas` (histórico completo no formato da API), `assistente_uso` (tokens e custo estimado; "Gasto estimado este mês" na tela).
+- Voz grátis: escuta com `lib/reconhecer-fala.ts`, resposta lida pela voz do aparelho (`lib/falar.ts`). Pergunta feita por voz: depois de falar a resposta, já escuta a próxima. Botão de alto-falante liga/desliga (`localStorage` `harmonize-assistente-voz`).
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.
 - Custo por disparo: adiado.
 - Backup: o plano do Supabase é gratuito, então vale o backup manual semanal (Configurações > Baixar backup, guardar no Google Drive). Restauração testada em 06/10/2026 num Postgres temporário (`docs/RESTAURACAO-BACKUP.md`, `scripts/restaurar-backup.py`). Ainda não foi testada num projeto Supabase de verdade.
 - Contrato assinado e checklist: fora do escopo por decisão do dono.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

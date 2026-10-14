@@ -138,6 +138,8 @@ export default function QuickActionsButton({
 
   // No espaço Pessoal o "+" é da Harmonize e não aparece (cada tela pessoal tem o próprio botão).
   if (ehEspacoPessoal(pathname)) return null;
+  // Na tela do assistente o "+" ficaria em cima do campo de pergunta.
+  if (pathname.startsWith("/assistente")) return null;
 
   return (
     <>
