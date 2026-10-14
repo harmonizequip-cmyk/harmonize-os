@@ -133,6 +133,8 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
 
     setAlugueis(
       locs
+        .slice()
+        .reverse() // do mais antigo para o mais recente dentro de cada grupo
         .map((r) => {
           const s = saldos.get(r.id);
           const fim = r.event_date_end ?? r.event_date;

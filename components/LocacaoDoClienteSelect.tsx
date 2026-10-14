@@ -104,7 +104,7 @@ export default function LocacaoDoClienteSelect({
             valor: Number(r.calculated_value),
           })
         ),
-      ];
+      ].sort((a, b) => a.data.localeCompare(b.data)); // do mais antigo para o mais recente
       setOpcoes(lista);
 
       const semVinculo = !value.rentalId && !value.eventId;

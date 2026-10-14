@@ -82,7 +82,7 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
         }))
       );
       setEventHits(
-        (eventsData ?? []).map((e: any) => ({
+        (eventsData ?? []).slice().reverse().map((e: any) => ({
           id: e.id,
           title: e.title,
           date_start: e.date_start,

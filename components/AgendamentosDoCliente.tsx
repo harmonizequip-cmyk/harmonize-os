@@ -125,7 +125,8 @@ export default function AgendamentosDoCliente({
       setErro(error.message || "Não foi possível carregar os agendamentos.");
       return;
     }
-    const lista = (data ?? []) as Agendamento[];
+    // Do mais antigo para o mais recente (a função do banco devolve ao contrário).
+    const lista = ((data ?? []) as Agendamento[]).slice().sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
     const ids = lista.map((a) => a.rental_id).filter((id): id is string => !!id);
     const novos: Record<string, Saldo> = {};
     let erroSaldo: string | null = null;
