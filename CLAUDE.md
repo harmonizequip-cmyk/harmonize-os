@@ -140,6 +140,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - `profiles.somente_leitura`. Configurações > "Acesso só de visualização" (`components/AcessoVisualizacaoCard.tsx`) cria o login (signUp num cliente sem sessão) e chama `liberar_acesso_visualizacao(email, nome)`: vê tudo menos Configurações. `remover_acesso_visualizacao` desliga.
 - O gatilho `trg_somente_leitura` (em toda tabela de public, por comando) recusa gravação de quem é só de visualização, inclusive por funções `security definer`; no Storage, políticas restritivas. Na tela (`useSomenteLeitura`, `components/SomenteLeitura.tsx`): faixa "Modo visualização", sem "+", sem avisos/inscrição de push, sem recibo; o Financeiro esconde "Novo lançamento" e não abre edição.
 
+## Segurança (checklist de 24 pontos, 14/10/2026)
+
+- Cabeçalhos em `next.config.js`: CSP (só o próprio site e `*.supabase.co`; `wasm-unsafe-eval` pelo PDF do contrato), HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy e Permissions-Policy (microfone só `self`). Serviço externo novo precisa entrar na CSP, senão é bloqueado sem aviso.
+- Banco: funções de gatilho sem EXECUTE para `authenticated`, `disponibilidade_publica` fechada, `anon` sem acesso a tabelas/views (também para tabelas futuras), `search_path` fixo (migration `2026-10-14-endurecer-seguranca.sql`).
+- Em aberto: Next.js 14 tem avisos corrigidos só no 15/16 (atualização à parte); ligar "Leaked password protection" no Auth; cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
+
 ## Pendências conhecidas
 
 - Benefício da indicação: o dono ainda vai definir.

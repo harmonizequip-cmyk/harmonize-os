@@ -1,4 +1,40 @@
 /** @type {import('next').NextConfig} */
+
+// Cabeçalhos de segurança em todas as respostas (checklist de segurança,
+// pontos 15 e 16). A CSP só deixa a página falar com o próprio site e com o
+// Supabase: mesmo que algum dia entrasse um script estranho, ele não teria
+// para onde mandar os dados. 'unsafe-inline' fica porque o Next.js e o
+// script de tema usam scripts embutidos; 'wasm-unsafe-eval' é do gerador de
+// PDF do contrato.
+const supabase = "https://*.supabase.co";
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${supabase}`,
+  "font-src 'self' data:",
+  `connect-src 'self' data: blob: ${supabase} wss://*.supabase.co`,
+  "media-src 'self' data: blob:",
+  "worker-src 'self' blob:",
+  "frame-src 'self' blob: data:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "upgrade-insecure-requests",
+].join("; ");
+
+const cabecalhos = [
+  { key: "Content-Security-Policy", value: csp },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // Microfone só para o próprio app (Nova tarefa e Despesa por voz).
+  { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)" },
+];
+
 const nextConfig = {
   // Sem isto, o Next.js App Router reaproveita (client-side) o RSC já buscado
   // para o layout/página ao navegar entre rotas irmãs (Link), mesmo em rotas
@@ -10,6 +46,10 @@ const nextConfig = {
     staleTimes: {
       dynamic: 0,
     },
+  },
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: cabecalhos }];
   },
 };
 
