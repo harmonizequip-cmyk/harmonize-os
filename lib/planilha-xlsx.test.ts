@@ -54,3 +54,27 @@ describe("montarXlsx", () => {
     expect(serialDeData("2026-01-01")).toBeNull();
   });
 });
+
+describe("montarXlsx com gráficos", () => {
+  it("cria a aba Gráficos primeiro, com desenho e um gráfico por item", () => {
+    const zip = unzipSync(
+      montarXlsx({
+        titulo: "Financeiro",
+        linhas: [{ v: 1 }],
+        colunas: [{ titulo: "V", valor: (l: { v: number }) => l.v, tipo: "moeda" }],
+        graficos: [
+          { tipo: "colunas", titulo: "Por dia", categorias: ["01/10", "02/10"], series: [{ nome: "Entradas", valores: [10, 20], cor: "#1F9E97" }] },
+          { tipo: "area", titulo: "Acumulado", categorias: ["01/10", "02/10"], series: [{ nome: "Acumulado", valores: [10, 30], cor: "#3DBFB8" }] },
+        ],
+      })
+    );
+    const f = Object.fromEntries(Object.entries(zip).map(([k, v]) => [k, strFromU8(v)]));
+    expect(f["xl/workbook.xml"]).toMatch(/<sheet name="Gráficos" sheetId="1".*<sheet name="Financeiro" sheetId="2"/);
+    expect(f["xl/workbook.xml"]).toContain('localSheetId="1"');
+    expect(f["xl/charts/chart1.xml"]).toContain("<c:barChart>");
+    expect(f["xl/charts/chart1.xml"]).toContain("'Gráficos'!$K$5:$K$6");
+    expect(f["xl/charts/chart2.xml"]).toContain("<c:areaChart>");
+    expect(f["xl/drawings/_rels/drawing1.xml.rels"]).toContain("../charts/chart2.xml");
+    expect(f["[Content_Types].xml"]).toContain("/xl/charts/chart2.xml");
+  });
+});

@@ -89,6 +89,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 ## Exportar planilha
 
 - Todas as telas que exportavam CSV (Agenda, Financeiro, Locações, Clientes, Funil, Pendências, Movimentações) agora geram .xlsx com o layout da Harmonize: título, período, resumo, cabeçalho turquesa, linhas zebradas, R$, datas de verdade, filtro, cabeçalho fixo e total. Montado à mão em `lib/planilha-xlsx.ts` (fflate), entregue por `lib/exportar-planilha.ts` (`exportarTabela`): tenta o Compartilhar (Drive); se o aparelho recusar o tipo, baixa e avisa como mandar ao Drive. Usa as mesmas linhas da tela.
+- Cada planilha abre numa aba "Gráficos" (gráficos nativos do Office, editáveis no Google Planilhas e no Excel; `lib/planilha-graficos.ts`), com a tabela de números de cada gráfico a partir da coluna J. O que cada tela leva fica em `lib/graficos-exportacao.ts` (Financeiro: entradas/saídas por dia, resultado acumulado, para onde foi e de onde veio; Locações: faturamento por dia, clientes que mais faturaram, disparos por equipamento; e os demais por ranking).
 
 ## Bloqueio da agenda
 

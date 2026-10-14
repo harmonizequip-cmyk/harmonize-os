@@ -68,7 +68,11 @@ export function exportarTabela<T>(
   colunas: DadosPlanilha<T>["colunas"],
   nomeBase: string,
   rotuloPeriodo: string | undefined,
-  opcoes: { titulo: string; resumo?: DadosPlanilha<T>["resumo"] }
+  opcoes: { titulo: string; resumo?: DadosPlanilha<T>["resumo"]; graficos?: DadosPlanilha<T>["graficos"] }
 ): Promise<void> {
-  return exportarPlanilha({ titulo: opcoes.titulo, periodo: rotuloPeriodo, linhas, colunas, resumo: opcoes.resumo }, nomeBase, rotuloPeriodo);
+  return exportarPlanilha(
+    { titulo: opcoes.titulo, periodo: rotuloPeriodo, linhas, colunas, resumo: opcoes.resumo, graficos: opcoes.graficos },
+    nomeBase,
+    rotuloPeriodo
+  );
 }

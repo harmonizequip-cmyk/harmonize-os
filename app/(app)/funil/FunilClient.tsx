@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
@@ -259,7 +260,13 @@ export default function FunilClient({
       ],
       aba === "clientes" ? "funil-clientes" : "funil-leads",
       undefined,
-      { titulo: aba === "clientes" ? "Funil de clientes" : "Funil de leads" }
+      {
+        titulo: aba === "clientes" ? "Funil de clientes" : "Funil de leads",
+        graficos: soGraficos([
+          barras("Contatos por etapa", rankingPor(filtered, (c) => rotuloEtapa(c), () => 1, 12), { serie: "Contatos", formato: "inteiro", cor: "#1F9E97" }),
+          barras("De onde vieram", rankingPor(filtered, (c) => origemLabel(c.origem)), { serie: "Contatos", formato: "inteiro" }),
+        ]),
+      }
     );
   }
 

@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
@@ -375,7 +376,13 @@ export default function AgendaClient({
       ],
       "agenda",
       format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR }),
-      { titulo: "Agenda" }
+      {
+        titulo: "Agenda",
+        graficos: soGraficos([
+          barras("Eventos por tipo", rankingPor(resumoMes.eventos, (e) => eventMeta(e).label), { serie: "Eventos", formato: "inteiro" }),
+          barras("Confirmação", rankingPor(resumoMes.eventos, (e) => (e.confirmed ? "Confirmados" : "Sem confirmação")), { serie: "Eventos", formato: "inteiro", cor: "#1F9E97" }),
+        ]),
+      }
     );
   }
 

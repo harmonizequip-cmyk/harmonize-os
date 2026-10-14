@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 
 const ETAPAS: Record<string, string> = {
@@ -71,7 +72,13 @@ export default function ClientesClient({
       ],
       "clientes",
       periodo.rotulo,
-      { titulo: "Clientes" }
+      {
+        titulo: "Clientes",
+        graficos: soGraficos([
+          barras("Quem mais faturou no período", rankingPor(filtered, (c) => c.name, (c) => c.stats.total, 10), { serie: "Total" }),
+          barras("Em aberto por cliente", rankingPor(filtered, (c) => c.name, (c) => c.valorPendente, 10), { serie: "Em aberto", cor: "#D9577E" }),
+        ]),
+      }
     );
   }
 

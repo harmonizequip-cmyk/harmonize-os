@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { graficosFinanceiro } from "@/lib/graficos-exportacao";
 import NovoLancamentoModal from "./NovoLancamentoModal";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { foraDoResultadoPorCartao, rotuloFatura } from "@/lib/cartao";
@@ -153,6 +154,12 @@ export default function FinanceiroClient({
           { rotulo: "Saídas", valor: totais.saidas },
           { rotulo: "Resultado", valor: totais.resultado },
         ],
+        // Gráficos sem empréstimo e sem pagamento de fatura, como o resultado.
+        graficos: graficosFinanceiro(
+          initialTransactions
+            .filter((t) => !ehCategoriaDeEmprestimo(t.categories?.name) && !foraDoResultadoPorCartao((t as any).cartao_mov))
+            .map((t) => ({ type: t.type, amount: Number(t.amount), date: t.date, categories: t.categories ?? null }))
+        ),
       }
     );
   }

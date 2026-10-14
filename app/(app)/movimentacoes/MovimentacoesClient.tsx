@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { ACAO_META, ENTIDADE_LABEL, formatarDataHora, descreverDetalhes, type Movimentacao } from "@/lib/movimentacoes";
 
 export default function MovimentacoesClient({
@@ -34,7 +35,13 @@ export default function MovimentacoesClient({
       ],
       "movimentacoes",
       periodo.rotulo,
-      { titulo: "Movimentações" }
+      {
+        titulo: "Movimentações",
+        graficos: soGraficos([
+          barras("O que foi feito", rankingPor(filtradas, (m) => ACAO_META[m.acao]?.label ?? m.acao), { serie: "Quantidade", formato: "inteiro" }),
+          barras("Em qual parte do sistema", rankingPor(filtradas, (m) => ENTIDADE_LABEL[m.entidade] ?? m.entidade), { serie: "Quantidade", formato: "inteiro", cor: "#3E8FC9" }),
+        ]),
+      }
     );
   }
 

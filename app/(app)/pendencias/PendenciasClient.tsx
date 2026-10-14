@@ -5,6 +5,7 @@ import Link from "next/link";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
@@ -56,7 +57,12 @@ export default function PendenciasClient({
       ],
       "pendencias-de-pagamento",
       undefined,
-      { titulo: "Pendências de pagamento" }
+      {
+        titulo: "Pendências de pagamento",
+        graficos: soGraficos([
+          barras("Saldo em aberto por cliente", rankingPor(pendencias.locacoes, (l) => l.cliente, (l) => l.saldo, 10), { serie: "Saldo em aberto", cor: "#D9577E" }),
+        ]),
+      }
     );
   }
 

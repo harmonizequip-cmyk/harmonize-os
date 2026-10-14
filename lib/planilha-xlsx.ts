@@ -11,6 +11,9 @@
 // ============================================================
 
 import { zipSync, strToU8 } from "fflate";
+import { desenhoXml, graficoXml, NOME_ABA_GRAFICOS, type GraficoPlanilha } from "./planilha-graficos";
+
+export type { GraficoPlanilha } from "./planilha-graficos";
 
 export type TipoColuna = "texto" | "moeda" | "data" | "inteiro";
 
@@ -39,6 +42,8 @@ export interface DadosPlanilha<T> {
   resumo?: ResumoPlanilha[];
   /** Data/hora da geração (para teste); padrão: agora. */
   geradoEm?: Date;
+  /** Gráficos nativos numa aba "Gráficos", que abre primeiro. */
+  graficos?: GraficoPlanilha[];
 }
 
 // Estilos (índice em cellXfs, ver estilosXml).
@@ -284,10 +289,83 @@ export function montarXlsx<T>(dados: DadosPlanilha<T>): Uint8Array {
 </worksheet>`;
 
   const nomeAba = xml(dados.titulo.replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Planilha");
+  const graficos = (dados.graficos ?? []).filter((g) => g.categorias.length > 0 && g.series.length > 0);
+  const temGraficos = graficos.length > 0;
+
+  // Aba de gráficos: título, gráficos empilhados à esquerda (A:H) e, a partir
+  // da coluna J, a tabelinha de números de cada gráfico.
+  let abaGraficos = "";
+  let desenho = "";
+  const chartsXml: string[] = [];
+  if (temGraficos) {
+    const celulas = new Map<number, string[]>();
+    const por = (linhaN: number, cel: string) => {
+      if (!celulas.has(linhaN)) celulas.set(linhaN, []);
+      celulas.get(linhaN)!.push(cel);
+    };
+    por(1, celTexto("A1", `Harmonize · ${dados.titulo} · Gráficos`, S.titulo));
+    for (let k = 1; k < 8; k++) por(1, `<c r="${letraColuna(k)}1" s="${S.titulo}"/>`);
+    por(2, celTexto("A2", [dados.periodo, "os números de cada gráfico estão ao lado, a partir da coluna J"].filter(Boolean).join(" · "), S.subtitulo));
+    const abaRef = `'${NOME_ABA_GRAFICOS}'`;
+    let linhaTab = 4;
+    let maxCols = 1;
+    graficos.forEach((g) => {
+      const cab = linhaTab;
+      por(cab, celTexto(`J${cab}`, g.titulo, S.cabecalho));
+      g.series.forEach((se, si) => por(cab, celTexto(`${letraColuna(10 + si)}${cab}`, se.nome, S.cabecalho)));
+      maxCols = Math.max(maxCols, g.series.length);
+      g.categorias.forEach((cat, ci) => {
+        const ln = cab + 1 + ci;
+        const z = ci % 2;
+        por(ln, celTexto(`J${ln}`, cat, S.texto[z]));
+        g.series.forEach((se, si) => {
+          const v = se.valores[ci] ?? 0;
+          por(ln, celNum(`${letraColuna(10 + si)}${ln}`, Math.round(v * 100) / 100, g.formato === "inteiro" ? S.inteiro[z] : S.moeda[z]));
+        });
+      });
+      const ini = cab + 1;
+      const fim = cab + g.categorias.length;
+      chartsXml.push(
+        graficoXml(g, {
+          categorias: `${abaRef}!$J$${ini}:$J$${fim}`,
+          series: g.series.map((_, si) => {
+            const col = letraColuna(10 + si);
+            return { nome: `${abaRef}!$${col}$${cab}`, valores: `${abaRef}!$${col}$${ini}:$${col}$${fim}` };
+          }),
+        })
+      );
+      linhaTab = fim + 2;
+    });
+    const ancoras = graficos.map((_, k) => ({ col0: 0, lin0: 3 + k * 20, col1: 8, lin1: 3 + k * 20 + 18 }));
+    const ultimaLinha = Math.max(linhaTab, 3 + graficos.length * 20);
+    const linhasGraf = Array.from(celulas.keys())
+      .sort((a, b) => a - b)
+      .map((n) => `<row r="${n}"${n === 1 ? ' ht="30" customHeight="1"' : ""}>${celulas.get(n)!.join("")}</row>`)
+      .join("");
+    const colsGraf = `<col min="1" max="8" width="11" customWidth="1"/><col min="9" max="9" width="3" customWidth="1"/><col min="10" max="10" width="26" customWidth="1"/><col min="11" max="${10 + maxCols}" width="16" customWidth="1"/>`;
+    abaGraficos = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<dimension ref="A1:${letraColuna(9 + maxCols)}${ultimaLinha}"/>
+<sheetViews><sheetView workbookViewId="0" showGridLines="0" tabSelected="1"/></sheetViews>
+<sheetFormatPr defaultRowHeight="18"/>
+<cols>${colsGraf}</cols>
+<sheetData>${linhasGraf}</sheetData>
+<mergeCells count="2"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/></mergeCells>
+<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
+<pageSetup paperSize="9" orientation="portrait"/>
+<drawing r:id="rId1"/>
+</worksheet>`;
+    desenho = desenhoXml(ancoras);
+  }
+
+  const idxDados = temGraficos ? 1 : 0;
+  const folhas = temGraficos
+    ? `<sheet name="${NOME_ABA_GRAFICOS}" sheetId="1" r:id="rId1"/><sheet name="${nomeAba}" sheetId="2" r:id="rId4"/>`
+    : `<sheet name="${nomeAba}" sheetId="1" r:id="rId1"/>`;
   const livro = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="${nomeAba}" sheetId="1" r:id="rId1"/></sheets>
-<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${nomeAba.replace(/'/g, "''")}'!${filtro.replace(/([A-Z]+)(\d+)/g, (_m, c, n) => `$${c}$${n}`)}</definedName></definedNames>
+<sheets>${folhas}</sheets>
+<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="${idxDados}" hidden="1">'${nomeAba.replace(/'/g, "''")}'!${filtro.replace(/([A-Z]+)(\d+)/g, (_m, c, n) => `$${c}$${n}`)}</definedName></definedNames>
 </workbook>`;
 
   const compartilhados = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -295,13 +373,18 @@ export function montarXlsx<T>(dados: DadosPlanilha<T>): Uint8Array {
     .map((t) => `<si><t xml:space="preserve">${xml(t)}</t></si>`)
     .join("")}</sst>`;
 
+  const tipoFolha = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+  const relFolha = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
   const arquivos: Record<string, Uint8Array> = {
     "[Content_Types].xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="${tipoFolha}"/>
+${temGraficos ? `<Override PartName="/xl/worksheets/sheet2.xml" ContentType="${tipoFolha}"/>
+<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+${chartsXml.map((_, k) => `<Override PartName="/xl/charts/chart${k + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`).join("\n")}` : ""}
 <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
 </Types>`),
@@ -309,10 +392,25 @@ export function montarXlsx<T>(dados: DadosPlanilha<T>): Uint8Array {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`),
     "xl/workbook.xml": strToU8(livro),
     "xl/_rels/workbook.xml.rels": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>`),
-    "xl/worksheets/sheet1.xml": strToU8(planilha),
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${relFolha}" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>${
+      temGraficos ? `<Relationship Id="rId4" Type="${relFolha}" Target="worksheets/sheet2.xml"/>` : ""
+    }</Relationships>`),
     "xl/styles.xml": strToU8(estilosXml()),
     "xl/sharedStrings.xml": strToU8(compartilhados),
   };
+  if (temGraficos) {
+    arquivos["xl/worksheets/sheet1.xml"] = strToU8(abaGraficos);
+    arquivos["xl/worksheets/sheet2.xml"] = strToU8(planilha.replace('<sheetView workbookViewId="0"', '<sheetView workbookViewId="0" tabSelected="0"'));
+    arquivos["xl/worksheets/_rels/sheet1.xml.rels"] = strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>`);
+    arquivos["xl/drawings/drawing1.xml"] = strToU8(desenho);
+    arquivos["xl/drawings/_rels/drawing1.xml.rels"] = strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${chartsXml
+      .map((_, k) => `<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${k + 1}.xml"/>`)
+      .join("")}</Relationships>`);
+    chartsXml.forEach((c, k) => (arquivos[`xl/charts/chart${k + 1}.xml`] = strToU8(c)));
+  } else {
+    arquivos["xl/worksheets/sheet1.xml"] = strToU8(planilha);
+  }
   return zipSync(arquivos, { level: 6 });
 }

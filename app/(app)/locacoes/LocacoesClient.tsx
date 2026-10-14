@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
+import { barras, colunasPorData, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 
 const PAGAMENTOS: Record<string, string> = {
   pix: "PIX",
@@ -142,7 +143,17 @@ export default function LocacoesClient({
       ],
       "locacoes",
       periodo.rotulo,
-      { titulo: "Locações" }
+      {
+        titulo: "Locações",
+        graficos: (() => {
+          const validas = linhas.filter((r) => r.status !== "cancelada");
+          return soGraficos([
+            colunasPorData("Faturamento", validas, (r) => r.event_date, (r) => Number(r.calculated_value), { serie: "Valor" }),
+            barras("Clientes que mais faturaram", rankingPor(validas, (r) => r.clients?.name, (r) => Number(r.calculated_value)), { serie: "Valor" }),
+            barras("Disparos por equipamento", rankingPor(validas, (r) => r.equipments?.name, (r) => Number(r.shots ?? 0)), { serie: "Disparos", formato: "inteiro", cor: "#3E8FC9" }),
+          ]);
+        })(),
+      }
     );
   }
 
