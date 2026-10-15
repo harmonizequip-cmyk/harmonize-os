@@ -1,7 +1,7 @@
 -- ============================================================
 -- CÉREBRO (tela /insights): insights gerados pela IA a partir dos dados
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (15/10/2026, conferida: tabela, 4 políticas, gatilho, anon sem acesso)
 --
 -- A Edge Function "assistente" (modo insights) lê o banco com o login do
 -- dono, cruza com o que sabe de mercado e grava aqui cada insight: o que os
