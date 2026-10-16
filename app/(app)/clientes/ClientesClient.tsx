@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
+import LinkCadastroBotao from "@/components/LinkCadastroBotao";
 import { createClient } from "@/lib/supabase/client";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
@@ -106,7 +107,8 @@ export default function ClientesClient({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-neutral-900">Clientes</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+        <LinkCadastroBotao className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-60" />
         <Link
           href="/clientes/cadastros"
           className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"

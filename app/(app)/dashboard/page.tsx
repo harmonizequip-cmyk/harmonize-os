@@ -393,6 +393,27 @@ export default async function DashboardPage(
     .select("id", { count: "exact", head: true })
     .eq("status", "pendente");
 
+  // Clientes que preencheram o formulário do Planejador e ainda esperam o acesso.
+  const { data: convitesPreenchidos } = await supabase
+    .from("convites_cadastro")
+    .select("id, resultado_client_id, preenchido_em, clients:resultado_client_id(name, display_name, treatment)")
+    .not("preenchido_em", "is", null)
+    .not("resultado_client_id", "is", null)
+    .order("preenchido_em", { ascending: false })
+    .limit(20);
+  const idsConvite = Array.from(new Set((convitesPreenchidos ?? []).map((c: any) => c.resultado_client_id)));
+  const { data: loginsAtivos } = idsConvite.length
+    ? await supabase.from("profiles").select("cliente_id").in("cliente_id", idsConvite).eq("active", true)
+    : { data: [] as { cliente_id: string }[] };
+  const comLogin = new Set((loginsAtivos ?? []).map((p: any) => p.cliente_id));
+  const vistos = new Set<string>();
+  const acessosParaLiberar = (convitesPreenchidos ?? [])
+    .filter((c: any) => !comLogin.has(c.resultado_client_id) && !vistos.has(c.resultado_client_id) && vistos.add(c.resultado_client_id))
+    .map((c: any) => {
+      const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients;
+      return { clientId: c.resultado_client_id as string, nome: [cl?.treatment, cl?.display_name || cl?.name].filter(Boolean).join(" ") || "Cliente" };
+    });
+
   const in7Str = somaDias(7).toISOString().slice(0, 10);
   const { count: pendingConfirmations } = await supabase
     .from("calendar_events")
@@ -553,6 +574,16 @@ export default async function DashboardPage(
           📝 {cadastrosNovos} {cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"} para conferir →
         </Link>
       )}
+
+      {acessosParaLiberar.map((c) => (
+        <Link
+          key={c.clientId}
+          href={`/clientes/${c.clientId}`}
+          className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+        >
+          📋 {c.nome} preencheu o cadastro do Planejador: toque para liberar o acesso →
+        </Link>
+      ))}
 
       {!!pendingConfirmations && pendingConfirmations > 0 && (
         <Link

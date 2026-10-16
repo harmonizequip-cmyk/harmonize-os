@@ -31,6 +31,8 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  // Formulário que a cliente preenche sozinha pelo link (token): abre sem login.
+  if (request.nextUrl.pathname.startsWith("/cadastro/")) return response;
 
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();

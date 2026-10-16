@@ -1,7 +1,9 @@
 "use client";
 
-// Acesso da cliente ao Planejador (portal): formulário feito uma vez por
-// cliente. Completa o cadastro (e-mail, WhatsApp, endereço), cria o login com
+// Acesso da cliente ao Planejador (portal). Dois caminhos: mandar o link do
+// formulário (/cadastro/<token>), em que ela mesma completa o cadastro e cria a
+// senha, e depois tocar em "Liberar acesso"; ou o formulário feito aqui uma vez
+// por cliente. Completa o cadastro (e-mail, WhatsApp, endereço), cria o login com
 // senha inicial e libera pelo liberar_acesso_planejador. Ela entra no mesmo
 // endereço do sistema e cai direto no Planejador dela (/portal).
 
@@ -34,6 +36,14 @@ interface Validade {
 
 const dataBr = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
 
+interface Convite {
+  token: string;
+  created_at: string;
+  expira_em: string;
+  preenchido_em: string | null;
+  email_login: string | null;
+}
+
 interface Acesso {
   id: string;
   email: string;
@@ -65,16 +75,27 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
   const [senha, setSenha] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [pronto, setPronto] = useState<{ email: string; senha: string; confirmar: boolean } | null>(null);
+  const [pronto, setPronto] = useState<{ email: string; senha: string; confirmar: boolean; doFormulario?: boolean } | null>(null);
+  const [convite, setConvite] = useState<Convite | null>(null);
+  const [linkConvite, setLinkConvite] = useState<string | null>(null);
+  const [gerandoConvite, setGerandoConvite] = useState(false);
+  const [copiadoConvite, setCopiadoConvite] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
   const carregar = useCallback(async () => {
-    const [{ data }, { data: v }] = await Promise.all([
+    const [{ data }, { data: v }, { data: cv }] = await Promise.all([
       supabase.from("profiles").select("id, email, active").eq("cliente_id", cliente.id).order("email"),
       supabase.rpc("portal_validade_cliente", { p_client_id: cliente.id }),
+      supabase
+        .from("convites_cadastro")
+        .select("token, created_at, expira_em, preenchido_em, email_login")
+        .or(`client_id.eq.${cliente.id},resultado_client_id.eq.${cliente.id}`)
+        .order("created_at", { ascending: false })
+        .limit(1),
     ]);
     setAcessos((data ?? []) as Acesso[]);
     setValidade((v as Validade | null) ?? null);
+    setConvite(((cv ?? [])[0] as Convite | undefined) ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente.id]);
 
@@ -137,6 +158,30 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
     carregar();
   }
 
+  // Link do formulário para ela mesma preencher (reaproveita o que ainda está aberto).
+  async function enviarFormulario() {
+    setErro(null);
+    setGerandoConvite(true);
+    const { data, error } = await supabase.rpc("criar_convite_cadastro", { p_client_id: cliente.id });
+    setGerandoConvite(false);
+    if (error || !data) return setErro(error?.message ?? "Não consegui gerar o link.");
+    setLinkConvite(`${window.location.origin}/cadastro/${data as string}`);
+    carregar();
+  }
+
+  // Ela já preencheu: libera com o e-mail que ela usou (a senha é a que ela criou).
+  async function liberarDoFormulario() {
+    if (!convite?.email_login) return;
+    setErro(null);
+    setOcupado(true);
+    const { error } = await supabase.rpc("liberar_acesso_planejador", { p_email: convite.email_login, p_client_id: cliente.id });
+    setOcupado(false);
+    if (error) return setErro(error.message);
+    setPronto({ email: convite.email_login, senha: "", confirmar: false, doFormulario: true });
+    onCadastroAtualizado?.();
+    carregar();
+  }
+
   // Validade: 60 dias ao liberar, 45 depois de cada atendimento; passou, trava. O dono libera por mais 60.
   async function liberar60() {
     setErro(null);
@@ -168,7 +213,7 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
         "",
         `Entre em: ${typeof window !== "undefined" ? window.location.origin : ""}/login`,
         `E-mail: ${pronto.email}`,
-        pronto.senha ? `Senha: ${pronto.senha}` : "Senha: a mesma que você já usa",
+        pronto.senha ? `Senha: ${pronto.senha}` : pronto.doFormulario ? "Senha: a que você criou no cadastro" : "Senha: a mesma que você já usa",
         pronto.confirmar ? "\nAntes, confirme o cadastro no e-mail que chegou para você." : "",
         "\nDepois de entrar, você pode trocar a senha no ícone da chave, no topo.",
       ]
@@ -176,6 +221,30 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
         .join("\n")
     : "";
   const linkWhats = pronto ? buildWhatsAppLink(whatsapp, mensagem) : null;
+
+  const mensagemConvite = linkConvite
+    ? [
+        `${saudacaoCurta({ name: cliente.name, treatment: cliente.treatment, displayName: cliente.display_name })} Para liberar seu acesso ao Planejador HIPRO da Harmonize, preencha seu cadastro neste link (você mesma cria a senha):`,
+        "",
+        linkConvite,
+        "",
+        "Assim que você enviar, eu libero e te aviso.",
+      ].join("\n")
+    : "";
+  const linkWhatsConvite = linkConvite ? buildWhatsAppLink(cliente.whatsapp ?? "", mensagemConvite) : null;
+  const conviteAguardando = !!convite && !convite.preenchido_em && new Date(convite.expira_em) > new Date();
+  const conviteParaLiberar =
+    !!convite?.preenchido_em && !!convite.email_login && !acessos.some((a) => a.active && a.email.toLowerCase() === convite.email_login!.toLowerCase());
+
+  async function copiarConvite() {
+    try {
+      await navigator.clipboard.writeText(mensagemConvite);
+      setCopiadoConvite(true);
+      setTimeout(() => setCopiadoConvite(false), 2000);
+    } catch {
+      // sem permissão de copiar
+    }
+  }
 
   async function copiar() {
     try {
@@ -203,10 +272,58 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
         </div>
         {!aberto && (
           <button onClick={abrir} className="flex-shrink-0 rounded-lg border border-brand-teal/40 bg-brand-teal/10 px-3 py-1.5 text-xs font-semibold text-brand-teal-dark">
-            {acessos.length ? "Novo login" : "Dar acesso"}
+            {acessos.length ? "Novo login" : "Criar aqui"}
           </button>
         )}
       </div>
+
+      {!aberto && (
+        <div className="mt-3 space-y-2">
+          {conviteParaLiberar ? (
+            <div className="rounded-lg border border-brand-teal/30 bg-brand-teal/5 px-3 py-2 text-xs text-neutral-700">
+              <p>
+                📋 Ela preencheu o cadastro em <b>{dataBr(convite!.preenchido_em!.slice(0, 10))}</b>. Login: <b>{convite!.email_login}</b>
+              </p>
+              <button onClick={liberarDoFormulario} disabled={ocupado} className="mt-2 w-full rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {ocupado ? "Liberando..." : "Liberar acesso"}
+              </button>
+            </div>
+          ) : (
+            <>
+              {conviteAguardando && !linkConvite && (
+                <p className="text-xs text-neutral-500">Formulário enviado em {dataBr(convite!.created_at.slice(0, 10))}, aguardando ela preencher.</p>
+              )}
+              {!linkConvite && (
+                <button
+                  onClick={enviarFormulario}
+                  disabled={gerandoConvite}
+                  className="w-full rounded-lg border border-brand-teal/40 px-3 py-2 text-xs font-semibold text-brand-teal-dark disabled:opacity-60"
+                >
+                  {gerandoConvite ? "Gerando link..." : conviteAguardando ? "Mandar o formulário de novo" : "Enviar formulário para ela preencher"}
+                </button>
+              )}
+            </>
+          )}
+          {linkConvite && (
+            <div className="space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+              <p className="text-xs font-semibold text-neutral-700">Link do cadastro (vale 14 dias). Quando ela enviar, chega o aviso no celular.</p>
+              <pre className="whitespace-pre-wrap break-all rounded-lg bg-white px-3 py-2 font-sans text-xs text-neutral-700">{mensagemConvite}</pre>
+              <div className="grid grid-cols-2 gap-2">
+                {linkWhatsConvite ? (
+                  <a href={linkWhatsConvite} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+                    <MessageCircle size={13} /> WhatsApp
+                  </a>
+                ) : (
+                  <span className="flex items-center justify-center text-[11px] text-neutral-400">sem WhatsApp</span>
+                )}
+                <button onClick={copiarConvite} className="flex items-center justify-center gap-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700">
+                  <Copy size={13} /> {copiadoConvite ? "Copiado" : "Copiar"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {acessos.some((x) => x.active) && validade && (
         <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${validade.ativo ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
