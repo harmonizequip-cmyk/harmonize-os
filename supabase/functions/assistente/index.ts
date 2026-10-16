@@ -147,6 +147,48 @@ const FERRAMENTAS = [
     },
   },
   {
+    name: "preparar_planejamento",
+    description:
+      "Monta um planejamento do Planejador HIPRO (distribuição de disparos por área e profundidade) para um paciente. A tela mostra o resumo e o botão que abre o planejador já preenchido. Respeite o saldo e o protocolo do Eder (memórias 'Protocolo HIPRO').",
+    input_schema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string", description: "Cliente (profissional) do atendimento, quando houver." },
+        calendar_event_id: { type: "string", description: "Atendimento da agenda, quando houver." },
+        paciente: { type: "string", description: "Nome do paciente (vazio se não souber)." },
+        queixa: { type: "string", description: "Queixa principal." },
+        saldo_total: { type: "integer", description: "Saldo total de disparos." },
+        procedimento: { type: "string", description: "Ex.: HIPRO Full Face." },
+        observacoes: { type: "string", description: "Observações clínicas / explicação da distribuição." },
+        areas: {
+          type: "array",
+          description: "Áreas com disparos. Cada linha é uma profundidade.",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"] },
+              linhas: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    prof: { type: "string", description: "Profundidade em mm, ex.: 4.5" },
+                    direito: { type: "integer", description: "Bilateral: disparos do lado direito." },
+                    esquerdo: { type: "integer", description: "Bilateral: disparos do lado esquerdo." },
+                    disparos: { type: "integer", description: "Área única (papada): disparos." },
+                  },
+                  required: ["prof"],
+                },
+              },
+            },
+            required: ["id", "linhas"],
+          },
+        },
+      },
+      required: ["saldo_total", "areas"],
+    },
+  },
+  {
     name: "preparar_whatsapp",
     description:
       "Deixa uma mensagem pronta para o dono enviar no WhatsApp da cliente (aparece um botão Abrir no WhatsApp). Não envia nada sozinho.",
@@ -169,6 +211,21 @@ const FERRAMENTAS = [
     },
   },
 ];
+
+// Áreas fixas do Planejador HIPRO (public/ferramentas/planejador.html).
+const PROF_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
+const PROF_PAP = [...PROF_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
+const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs: string[] }> = {
+  pescoco: { nome: "Pescoço", bilateral: true, profs: PROF_STD },
+  papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
+  submandibular: { nome: "Submandibular", bilateral: true, profs: PROF_STD },
+  jowls: { nome: "Jowls", bilateral: true, profs: PROF_STD },
+  arcomandibular: { nome: "Arco Mandibular", bilateral: true, profs: PROF_STD },
+  temporal: { nome: "Temporal e Arco Zigomático", bilateral: true, profs: PROF_STD },
+  frontal: { nome: "Frontal", bilateral: true, profs: PROF_STD },
+  perioral_sup: { nome: "Perioral Superior", bilateral: true, profs: PROF_STD },
+  perioral_inf: { nome: "Perioral Inferior", bilateral: true, profs: PROF_STD },
+};
 
 // Modo Cérebro: só lê o banco e grava insights.
 const CATEGORIAS = ["prospeccao", "relacionamento", "vendas", "financeiro", "agenda", "marketing", "operacao"];
@@ -287,7 +344,24 @@ type Planilha = {
 };
 type ItemAgenda = { client_id: string; nome: string; telefone: string; texto: string; ultimo_envio: string | null };
 type Agenda = { inicio: string; fim: string; itens: ItemAgenda[] };
-type Estado = { clienteId: string | null; whatsapp: Whats[]; planilhas: Planilha[]; agendas: Agenda[]; insights: number };
+type PlanejamentoIA = {
+  client_id: string | null;
+  calendar_event_id: string | null;
+  cliente_nome: string | null;
+  paciente: string;
+  saldo: number;
+  total: number;
+  resumo: { area: string; total: number }[];
+  estado: Record<string, unknown>;
+};
+type Estado = {
+  clienteId: string | null;
+  whatsapp: Whats[];
+  planilhas: Planilha[];
+  agendas: Agenda[];
+  insights: number;
+  planejamentos: PlanejamentoIA[];
+};
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -340,6 +414,85 @@ async function executarFerramenta(
         }),
         erro: false,
       };
+    }
+    if (nome === "preparar_planejamento") {
+      const saldo = Math.max(0, Math.round(Number(entrada.saldo_total) || 0));
+      const areas = (Array.isArray(entrada.areas) ? entrada.areas : []) as { id?: string; linhas?: Record<string, unknown>[] }[];
+      const DATA: Record<string, unknown[]> = {};
+      const resumo: { area: string; total: number }[] = [];
+      const problemas: string[] = [];
+      let total = 0;
+      for (const a of areas) {
+        const def = AREAS_PLANEJADOR[String(a.id)];
+        if (!def) {
+          problemas.push(`área desconhecida: ${a.id}`);
+          continue;
+        }
+        const linhas: unknown[] = [];
+        let totArea = 0;
+        for (const l of Array.isArray(a.linhas) ? a.linhas : []) {
+          const prof = Number(l.prof).toFixed(1);
+          if (!def.profs.includes(prof)) {
+            problemas.push(`${def.nome}: profundidade ${l.prof} mm não existe`);
+            continue;
+          }
+          const n = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
+          if (def.bilateral) {
+            const d = n(l.direito ?? l.disparos);
+            const e = n(l.esquerdo ?? l.disparos);
+            linhas.push({ prof, dispD: d, dispE: e });
+            totArea += d + e;
+          } else {
+            const d = n(l.disparos ?? (n(l.direito) + n(l.esquerdo)));
+            linhas.push({ prof, disp: d });
+            totArea += d;
+          }
+        }
+        if (linhas.length) {
+          DATA[String(a.id)] = linhas;
+          resumo.push({ area: def.nome, total: totArea });
+          total += totArea;
+        }
+      }
+      if (problemas.length) return { texto: `Corrija e chame de novo: ${problemas.join("; ")}.`, erro: true };
+      if (!total) return { texto: "Nenhum disparo distribuído.", erro: true };
+      if (saldo && total > saldo) return { texto: `Distribuiu ${total} disparos, acima do saldo de ${saldo}. Ajuste.`, erro: true };
+      let clienteNome: string | null = null;
+      const clientId = entrada.client_id && UUID.test(String(entrada.client_id)) ? String(entrada.client_id) : null;
+      if (clientId) {
+        const { data: c } = await supabase.from("clients").select("name, display_name, treatment").eq("id", clientId).maybeSingle();
+        if (c) clienteNome = [c.treatment, c.display_name || c.name].filter(Boolean).join(" ");
+      }
+      const eventId = entrada.calendar_event_id && UUID.test(String(entrada.calendar_event_id)) ? String(entrada.calendar_event_id) : null;
+      let data = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+      if (eventId) {
+        const { data: ev } = await supabase.from("calendar_events").select("date_start").eq("id", eventId).maybeSingle();
+        if (ev?.date_start) data = ev.date_start;
+      }
+      const txt = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
+      const estadoPlano: Record<string, unknown> = {
+        paciente: txt(entrada.paciente, 120),
+        data,
+        queixa: txt(entrada.queixa, 300),
+        profissional: clienteNome ?? "",
+        procNome: txt(entrada.procedimento, 120),
+        saldoTotal: String(saldo || total),
+        obs: txt(entrada.observacoes),
+        DATA,
+      };
+      const plano: PlanejamentoIA = {
+        client_id: clientId,
+        calendar_event_id: eventId,
+        cliente_nome: clienteNome,
+        paciente: txt(entrada.paciente, 120),
+        saldo: saldo || total,
+        total,
+        resumo,
+        estado: estadoPlano,
+      };
+      estado.planejamentos.push(plano);
+      // O plano inteiro vai no resultado para a tela remontar o cartão ao reabrir a conversa.
+      return { texto: JSON.stringify({ ok: true, ...plano }), erro: false };
     }
     if (nome === "registrar_insights") {
       const itens = (Array.isArray(entrada.itens) ? entrada.itens : []).slice(0, 15) as Record<string, unknown>[];
@@ -496,7 +649,7 @@ Deno.serve(async (req) => {
   // Conversa: continua a anterior ou começa uma nova.
   let conversaId = modoInsights ? null : corpo.conversa_id || null;
   let historico: Mensagem[] = [];
-  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0 };
+  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0, planejamentos: [] };
   if (conversaId) {
     const { data: conv } = await supabase
       .from("assistente_conversas")
@@ -663,6 +816,7 @@ Deno.serve(async (req) => {
     planilhas: estado.planilhas,
     agendas: estado.agendas,
     insights_criados: estado.insights,
+    planejamentos: estado.planejamentos,
     gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,
   });
 });

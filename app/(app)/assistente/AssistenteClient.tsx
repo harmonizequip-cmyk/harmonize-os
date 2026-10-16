@@ -13,8 +13,10 @@ import {
   type MensagemWhatsApp,
   type PlanilhaPedida,
   type AgendaPedida,
+  type PlanejamentoIA,
 } from "@/lib/assistente";
 import CartaoAgenda from "./CartaoAgenda";
+import CartaoPlanejamento from "./CartaoPlanejamento";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -30,6 +32,7 @@ const SUGESTOES = [
   "Quais tarefas estão atrasadas?",
   "Planilha de quanto cada cliente já gastou comigo",
   "Manda a agenda do mês que vem",
+  "Monta um planejamento de 12.000 disparos, queixa principal papada",
 ];
 
 type ClienteRef = { name: string; display_name: string | null; treatment: string | null } | null;
@@ -343,6 +346,7 @@ export default function AssistenteClient() {
     const whatsapp: MensagemWhatsApp[] = Array.isArray(data.whatsapp) ? data.whatsapp : [];
     const planilhas: PlanilhaPedida[] = Array.isArray(data.planilhas) ? data.planilhas : [];
     const agendas: AgendaPedida[] = Array.isArray(data.agendas) ? data.agendas : [];
+    const planejamentos: PlanejamentoIA[] = Array.isArray(data.planejamentos) ? data.planejamentos : [];
     setBolhas((b) => [
       ...b,
       {
@@ -351,6 +355,7 @@ export default function AssistenteClient() {
         ...(whatsapp.length ? { whatsapp } : {}),
         ...(planilhas.length ? { planilhas } : {}),
         ...(agendas.length ? { agendas } : {}),
+        ...(planejamentos.length ? { planejamentos } : {}),
       },
     ]);
 
@@ -514,6 +519,7 @@ export default function AssistenteClient() {
                 {b.whatsapp && <BotoesWhatsApp lista={b.whatsapp} />}
                 {b.planilhas && <BotoesPlanilha lista={b.planilhas} />}
                 {b.agendas?.map((a, j) => <CartaoAgenda key={j} agenda={a} onPedir={(p) => enviar(p)} />)}
+                {b.planejamentos?.map((p, j) => <CartaoPlanejamento key={j} plano={p} />)}
                 {temVoz && (
                   <button
                     onClick={() => {

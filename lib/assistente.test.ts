@@ -95,3 +95,26 @@ describe("textoParaFala", () => {
     expect(textoParaFala("**Total**: R$1.200\n- Ana\n- Bia")).toBe("Total: R$ 1.200. Ana. Bia");
   });
 });
+
+describe("planejamento da IA no histórico", () => {
+  it("remonta o cartão a partir do resultado da ferramenta", () => {
+    const plano = {
+      client_id: null,
+      calendar_event_id: null,
+      cliente_nome: "Dra. Ana",
+      paciente: "Maria",
+      saldo: 12000,
+      total: 12000,
+      resumo: [{ area: "Papada", total: 4000 }],
+      estado: { paciente: "Maria", DATA: { papada: [{ prof: "13.0", disp: 4000 }] } },
+    };
+    const b = bolhasDoHistorico([
+      { role: "user", content: "monta 12 mil, queixa papada" },
+      { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "preparar_planejamento", input: {} }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: JSON.stringify({ ok: true, ...plano }) }] },
+      { role: "assistant", content: [{ type: "text", text: "Pronto." }] },
+    ]);
+    expect(b[1].planejamentos?.[0].total).toBe(12000);
+    expect(b[1].planejamentos?.[0].estado).toEqual(plano.estado);
+  });
+});

@@ -25,6 +25,9 @@ export const linkTarefa = (taskId: string) => `/tarefas?highlight=${taskId}`;
 
 export const linkPlanejamento = (id: string) => `/planejador/${id}`;
 
+/** Onde o cartão do assistente deixa o planejamento montado pela IA para o planejador abrir (?ia=1). */
+export const CHAVE_PLANO_IA = "harmonize-planejamento-ia";
+
 /** Novo planejamento já amarrado à cliente e, se houver, ao atendimento. */
 export function linkNovoPlanejamento(clientId?: string | null, eventId?: string | null): string {
   const p = new URLSearchParams();

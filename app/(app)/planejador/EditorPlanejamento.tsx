@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { Atalho, Atalhos } from "@/components/Atalhos";
-import { linkCliente, linkEvento, linkNovoPlanejamento } from "@/lib/atalhos";
+import { CHAVE_PLANO_IA, linkCliente, linkEvento, linkNovoPlanejamento } from "@/lib/atalhos";
 import { chaveLocal, temConteudo, type EstadoPlanejador } from "@/lib/planejamento";
 import { formatDate } from "@/lib/format";
 import { ArrowLeft, Check, Loader2, Trash2 } from "lucide-react";
@@ -53,10 +53,21 @@ export default function EditorPlanejamento({
   idRef.current = id;
   ligacao.current = { cliente, evento };
 
-  // Estado no aparelho antes de abrir a moldura.
+  // Estado no aparelho antes de abrir a moldura. Vindo do assistente (?ia=1),
+  // a distribuição montada pela IA entra por cima do estado inicial.
   useEffect(() => {
+    let inicial: EstadoPlanejador = estado;
     try {
-      localStorage.setItem(chaveLocal(chave), JSON.stringify(estado));
+      if (!planoId && new URLSearchParams(window.location.search).get("ia") === "1") {
+        const daIa = JSON.parse(sessionStorage.getItem(CHAVE_PLANO_IA) ?? "null") as EstadoPlanejador | null;
+        sessionStorage.removeItem(CHAVE_PLANO_IA);
+        if (daIa) inicial = { ...estado, ...daIa, profissional: (daIa.profissional as string) || estado.profissional };
+      }
+    } catch {
+      // sessão indisponível: segue com o estado inicial
+    }
+    try {
+      localStorage.setItem(chaveLocal(chave), JSON.stringify(inicial));
     } catch {
       // sem armazenamento: o planejador abre vazio
     }
@@ -267,6 +278,16 @@ export default function EditorPlanejamento({
           {cliente && (
             <Atalho href={`/planejador?cliente=${cliente}`} emoji="📋">
               Outros pacientes dela
+            </Atalho>
+          )}
+          {!somenteLeitura && (
+            <Atalho
+              href={`/assistente?${cliente ? `cliente=${cliente}&` : ""}pergunta=${encodeURIComponent(
+                "Monta um planejamento: paciente , saldo de  disparos, queixa principal: "
+              )}`}
+              emoji="✨"
+            >
+              Montar com a IA
             </Atalho>
           )}
         </Atalhos>

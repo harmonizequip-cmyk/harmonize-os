@@ -14,12 +14,23 @@ export type PlanilhaPedida = {
 };
 export type ItemAgenda = { client_id: string; nome: string; telefone: string; texto: string; ultimo_envio: string | null };
 export type AgendaPedida = { inicio: string; fim: string; itens: ItemAgenda[] };
+export type PlanejamentoIA = {
+  client_id: string | null;
+  calendar_event_id: string | null;
+  cliente_nome: string | null;
+  paciente: string;
+  saldo: number;
+  total: number;
+  resumo: { area: string; total: number }[];
+  estado: Record<string, unknown>;
+};
 export type Bolha = {
   papel: "eu" | "ia";
   texto: string;
   whatsapp?: MensagemWhatsApp[];
   planilhas?: PlanilhaPedida[];
   agendas?: AgendaPedida[];
+  planejamentos?: PlanejamentoIA[];
 };
 
 type BlocoGuardado = {
@@ -47,23 +58,33 @@ export function bolhasDoHistorico(mensagens: MensagemGuardada[]): Bolha[] {
   let whatsPendentes: MensagemWhatsApp[] = [];
   let planilhasPendentes: PlanilhaPedida[] = [];
   let agendasPendentes: AgendaPedida[] = [];
+  let planejamentosPendentes: PlanejamentoIA[] = [];
+  const pedidosPlanejamento = new Set<string>();
   const pedidosAgenda = new Map<string, { inicio: string; fim: string; textos: Map<string, string> }>();
   const pedidosWhats = new Map<string, { client_id: string; texto: string }>();
   const pedidosPlanilha = new Map<string, Omit<PlanilhaPedida, "linhas">>();
   const fecharResposta = () => {
-    if (respostaPendente.trim() || whatsPendentes.length || planilhasPendentes.length || agendasPendentes.length) {
+    if (
+      respostaPendente.trim() ||
+      whatsPendentes.length ||
+      planilhasPendentes.length ||
+      agendasPendentes.length ||
+      planejamentosPendentes.length
+    ) {
       bolhas.push({
         papel: "ia",
         texto: respostaPendente.trim(),
         ...(whatsPendentes.length ? { whatsapp: whatsPendentes } : {}),
         ...(planilhasPendentes.length ? { planilhas: planilhasPendentes } : {}),
         ...(agendasPendentes.length ? { agendas: agendasPendentes } : {}),
+        ...(planejamentosPendentes.length ? { planejamentos: planejamentosPendentes } : {}),
       });
     }
     respostaPendente = "";
     whatsPendentes = [];
     planilhasPendentes = [];
     agendasPendentes = [];
+    planejamentosPendentes = [];
   };
   for (const m of mensagens ?? []) {
     if (m.role === "user" && typeof m.content === "string") {
@@ -71,6 +92,17 @@ export function bolhasDoHistorico(mensagens: MensagemGuardada[]): Bolha[] {
       bolhas.push({ papel: "eu", texto: m.content });
     } else if (m.role === "user" && Array.isArray(m.content)) {
       for (const b of m.content) {
+        if (b.type === "tool_result" && b.tool_use_id && pedidosPlanejamento.has(b.tool_use_id)) {
+          if (!b.is_error && typeof b.content === "string") {
+            try {
+              const r = JSON.parse(b.content);
+              if (r?.ok && r.estado) planejamentosPendentes.push({ ...r, ok: undefined } as PlanejamentoIA);
+            } catch {
+              // resultado ilegível: sem cartão
+            }
+          }
+          continue;
+        }
         const agenda = b.type === "tool_result" && b.tool_use_id ? pedidosAgenda.get(b.tool_use_id) : undefined;
         if (agenda && !b.is_error && typeof b.content === "string") {
           try {
@@ -114,6 +146,7 @@ export function bolhasDoHistorico(mensagens: MensagemGuardada[]): Bolha[] {
       }
     } else if (m.role === "assistant" && Array.isArray(m.content)) {
       for (const b of m.content) {
+        if (b.type === "tool_use" && b.name === "preparar_planejamento" && b.id) pedidosPlanejamento.add(b.id);
         if (b.type === "tool_use" && b.name === "preparar_whatsapp" && b.id && b.input?.texto) {
           pedidosWhats.set(b.id, { client_id: b.input.client_id ?? "", texto: b.input.texto });
         }
