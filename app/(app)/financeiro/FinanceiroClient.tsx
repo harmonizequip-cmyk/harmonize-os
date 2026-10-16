@@ -23,6 +23,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   debito: "Débito",
   credito: "Crédito",
   transferencia: "Transferência",
+  permuta: "Permuta",
   outros: "Outros",
 };
 
@@ -271,6 +272,11 @@ export default function FinanceiroClient({
           )}
         </div>
       </div>
+      {!pessoal && (
+        <Link href="/clientes/creditos" className="inline-block text-xs font-medium text-brand-teal-dark">
+          Créditos de clientes →
+        </Link>
+      )}
 
       {pessoal && resumoPessoal && (
         <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">

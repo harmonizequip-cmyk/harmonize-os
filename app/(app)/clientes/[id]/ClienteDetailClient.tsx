@@ -17,6 +17,7 @@ import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import HistoricoClienteSection from "./HistoricoClienteSection";
 import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
+import CreditosClienteCard from "@/components/CreditosClienteCard";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento } from "@/lib/atalhos";
 
@@ -26,6 +27,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   debito: "Débito",
   credito: "Crédito",
   transferencia: "Transferência",
+  permuta: "Permuta",
   outros: "Outros",
 };
 
@@ -607,6 +609,8 @@ export default function ClienteDetailClient({
           </tbody>
         </table>
       </div>
+
+      <CreditosClienteCard clientId={client.id} />
 
       <AcessoPlanejadorCard cliente={client} onCadastroAtualizado={() => router.refresh()} />
 

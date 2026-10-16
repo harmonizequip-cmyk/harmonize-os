@@ -113,6 +113,12 @@ export default function ClientesClient({
         >
           📝 Cadastros recebidos
         </Link>
+        <Link
+          href="/clientes/creditos"
+          className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+        >
+          Créditos
+        </Link>
         <button
           onClick={() => setModalOpen(true)}
           className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"

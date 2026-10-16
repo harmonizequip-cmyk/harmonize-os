@@ -256,6 +256,17 @@ export interface ResumoWhatsAppInput extends ResumoLocacaoInput {
   clientName: string;
   eventDate: string;
   pagamentos: PagamentoLinha[];
+  // Lista de contagens (troca de ponteira/aplicador no meio do atendimento).
+  // Com mais de uma, o texto mostra cada uma; com uma só ou nenhuma, usa
+  // initialCount/finalCount como sempre.
+  contagens?: { inicial: number; final: number; gera_credito?: boolean }[];
+  // Disparos feitos de verdade (soma das contagens). `shots` passa a ser os
+  // disparos cobrados, depois de usar o crédito. Sem este campo, vale `shots`.
+  disparosRealizados?: number;
+  // Crédito de disparos da cliente usado nesta locação.
+  creditoUsado?: number;
+  // Disparos das contagens marcadas que viram crédito para a próxima.
+  viraCredito?: number;
 }
 
 // Monta o texto de resumo (mesmo formato do protótipo aprovado, com
@@ -277,20 +288,42 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
       )}`
     );
     linhas.push(`  ▸ *Subtotal mentoria: ${fmtMoney(resumo.subtotalProduto)}*`);
-  } else if (input.pricing) {
-    const { config } = input.pricing;
+  } else if (!input.isMentoria && (input.pricing || (input.disparosRealizados ?? 0) > 0)) {
+    const realizados = input.disparosRealizados ?? input.shots;
+    const creditoUsado = input.creditoUsado ?? 0;
+    const viraCredito = input.viraCredito ?? 0;
+    const lista = input.contagens ?? [];
     linhas.push("📊 *CONTAGEM DO EQUIPAMENTO*");
-    linhas.push(`  • Contagem inicial: ${fmtInt(input.initialCount)}`);
-    linhas.push(`  • Contagem final:   ${fmtInt(input.finalCount)}`);
-    linhas.push(`  • Disparos realizados: *${fmtInt(input.shots)}*`);
+    if (lista.length > 1) {
+      lista.forEach((c, i) => {
+        const d = Math.abs(c.final - c.inicial);
+        linhas.push(
+          `  • Contagem ${i + 1}: ${fmtInt(c.inicial)} → ${fmtInt(c.final)} (${fmtInt(d)} disparos${c.gera_credito ? ", vira crédito" : ""})`
+        );
+      });
+    } else {
+      linhas.push(`  • Contagem inicial: ${fmtInt(input.initialCount)}`);
+      linhas.push(`  • Contagem final:   ${fmtInt(input.finalCount)}`);
+    }
+    linhas.push(`  • Disparos realizados: *${fmtInt(realizados)}*`);
+    if (creditoUsado > 0) {
+      linhas.push(`  • Crédito usado: ${fmtInt(creditoUsado)} disparos`);
+      linhas.push(`  • Disparos cobrados: *${fmtInt(input.shots)}*`);
+    }
+    if (viraCredito > 0) {
+      linhas.push(`  • Vira crédito para a próxima: ${fmtInt(viraCredito)} disparos (vale depois que esta locação for paga)`);
+    }
     linhas.push("");
     linhas.push("💡 *VALOR DOS DISPAROS*");
-    if (input.custoManualPorDisparo != null) {
+    if (!input.pricing) {
+      linhas.push("  Todos os disparos foram cobertos pelo crédito.");
+    } else if (input.custoManualPorDisparo != null) {
       linhas.push(`  🤝 Custo negociado: R$ ${fmtRate(input.custoManualPorDisparo)} / disparo`);
       linhas.push(`  ${fmtInt(input.shots)} x R$ ${fmtRate(input.custoManualPorDisparo)} = *${fmtMoney(resumo.subtotalProduto)}*`);
       linhas.push(`  Valor pela tabela normal: ${fmtMoney(resumo.subtotalTabela)}`);
       linhas.push(`  ✅ Economia: *${fmtMoney(resumo.economiaCustoManual)}*`);
     } else {
+      const { config } = input.pricing;
       if (input.pricing.tier3Portion === 0) {
         linhas.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(input.pricing.flatPackageValue)}`);
       }
