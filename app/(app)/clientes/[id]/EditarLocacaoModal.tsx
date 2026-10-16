@@ -8,6 +8,7 @@ import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { valorParaNumero } from "@/lib/valor";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamento } from "@/lib/atalhos";
+import { somarContagens, disparosCobrados } from "@/lib/creditos";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -56,6 +57,32 @@ interface RentalToEdit {
   deslocamento_incluso_no_valor?: boolean;
   // Atendimento da Agenda ligado a esta locação (para o atalho).
   eventId?: string | null;
+}
+
+// Contagem em edição (texto nos campos; aplicador_id volta igual ao banco).
+interface ContagemEdicao {
+  inicial: string;
+  final: string;
+  gera_credito: boolean;
+  aplicador_id: string | null;
+}
+
+function numeroDoCampo(v: string): number | null {
+  const limpo = v.replace(/\D/g, "");
+  return limpo === "" ? null : Number(limpo);
+}
+
+function contagensParaNumeros(lista: ContagemEdicao[]) {
+  return lista.map((c) => ({
+    inicial: numeroDoCampo(c.inicial),
+    final: numeroDoCampo(c.final),
+    gera_credito: c.gera_credito,
+    aplicador_id: c.aplicador_id,
+  }));
+}
+
+function chaveContagens(lista: ContagemEdicao[]): string {
+  return JSON.stringify(contagensParaNumeros(lista));
 }
 
 interface RentalPayment {
@@ -309,16 +336,109 @@ export default function EditarLocacaoModal({
     onPaymentsChanged?.();
   }
 
-  const shotsNumber = Number(shots.replace(/\D/g, ""));
+  // ------------------------------------------------------------
+  // Contagens e crédito de disparos: a locação pode ter várias contagens
+  // (uma por ponteira) e ter gerado ou usado crédito. Editar disparos aqui
+  // refaz isso junto, por corrigir_contagens_locacao.
+  // ------------------------------------------------------------
+  const [carregandoCredito, setCarregandoCredito] = useState(true);
+  const [contagens, setContagens] = useState<ContagemEdicao[]>([]);
+  const [contagensOriginais, setContagensOriginais] = useState<ContagemEdicao[]>([]);
+  const [creditoUsadoOriginal, setCreditoUsadoOriginal] = useState(0);
+  const [creditoGeradoOriginal, setCreditoGeradoOriginal] = useState(0);
+  const [creditoDisponivel, setCreditoDisponivel] = useState(0);
+  const [creditoUsadoTexto, setCreditoUsadoTexto] = useState("0");
+
+  useEffect(() => {
+    (async () => {
+      const [{ data: linhasContagem }, { data: linhasCredito }, { data: saldo }] = await Promise.all([
+        supabase
+          .from("locacao_contagens")
+          .select("ordem, inicial, final, gera_credito, aplicador_id")
+          .eq("rental_id", rental.id)
+          .order("ordem", { ascending: true }),
+        supabase
+          .from("creditos_cliente")
+          .select("quantidade, origem")
+          .eq("rental_id", rental.id)
+          .eq("tipo", "disparos")
+          .in("origem", ["contagem", "uso"]),
+        supabase.from("creditos_saldo").select("disparos_disponiveis").eq("client_id", currentClientId).maybeSingle(),
+      ]);
+      const lista: ContagemEdicao[] = (linhasContagem ?? []).map((c: any) => ({
+        inicial: String(c.inicial ?? ""),
+        final: String(c.final ?? ""),
+        gera_credito: !!c.gera_credito,
+        aplicador_id: c.aplicador_id ?? null,
+      }));
+      let usado = 0;
+      let gerado = 0;
+      for (const l of (linhasCredito ?? []) as { quantidade: number; origem: string }[]) {
+        if (l.origem === "uso") usado += Math.abs(Number(l.quantidade ?? 0));
+        else if (l.origem === "contagem") gerado += Number(l.quantidade ?? 0);
+      }
+      setContagens(lista);
+      setContagensOriginais(lista);
+      setCreditoUsadoOriginal(usado);
+      setCreditoGeradoOriginal(gerado);
+      setCreditoUsadoTexto(String(usado));
+      setCreditoDisponivel(Math.max(0, Number((saldo as any)?.disparos_disponiveis ?? 0)));
+      setCarregandoCredito(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const porContagens = contagens.length > 0;
+  const somaContagens = useMemo(
+    () =>
+      somarContagens(
+        contagensParaNumeros(contagens).map((c) => ({
+          inicial: c.inicial ?? NaN,
+          final: c.final ?? NaN,
+          gera_credito: c.gera_credito,
+        }))
+      ),
+    [contagens]
+  );
+  const shotsCampo = Number(shots.replace(/\D/g, ""));
+  // Total real de disparos (desgaste): soma das contagens, ou o campo único.
+  const shotsNumber = porContagens ? somaContagens.total : shotsCampo;
+  // Crédito só muda com contagens (a função do banco refaz tudo a partir delas).
+  const podeMudarCredito = (porContagens || contagensOriginais.length > 0) && status !== "cancelada";
+  const creditoUsado = podeMudarCredito ? numeroDoCampo(creditoUsadoTexto) ?? 0 : creditoUsadoOriginal;
+  const limiteCredito = Math.max(0, Math.min(shotsNumber, creditoDisponivel + creditoUsadoOriginal));
+  const shotsCobrados = disparosCobrados(shotsNumber, creditoUsado);
+  const creditoGerado = porContagens || contagensOriginais.length > 0 ? somaContagens.credito : creditoGeradoOriginal;
+  const contagensMudaram = chaveContagens(contagens) !== chaveContagens(contagensOriginais);
+  const creditoMudou = creditoUsado !== creditoUsadoOriginal;
+
+  function mudarContagem(i: number, campo: Partial<ContagemEdicao>) {
+    setContagens((prev) => prev.map((c, j) => (j === i ? { ...c, ...campo } : c)));
+  }
+
+  function adicionarContagem() {
+    setContagens((prev) => {
+      const ultima = prev[prev.length - 1];
+      // A próxima costuma começar onde a anterior parou.
+      return [...prev, { inicial: ultima?.final ?? "", final: "", gera_credito: false, aplicador_id: null }];
+    });
+  }
+
+  function tirarContagem(i: number) {
+    const nova = contagens.filter((_, j) => j !== i);
+    // Sem contagens volta o campo único, já com o total que havia.
+    if (nova.length === 0) setShots(String(somaContagens.total || shotsCampo || ""));
+    setContagens(nova);
+  }
 
   const suggestedValue = useMemo(() => {
-    if (!shotsNumber || shotsNumber <= 0) return null;
+    if (!shotsCobrados || shotsCobrados <= 0) return null;
     try {
-      return calculateRentalValue(shotsNumber, pricingConfig).totalValue;
+      return calculateRentalValue(shotsCobrados, pricingConfig).totalValue;
     } catch {
       return null;
     }
-  }, [shotsNumber, pricingConfig]);
+  }, [shotsCobrados, pricingConfig]);
 
   function usarValorSugerido() {
     if (suggestedValue !== null) setValor(String(suggestedValue));
@@ -338,6 +458,18 @@ export default function EditarLocacaoModal({
       setError("Informe uma data final válida (igual ou depois da data inicial).");
       return;
     }
+    const contagensNumeros = contagensParaNumeros(contagens);
+    const incompleta = contagensNumeros.findIndex((c) => c.inicial === null || c.final === null || c.inicial === c.final);
+    if (incompleta >= 0) {
+      setError(`Preencha a contagem ${incompleta + 1} (inicial e final diferentes) ou tire ela.`);
+      return;
+    }
+    if (podeMudarCredito && creditoUsado > limiteCredito) {
+      setError(`O crédito usado pode ser no máximo ${limiteCredito.toLocaleString("pt-BR")} disparos.`);
+      return;
+    }
+    const precisaCorrigir =
+      status !== "cancelada" && (porContagens || contagensOriginais.length > 0) && (contagensMudaram || creditoMudou);
     if (!window.confirm("Salvar essas alterações na locação?")) return;
     setSaving(true);
     setError(null);
@@ -377,6 +509,30 @@ export default function EditarLocacaoModal({
         setError(rpcError.message || "Não foi possível salvar. Tente novamente.");
       }
       return;
+    }
+
+    if (precisaCorrigir) {
+      const { error: contagemError } = await supabase.rpc("corrigir_contagens_locacao", {
+        p_rental_id: rental.id,
+        p_contagens: contagensNumeros.map((c) => ({
+          inicial: c.inicial,
+          final: c.final,
+          gera_credito: c.gera_credito,
+          ...(c.aplicador_id ? { aplicador_id: c.aplicador_id } : {}),
+        })),
+        p_credito_usado: creditoUsado,
+      });
+      if (contagemError) {
+        setSaving(false);
+        setError(
+          `A locação foi salva, mas as contagens e o crédito não foram ajustados: ${
+            contagemError.message || "tente de novo."
+          }`
+        );
+        return;
+      }
+      setContagensOriginais(contagens);
+      setCreditoUsadoOriginal(creditoUsado);
     }
 
     // Deslocamento (leva O/Y): sempre grava de novo, mesmo com km 0 —
@@ -476,15 +632,139 @@ export default function EditarLocacaoModal({
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Disparos</label>
-            <input
-              inputMode="numeric"
-              value={shots}
-              onChange={(e) => setShots(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-            />
-          </div>
+          {porContagens ? (
+            <div className="rounded-xl border border-neutral-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-xs font-medium text-neutral-600">Contagens</label>
+                <span className="text-xs font-semibold text-neutral-700">
+                  Total: {somaContagens.total.toLocaleString("pt-BR")} disparos
+                </span>
+              </div>
+              <div className="space-y-2">
+                {contagens.map((c, i) => (
+                  <div key={i} className="rounded-lg bg-neutral-50 p-2">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-xs text-neutral-500">Contagem {i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => tirarContagem(i)}
+                        disabled={status === "cancelada"}
+                        className="text-xs text-red-500 underline underline-offset-2 disabled:opacity-50"
+                      >
+                        tirar
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-0.5 block text-[11px] text-neutral-500">Inicial</label>
+                        <input
+                          inputMode="numeric"
+                          value={c.inicial}
+                          disabled={status === "cancelada"}
+                          onChange={(e) => mudarContagem(i, { inicial: e.target.value.replace(/\D/g, "") })}
+                          className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-0.5 block text-[11px] text-neutral-500">Final</label>
+                        <input
+                          inputMode="numeric"
+                          value={c.final}
+                          disabled={status === "cancelada"}
+                          onChange={(e) => mudarContagem(i, { final: e.target.value.replace(/\D/g, "") })}
+                          className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <label className="mt-1.5 flex items-center gap-2 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={c.gera_credito}
+                        disabled={status === "cancelada"}
+                        onChange={(e) => mudarContagem(i, { gera_credito: e.target.checked })}
+                        className="h-4 w-4 rounded border-neutral-300"
+                      />
+                      Vira crédito
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {contagens.length < 10 && status !== "cancelada" && (
+                <button
+                  type="button"
+                  onClick={adicionarContagem}
+                  className="mt-2 text-xs text-brand-teal underline underline-offset-2"
+                >
+                  + Adicionar contagem
+                </button>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Disparos</label>
+              <input
+                inputMode="numeric"
+                value={shots}
+                onChange={(e) => setShots(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+              {!carregandoCredito && status !== "cancelada" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setContagens([{ inicial: "", final: "", gera_credito: false, aplicador_id: null }])
+                  }
+                  className="mt-1 text-xs text-brand-teal underline underline-offset-2"
+                >
+                  Detalhar por contagens
+                </button>
+              )}
+            </div>
+          )}
+
+          {!carregandoCredito && (podeMudarCredito || creditoUsadoOriginal > 0 || creditoDisponivel > 0) && (
+            <div className="rounded-xl border border-neutral-200 p-3">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
+                Crédito de disparos usado nesta locação
+              </label>
+              {podeMudarCredito ? (
+                <>
+                  <input
+                    inputMode="numeric"
+                    value={creditoUsadoTexto}
+                    onChange={(e) => setCreditoUsadoTexto(e.target.value.replace(/\D/g, ""))}
+                    className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Até {limiteCredito.toLocaleString("pt-BR")} disparos (crédito da cliente mais o que esta locação já
+                    usava, sem passar do total).
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-neutral-700">{creditoUsadoOriginal.toLocaleString("pt-BR")} disparos</p>
+                  {status !== "cancelada" && (
+                    <p className="mt-1 text-xs text-neutral-400">
+                      Para mudar o crédito, toque em "Detalhar por contagens" e informe as contagens desta locação.
+                    </p>
+                  )}
+                </>
+              )}
+              {creditoUsado > 0 && (
+                <p className="mt-1 text-xs text-neutral-600">
+                  Disparos cobrados: {shotsCobrados.toLocaleString("pt-BR")} ({shotsNumber.toLocaleString("pt-BR")} menos{" "}
+                  {creditoUsado.toLocaleString("pt-BR")} de crédito)
+                </p>
+              )}
+            </div>
+          )}
+
+          {!carregandoCredito && (creditoGerado > 0 || creditoUsado > 0) && (
+            <div className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+              {creditoGerado > 0 && <p>Gerou {creditoGerado.toLocaleString("pt-BR")} disparos de crédito</p>}
+              {creditoUsado > 0 && <p>Usou {creditoUsado.toLocaleString("pt-BR")} disparos de crédito</p>}
+            </div>
+          )}
 
           <div>
             <div className="mb-1 flex items-center justify-between">
