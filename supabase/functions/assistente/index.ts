@@ -643,7 +643,7 @@ async function executarFerramenta(
         if (ev?.date_start) data = ev.date_start;
       }
       const txt = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
-      const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const semAcento = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
       const idsUsados = new Set<string>(Object.keys(DATA).filter((k) => !k.startsWith("custom_")));
       for (const c of customAreas) {
         const nomeC = semAcento(String(c.nome));
