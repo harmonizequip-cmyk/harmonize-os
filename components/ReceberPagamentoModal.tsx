@@ -297,7 +297,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
                   {a.vencido ? " · já aconteceu" : " · ainda por vir"}
                   {a.totalPago > 0 ? ` · já recebido ${formatCurrency(a.totalPago)}` : ""}
                 </p>
-                <ReceberPagamentoBotao rentalId={a.id} saldo={a.saldo} rotulo="Receber (quitar ou abater)" onDone={() => aoReceber(`locacao/${a.id}`, a.cliente)} />
+                <ReceberPagamentoBotao rentalId={a.id} saldo={a.saldo} clientId={a.clientId} rotulo="Receber (quitar ou abater)" onDone={() => aoReceber(`locacao/${a.id}`, a.cliente)} />
               </div>
             ))}
           </div>
