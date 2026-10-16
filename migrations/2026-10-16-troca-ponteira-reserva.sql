@@ -1,7 +1,7 @@
 -- ============================================================
 -- TROCA DE PONTEIRA DURANTE O ATENDIMENTO (antes de finalizar)
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: coluna, tabela, 2 funções, anon sem execução, gatilho)
 --
 -- Na reserva, o dono já grava a contagem inicial (calendar_events.contagem_inicial).
 -- Quando troca a ponteira no meio do atendimento, grava agora o disparo final
