@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { EscolhaAreas } from "@/lib/assistente";
-import { CATALOGO_AREAS, nomeProcedimento } from "@/lib/planejamento";
+import { CATALOGO_AREAS, dividirDisparos, nomeProcedimento, profundidadesPapada } from "@/lib/planejamento";
 import { Check, ClipboardList } from "lucide-react";
 
 // Caixinhas das áreas que o Eder vai tratar. O nome do procedimento sai da
@@ -13,6 +13,19 @@ export default function CartaoEscolhaAreas({ escolha, onPedir }: { escolha: Esco
   const [saldo, setSaldo] = useState(escolha.saldo ? String(escolha.saldo) : "");
   const [queixa, setQueixa] = useState(escolha.queixa ?? "");
   const [enviado, setEnviado] = useState(false);
+  // Papada: medida do adipômetro, quantas profundidades e quantos disparos.
+  const [adipometro, setAdipometro] = useState("");
+  const [nProf, setNProf] = useState("3");
+  const [dispPapada, setDispPapada] = useState("");
+  const temPapada = sel.has("papada");
+  const previaPapada = useMemo(() => {
+    const adip = Number(adipometro.replace(",", "."));
+    if (!temPapada || !adip) return null;
+    const profs = profundidadesPapada(adip, Number(nProf));
+    const partes = dispPapada ? dividirDisparos(Number(dispPapada), profs.length) : [];
+    return profs.map((p, i) => `${p.toFixed(1).replace(".", ",")} mm${partes[i] ? ` (${partes[i].toLocaleString("pt-BR")})` : ""}`).join(" · ");
+  }, [temPapada, adipometro, nProf, dispPapada]);
+  const papadaIncompleta = temPapada && (!adipometro || !dispPapada);
   const nome = useMemo(() => nomeProcedimento(Array.from(sel)), [sel]);
 
   const alternar = (id: string) =>
@@ -32,6 +45,9 @@ export default function CartaoEscolhaAreas({ escolha, onPedir }: { escolha: Esco
       `Procedimento: ${nome}.`,
       saldo ? `Saldo: ${Number(saldo).toLocaleString("pt-BR")} disparos.` : "",
       queixa.trim() ? `Queixa principal: ${queixa.trim()}.` : "",
+      temPapada && adipometro && dispPapada
+        ? `Papada: adipômetro ${adipometro} mm, ${nProf} profundidades, ${Number(dispPapada).toLocaleString("pt-BR")} disparos.`
+        : "",
       escolha.paciente ? `Paciente: ${escolha.paciente}.` : "",
       "Pode distribuir.",
     ];
@@ -81,6 +97,51 @@ export default function CartaoEscolhaAreas({ escolha, onPedir }: { escolha: Esco
       </div>
       {grupo("face", "Rosto (queixo até a testa)")}
       {grupo("fora", "Fora do rosto")}
+      {temPapada && (
+        <div className="space-y-2 rounded-lg border border-brand-teal/30 bg-white p-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Papada</p>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="text-[11px] text-neutral-500">
+              Adipômetro (mm)
+              <input
+                value={adipometro}
+                onChange={(e) => setAdipometro(e.target.value.replace(/[^\d,.]/g, ""))}
+                disabled={enviado}
+                inputMode="decimal"
+                placeholder="20"
+                className="mt-0.5 w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900"
+              />
+            </label>
+            <label className="text-[11px] text-neutral-500">
+              Profundidades
+              <select
+                value={nProf}
+                onChange={(e) => setNProf(e.target.value)}
+                disabled={enviado}
+                className="mt-0.5 w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900"
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[11px] text-neutral-500">
+              Disparos
+              <input
+                value={dispPapada}
+                onChange={(e) => setDispPapada(e.target.value.replace(/\D/g, ""))}
+                disabled={enviado}
+                inputMode="numeric"
+                placeholder="1500"
+                className="mt-0.5 w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900"
+              />
+            </label>
+          </div>
+          {previaPapada && <p className="text-xs text-brand-teal-dark">{previaPapada}</p>}
+        </div>
+      )}
       <div className="rounded-lg bg-white px-3 py-2 text-sm">
         <span className="text-xs text-neutral-500">Procedimento: </span>
         <span className="font-semibold text-neutral-900">{nome || "marque as áreas"}</span>
@@ -104,10 +165,10 @@ export default function CartaoEscolhaAreas({ escolha, onPedir }: { escolha: Esco
       </div>
       <button
         onClick={montar}
-        disabled={enviado || sel.size === 0}
+        disabled={enviado || sel.size === 0 || papadaIncompleta}
         className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-gradient px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {enviado ? "Escolha enviada" : "Montar com estas áreas"}
+        {enviado ? "Escolha enviada" : papadaIncompleta ? "Preencha adipômetro e disparos da papada" : "Montar com estas áreas"}
       </button>
     </div>
   );

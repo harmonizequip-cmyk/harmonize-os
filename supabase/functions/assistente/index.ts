@@ -203,6 +203,16 @@ const FERRAMENTAS = [
             required: ["id", "linhas"],
           },
         },
+        papada_config: {
+          type: "object",
+          description: "Papada pelo adipômetro (o Eder informa). A função calcula as profundidades e divide os disparos; não mande linhas de papada em 'areas' quando usar isto.",
+          properties: {
+            adipometro_mm: { type: "number", description: "Medida do adipômetro em mm." },
+            profundidades: { type: "integer", description: "Quantas profundidades (1 a 5)." },
+            disparos: { type: "integer", description: "Disparos na papada." },
+          },
+          required: ["adipometro_mm", "profundidades", "disparos"],
+        },
         areas_extras: {
           type: "array",
           description: "Áreas manuais (as que não são fixas no planejador): terço médio, nasolabial, áreas corporais...",
@@ -261,6 +271,30 @@ const FERRAMENTAS = [
 // Áreas fixas do Planejador HIPRO (public/ferramentas/planejador.html).
 const PROF_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 const PROF_PAP = [...PROF_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
+// Papada pelo adipômetro (espelha profundidadesPapada/dividirDisparos de lib/planejamento.ts).
+const PROF_PAPADA = [4.5, 6, 7, 8, 9, 10, 11, 12, 13];
+function profundidadesPapada(adip: number, quantidade: number): number[] {
+  const cabem = PROF_PAPADA.filter((p) => p <= adip / 2);
+  const max = cabem.length ? cabem[cabem.length - 1] : 4.5;
+  const cands = PROF_PAPADA.filter((p) => p <= max);
+  const n = Math.max(1, Math.min(5, Math.round(quantidade) || 1, cands.length));
+  if (n === 1) return [max];
+  const escolhidas = new Set<number>([4.5, max]);
+  for (let i = 1; i < n - 1; i++) {
+    const alvo = 4.5 + ((max - 4.5) * i) / (n - 1);
+    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo))[0];
+    if (livre !== undefined) escolhidas.add(livre);
+  }
+  return Array.from(escolhidas).sort((a, b) => b - a);
+}
+function dividirDisparos(total: number, partes: number): number[] {
+  if (partes <= 0) return [];
+  const base = Math.floor(total / partes / 10) * 10;
+  const r = Array(partes).fill(base);
+  r[0] += Math.max(0, Math.round(total) - base * partes);
+  return r;
+}
+
 // Máximo da tabela do fabricante por lado e por profundidade (papada, campo
 // único, aceita a soma dos dois lados). Jowls pode passar (palavra do dono).
 const MAXIMO_POR_LINHA: Record<string, number | null> = {
@@ -503,7 +537,20 @@ async function executarFerramenta(
       const resumo: { area: string; total: number }[] = [];
       const problemas: string[] = [];
       let total = 0;
+      // Papada pelo adipômetro: a conta é fixa, não fica a cargo da IA.
+      const pc = entrada.papada_config as { adipometro_mm?: number; profundidades?: number; disparos?: number } | undefined;
+      let papadaCalculada = false;
+      if (pc && Number(pc.adipometro_mm) > 0 && Number(pc.disparos) > 0) {
+        const profs = profundidadesPapada(Number(pc.adipometro_mm), Number(pc.profundidades) || 1);
+        const partes = dividirDisparos(Number(pc.disparos), profs.length);
+        DATA.papada = profs.map((p, i) => ({ prof: p.toFixed(1), disp: partes[i] }));
+        const tot = partes.reduce((x, y) => x + y, 0);
+        resumo.push({ area: "Papada", total: tot });
+        total += tot;
+        papadaCalculada = true;
+      }
       for (const a of areas) {
+        if (papadaCalculada && String(a.id) === "papada") continue;
         const def = AREAS_PLANEJADOR[String(a.id)];
         if (!def) {
           problemas.push(`área desconhecida: ${a.id}`);

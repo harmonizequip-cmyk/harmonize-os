@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { agruparPorCliente, estadoInicial, nomeProcedimento, retornosProximos, temConteudo, type PlanejamentoLinha } from "./planejamento";
+import {
+  agruparPorCliente,
+  dividirDisparos,
+  estadoInicial,
+  nomeProcedimento,
+  profundidadeMaximaPapada,
+  profundidadesPapada,
+  retornosProximos,
+  temConteudo,
+  type PlanejamentoLinha,
+} from "./planejamento";
 
 const p = (x: Partial<PlanejamentoLinha>): PlanejamentoLinha => ({
   id: "1",
@@ -56,5 +66,30 @@ describe("nome do procedimento pela escolha de áreas", () => {
   });
   it("sem o rosto completo, lista as áreas", () => {
     expect(nomeProcedimento(["papada", "jowls"])).toBe("Jowls + Papada");
+  });
+});
+
+describe("papada pelo adipômetro", () => {
+  it("exemplo do dono: 20 mm, 3 profundidades, 1.500 disparos", () => {
+    expect(profundidadesPapada(20, 3)).toEqual([10, 7, 4.5]);
+    expect(dividirDisparos(1500, 3)).toEqual([500, 500, 500]);
+  });
+  it("mais funda é a metade do adipômetro, até 13 mm, e no mínimo 4,5", () => {
+    expect(profundidadeMaximaPapada(30)).toBe(13);
+    expect(profundidadeMaximaPapada(15)).toBe(7);
+    expect(profundidadeMaximaPapada(6)).toBe(4.5);
+  });
+  it("no máximo 5 profundidades, sempre com 4,5 e a mais funda", () => {
+    const p = profundidadesPapada(20, 8);
+    expect(p.length).toBe(5);
+    expect(p[0]).toBe(10);
+    expect(p[p.length - 1]).toBe(4.5);
+  });
+  it("não inventa profundidade quando não cabe", () => {
+    expect(profundidadesPapada(9, 3)).toEqual([4.5]);
+    expect(profundidadesPapada(12, 3)).toEqual([6, 4.5]);
+  });
+  it("sobra da divisão vai para a mais funda", () => {
+    expect(dividirDisparos(1000, 3)).toEqual([340, 330, 330]);
   });
 });

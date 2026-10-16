@@ -115,3 +115,42 @@ export function nomeProcedimento(ids: string[]): string {
   const todas = CATALOGO_AREAS.filter((a) => sel.has(a.id)).map((a) => a.nome);
   return todas.join(" + ");
 }
+
+// Papada: profundidades pelo adipômetro (metade da medida, até 13 mm) e
+// disparos divididos entre elas. Espelhado em supabase/functions/assistente.
+export const PROFUNDIDADES_PAPADA = [4.5, 6, 7, 8, 9, 10, 11, 12, 13];
+
+/** Profundidade mais funda: metade do adipômetro, arredondada para baixo numa que existe (4,5 a 13). */
+export function profundidadeMaximaPapada(adipometroMm: number): number {
+  const alvo = adipometroMm / 2;
+  const cabem = PROFUNDIDADES_PAPADA.filter((p) => p <= alvo);
+  return cabem.length ? cabem[cabem.length - 1] : 4.5;
+}
+
+/**
+ * Até 5 profundidades: sempre 4,5 e a mais funda; as do meio, as que
+ * existem mais perto de intervalos iguais. Volta da mais funda para a mais
+ * rasa (o planejador manda começar pela maior).
+ */
+export function profundidadesPapada(adipometroMm: number, quantidade: number): number[] {
+  const max = profundidadeMaximaPapada(adipometroMm);
+  const cands = PROFUNDIDADES_PAPADA.filter((p) => p <= max);
+  const n = Math.max(1, Math.min(5, Math.round(quantidade) || 1, cands.length));
+  if (n === 1) return [max];
+  const escolhidas = new Set<number>([4.5, max]);
+  for (let i = 1; i < n - 1; i++) {
+    const alvo = 4.5 + ((max - 4.5) * i) / (n - 1);
+    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo))[0];
+    if (livre !== undefined) escolhidas.add(livre);
+  }
+  return Array.from(escolhidas).sort((a, b) => b - a);
+}
+
+/** Divide os disparos igual entre as profundidades (múltiplos de 10; a sobra vai para a mais funda). */
+export function dividirDisparos(total: number, partes: number): number[] {
+  if (partes <= 0) return [];
+  const base = Math.floor(total / partes / 10) * 10;
+  const r = Array(partes).fill(base);
+  r[0] += Math.max(0, Math.round(total) - base * partes);
+  return r;
+}
