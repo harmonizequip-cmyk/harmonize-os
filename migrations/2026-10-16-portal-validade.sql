@@ -1,7 +1,7 @@
 -- ============================================================
 -- PORTAL DA CLIENTE: VALIDADE DE 60 DIAS
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: coluna, 5 funções, trava 60/45, primeiros 60, anon sem execução)
 --
 -- Regra do dono (16/10/2026): ao liberar o acesso, a cliente ganha 60 dias;
 -- cada agendamento de HIPRO (locação ou reserva não cancelada, fora teste)
