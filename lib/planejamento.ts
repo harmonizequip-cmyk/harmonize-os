@@ -73,3 +73,45 @@ export function agruparPorCliente(lista: PlanejamentoLinha[]): { clientId: strin
     .map((g) => ({ ...g, itens: [...g.itens].sort(ordenar) }))
     .sort((a, b) => (a.clientId ? 0 : 1) - (b.clientId ? 0 : 1) || ordenar(a.itens[0], b.itens[0]));
 }
+
+// Seletor de áreas do assistente: catálogo (fixas do planejador + manuais do
+// guia) e o nome do procedimento que sai da escolha.
+export interface AreaCatalogo {
+  id: string;
+  nome: string;
+  /** face = do queixo até a testa (compõe o Full Face); fora = soma no nome. */
+  grupo: "face" | "fora";
+  /** Área pequena: não precisa estar marcada para contar como Full Face. */
+  pequena?: boolean;
+}
+
+export const CATALOGO_AREAS: AreaCatalogo[] = [
+  { id: "frontal", nome: "Frontal", grupo: "face" },
+  { id: "temporal", nome: "Temporal e Arco Zigomático", grupo: "face" },
+  { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", grupo: "face", pequena: true },
+  { id: "terco_medio", nome: "Terço médio", grupo: "face" },
+  { id: "nasolabial", nome: "Nasolabial", grupo: "face" },
+  { id: "perioral_sup", nome: "Perioral Superior", grupo: "face", pequena: true },
+  { id: "perioral_inf", nome: "Perioral Inferior", grupo: "face", pequena: true },
+  { id: "mento", nome: "Mento", grupo: "face", pequena: true },
+  { id: "jowls", nome: "Jowls", grupo: "face" },
+  { id: "arcomandibular", nome: "Arco Mandibular", grupo: "face" },
+  { id: "submandibular", nome: "Submandibular", grupo: "fora" },
+  { id: "papada", nome: "Papada", grupo: "fora" },
+  { id: "pescoco", nome: "Pescoço", grupo: "fora" },
+];
+
+/**
+ * Nome do procedimento pela escolha: todas as áreas grandes do rosto (do
+ * queixo à testa) = "Full Face"; o que é de fora soma no nome ("Full Face +
+ * Papada + Pescoço"). Sem o rosto completo, lista as áreas.
+ */
+export function nomeProcedimento(ids: string[]): string {
+  const sel = new Set(ids);
+  const grandesRosto = CATALOGO_AREAS.filter((a) => a.grupo === "face" && !a.pequena);
+  const fullFace = grandesRosto.every((a) => sel.has(a.id));
+  const fora = CATALOGO_AREAS.filter((a) => a.grupo === "fora" && sel.has(a.id)).map((a) => a.nome);
+  if (fullFace) return ["Full Face", ...fora].join(" + ");
+  const todas = CATALOGO_AREAS.filter((a) => sel.has(a.id)).map((a) => a.nome);
+  return todas.join(" + ");
+}

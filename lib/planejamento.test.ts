@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agruparPorCliente, estadoInicial, retornosProximos, temConteudo, type PlanejamentoLinha } from "./planejamento";
+import { agruparPorCliente, estadoInicial, nomeProcedimento, retornosProximos, temConteudo, type PlanejamentoLinha } from "./planejamento";
 
 const p = (x: Partial<PlanejamentoLinha>): PlanejamentoLinha => ({
   id: "1",
@@ -41,5 +41,20 @@ describe("planejamento", () => {
     ]);
     expect(g.map((x) => x.nome)).toEqual(["Dra. Ana", "Sem cliente"]);
     expect(g[0].itens.map((x) => x.id)).toEqual(["3", "2"]);
+  });
+});
+
+describe("nome do procedimento pela escolha de áreas", () => {
+  const rosto = ["frontal", "temporal", "terco_medio", "nasolabial", "jowls", "arcomandibular"];
+  it("rosto inteiro (sem as pequenas) é Full Face", () => {
+    expect(nomeProcedimento(rosto)).toBe("Full Face");
+    expect(nomeProcedimento([...rosto, "perioral_sup", "mento"])).toBe("Full Face");
+  });
+  it("o que é de fora do rosto soma no nome, na ordem", () => {
+    expect(nomeProcedimento([...rosto, "papada"])).toBe("Full Face + Papada");
+    expect(nomeProcedimento([...rosto, "pescoco", "papada"])).toBe("Full Face + Papada + Pescoço");
+  });
+  it("sem o rosto completo, lista as áreas", () => {
+    expect(nomeProcedimento(["papada", "jowls"])).toBe("Jowls + Papada");
   });
 });

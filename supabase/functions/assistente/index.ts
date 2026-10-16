@@ -147,6 +147,25 @@ const FERRAMENTAS = [
     },
   },
   {
+    name: "escolher_areas",
+    description:
+      "Mostra ao Eder a lista de áreas com caixinhas para ele marcar o que vai tratar (full face ou quando ele não disse as áreas). Use ANTES de preparar_planejamento quando as áreas não estiverem definidas. Ele marca e manda; aí você distribui.",
+    input_schema: {
+      type: "object",
+      properties: {
+        marcadas: {
+          type: "array",
+          description: "Áreas que já vêm marcadas (sugestão pela queixa).",
+          items: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "terco_medio", "nasolabial", "olhos", "mento"] },
+        },
+        saldo_total: { type: "integer" },
+        queixa: { type: "string" },
+        paciente: { type: "string" },
+      },
+      required: ["marcadas"],
+    },
+  },
+  {
     name: "preparar_planejamento",
     description:
       "Monta um planejamento do Planejador HIPRO (distribuição de disparos por área e profundidade) para um paciente. A tela mostra o resumo e o botão que abre o planejador já preenchido. Respeite o saldo e o protocolo do Eder (memórias 'Protocolo HIPRO').",
@@ -184,6 +203,33 @@ const FERRAMENTAS = [
             required: ["id", "linhas"],
           },
         },
+        areas_extras: {
+          type: "array",
+          description: "Áreas manuais (as que não são fixas no planejador): terço médio, nasolabial, áreas corporais...",
+          items: {
+            type: "object",
+            properties: {
+              nome: { type: "string" },
+              regiao: { type: "string", enum: ["facial", "corporal"] },
+              bilateral: { type: "boolean" },
+              quadrantes: { type: "integer", description: "Corporal: quantos quadrantes de 10 x 10 cm (multiplica os disparos)." },
+              linhas: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    prof: { type: "string" },
+                    direito: { type: "integer" },
+                    esquerdo: { type: "integer" },
+                    disparos: { type: "integer", description: "Área única: disparos (no corporal, por quadrante)." },
+                  },
+                  required: ["prof"],
+                },
+              },
+            },
+            required: ["nome", "regiao", "bilateral", "linhas"],
+          },
+        },
       },
       required: ["saldo_total", "areas"],
     },
@@ -215,6 +261,19 @@ const FERRAMENTAS = [
 // Áreas fixas do Planejador HIPRO (public/ferramentas/planejador.html).
 const PROF_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 const PROF_PAP = [...PROF_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
+// Máximo da tabela do fabricante por lado e por profundidade (papada, campo
+// único, aceita a soma dos dois lados). Jowls pode passar (palavra do dono).
+const MAXIMO_POR_LINHA: Record<string, number | null> = {
+  pescoco: 1200,
+  papada: 2400,
+  submandibular: 1200,
+  jowls: null,
+  arcomandibular: 1200,
+  temporal: 1200,
+  frontal: 500,
+  perioral_sup: 600,
+  perioral_inf: 600,
+};
 const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs: string[] }> = {
   pescoco: { nome: "Pescoço", bilateral: true, profs: PROF_STD },
   papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
@@ -226,6 +285,16 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
   perioral_sup: { nome: "Perioral Superior", bilateral: true, profs: PROF_STD },
   perioral_inf: { nome: "Perioral Inferior", bilateral: true, profs: PROF_STD },
 };
+
+// Nome do procedimento pelas áreas (espelha nomeProcedimento de lib/planejamento.ts):
+// todas as áreas grandes do rosto = Full Face; papada, pescoço e submandibular somam no nome.
+const ROSTO_GRANDES = ["frontal", "temporal", "terco_medio", "nasolabial", "jowls", "arcomandibular"];
+const FORA_DO_ROSTO: [string, string][] = [["submandibular", "Submandibular"], ["papada", "Papada"], ["pescoco", "Pescoço"]];
+const ID_POR_NOME: Record<string, string> = { "terco medio": "terco_medio", nasolabial: "nasolabial", mento: "mento", olhos: "olhos" };
+function nomeDoProcedimento(ids: Set<string>, nomes: string[]): string {
+  if (ROSTO_GRANDES.every((id) => ids.has(id))) return ["Full Face", ...FORA_DO_ROSTO.filter(([id]) => ids.has(id)).map(([, n]) => n)].join(" + ");
+  return nomes.join(" + ");
+}
 
 // Modo Cérebro: só lê o banco e grava insights.
 const CATEGORIAS = ["prospeccao", "relacionamento", "vendas", "financeiro", "agenda", "marketing", "operacao"];
@@ -361,6 +430,7 @@ type Estado = {
   agendas: Agenda[];
   insights: number;
   planejamentos: PlanejamentoIA[];
+  escolhas: { marcadas: string[]; saldo: number | null; queixa: string | null; paciente: string | null }[];
 };
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -415,6 +485,17 @@ async function executarFerramenta(
         erro: false,
       };
     }
+    if (nome === "escolher_areas") {
+      const validas = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "terco_medio", "nasolabial", "olhos", "mento"];
+      const marcadas = (Array.isArray(entrada.marcadas) ? entrada.marcadas : []).map(String).filter((x) => validas.includes(x));
+      estado.escolhas.push({
+        marcadas,
+        saldo: Math.max(0, Math.round(Number(entrada.saldo_total) || 0)) || null,
+        queixa: entrada.queixa ? String(entrada.queixa).slice(0, 200) : null,
+        paciente: entrada.paciente ? String(entrada.paciente).slice(0, 120) : null,
+      });
+      return { texto: JSON.stringify({ ok: true, marcadas }), erro: false };
+    }
     if (nome === "preparar_planejamento") {
       const saldo = Math.max(0, Math.round(Number(entrada.saldo_total) || 0));
       const areas = (Array.isArray(entrada.areas) ? entrada.areas : []) as { id?: string; linhas?: Record<string, unknown>[] }[];
@@ -437,13 +518,16 @@ async function executarFerramenta(
             continue;
           }
           const n = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
+          const teto = MAXIMO_POR_LINHA[String(a.id)];
           if (def.bilateral) {
             const d = n(l.direito ?? l.disparos);
             const e = n(l.esquerdo ?? l.disparos);
+            if (teto && (d > teto || e > teto)) problemas.push(`${def.nome} ${prof} mm passa do máximo de ${teto} por lado`);
             linhas.push({ prof, dispD: d, dispE: e });
             totArea += d + e;
           } else {
             const d = n(l.disparos ?? (n(l.direito) + n(l.esquerdo)));
+            if (teto && d > teto) problemas.push(`${def.nome} ${prof} mm passa do máximo de ${teto}`);
             linhas.push({ prof, disp: d });
             totArea += d;
           }
@@ -453,6 +537,38 @@ async function executarFerramenta(
           resumo.push({ area: def.nome, total: totArea });
           total += totArea;
         }
+      }
+      // Áreas manuais, no mesmo formato do botão "Adicionar área manual".
+      const customAreas: Record<string, unknown>[] = [];
+      for (const x of (Array.isArray(entrada.areas_extras) ? entrada.areas_extras : []) as Record<string, unknown>[]) {
+        const nomeArea = String(x.nome ?? "").trim().slice(0, 60);
+        if (!nomeArea) continue;
+        const corporal = x.regiao === "corporal";
+        const bilateral = !!x.bilateral;
+        const quad = corporal ? Math.max(1, Math.round(Number(x.quadrantes) || 1)) : 1;
+        const id = `custom_${customAreas.length + 1}`;
+        const linhas: unknown[] = [];
+        let totArea = 0;
+        for (const l of (Array.isArray(x.linhas) ? x.linhas : []) as Record<string, unknown>[]) {
+          const prof = Number(l.prof).toFixed(1);
+          if (!PROF_PAP.includes(prof)) {
+            problemas.push(`${nomeArea}: profundidade ${l.prof} mm não existe`);
+            continue;
+          }
+          const n = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
+          const base: Record<string, unknown> = bilateral
+            ? { prof, dispD: n(l.direito ?? l.disparos), dispE: n(l.esquerdo ?? l.disparos) }
+            : { prof, disp: n(l.disparos ?? (n(l.direito) + n(l.esquerdo))) };
+          if (corporal) base.quad = quad;
+          const soma = bilateral ? (base.dispD as number) + (base.dispE as number) : (base.disp as number);
+          totArea += soma * quad;
+          linhas.push(base);
+        }
+        if (!linhas.length) continue;
+        customAreas.push({ id, nome: nomeArea, bilateral, opts: PROF_PAP, regiao: corporal ? "corporal" : "facial" });
+        DATA[id] = linhas;
+        resumo.push({ area: nomeArea, total: totArea });
+        total += totArea;
       }
       if (problemas.length) return { texto: `Corrija e chame de novo: ${problemas.join("; ")}.`, erro: true };
       if (!total) return { texto: "Nenhum disparo distribuído.", erro: true };
@@ -470,15 +586,25 @@ async function executarFerramenta(
         if (ev?.date_start) data = ev.date_start;
       }
       const txt = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
+      const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const idsUsados = new Set<string>(Object.keys(DATA).filter((k) => !k.startsWith("custom_")));
+      for (const c of customAreas) {
+        const nomeC = semAcento(String(c.nome));
+        const achado = Object.keys(ID_POR_NOME).find((k) => nomeC.includes(k)) ?? (nomeC.includes("palpebr") ? "olhos" : null);
+        if (achado) idsUsados.add(ID_POR_NOME[achado] ?? achado);
+      }
+      const procedimento = txt(entrada.procedimento, 120) || nomeDoProcedimento(idsUsados, resumo.map((r) => r.area));
       const estadoPlano: Record<string, unknown> = {
         paciente: txt(entrada.paciente, 120),
         data,
         queixa: txt(entrada.queixa, 300),
         profissional: clienteNome ?? "",
-        procNome: txt(entrada.procedimento, 120),
+        procNome: procedimento,
         saldoTotal: String(saldo || total),
         obs: txt(entrada.observacoes),
         DATA,
+        customAreas,
+        customSeq: customAreas.length,
       };
       const plano: PlanejamentoIA = {
         client_id: clientId,
@@ -649,7 +775,7 @@ Deno.serve(async (req) => {
   // Conversa: continua a anterior ou começa uma nova.
   let conversaId = modoInsights ? null : corpo.conversa_id || null;
   let historico: Mensagem[] = [];
-  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0, planejamentos: [] };
+  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0, planejamentos: [], escolhas: [] };
   if (conversaId) {
     const { data: conv } = await supabase
       .from("assistente_conversas")
@@ -817,6 +943,7 @@ Deno.serve(async (req) => {
     agendas: estado.agendas,
     insights_criados: estado.insights,
     planejamentos: estado.planejamentos,
+    escolhas_areas: estado.escolhas,
     gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,
   });
 });
