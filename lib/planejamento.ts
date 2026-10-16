@@ -2,6 +2,8 @@
 // estado é o mesmo objeto que o planejador salvava no aparelho; aqui ficam
 // as contas da lista e o que decide quando vale guardar no banco.
 
+import { urlBoneco } from "./boneco-corporal";
+
 export const PREFIXO_CHAVE = "harmonize_planejador_plano_";
 export const chaveLocal = (id: string) => PREFIXO_CHAVE + id;
 
@@ -140,7 +142,7 @@ export function profundidadesPapada(adipometroMm: number, quantidade: number): n
   const escolhidas = new Set<number>([4.5, max]);
   for (let i = 1; i < n - 1; i++) {
     const alvo = 4.5 + ((max - 4.5) * i) / (n - 1);
-    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo))[0];
+    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo) || b - a)[0];
     if (livre !== undefined) escolhidas.add(livre);
   }
   return Array.from(escolhidas).sort((a, b) => b - a);
@@ -153,4 +155,198 @@ export function dividirDisparos(total: number, partes: number): number[] {
   const r = Array(partes).fill(base);
   r[0] += Math.max(0, Math.round(total) - base * partes);
   return r;
+}
+
+// ─── Montagem pelas regras (o seletor monta sozinho; a IA só ajusta) ───
+
+/** Máximo por lado em cada profundidade (tabela do fabricante + regra do dono). */
+export const MAXIMO_LINHA: Record<string, number> = {
+  pescoco: 1200,
+  submandibular: 1200,
+  jowls: 1200,
+  arcomandibular: 1200,
+  temporal: 1200,
+  frontal: 500,
+  perioral_sup: 600,
+  perioral_inf: 600,
+  terco_medio: 1200,
+  nasolabial: 1200,
+  olhos: 1200,
+  mento: 1200,
+};
+
+/** Profundidades de cada área do rosto (regra: 4,5, 3,0 e 1,5; exceções do guia). */
+export function profundidadesRosto(id: string): number[] {
+  if (id === "frontal" || id === "olhos") return [4.5, 1.5];
+  if (id === "perioral_sup" || id === "perioral_inf") return [1.5];
+  return [4.5, 3, 1.5];
+}
+
+const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"]);
+const AREA_UNICA = new Set(["papada", "mento"]);
+const NOME_EXTRA: Record<string, string> = { terco_medio: "Terço médio", nasolabial: "Nasolabial", olhos: "Pálpebras inferiores e lateral dos olhos", mento: "Mento" };
+
+export const PROFUNDIDADES_GORDURA = [6, 7, 8, 9, 10, 11, 12, 13];
+export const DISPAROS_CORPORAL = { min: 3200, max: 4000 };
+
+/** Gordura corporal: de 6,0 até a metade do adipômetro (acima de 26 mm fica 13), no mínimo 3 profundidades. */
+export function profundidadesGordura(adipometroMm: number, quantidade: number): number[] {
+  const alvo = Math.min(13, adipometroMm / 2);
+  const cabem = PROFUNDIDADES_GORDURA.filter((p) => p <= alvo);
+  const max = cabem.length ? cabem[cabem.length - 1] : 6;
+  const cands = PROFUNDIDADES_GORDURA.filter((p) => p <= max);
+  const n = Math.max(1, Math.min(Math.max(3, Math.round(quantidade) || 3), cands.length));
+  if (n === 1) return [max];
+  const escolhidas = new Set<number>([6, max]);
+  for (let i = 1; i < n - 1; i++) {
+    const alvoI = 6 + ((max - 6) * i) / (n - 1);
+    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvoI) - Math.abs(b - alvoI) || b - a)[0];
+    if (livre !== undefined) escolhidas.add(livre);
+  }
+  return Array.from(escolhidas).sort((a, b) => b - a);
+}
+
+/** Flacidez corporal: 2 profundidades = 4,5 e 1,5; 3 = 4,5, 3,0 e 1,5. */
+export function profundidadesFlacidez(quantidade: number): number[] {
+  return quantidade >= 3 ? [4.5, 3, 1.5] : [4.5, 1.5];
+}
+
+export interface AreaCorporal {
+  nome: string;
+  tipo: "flacidez" | "gordura";
+  quadrantes: number;
+  profundidades: number;
+  disparosPorProfundidade: number;
+  adipometro?: number;
+  /** Dois lados (braços, flancos...): linha com direito e esquerdo. */
+  bilateral?: boolean;
+  /** Região do boneco (CATALOGO_CORPORAL): vira a imagem da área no planejador. */
+  regiao?: string;
+}
+
+export interface EscolhaPlanejamento {
+  areas: string[];
+  saldo?: number | null;
+  papada?: { adipometro: number; profundidades: number; disparos: number } | null;
+  corporais?: AreaCorporal[];
+  queixa?: string | null;
+  paciente?: string | null;
+}
+
+export interface PlanejamentoMontado {
+  estado: EstadoPlanejador;
+  resumo: { area: string; total: number }[];
+  total: number;
+  sobra: number;
+  avisos: string[];
+}
+
+const fx = (p: number) => p.toFixed(1);
+
+/**
+ * Monta o planejamento pelas regras: papada e corporal com a conta fixa; o
+ * resto do saldo dividido igual entre as profundidades e lados das áreas do
+ * rosto, sem passar do máximo de cada uma (o que não cabe vira "sobra").
+ * Sem saldo, cada linha do rosto vai no máximo.
+ */
+export function montarPlanejamento(e: EscolhaPlanejamento): PlanejamentoMontado {
+  const DATA: Record<string, unknown[]> = {};
+  const customAreas: Record<string, unknown>[] = [];
+  const resumo: { area: string; total: number }[] = [];
+  const avisos: string[] = [];
+  let usado = 0;
+  const sel = new Set(e.areas);
+  const opts = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
+
+  const idDaArea = (id: string, nome: string, regiao: "facial" | "corporal", bilateral: boolean, img?: string) => {
+    if (AREAS_FIXAS_PLANEJADOR.has(id)) return id;
+    const novo = `custom_${customAreas.length + 1}`;
+    customAreas.push({ id: novo, nome, bilateral, opts, regiao, ...(img ? { img } : {}) });
+    return novo;
+  };
+
+  // Papada pelo adipômetro.
+  if (sel.has("papada") && e.papada && e.papada.adipometro > 0 && e.papada.disparos > 0) {
+    const profs = profundidadesPapada(e.papada.adipometro, e.papada.profundidades);
+    const partes = dividirDisparos(e.papada.disparos, profs.length);
+    DATA.papada = profs.map((p, i) => ({ prof: fx(p), disp: partes[i] }));
+    const t = partes.reduce((a, b) => a + b, 0);
+    resumo.push({ area: "Papada", total: t });
+    usado += t;
+    if (profs.length < e.papada.profundidades) avisos.push(`Papada: com ${e.papada.adipometro} mm só cabem ${profs.length} profundidade(s).`);
+  } else if (sel.has("papada")) {
+    avisos.push("Papada marcada sem adipômetro ou disparos: ficou de fora.");
+  }
+
+  // Corporal: por quadrante, disparos por profundidade entre 3.200 e 4.000.
+  for (const c of e.corporais ?? []) {
+    const nome = c.nome.trim();
+    if (!nome) continue;
+    const q = Math.max(1, Math.round(c.quadrantes) || 1);
+    const disp = Math.min(DISPAROS_CORPORAL.max, Math.max(DISPAROS_CORPORAL.min, Math.round(c.disparosPorProfundidade) || DISPAROS_CORPORAL.min));
+    const profs = c.tipo === "gordura" ? profundidadesGordura(c.adipometro ?? 0, c.profundidades) : profundidadesFlacidez(c.profundidades);
+    if (c.tipo === "gordura" && profs.length < 3) avisos.push(`${nome}: com ${c.adipometro ?? 0} mm no adipômetro só cabem ${profs.length} profundidade(s) de gordura.`);
+    const id = idDaArea("", nome, "corporal", !!c.bilateral, urlBoneco(c.regiao || "corpo"));
+    DATA[id] = profs.map((p) => (c.bilateral ? { prof: fx(p), dispD: disp, dispE: disp, quad: q } : { prof: fx(p), disp, quad: q }));
+    const t = profs.length * disp * q * (c.bilateral ? 2 : 1);
+    resumo.push({ area: `${nome} (${q} quad.)`, total: t });
+    usado += t;
+  }
+
+  // Rosto: divide o restante igual entre as vagas (profundidade x lado).
+  const rosto = CATALOGO_AREAS.filter((a) => sel.has(a.id) && a.id !== "papada");
+  type Vaga = { area: string; prof: number; lado: "D" | "E" | "U"; teto: number; valor: number };
+  const vagas: Vaga[] = [];
+  for (const a of rosto) {
+    const unica = AREA_UNICA.has(a.id);
+    for (const p of profundidadesRosto(a.id)) {
+      for (const lado of unica ? (["U"] as const) : (["D", "E"] as const)) {
+        vagas.push({ area: a.id, prof: p, lado, teto: MAXIMO_LINHA[a.id] ?? 1200, valor: 0 });
+      }
+    }
+  }
+  const saldo = e.saldo && e.saldo > 0 ? e.saldo : null;
+  if (saldo !== null && usado > saldo) avisos.push(`Papada e corporal (${usado.toLocaleString("pt-BR")}) já passam do saldo de ${saldo.toLocaleString("pt-BR")}.`);
+  let resta = saldo === null ? Infinity : Math.max(0, saldo - usado);
+  let abertas = vagas.slice();
+  while (abertas.length && resta > 0) {
+    const parte = resta === Infinity ? Infinity : Math.floor(resta / abertas.length / 10) * 10;
+    if (parte <= 0) break;
+    const proximas: Vaga[] = [];
+    for (const v of abertas) {
+      const add = Math.min(parte, v.teto - v.valor);
+      v.valor += add;
+      if (resta !== Infinity) resta -= add;
+      if (v.valor < v.teto) proximas.push(v);
+    }
+    if (proximas.length === abertas.length && parte !== Infinity && parte < 10) break;
+    abertas = proximas;
+  }
+  for (const a of rosto) {
+    const unica = AREA_UNICA.has(a.id);
+    const linhas = profundidadesRosto(a.id).map((p) => {
+      const val = (lado: string) => vagas.find((v) => v.area === a.id && v.prof === p && v.lado === lado)?.valor ?? 0;
+      return unica ? { prof: fx(p), disp: val("U") } : { prof: fx(p), dispD: val("D"), dispE: val("E") };
+    });
+    const t = linhas.reduce((s, l: any) => s + (l.disp ?? 0) + (l.dispD ?? 0) + (l.dispE ?? 0), 0);
+    const id = idDaArea(a.id, NOME_EXTRA[a.id] ?? a.nome, "facial", !unica);
+    DATA[id] = linhas;
+    resumo.push({ area: a.nome, total: t });
+    usado += t;
+  }
+
+  const sobra = saldo === null ? 0 : Math.max(0, saldo - usado);
+  if (sobra >= 10 && rosto.length) avisos.push(`Sobraram ${sobra.toLocaleString("pt-BR")} disparos: as áreas do rosto chegaram no máximo.`);
+  const nomesCorporais = (e.corporais ?? []).map((c) => c.nome.trim()).filter(Boolean);
+  const proc = [nomeProcedimento(e.areas), ...nomesCorporais].filter(Boolean).join(" + ");
+  const estado: EstadoPlanejador = {
+    DATA,
+    customAreas,
+    customSeq: customAreas.length,
+    saldoTotal: String(saldo ?? usado),
+    procNome: proc,
+    ...(e.queixa ? { queixa: e.queixa } : {}),
+    ...(e.paciente ? { paciente: e.paciente } : {}),
+  };
+  return { estado, resumo, total: usado, sobra, avisos };
 }

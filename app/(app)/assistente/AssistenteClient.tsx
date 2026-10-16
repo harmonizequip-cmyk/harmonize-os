@@ -523,7 +523,7 @@ export default function AssistenteClient() {
                 {b.whatsapp && <BotoesWhatsApp lista={b.whatsapp} />}
                 {b.planilhas && <BotoesPlanilha lista={b.planilhas} />}
                 {b.agendas?.map((a, j) => <CartaoAgenda key={j} agenda={a} onPedir={(p) => enviar(p)} />)}
-                {b.escolhas?.map((e, j) => <CartaoEscolhaAreas key={j} escolha={e} onPedir={(t) => enviar(t)} />)}
+                {b.escolhas?.map((e, j) => <CartaoEscolhaAreas key={j} escolha={e} clienteId={cliente?.id ?? null} onPedir={(t) => enviar(t)} />)}
                 {b.planejamentos?.map((p, j) => <CartaoPlanejamento key={j} plano={p} />)}
                 {temVoz && (
                   <button

@@ -47,6 +47,10 @@ type Bloco =
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 type Mensagem = { role: "user" | "assistant"; content: string | Bloco[] };
 
+// Áreas do seletor (lib/planejamento.ts CATALOGO_AREAS + lib/boneco-corporal.ts CATALOGO_CORPORAL).
+const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "terco_medio", "nasolabial", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+
 const FERRAMENTAS = [
   {
     name: "consultar_banco",
@@ -149,14 +153,14 @@ const FERRAMENTAS = [
   {
     name: "escolher_areas",
     description:
-      "Mostra ao Eder a lista de áreas com caixinhas para ele marcar o que vai tratar (full face ou quando ele não disse as áreas). Use ANTES de preparar_planejamento quando as áreas não estiverem definidas. Ele marca e manda; aí você distribui.",
+      "Mostra ao Eder o seletor: caixinhas do rosto, campos da papada e o boneco corporal (toque na região). O seletor já monta o planejamento pelas regras e abre no planejador; só volta para você se ele pedir ajuste. Use quando as áreas não estiverem definidas (full face, corporal, 'monta um planejamento').",
     input_schema: {
       type: "object",
       properties: {
         marcadas: {
           type: "array",
           description: "Áreas que já vêm marcadas (sugestão pela queixa).",
-          items: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "terco_medio", "nasolabial", "olhos", "mento"] },
+          items: { type: "string", enum: [...AREAS_SELETOR] },
         },
         saldo_total: { type: "integer" },
         queixa: { type: "string" },
@@ -223,6 +227,7 @@ const FERRAMENTAS = [
               regiao: { type: "string", enum: ["facial", "corporal"] },
               bilateral: { type: "boolean" },
               quadrantes: { type: "integer", description: "Corporal: quantos quadrantes de 10 x 10 cm (multiplica os disparos)." },
+              parte_do_corpo: { type: "string", enum: [...AREAS_CORPORAIS], description: "Corporal: região do boneco (vira a imagem da área no planejador)." },
               linhas: {
                 type: "array",
                 items: {
@@ -520,7 +525,7 @@ async function executarFerramenta(
       };
     }
     if (nome === "escolher_areas") {
-      const validas = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "terco_medio", "nasolabial", "olhos", "mento"];
+      const validas: string[] = AREAS_SELETOR;
       const marcadas = (Array.isArray(entrada.marcadas) ? entrada.marcadas : []).map(String).filter((x) => validas.includes(x));
       estado.escolhas.push({
         marcadas,
@@ -606,13 +611,18 @@ async function executarFerramenta(
           const base: Record<string, unknown> = bilateral
             ? { prof, dispD: n(l.direito ?? l.disparos), dispE: n(l.esquerdo ?? l.disparos) }
             : { prof, disp: n(l.disparos ?? (n(l.direito) + n(l.esquerdo))) };
-          if (corporal) base.quad = quad;
+          if (corporal) {
+            base.quad = quad;
+            const valores = bilateral ? [base.dispD as number, base.dispE as number] : [base.disp as number];
+            if (valores.some((v) => v < 3200 || v > 4000)) problemas.push(`${nomeArea} ${prof} mm: corporal vai de 3.200 a 4.000 por profundidade por quadrante`);
+          }
           const soma = bilateral ? (base.dispD as number) + (base.dispE as number) : (base.disp as number);
           totArea += soma * quad;
           linhas.push(base);
         }
         if (!linhas.length) continue;
-        customAreas.push({ id, nome: nomeArea, bilateral, opts: PROF_PAP, regiao: corporal ? "corporal" : "facial" });
+        const parte = corporal && AREAS_CORPORAIS.includes(String(x.parte_do_corpo)) ? String(x.parte_do_corpo) : "corpo";
+        customAreas.push({ id, nome: nomeArea, bilateral, opts: PROF_PAP, regiao: corporal ? "corporal" : "facial", ...(corporal ? { img: `/ferramentas/corpo/${parte}.svg` } : {}) });
         DATA[id] = linhas;
         resumo.push({ area: nomeArea, total: totArea });
         total += totArea;

@@ -658,10 +658,28 @@ table.rt .tr-tot td { background: var(--teal-l); font-weight: 700; color: var(--
     </div>
     <div class="modal-field">
       <label>Região</label>
-      <select id="mRegiao">
+      <select id="mRegiao" onchange="mudouRegiaoModal()">
         <option value="facial">Facial</option>
         <option value="corporal">Corporal</option>
       </select>
+    </div>
+    <div class="modal-field" id="mParteWrap" style="display:none">
+      <label>Parte do corpo (marca no boneco)</label>
+      <select id="mParte" onchange="mudouParteModal()">
+        <option value="" data-bi="1">Outra (boneco sem marca)</option>
+        <option value="abdomen" data-bi="0">Abdômen</option>
+        <option value="flancos" data-bi="1">Flancos</option>
+        <option value="bracos" data-bi="1">Braços</option>
+        <option value="costas" data-bi="1">Costas (dobra do sutiã)</option>
+        <option value="gluteos" data-bi="1">Glúteos</option>
+        <option value="culote" data-bi="1">Culote</option>
+        <option value="coxa_interna" data-bi="1">Interno de coxa</option>
+        <option value="coxa_anterior" data-bi="1">Coxa anterior</option>
+        <option value="coxa_posterior" data-bi="1">Coxa posterior</option>
+        <option value="joelhos" data-bi="1">Joelhos</option>
+        <option value="panturrilhas" data-bi="1">Panturrilhas</option>
+      </select>
+      <img id="mParteImg" src="/ferramentas/corpo/corpo.svg" alt="" style="display:block;width:150px;height:150px;margin:8px auto 0;border-radius:10px;border:1.5px solid var(--border)">
     </div>
     <div class="modal-field">
       <label>Tipo de aplicação</label>
@@ -1033,10 +1051,31 @@ function addLinha(id) {
 function abrirModal() {
   document.getElementById('mNome').value   = '';
   document.getElementById('mRegiao').value = 'facial';
+  document.getElementById('mParte').value  = '';
+  mudouRegiaoModal();
   document.getElementById('mTipo').value   = 'bilateral';
   document.getElementById('mProf').value   = '3.0';
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(() => document.getElementById('mNome').focus(), 120);
+}
+
+// Harmonize: área corporal escolhe a parte do corpo, e a imagem da área é o
+// boneco inteiro com a região marcada (public/ferramentas/corpo).
+let nomeAutoModal = '';
+function mudouRegiaoModal() {
+  const corporal = document.getElementById('mRegiao').value === 'corporal';
+  document.getElementById('mParteWrap').style.display = corporal ? '' : 'none';
+}
+function mudouParteModal() {
+  const sel = document.getElementById('mParte');
+  const op = sel.options[sel.selectedIndex];
+  document.getElementById('mParteImg').src = '/ferramentas/corpo/' + (sel.value || 'corpo') + '.svg';
+  const nome = document.getElementById('mNome');
+  if (!nome.value.trim() || nome.value === nomeAutoModal) {
+    nomeAutoModal = sel.value ? op.textContent : '';
+    nome.value = nomeAutoModal;
+  }
+  document.getElementById('mTipo').value = op.dataset.bi === '0' ? 'unico' : 'bilateral';
 }
 
 function fecharModal() {
@@ -1051,7 +1090,8 @@ function confirmarArea() {
   const profInicial = document.getElementById('mProf').value;
   const id = 'custom_' + (++customSeq);
   // Facial → rosto limpo; Corporal → imagem corporal
-  const img = regiao === 'corporal' ? IMG_CORPORAL : IMG_FACIAL_LIMPO;
+  const parte = document.getElementById('mParte').value;
+  const img = regiao === 'corporal' ? (parte ? '/ferramentas/corpo/' + parte + '.svg' : IMG_CORPORAL) : IMG_FACIAL_LIMPO;
   const a  = { id, nome, bilateral, opts: OPTS_ALL, regiao, img };
   customAreas.push(a);
   DATA[id] = [novaLinha(a, profInicial)];

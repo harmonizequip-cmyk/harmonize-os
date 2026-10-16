@@ -8,9 +8,10 @@ import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { CHAVE_PLANO_IA, linkCliente, linkEvento, linkNovoPlanejamento } from "@/lib/atalhos";
-import { chaveLocal, temConteudo, type EstadoPlanejador } from "@/lib/planejamento";
+import { chaveLocal, temConteudo, type EstadoPlanejador, type PlanejamentoMontado } from "@/lib/planejamento";
+import SeletorPlanejamento from "@/components/SeletorPlanejamento";
 import { formatDate } from "@/lib/format";
-import { ArrowLeft, Check, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ListChecks, Loader2, Trash2, X } from "lucide-react";
 
 type Cliente = ClientOption & { profissional: string };
 type Evento = { id: string; date_start: string; event_type: string };
@@ -45,6 +46,9 @@ export default function EditorPlanejamento({
   const [pronto, setPronto] = useState(false);
   // Chave local fixa enquanto a tela está aberta (o novo ganha id só depois).
   const [chave] = useState(() => planoId ?? `novo-${crypto.randomUUID()}`);
+  const [seletor, setSeletor] = useState(false);
+  const [versao, setVersao] = useState(0);
+  const atual = useRef<EstadoPlanejador>(estado);
 
   const ultimo = useRef<{ estado: EstadoPlanejador; total: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +70,7 @@ export default function EditorPlanejamento({
     } catch {
       // sessão indisponível: segue com o estado inicial
     }
+    atual.current = inicial;
     try {
       localStorage.setItem(chaveLocal(chave), JSON.stringify(inicial));
     } catch {
@@ -120,6 +125,7 @@ export default function EditorPlanejamento({
       if (!m || m.plano !== chave) return;
       if (m.tipo === "planejador:estado" && m.estado) {
         ultimo.current = { estado: m.estado, total: Number(m.total) || 0 };
+        atual.current = m.estado;
         agendar();
       }
       if (m.tipo === "planejador:novo") {
@@ -182,6 +188,32 @@ export default function EditorPlanejamento({
     setEvento(novoEvento);
     ligacao.current = { cliente: novoCliente, evento: novoEvento };
     if (idRef.current || ultimo.current) agendar();
+  }
+
+  // "Montar pelas regras": troca as áreas pelo que o seletor montou, mantém
+  // paciente, datas e anotações, e recarrega a moldura.
+  function aplicarSeletor(m: PlanejamentoMontado) {
+    const tem = Object.keys((atual.current.DATA as Record<string, unknown>) ?? {}).length > 0;
+    if (tem && !window.confirm("Trocar as áreas e disparos deste planejamento pelo que foi montado?")) return false;
+    const novo: EstadoPlanejador = {
+      ...atual.current,
+      DATA: m.estado.DATA,
+      customAreas: m.estado.customAreas,
+      customSeq: m.estado.customSeq,
+      saldoTotal: m.estado.saldoTotal,
+      procNome: m.estado.procNome,
+      ...(m.estado.queixa ? { queixa: m.estado.queixa } : {}),
+    };
+    atual.current = novo;
+    try {
+      localStorage.setItem(chaveLocal(chave), JSON.stringify(novo));
+    } catch {
+      // sem armazenamento: só guarda no banco
+    }
+    ultimo.current = { estado: novo, total: m.total };
+    agendar();
+    setSeletor(false);
+    setVersao((v) => v + 1);
   }
 
   async function excluir() {
@@ -281,6 +313,15 @@ export default function EditorPlanejamento({
             </Atalho>
           )}
           {!somenteLeitura && (
+            <button
+              type="button"
+              onClick={() => setSeletor(true)}
+              className="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-brand-teal/40 bg-brand-teal/10 px-2.5 py-1 text-xs font-semibold text-brand-teal-dark"
+            >
+              <ListChecks size={13} /> Montar pelas regras
+            </button>
+          )}
+          {!somenteLeitura && (
             <Atalho
               href={`/assistente?${cliente ? `cliente=${cliente}&` : ""}pergunta=${encodeURIComponent(
                 "Monta um planejamento: paciente , saldo de  disparos, queixa principal: "
@@ -292,8 +333,28 @@ export default function EditorPlanejamento({
           )}
         </Atalhos>
       </div>
+      {seletor && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setSeletor(false)}>
+          <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-neutral-50 p-4 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-bold text-neutral-900">Montar pelas regras</p>
+              <button onClick={() => setSeletor(false)} className="text-neutral-400" aria-label="Fechar">
+                <X size={18} />
+              </button>
+            </div>
+            <SeletorPlanejamento
+              saldoInicial={Number(atual.current.saldoTotal) || null}
+              queixaInicial={(atual.current.queixa as string) || null}
+              paciente={(atual.current.paciente as string) || null}
+              textoAplicar="Colocar no planejador"
+              onAplicar={aplicarSeletor}
+            />
+          </div>
+        </div>
+      )}
       {pronto && (
         <iframe
+          key={versao}
           title="Planejador HIPRO"
           src={`/ferramentas/planejador.html?plano=${encodeURIComponent(chave)}`}
           className="h-[calc(100dvh-230px)] min-h-[520px] w-full border-0 bg-[#f4f6f7] sm:rounded-b-2xl"
