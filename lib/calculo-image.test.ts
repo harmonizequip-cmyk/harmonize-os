@@ -139,3 +139,89 @@ describe("imagem da mentoria", () => {
     expect(mentoria.isParcelado).toBe(true);
   });
 });
+
+describe("imagem do cálculo com várias contagens e crédito", () => {
+  const base = {
+    isMentoria: false,
+    custoManualPorDisparo: null,
+    mentoriaPricing: null,
+    kmIda: 0,
+    itens: [],
+    reservationFeeStatus: "nao_aplica" as const,
+    reservationFee: 250,
+  };
+
+  it("sem dados novos sai igual a antes", () => {
+    const pricing = calculateRentalValue(15_000, DEFAULT_PRICING);
+    const resumo = calcularResumoLocacao({ ...base, shots: 15_000, pricing });
+    const d = montarDadosCalculo({
+      cliente: "DRA. TESTE",
+      dataEvento: "2026-10-20",
+      contagemInicial: 1_000,
+      contagemFinal: 16_000,
+      disparos: 15_000,
+      pricing,
+      custoManualPorDisparo: null,
+      itens: [],
+      descontoPercentual: null,
+      kmIda: 0,
+      resumo,
+      contagens: [{ inicial: 1_000, final: 16_000, disparos: 15_000, viraCredito: false }],
+    });
+    expect(d.contagens).toBeUndefined();
+    expect(d.creditoUsado).toBeUndefined();
+    expect(d.disparosRealizados).toBeUndefined();
+  });
+
+  it("leva as contagens e o crédito usado", () => {
+    const pricing = calculateRentalValue(12_000, DEFAULT_PRICING);
+    const resumo = calcularResumoLocacao({ ...base, shots: 12_000, pricing });
+    const contagens = [
+      { inicial: 1_000, final: 11_000, disparos: 10_000, viraCredito: true },
+      { inicial: 500, final: 7_500, disparos: 7_000, viraCredito: false },
+    ];
+    const d = montarDadosCalculo({
+      cliente: "DRA. TESTE",
+      dataEvento: "2026-10-20",
+      contagemInicial: 1_000,
+      contagemFinal: 7_500,
+      disparos: 12_000,
+      pricing,
+      custoManualPorDisparo: null,
+      itens: [],
+      descontoPercentual: null,
+      kmIda: 0,
+      resumo,
+      contagens,
+      disparosRealizados: 17_000,
+      creditoUsado: 5_000,
+    });
+    expect(d.contagens).toEqual(contagens);
+    expect(d.creditoUsado).toBe(5_000);
+    expect(d.disparosRealizados).toBe(17_000);
+    expect(d.disparos).toBe(12_000);
+  });
+
+  it("tudo no crédito: imagem com valor dos disparos zero", () => {
+    const resumo = calcularResumoLocacao({ ...base, shots: 0, pricing: null });
+    const d = montarDadosCalculo({
+      cliente: "DRA. TESTE",
+      dataEvento: "2026-10-20",
+      contagemInicial: 1_000,
+      contagemFinal: 4_000,
+      disparos: 0,
+      pricing: null,
+      custoManualPorDisparo: null,
+      itens: [],
+      descontoPercentual: null,
+      kmIda: 0,
+      resumo,
+      disparosRealizados: 3_000,
+      creditoUsado: 3_000,
+    });
+    expect(d.valorDisparos).toBe(0);
+    expect(d.faixaTitulo).toBe("CRÉDITO DA CLIENTE");
+    expect(d.faixaLinhas[0]).toBe(`3.000 disparos do crédito: ${reais(0)}`);
+    expect(d.total).toBe(resumo.totalAPagarAgora);
+  });
+});

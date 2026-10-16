@@ -26,9 +26,12 @@ export const PAYMENT_METHODS = [
   { value: "outros", label: "Outros" },
 ] as const;
 
-export const PAYMENT_LABELS: Record<string, string> = Object.fromEntries(
-  PAYMENT_METHODS.map((p) => [p.value, p.label])
-);
+// Permuta não entra em PAYMENT_METHODS (não é forma de despesa), mas aparece
+// no resumo quando a cliente paga a locação com produto ou serviço.
+export const PAYMENT_LABELS: Record<string, string> = {
+  ...Object.fromEntries(PAYMENT_METHODS.map((p) => [p.value, p.label])),
+  permuta: "Permuta",
+};
 
 // As três contas PIX reais do negócio (ver rental_payments.pix_conta no
 // banco — lista fechada de propósito, igual lá). Nome/chave usados só para

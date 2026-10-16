@@ -36,6 +36,19 @@ export interface DadosImagemCalculo {
   ajustes: LinhaAjusteImagem[];
   total: number;
   observacaoTotal: string | null;
+  /** Mais de uma contagem (troca de ponteira): cada uma vira uma linha. */
+  contagens?: ContagemImagem[];
+  /** Total real de disparos quando parte foi coberta pelo crédito (`disparos` = cobrados). */
+  disparosRealizados?: number;
+  /** Disparos do crédito da cliente usados nesta locação. */
+  creditoUsado?: number;
+}
+
+export interface ContagemImagem {
+  inicial: number;
+  final: number;
+  disparos: number;
+  viraCredito: boolean;
 }
 
 export function reais(n: number): string {
@@ -145,21 +158,51 @@ export function montarAjustes(params: {
   return linhas;
 }
 
+/** Todos os disparos cobertos pelo crédito: não há faixa, o valor é zero. */
+export function faixaTudoNoCredito(
+  disparosDoCredito: number
+): Pick<DadosImagemCalculo, "faixaTitulo" | "faixaSubtitulo" | "faixaChip" | "faixaLinhas" | "valorDisparos"> {
+  return {
+    faixaTitulo: "CRÉDITO DA CLIENTE",
+    faixaSubtitulo: "Todos os disparos cobertos pelo crédito",
+    faixaChip: reais(0),
+    faixaLinhas: [`${inteiro(disparosDoCredito)} disparos do crédito: ${reais(0)}`],
+    valorDisparos: 0,
+  };
+}
+
 export function montarDadosCalculo(params: {
   cliente: string | null;
   dataEvento: string | null;
   contagemInicial: number;
   contagemFinal: number;
+  /** Disparos cobrados (depois do crédito usado). */
   disparos: number;
-  pricing: RentalPricingBreakdown;
+  /** null quando todos os disparos foram cobertos pelo crédito. */
+  pricing: RentalPricingBreakdown | null;
   custoManualPorDisparo: number | null;
   itens: ItemAjuste[];
   descontoPercentual: number | null;
   kmIda: number;
   resumo: ResumoLocacao;
+  /** Contagens da locação; só aparecem na imagem quando são mais de uma. */
+  contagens?: ContagemImagem[];
+  disparosRealizados?: number;
+  creditoUsado?: number;
 }): DadosImagemCalculo {
-  const faixa = descreverFaixa(params.pricing, params.custoManualPorDisparo, params.disparos);
+  const creditoUsado = Math.max(0, Math.round(params.creditoUsado ?? 0));
+  const faixa =
+    params.pricing && params.disparos > 0
+      ? descreverFaixa(params.pricing, params.custoManualPorDisparo, params.disparos)
+      : faixaTudoNoCredito(creditoUsado || params.disparosRealizados || 0);
+  const extras: Pick<DadosImagemCalculo, "contagens" | "disparosRealizados" | "creditoUsado"> = {};
+  if (params.contagens && params.contagens.length > 1) extras.contagens = params.contagens;
+  if (creditoUsado > 0) {
+    extras.creditoUsado = creditoUsado;
+    extras.disparosRealizados = params.disparosRealizados ?? params.disparos + creditoUsado;
+  }
   return {
+    ...extras,
     cliente: params.cliente,
     dataEvento: params.dataEvento,
     contagemInicial: params.contagemInicial,
@@ -278,7 +321,11 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   const alturaAjustes = dados.ajustes.length > 0 ? 40 + dados.ajustes.length * 52 : 0;
   const alturaObs = dados.observacaoTotal ? 24 : 0;
   const ehMentoria = dados.modo === "mentoria";
-  const altura = 96 + (ehMentoria ? 60 : 3 * 60) + 70 + alturaFaixa + 20 + 90 + 20 + alturaAjustes + 130 + alturaObs + 56;
+  const variasContagens = !ehMentoria && (dados.contagens?.length ?? 0) > 1;
+  const comCredito = !ehMentoria && (dados.creditoUsado ?? 0) > 0;
+  const alturaContagens = ehMentoria ? 0 : variasContagens ? (dados.contagens?.length ?? 0) * 64 : 2 * 60;
+  const alturaCredito = comCredito ? 2 * 60 + 10 : 0;
+  const altura = 96 + alturaContagens + 60 + alturaCredito + 70 + alturaFaixa + 20 + 90 + 20 + alturaAjustes + 130 + alturaObs + 56;
 
   const canvas = document.createElement("canvas");
   canvas.width = LARGURA * ESCALA;
@@ -325,7 +372,39 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
     ctx.textAlign = "left";
     y += 60;
   };
-  if (!ehMentoria) {
+  if (variasContagens) {
+    // Uma linha por contagem (troca de ponteira): inicial → final = disparos.
+    (dados.contagens ?? []).forEach((c, i) => {
+      roundedRectPath(ctx, MARGEM, y, larguraUtil, 54, 14);
+      ctx.fillStyle = c.viraCredito ? COR.rosaClaro : COR.cinzaCard;
+      ctx.fill();
+      if (c.viraCredito) {
+        ctx.strokeStyle = COR.rosaBorda;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.textAlign = "left";
+      ctx.fillStyle = COR.tinta;
+      ctx.font = `600 14px ${FONTE}`;
+      const rotulo = `Contagem ${i + 1}`;
+      ctx.fillText(rotulo, MARGEM + 16, y + 22);
+      if (c.viraCredito) {
+        const larguraRotulo = ctx.measureText(rotulo).width;
+        ctx.fillStyle = COR.rosa;
+        ctx.font = `700 12px ${FONTE}`;
+        ctx.fillText("·  vira crédito", MARGEM + 16 + larguraRotulo + 8, y + 22);
+      }
+      ctx.fillStyle = COR.suave;
+      ctx.font = `500 13px ${FONTE}`;
+      ctx.fillText(`${inteiro(c.inicial)} → ${inteiro(c.final)}`, MARGEM + 16, y + 41);
+      ctx.fillStyle = c.viraCredito ? COR.rosa : COR.tinta;
+      ctx.font = `700 19px ${FONTE}`;
+      ctx.textAlign = "right";
+      ctx.fillText(`= ${inteiro(c.disparos)}`, MARGEM + larguraUtil - 16, y + 34);
+      ctx.textAlign = "left";
+      y += 64;
+    });
+  } else if (!ehMentoria) {
     linhaCinza("Contagem inicial", inteiro(dados.contagemInicial));
     linhaCinza("Contagem final", inteiro(dados.contagemFinal));
   }
@@ -343,9 +422,15 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   ctx.fillStyle = COR.teal;
   ctx.font = `700 26px ${FONTE}`;
   ctx.textAlign = "right";
-  ctx.fillText(inteiro(dados.disparos), MARGEM + larguraUtil - 16, y + 36);
+  ctx.fillText(inteiro(comCredito ? dados.disparosRealizados ?? dados.disparos : dados.disparos), MARGEM + larguraUtil - 16, y + 36);
   ctx.textAlign = "left";
   y += 74;
+
+  if (comCredito) {
+    linhaCinza("Crédito usado", `−${inteiro(dados.creditoUsado ?? 0)}`);
+    linhaCinza("Disparos cobrados", inteiro(dados.disparos));
+    y += 10;
+  }
 
   // Faixa aplicada
   roundedRectPath(ctx, MARGEM, y, larguraUtil, alturaFaixa, 14);
