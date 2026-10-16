@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkCliente, linkEvento, linkLocacao } from "@/lib/atalhos";
 import ClientPicker from "@/components/ClientPicker";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
@@ -334,14 +335,17 @@ export default function EditarLancamentoModal({
         >
           Remover só este pagamento
         </button>
-        {transaction.client_id && (
-          <Link
-            href={`/clientes/${transaction.client_id}`}
-            className="mt-2 block text-center text-xs text-brand-teal underline underline-offset-2"
-          >
-            Abrir a ficha do cliente
-          </Link>
-        )}
+        <Atalhos className="mt-3 justify-center">
+          {transaction.client_id && (
+            <Atalho href={linkCliente(transaction.client_id)} emoji="👤">Abrir a ficha do cliente</Atalho>
+          )}
+          {transaction.client_id && transaction.rental_id && (
+            <Atalho href={linkLocacao(transaction.client_id, transaction.rental_id)} emoji="📦">Ver a locação</Atalho>
+          )}
+          {transaction.calendar_event_id && (
+            <Atalho href={linkEvento(transaction.calendar_event_id)} emoji="📅">Atendimento na agenda</Atalho>
+          )}
+        </Atalhos>
       </>
     );
   }
@@ -353,6 +357,18 @@ export default function EditarLancamentoModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar lançamento</h2>
+
+        <Atalhos className="-mt-2 mb-3">
+          {transaction.client_id && (
+            <Atalho href={linkCliente(transaction.client_id)} emoji="👤">Ficha</Atalho>
+          )}
+          {transaction.client_id && transaction.rental_id && (
+            <Atalho href={linkLocacao(transaction.client_id, transaction.rental_id)} emoji="📦">Locação</Atalho>
+          )}
+          {transaction.calendar_event_id && (
+            <Atalho href={linkEvento(transaction.calendar_event_id)} emoji="📅">Reserva na agenda</Atalho>
+          )}
+        </Atalhos>
 
         <div className="mb-3 flex gap-2">
           {(["entrada", "saida"] as const).map((t) => (

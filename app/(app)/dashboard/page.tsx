@@ -18,6 +18,8 @@ import { foraDoResultadoPorCartao, foraDoSaldoPorCartao } from "@/lib/cartao";
 import { diasDoPeriodo } from "@/lib/period";
 import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
+import { LinkCliente } from "@/components/Atalhos";
+import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
 // máxima. Ficam aqui, juntas, para mudar num lugar só.
@@ -784,9 +786,9 @@ export default async function DashboardPage(
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-neutral-500">
+                    <Link href={linkDiaAgenda(date)} className="text-xs font-medium text-neutral-500 hover:text-brand-teal-dark">
                       {formatWeekdayDate(date)}
-                    </p>
+                    </Link>
                     {bothHipros && (
                       <span className="rounded-full bg-brand-pink/15 px-2 py-0.5 text-[10px] font-medium text-brand-pink-dark">
                         2 HIPROs no mesmo dia
@@ -801,11 +803,13 @@ export default async function DashboardPage(
                             e.event_type === "hipro_1" ? "bg-brand-teal" : "bg-brand-blue"
                           }`}
                         />
-                        <span className="font-medium text-neutral-900">
-                          {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
-                        </span>
+                        <Link href={linkEvento(e.id)} className="font-medium text-neutral-900 underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark">
+                          📅 {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
+                        </Link>
                         {e.clients?.name && (
-                          <span className="text-neutral-500">· {e.clients.name}</span>
+                          <span className="text-neutral-500">
+                            · <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
+                          </span>
                         )}
                         {!e.confirmed && (
                           <span className="ml-auto whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">

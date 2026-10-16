@@ -35,6 +35,21 @@ const cabecalhos = [
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)" },
 ];
 
+// Ferramentas em HTML próprio (public/ferramentas, ex.: planejador HIPRO)
+// abrem dentro de uma tela do app: podem ser emolduradas pelo próprio site e
+// usam as fontes do Google que vieram no arquivo original.
+const cspFerramentas = csp
+  .replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+  .replace("style-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com")
+  .replace("font-src 'self' data:", "font-src 'self' data: https://fonts.gstatic.com");
+const cabecalhosFerramentas = cabecalhos.map((c) =>
+  c.key === "Content-Security-Policy"
+    ? { key: c.key, value: cspFerramentas }
+    : c.key === "X-Frame-Options"
+    ? { key: c.key, value: "SAMEORIGIN" }
+    : c
+);
+
 const nextConfig = {
   // Sem isto, o Next.js App Router reaproveita (client-side) o RSC já buscado
   // para o layout/página ao navegar entre rotas irmãs (Link), mesmo em rotas
@@ -49,7 +64,10 @@ const nextConfig = {
   },
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: cabecalhos }];
+    return [
+      { source: "/((?!ferramentas/).*)", headers: cabecalhos },
+      { source: "/ferramentas/:path*", headers: cabecalhosFerramentas },
+    ];
   },
 };
 

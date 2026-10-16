@@ -11,6 +11,8 @@ import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import { somarDias, hojeLocal } from "@/lib/period";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
+import { Atalho, Atalhos, LinkCliente } from "@/components/Atalhos";
+import { linkEvento } from "@/lib/atalhos";
 import type { TarefaRow } from "./TarefasClient";
 
 const TIPOS: Record<TarefaRow["type"], string> = {
@@ -112,11 +114,18 @@ export default function ModoFila({
   return casca(
     <>
       <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[11px] font-medium text-brand-blue">{TIPOS[t.type]}</span>
-      <p className="mt-2 text-base font-semibold text-neutral-900">{t.client_name ?? t.title}</p>
+      <p className="mt-2 text-base font-semibold text-neutral-900">
+        {t.client_name ? <LinkCliente id={t.client_id}>{t.client_name}</LinkCliente> : t.title}
+      </p>
       <p className="text-xs text-neutral-500">
         {t.title} · {formatDate(t.due_date)}
         {atrasada && <span className="ml-1 font-medium text-red-600">atrasada</span>}
       </p>
+      {t.event_id && (
+        <Atalhos className="mt-2">
+          <Atalho href={linkEvento(t.event_id)} emoji="📅">Atendimento</Atalho>
+        </Atalhos>
+      )}
 
       {mensagem && (
         <p className="mt-3 whitespace-pre-line rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">

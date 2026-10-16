@@ -9,6 +9,8 @@ import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 import { hojeLocal } from "@/lib/period";
 import DespesasDaReserva from "@/components/DespesasDaReserva";
 import AjudaCustoReserva from "@/components/AjudaCustoReserva";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkEvento, linkLocacao } from "@/lib/atalhos";
 // Uma linha por agendamento do cliente, já com o rótulo de situação
 // resolvido pelo banco. A função agendamentos_do_cliente é quem combina
 // os dois eixos (status da locação e marca de confirmado) num rótulo só,
@@ -323,6 +325,11 @@ export default function AgendamentosDoCliente({
                   </span>
                 )}
               </div>
+
+              <Atalhos className="mt-1.5">
+                <Atalho href={linkEvento(a.event_id)} emoji="📅">Agenda</Atalho>
+                {a.rental_id && <Atalho href={linkLocacao(clientId, a.rental_id)} emoji="📦">Locação</Atalho>}
+              </Atalhos>
 
               {a.rental_id == null && !cancelado && (
                 <p className="mt-1 text-[11px] text-neutral-400">

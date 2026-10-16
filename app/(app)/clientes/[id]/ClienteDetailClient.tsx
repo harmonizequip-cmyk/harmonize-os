@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FileText } from "lucide-react";
@@ -16,6 +16,8 @@ import ReservarHiproModal from "../../agenda/ReservarHiproModal";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import HistoricoClienteSection from "./HistoricoClienteSection";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento } from "@/lib/atalhos";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -64,6 +66,8 @@ interface RentalRow {
   saldo?: number;
   totalPago?: number;
   equipments?: { name: string; serial_number?: string | null; anvisa_registro?: string | null } | null;
+  // Atendimento da Agenda ligado à locação (atalho 📅).
+  eventId?: string | null;
 }
 
 interface EquipmentOption {
@@ -151,6 +155,20 @@ export default function ClienteDetailClient({
   const [editingRental, setEditingRental] = useState<RentalRow | null>(null);
   const [contratoOrigem, setContratoOrigem] = useState<OrigemContrato | null>(null);
 
+  // /clientes/<id>?locacao=<rentalId>: atalho de outras telas (Agenda,
+  // Financeiro, Locações, Contratos...) que abre direto aquela locação.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get("locacao");
+    if (!id) return;
+    url.searchParams.delete("locacao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    const r = rentals.find((x) => x.id === id);
+    if (r) setEditingRental(r);
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const totalLocacoes = rentals.length;
   // Faturado e ticket médio saem da contagem contabilizável, não do
   // tamanho da lista do histórico. Locação cancelada continua aparecendo
@@ -201,6 +219,15 @@ export default function ClienteDetailClient({
               ✨ Conversar com o assistente sobre este cliente
             </Link>
           )}
+          <Atalhos className="mt-2">
+            <Atalho href={linkLancamentosCliente(client.id)} emoji="💰">Lançamentos</Atalho>
+            <Atalho href={linkLocacoesCliente(client.id)} emoji="📦">Locações</Atalho>
+            <Atalho href="/tarefas" emoji="🗒️">Tarefas</Atalho>
+            <Atalho href={`/planejador?cliente=${client.id}`} emoji="📋">Planejamentos</Atalho>
+            {!somenteLeitura && (
+              <Atalho href={linkNovoPlanejamento(client.id)} emoji="📋">Novo planejamento</Atalho>
+            )}
+          </Atalhos>
         </div>
         <div className="flex gap-2">
           <button
@@ -360,6 +387,12 @@ export default function ClienteDetailClient({
                   {pr.equipments?.name ?? "-"}
                 </p>
                 <p className="mt-0.5 text-xs text-neutral-500">{formatPeriodo(pr)}</p>
+                <Atalhos className="mt-2">
+                  <Atalho href={linkEvento(pr.id)} emoji="📅">Agenda</Atalho>
+                  {pr.equipment_id && !somenteLeitura && (
+                    <Atalho href={linkNovoPlanejamento(client.id, pr.id)} emoji="📋">Planejamento</Atalho>
+                  )}
+                </Atalhos>
                 {pr.taxa_status === "pendente" && (
                   <div className="mt-2">
                     <TaxaRecebidaBotao eventId={pr.id} />
@@ -393,7 +426,15 @@ export default function ClienteDetailClient({
                     <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                       {formatPeriodo(pr)}
                     </td>
-                    <td className="px-4 py-3 text-neutral-900">{pr.equipments?.name ?? "-"}</td>
+                    <td className="px-4 py-3 text-neutral-900">
+                      {pr.equipments?.name ?? "-"}
+                      <Atalhos className="mt-1">
+                        <Atalho href={linkEvento(pr.id)} emoji="📅">Agenda</Atalho>
+                        {pr.equipment_id && !somenteLeitura && (
+                          <Atalho href={linkNovoPlanejamento(client.id, pr.id)} emoji="📋">Planejamento</Atalho>
+                        )}
+                      </Atalhos>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       {pr.taxa_status === "pendente" && (
                         <div className="mb-2 min-w-[12rem] text-left">
@@ -446,8 +487,9 @@ export default function ClienteDetailClient({
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-neutral-500">
+              <span className="flex items-center gap-2 text-xs text-neutral-500">
                 {PAYMENT_LABELS[r.payment_method] ?? r.payment_method}
+                {r.eventId && <Atalho href={linkEvento(r.eventId)} emoji="📅">Agenda</Atalho>}
               </span>
               <span className="font-medium text-brand-teal">{formatCurrency(Number(r.calculated_value))}</span>
             </div>
@@ -504,7 +546,14 @@ export default function ClienteDetailClient({
                 onClick={() => setEditingRental(r)}
                 className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
               >
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatPeriodo(r)}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
+                  {formatPeriodo(r)}
+                  {r.eventId && (
+                    <span className="ml-2">
+                      <Atalho href={linkEvento(r.eventId)} emoji="📅" title="Atendimento na agenda">Agenda</Atalho>
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-neutral-900">{r.equipments?.name ?? "-"}</td>
                 <td className="px-4 py-3 text-neutral-600">{r.shots.toLocaleString("pt-BR")}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-brand-teal">

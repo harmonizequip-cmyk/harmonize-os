@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Search, X } from "lucide-react";
+import { linkEvento } from "@/lib/atalhos";
 
 interface ClientHit {
   id: string;
@@ -188,7 +189,7 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
                   {eventHits.map((e) => (
                     <button
                       key={e.id}
-                      onClick={() => goTo(`/agenda?date=${e.date_start}`)}
+                      onClick={() => goTo(linkEvento(e.id))}
                       className="block w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
                     >
                       {e.title}

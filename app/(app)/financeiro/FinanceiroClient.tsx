@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -13,6 +14,8 @@ import NovoLancamentoModal from "./NovoLancamentoModal";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { foraDoResultadoPorCartao, rotuloFatura } from "@/lib/cartao";
 import EditarLancamentoModal from "./EditarLancamentoModal";
+import { LinkCliente } from "@/components/Atalhos";
+import { linkEvento, linkLocacao } from "@/lib/atalhos";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -59,13 +62,37 @@ interface ClientOption {
 }
 
 // Marca o vínculo com a locação. Despesa de cliente sem locação fica em
-// âmbar, porque é ela que não entra no lucro de locação nenhuma.
+// âmbar, porque é ela que não entra no lucro de locação nenhuma. A marca
+// leva à locação (ficha da cliente) ou à reserva (Agenda) sem abrir a linha.
 function vinculoLocacao(t: TransactionRow) {
+  const link = "underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark";
   if (t.rental_date) {
-    return <span className="ml-1 text-xs font-normal text-neutral-400">· locação {formatDate(t.rental_date)}</span>;
+    return (
+      <span className="ml-1 text-xs font-normal text-neutral-400">
+        ·{" "}
+        {t.client_id && t.rental_id ? (
+          <Link href={linkLocacao(t.client_id, t.rental_id)} onClick={(e) => e.stopPropagation()} className={link}>
+            locação {formatDate(t.rental_date)}
+          </Link>
+        ) : (
+          `locação ${formatDate(t.rental_date)}`
+        )}
+      </span>
+    );
   }
   if (t.reserva_date) {
-    return <span className="ml-1 text-xs font-normal text-neutral-400">· reserva {formatDate(t.reserva_date)}</span>;
+    return (
+      <span className="ml-1 text-xs font-normal text-neutral-400">
+        ·{" "}
+        {t.calendar_event_id ? (
+          <Link href={linkEvento(t.calendar_event_id)} onClick={(e) => e.stopPropagation()} className={link}>
+            reserva {formatDate(t.reserva_date)}
+          </Link>
+        ) : (
+          `reserva ${formatDate(t.reserva_date)}`
+        )}
+      </span>
+    );
   }
   if (t.type === "saida" && t.client_id && !t.rental_id && !t.calendar_event_id) {
     return <span className="ml-1 text-xs font-normal text-amber-600">· sem locação</span>;
@@ -168,8 +195,9 @@ export default function FinanceiroClient({
   // e o lançamento do caixa nunca ficarem diferentes.
   function abrirLancamento(t: TransactionRow) {
     if (somenteLeitura) return;
+    // Entrada espelhada de uma Retirada: abre a retirada original.
     if ((t as any).vinculo_id) {
-      window.alert("Esta entrada veio de uma Retirada no caixa da Harmonize. Para mudar ou apagar, edite a retirada no Financeiro.");
+      router.push(`/financeiro?lancamento=${(t as any).vinculo_id}`);
       return;
     }
     if (ehCategoriaDeEmprestimo(t.categories?.name)) {
@@ -178,6 +206,36 @@ export default function FinanceiroClient({
     }
     setEditing(t);
   }
+
+  // /financeiro?lancamento=<id>: atalho de outras telas (locação, ficha do
+  // cliente, cartões...) que abre direto a edição daquele lançamento, mesmo
+  // que ele seja de outro mês.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get("lancamento");
+    if (!id) return;
+    url.searchParams.delete("lancamento");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    const naLista = initialTransactions.find((t) => t.id === id);
+    if (naLista) {
+      abrirLancamento(naLista);
+      return;
+    }
+    createClient()
+      .from("transactions")
+      .select(
+        "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
+      )
+      .eq("id", id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        const um = <T,>(v: T | T[] | null) => (Array.isArray(v) ? v[0] ?? null : v);
+        abrirLancamento({ ...(data as any), categories: um((data as any).categories), clients: um((data as any).clients) });
+      });
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleCreated() {
     setModalOpen(false);
@@ -355,7 +413,12 @@ export default function FinanceiroClient({
                 </p>
                 <p className="mt-0.5 text-xs text-neutral-500">
                   {formatDate(t.date)} · {t.categories?.name ?? "-"}
-                  {t.clients?.name ? ` · ${t.clients.name}` : ""}
+                  {t.clients?.name && (
+                    <>
+                      {" · "}
+                      <LinkCliente id={t.client_id}>{t.clients.name}</LinkCliente>
+                    </>
+                  )}
                   {vinculoLocacao(t)}
                   {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600">· custo de atendimento</span>}
                 </p>
@@ -424,7 +487,9 @@ export default function FinanceiroClient({
                     </span>
                   )}
                   {t.clients?.name && (
-                    <span className="ml-1 text-xs font-normal text-neutral-400">· {t.clients.name}</span>
+                    <span className="ml-1 text-xs font-normal text-neutral-400">
+                      · <LinkCliente id={t.client_id}>{t.clients.name}</LinkCliente>
+                    </span>
                   )}
                   {vinculoLocacao(t)}
                   {(t as any).conta_no_lucro && <span className="ml-1 text-xs text-amber-600">· custo de atendimento</span>}

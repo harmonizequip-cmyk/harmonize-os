@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ORIGENS } from "@/app/(app)/funil/NovoLeadModal";
+import { LinkCliente } from "@/components/Atalhos";
 
 export default function CompletarOrigem({ clientes }: { clientes: { id: string; name: string }[] }) {
   const supabase = createClient();
@@ -44,7 +45,9 @@ export default function CompletarOrigem({ clientes }: { clientes: { id: string; 
           <ul className="mt-2 space-y-2">
             {restantes.map((c) => (
               <li key={c.id}>
-                <p className="truncate text-xs text-neutral-800">{c.name}</p>
+                <p className="truncate text-xs text-neutral-800">
+                  <LinkCliente id={c.id}>{c.name}</LinkCliente>
+                </p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {ORIGENS.map((o) => (
                     <button

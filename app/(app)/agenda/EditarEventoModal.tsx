@@ -14,6 +14,8 @@ import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
 import ArteDivulgacaoModal from "@/components/ArteDivulgacaoModal";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkCliente, linkLancamentosCliente, linkLocacao, linkNovoPlanejamento } from "@/lib/atalhos";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import { valorParaNumero } from "@/lib/valor";
@@ -477,6 +479,15 @@ export default function EditarEventoModal({
               : "Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar."}
           </p>
 
+          {event.client_id && (
+            <Atalhos className="-mt-2 mb-4">
+              <Atalho href={linkCliente(event.client_id)} emoji="👤">Ficha da cliente</Atalho>
+              {!event.is_mentoria && (
+                <Atalho href={linkNovoPlanejamento(event.client_id, event.id)} emoji="📋">Planejamento</Atalho>
+              )}
+            </Atalhos>
+          )}
+
           {cancelError && <p className="mb-3 text-sm text-red-600">{cancelError}</p>}
 
           {showCancelForm ? (
@@ -788,8 +799,26 @@ export default function EditarEventoModal({
           <h2 className="mb-1 text-lg font-semibold text-neutral-900">{event.title}</h2>
           <p className="mb-4 text-sm text-neutral-500">
             Este evento veio de uma locação HIPRO. Para editar cliente, data, equipamento, disparos ou valor, isso é
-            feito na própria locação (na ficha do cliente), para manter o financeiro e a agenda sincronizados.
+            feito na própria locação (na{" "}
+            {event.client_id ? (
+              <Link href={linkCliente(event.client_id)} className="underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark">
+                ficha do cliente
+              </Link>
+            ) : (
+              "ficha do cliente"
+            )}
+            ), para manter o financeiro e a agenda sincronizados.
           </p>
+
+          {event.client_id && (
+            <Atalhos className="-mt-2 mb-4">
+              <Atalho href={linkCliente(event.client_id)} emoji="👤">Ficha</Atalho>
+              <Atalho href={linkLancamentosCliente(event.client_id)} emoji="💰">Lançamentos da cliente</Atalho>
+              {!event.is_mentoria && (
+                <Atalho href={linkNovoPlanejamento(event.client_id, event.id)} emoji="📋">Planejamento</Atalho>
+              )}
+            </Atalhos>
+          )}
 
           {saldoLocacao !== null && (
             <div className="mb-4 rounded-xl border border-neutral-200 p-3">
@@ -896,7 +925,7 @@ export default function EditarEventoModal({
             </button>
             {event.client_id && (
               <Link
-                href={`/clientes/${event.client_id}`}
+                href={linkLocacao(event.client_id, event.rental_id as string)}
                 className="flex-1 rounded-xl bg-brand-teal py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-teal-dark"
               >
                 Ir para a locação
@@ -915,6 +944,12 @@ export default function EditarEventoModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar evento</h2>
+
+        {event.client_id && (
+          <Atalhos className="-mt-2 mb-4">
+            <Atalho href={linkCliente(event.client_id)} emoji="👤">Ficha da cliente</Atalho>
+          </Atalhos>
+        )}
 
         <div className="space-y-3">
           <div>

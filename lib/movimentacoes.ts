@@ -43,6 +43,10 @@ export const ENTIDADE_LABEL: Record<string, string> = {
   tasks: "Tarefa",
   mentoring_events: "Mentoria",
   equipments: "Equipamento",
+  cliente: "Cliente",
+  planejamento: "Planejamento",
+  envio_agenda: "Envio da agenda",
+  cartoes: "Cartão",
 };
 
 export function formatarDataHora(iso: string) {

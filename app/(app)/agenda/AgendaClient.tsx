@@ -25,6 +25,7 @@ import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
+import { LinkCliente } from "@/components/Atalhos";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
@@ -234,6 +235,19 @@ export default function AgendaClient({
     const url = new URL(window.location.href);
     const confirmar = url.searchParams.get("confirmar");
     const acao = url.searchParams.get("acao");
+    // /agenda?evento=<id>: atalho de outras telas (Financeiro, Locações,
+    // Tarefas...) que abre direto o atendimento, já no mês e no dia dele.
+    const evento = url.searchParams.get("evento");
+    if (evento) {
+      url.searchParams.delete("evento");
+      const ev = initialEvents.find((e) => e.id === evento);
+      if (ev) {
+        setCurrentMonth(startOfMonth(parseDate(ev.date_start)));
+        setSelectedDate(ev.date_start);
+        setEditingEvent(ev);
+      }
+      if (!confirmar && acao !== "datas") window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
     if (!confirmar && acao !== "datas") return;
     url.searchParams.delete("confirmar");
     if (acao === "datas") url.searchParams.delete("acao");
@@ -504,7 +518,12 @@ export default function AgendaClient({
                     Taxa vencida
                   </span>
                 )}
-                {e.clients?.name ? ` · ${e.clients.name}` : ""}
+                {e.clients?.name && (
+                  <>
+                    {" · "}
+                    <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
+                  </>
+                )}
                 {/* "sem disparos ainda" é sobre a contagem de disparos do
                     HIPRO (preço/procedimento), não tem relação com
                     mensagem de confirmação — por isso continua igual. */}
@@ -608,17 +627,29 @@ export default function AgendaClient({
               <p className="px-3 py-2 text-sm text-neutral-400">Nenhum evento bate com essa busca.</p>
             ) : (
               eventMatches.map((e) => (
-                <button
+                // Div em vez de botão: o nome da cliente é um link e não pode
+                // ficar dentro de outro botão.
+                <div
                   key={e.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => goToEvent(e)}
-                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50"
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") goToEvent(e);
+                  }}
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-neutral-50"
                 >
                   <span className="font-medium text-neutral-800">{e.title}</span>
                   <span className="ml-2 text-xs text-neutral-400">
                     {formatDate(e.date_start)}
-                    {e.clients?.name ? ` · ${e.clients.name}` : ""}
+                    {e.clients?.name && (
+                      <>
+                        {" · "}
+                        <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
+                      </>
+                    )}
                   </span>
-                </button>
+                </div>
               ))
             )}
           </div>
@@ -894,7 +925,8 @@ export default function AgendaClient({
               Pedir confirmação no WhatsApp
             </h2>
             <p className="mb-3 text-xs text-neutral-500">
-              {pedidoEvent.clients?.name ?? "Cliente"} · {formatDate(pedidoEvent.date_start)}
+              <LinkCliente id={pedidoEvent.client_id}>{pedidoEvent.clients?.name ?? "Cliente"}</LinkCliente> ·{" "}
+              {formatDate(pedidoEvent.date_start)}
             </p>
 
             {pedidoCadastroIncompleto && (

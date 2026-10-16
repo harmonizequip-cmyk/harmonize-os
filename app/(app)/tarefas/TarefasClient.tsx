@@ -8,6 +8,8 @@ import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import ModoFila from "./ModoFila";
+import { Atalho, Atalhos, LinkCliente } from "@/components/Atalhos";
+import { linkEvento } from "@/lib/atalhos";
 
 import { hojeLocal } from "@/lib/period";
 export interface TarefaRow {
@@ -254,6 +256,11 @@ export default function TarefasClient({
                   </button>
                   {expanded && (
                     <div className="border-t border-brand-blue/10 px-3 py-2">
+                      {task.event_id && (
+                        <Atalhos className="mb-2">
+                          <Atalho href={linkEvento(task.event_id)} emoji="📅">Atendimento</Atalho>
+                        </Atalhos>
+                      )}
                       {/* Ação do tipo da tarefa: o aviso nunca leva a uma tela
                           sem a ação. WhatsApp com a mensagem pronta (a pessoa
                           lê antes de enviar) e, na taxa, a baixa direto aqui. */}
@@ -398,7 +405,11 @@ export default function TarefasClient({
                       <p className="font-medium text-neutral-500 line-through decoration-neutral-400">
                         {task.title}
                       </p>
-                      {task.client_name && <p className="text-[10px] text-neutral-400">{task.client_name}</p>}
+                      {task.client_name && (
+                        <p className="text-[10px] text-neutral-400">
+                          <LinkCliente id={task.client_id}>{task.client_name}</LinkCliente>
+                        </p>
+                      )}
                     </div>
                     <span className="flex-shrink-0 text-[10px] text-neutral-400">
                       {task.completed_at ? formatDate(task.completed_at.slice(0, 10)) : ""}

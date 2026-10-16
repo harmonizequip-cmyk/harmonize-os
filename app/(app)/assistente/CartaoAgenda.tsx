@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/format";
 import { gerarImagensAgenda } from "@/lib/agenda-imagens";
+import { LinkCliente } from "@/components/Atalhos";
 import type { AgendaPedida, ItemAgenda } from "@/lib/assistente";
 import { Check, ChevronDown, ChevronUp, ImageIcon, MessageCircle, Plus, Send } from "lucide-react";
 
@@ -86,15 +87,30 @@ function Linha({
 
   return (
     <div className={`rounded-xl border px-3 py-2.5 ${enviado ? "border-emerald-200 bg-emerald-50/60" : "border-neutral-200 bg-white"}`}>
-      <button onClick={() => setAberta((v) => !v)} className="flex w-full items-center justify-between gap-2 text-left">
+      {/* Div em vez de botão: o nome é link para a ficha (que para o
+          clique) e link não pode ficar dentro de botão. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setAberta((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setAberta((v) => !v);
+          }
+        }}
+        className="flex w-full cursor-pointer items-center justify-between gap-2 text-left"
+      >
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-neutral-900">{item.nome}</span>
+          <span className="block truncate text-sm font-semibold text-neutral-900">
+            <LinkCliente id={item.client_id}>{item.nome}</LinkCliente>
+          </span>
           <span className="block text-[11px] text-neutral-400">{enviado ? "✓ enviado" : quandoFoi(item.ultimo_envio)}</span>
         </span>
         <span className="flex flex-shrink-0 items-center gap-1 text-[11px] text-neutral-500">
           {aberta ? "fechar" : "mensagem"} {aberta ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </span>
-      </button>
+      </div>
       {aberta && (
         <textarea
           value={texto}

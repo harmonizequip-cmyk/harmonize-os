@@ -14,6 +14,8 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 import { faturaDaCompra, rotuloFatura, somarMesesRef } from "@/lib/cartao";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { Atalho } from "@/components/Atalhos";
+import { linkLancamento } from "@/lib/atalhos";
 
 export interface Cartao {
   id: string;
@@ -393,6 +395,14 @@ export default function CartoesClient({
                         {c.cartao_mov === "pagamento" ? "pago " : ""}
                         {formatCurrency(c.amount)}
                       </span>
+                      {/* Abre o lançamento para editar; o pessoal abre na tela do Pessoal. */}
+                      {!somenteLeitura && (
+                        <Atalho
+                          href={cartao.scope === "pessoal" ? `/pessoal/lancamentos?lancamento=${c.id}` : linkLancamento(c.id)}
+                        >
+                          abrir
+                        </Atalho>
+                      )}
                       {!somenteLeitura && c.cartao_mov === "compra" && (
                         <button type="button" onClick={() => excluirCompra(c)} className="text-[11px] text-neutral-400 underline">
                           apagar

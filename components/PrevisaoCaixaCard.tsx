@@ -8,6 +8,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { PrevisaoCaixa } from "@/lib/previsao";
+import { LinkCliente } from "@/components/Atalhos";
+import { linkEvento } from "@/lib/atalhos";
 
 const ROTULO_BASE = { cliente: "média do cliente", media: "média geral", sem: "sem histórico" } as const;
 
@@ -77,10 +79,14 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
             <ul className="mt-2 divide-y divide-neutral-200/70">
               {p.reservas.map((r) => (
                 <li key={r.id}>
-                  <Link href="/agenda" className="flex items-baseline justify-between gap-3 py-1.5 text-xs">
+                  <div className="flex items-baseline justify-between gap-3 py-1.5 text-xs">
                     <span className="min-w-0">
-                      <span className="text-neutral-500">{formatDate(r.data)}</span>{" "}
-                      <span className="font-medium text-neutral-800">{r.clienteNome ?? "Sem cliente"}</span>
+                      <Link href={linkEvento(r.id)} className="text-neutral-500 underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark">
+                        📅 {formatDate(r.data)}
+                      </Link>{" "}
+                      <LinkCliente id={r.clienteId} className="font-medium text-neutral-800">
+                        {r.clienteNome ?? "Sem cliente"}
+                      </LinkCliente>
                       <span className="block text-[10px] text-neutral-400">
                         {r.mentoria ? "Mentoria" : r.equipamento} · {ROTULO_BASE[r.base]}
                         {r.taxaPaga > 0 ? ` · taxa paga ${formatCurrency(r.taxaPaga)}` : ""}
@@ -89,7 +95,7 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
                     <span className="shrink-0 text-neutral-700">
                       {r.base === "sem" ? "?" : `≈ ${formatCurrency(r.aEntrar)}`}
                     </span>
-                  </Link>
+                  </div>
                 </li>
               ))}
             </ul>

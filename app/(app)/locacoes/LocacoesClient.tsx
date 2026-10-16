@@ -8,6 +8,8 @@ import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, colunasPorData, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkDiaAgenda, linkEvento, linkLancamentosCliente, linkLocacao } from "@/lib/atalhos";
 
 const PAGAMENTOS: Record<string, string> = {
   pix: "PIX",
@@ -41,6 +43,8 @@ interface Locacao {
   vencida: boolean;
   rescheduled: boolean;
   client_id: string;
+  // Atendimento da Agenda ligado à locação (para o atalho 📅).
+  event_id?: string | null;
   clients?: { name: string } | null;
   equipments?: { name: string } | null;
 }
@@ -81,6 +85,18 @@ function situacao(r: Locacao): { label: string; classe: string } {
     };
   }
   return { label: "Agendada", classe: "bg-brand-blue/10 text-brand-blue" };
+}
+
+// Atalhos da linha: a locação na ficha, o atendimento na Agenda e os
+// lançamentos da cliente.
+function AtalhosLocacao({ r, className = "" }: { r: Locacao; className?: string }) {
+  return (
+    <Atalhos className={className}>
+      {r.client_id && <Atalho href={linkLocacao(r.client_id, r.id)} emoji="📦">Abrir</Atalho>}
+      <Atalho href={r.event_id ? linkEvento(r.event_id) : linkDiaAgenda(r.event_date)} emoji="📅">Agenda</Atalho>
+      {r.client_id && <Atalho href={linkLancamentosCliente(r.client_id)} emoji="💰">Lançamentos</Atalho>}
+    </Atalhos>
+  );
 }
 
 export default function LocacoesClient({
@@ -310,6 +326,7 @@ export default function LocacoesClient({
                 </p>
               )}
               </Link>
+              <AtalhosLocacao r={r} className="mt-2" />
               {temSaldo(r) && (
                 <div className="mt-2">
                   <ReceberPagamentoBotao rentalId={r.id} saldo={Number(r.saldo)} />
@@ -364,6 +381,7 @@ export default function LocacoesClient({
                         · reagendada
                       </span>
                     )}
+                    <AtalhosLocacao r={r} className="mt-1" />
                   </td>
                   <td className="px-4 py-3 text-neutral-600">
                     {r.equipments?.name ?? "-"}

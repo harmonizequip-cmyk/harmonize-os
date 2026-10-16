@@ -5,6 +5,7 @@ import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
+import { linkDaMovimentacao } from "@/lib/atalhos";
 import { ACAO_META, ENTIDADE_LABEL, formatarDataHora, descreverDetalhes, type Movimentacao } from "@/lib/movimentacoes";
 
 export default function MovimentacoesClient({
@@ -106,11 +107,14 @@ export default function MovimentacoesClient({
         {filtradas.map((m) => {
           const meta = ACAO_META[m.acao] ?? { label: m.acao, classe: "bg-neutral-100 text-neutral-600" };
           const detalhe = descreverDetalhes(m);
-          return (
-            <div
-              key={m.id}
-              className="rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl"
-            >
+          // Toque abre o item ligado; o que foi excluído fica sem link.
+          const href =
+            m.acao === "excluido"
+              ? null
+              : linkDaMovimentacao(m.entidade, m.entidade_id, { client_id: m.detalhes?.client_id ?? null });
+          const classe = "block rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl";
+          const conteudo = (
+            <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.classe}`}>
                   {meta.label}
@@ -127,7 +131,19 @@ export default function MovimentacoesClient({
                 <p className="mt-0.5 text-xs text-neutral-500">{detalhe}</p>
               )}
 
-              <p className="mt-1 text-xs text-neutral-400">por {m.usuario_nome}</p>
+              <p className="mt-1 text-xs text-neutral-400">
+                por {m.usuario_nome}
+                {href && <span className="ml-2 text-brand-teal-dark">abrir ›</span>}
+              </p>
+            </>
+          );
+          return href ? (
+            <Link key={m.id} href={href} className={`${classe} hover:border-brand-teal`}>
+              {conteudo}
+            </Link>
+          ) : (
+            <div key={m.id} className={classe}>
+              {conteudo}
             </div>
           );
         })}

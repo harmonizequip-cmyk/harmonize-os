@@ -113,8 +113,17 @@ export default async function LocacoesPage(
       lucros.set(l.rental_id, { despesas: Number(l.total_despesas), lucro: Number(l.lucro_liquido) });
     }
   }
+  // Atendimento da Agenda de cada locação (calendar_events.rental_id), para o
+  // atalho abrir o evento direto. Sem ele, o atalho cai no dia.
+  const eventos = new Map<string, string>();
+  for (let i = 0; i < normalizadas.length; i += LOTE) {
+    const ids = normalizadas.slice(i, i + LOTE).map((r: any) => r.id);
+    const { data: evs } = await supabase.from("calendar_events").select("id, rental_id").in("rental_id", ids);
+    for (const e of evs ?? []) if (e.rental_id && !eventos.has(e.rental_id)) eventos.set(e.rental_id, e.id);
+  }
   const hoje = hojeLocal();
   for (const r of normalizadas as any[]) {
+    r.event_id = eventos.get(r.id) ?? null;
     r.despesas = lucros.get(r.id)?.despesas ?? null;
     r.lucro = lucros.get(r.id)?.lucro ?? null;
     r.saldo = saldos.get(r.id) ?? (r.pago ? 0 : Number(r.calculated_value));

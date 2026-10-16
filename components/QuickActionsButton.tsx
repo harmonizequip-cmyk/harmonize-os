@@ -46,7 +46,8 @@ type ActionKey =
   | "locacao_disparos"
   | "receber"
   | "despesa_voz"
-  | "tabela";
+  | "tabela"
+  | "planejador";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -64,6 +65,7 @@ const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[
   { key: "locacao_disparos", label: "Lançar locação (com disparos)", emoji: "🎯", module: "agenda" },
   { key: "locacao", label: "Reservar data (sem disparos ainda)", emoji: "📦", module: "agenda" },
   { key: "tabela", label: "Tabela de preços (arte para mandar)", emoji: "🏷️", module: "clientes" },
+  { key: "planejador", label: "Planejador HIPRO (novo planejamento)", emoji: "📋", module: "agenda" },
 ];
 
 // Botão "+" único, disponível em toda tela (fica no layout, não em cada
@@ -126,6 +128,11 @@ export default function QuickActionsButton({
 
   function handlePick(key: ActionKey) {
     setMenuOpen(false);
+    // O planejador é uma tela, não uma janela.
+    if (key === "planejador") {
+      router.push("/planejador/novo");
+      return;
+    }
     setActiveModal(key);
   }
 

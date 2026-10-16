@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkCliente } from "@/lib/atalhos";
 import {
   acharParecidos,
   digitos,
@@ -272,6 +274,11 @@ function Cartao({
               </optgroup>
             </select>
             {parecidos.length === 0 && <p className="mt-1 text-[11px] text-neutral-400">Não achei ninguém parecido. Escolha na lista ou crie um lead novo.</p>}
+            {alvo && (
+              <Atalhos className="mt-1.5">
+                <Atalho href={linkCliente(alvo.id)} emoji="👤">Ver ficha</Atalho>
+              </Atalhos>
+            )}
           </div>
 
           {alvo && (

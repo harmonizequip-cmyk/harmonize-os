@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
+import { LinkCliente } from "@/components/Atalhos";
 
 function formatDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -120,7 +121,7 @@ export default async function EquipmentDetailPage(
               return (
                 <tr key={r.id} className="border-b border-neutral-200/40 last:border-0">
                   <td className="px-4 py-3 text-neutral-900">
-                    {r.clients?.name ?? "—"}
+                    {r.clients?.name ? <LinkCliente id={r.client_id}>{r.clients.name}</LinkCliente> : "-"}
                   </td>
                   <td className="px-4 py-3 text-neutral-500">
                     {formatDate(r.event_date)}

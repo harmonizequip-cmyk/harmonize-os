@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { ContratoDados } from "@/lib/contrato-pdf";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkEvento, linkLocacao } from "@/lib/atalhos";
 
 interface ContratoRow {
   id: string;
@@ -16,6 +18,16 @@ interface ContratoRow {
   rental_id: string | null;
   reservation_id: string | null;
   clients?: { name: string } | null;
+}
+
+// Atalho para o que gerou o contrato: a locação (na ficha) ou a reserva (na Agenda).
+function AtalhoOrigem({ c, className = "" }: { c: ContratoRow; className?: string }) {
+  return (
+    <Atalhos className={className}>
+      {c.rental_id && c.client_id && <Atalho href={linkLocacao(c.client_id, c.rental_id)} emoji="📦">Locação</Atalho>}
+      {c.reservation_id && <Atalho href={linkEvento(c.reservation_id)} emoji="📅">Reserva</Atalho>}
+    </Atalhos>
+  );
 }
 
 function formatPeriodo(dados: ContratoDados): string {
@@ -97,6 +109,7 @@ export default function ContratosClient({
                   {c.clients?.name ?? c.dados.contratante.nome}
                 </Link>
                 <p className="mt-0.5 text-xs text-neutral-500">{formatPeriodo(c.dados)}</p>
+                <AtalhoOrigem c={c} className="mt-1.5" />
               </div>
               <span className="text-xs text-neutral-400">{formatDate(c.gerado_em.slice(0, 10))}</span>
             </div>
@@ -142,7 +155,10 @@ export default function ContratosClient({
                     {c.clients?.name ?? c.dados.contratante.nome}
                   </Link>
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatPeriodo(c.dados)}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
+                  {formatPeriodo(c.dados)}
+                  <AtalhoOrigem c={c} className="mt-1" />
+                </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-brand-teal">
                   {formatValorOuApurar(c.dados)}
                 </td>

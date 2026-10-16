@@ -1,0 +1,72 @@
+// Endereços dos atalhos entre telas: cada um abre direto o item, não a
+// lista. Usados pelo componente components/Atalhos.tsx em todas as telas.
+
+export const linkCliente = (clientId: string) => `/clientes/${clientId}`;
+
+/** Abre a locação dentro da ficha da cliente (EditarLocacaoModal). */
+export const linkLocacao = (clientId: string, rentalId: string) => `/clientes/${clientId}?locacao=${rentalId}`;
+
+/** Abre o atendimento na Agenda, já no dia dele. */
+export const linkEvento = (eventId: string) => `/agenda?evento=${eventId}`;
+
+/** Só o dia na Agenda (quando não há o id do atendimento). */
+export const linkDiaAgenda = (data: string) => `/agenda?date=${data.slice(0, 10)}`;
+
+/** Abre a edição do lançamento no Financeiro. */
+export const linkLancamento = (transactionId: string) => `/financeiro?lancamento=${transactionId}`;
+
+/** Lançamentos da cliente no Financeiro (o ano todo). */
+export const linkLancamentosCliente = (clientId: string) => `/financeiro?cliente=${clientId}&period=ano`;
+
+/** Locações da cliente (o ano todo). */
+export const linkLocacoesCliente = (clientId: string) => `/locacoes?cliente=${clientId}&period=ano`;
+
+export const linkTarefa = (taskId: string) => `/tarefas?highlight=${taskId}`;
+
+export const linkPlanejamento = (id: string) => `/planejador/${id}`;
+
+/** Novo planejamento já amarrado à cliente e, se houver, ao atendimento. */
+export function linkNovoPlanejamento(clientId?: string | null, eventId?: string | null): string {
+  const p = new URLSearchParams();
+  if (clientId) p.set("cliente", clientId);
+  if (eventId) p.set("evento", eventId);
+  const q = p.toString();
+  return q ? `/planejador/novo?${q}` : "/planejador/novo";
+}
+
+/**
+ * Para onde leva uma linha de Movimentações (histórico), pela entidade.
+ * Lançamento, locação e atendimento abrem o item; o resto, a lista certa.
+ */
+export function linkDaMovimentacao(
+  entidade: string,
+  entidadeId: string | null,
+  extra?: { client_id?: string | null } | null
+): string | null {
+  if (!entidadeId) return null;
+  switch (entidade) {
+    case "clients":
+    case "cliente":
+      return linkCliente(entidadeId);
+    case "tasks":
+      return linkTarefa(entidadeId);
+    case "calendar_events":
+      return linkEvento(entidadeId);
+    case "transactions":
+      return linkLancamento(entidadeId);
+    case "rentals":
+      return extra?.client_id ? linkLocacao(extra.client_id, entidadeId) : null;
+    case "planejamento":
+      return linkPlanejamento(entidadeId);
+    case "envio_agenda":
+      return extra?.client_id ? linkCliente(extra.client_id) : null;
+    case "emprestimos":
+      return "/financeiro/emprestimos";
+    case "equipments":
+      return "/equipamentos";
+    case "cartoes":
+      return "/financeiro/cartoes";
+    default:
+      return null;
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Bell, LayoutGrid, List, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
@@ -9,6 +10,8 @@ import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
+import { Atalho, LinkCliente } from "@/components/Atalhos";
+import { linkEvento } from "@/lib/atalhos";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import { ORIGENS } from "./NovoLeadModal";
@@ -502,10 +505,15 @@ export default function FunilClient({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs font-medium text-neutral-900">{lead.name}</p>
-                        <p className="text-[11px] text-neutral-500">
-                          {formatDate(lead.nextEvent!.date_start)}
+                        <p className="text-xs font-medium text-neutral-900">
+                          <LinkCliente id={lead.id}>{lead.name}</LinkCliente>
                         </p>
+                        <Link
+                          href={linkEvento(lead.nextEvent!.id)}
+                          className="text-[11px] text-neutral-500 underline decoration-dotted underline-offset-2"
+                        >
+                          📅 {formatDate(lead.nextEvent!.date_start)}
+                        </Link>
                         <p className="text-[10px] text-neutral-400">
                           {lead.nextEvent!.confirmation_message_sent_at
                             ? `✓ mensagem enviada em ${formatDiaMes(lead.nextEvent!.confirmation_message_sent_at)}`
@@ -579,7 +587,9 @@ export default function FunilClient({
                           </span>
                         )}
                         {task.client_name && (
-                          <span className="mt-0.5 block text-[10px] text-neutral-400">{task.client_name}</span>
+                          <span className="mt-0.5 block text-[10px] text-neutral-400">
+                            <LinkCliente id={task.client_id}>{task.client_name}</LinkCliente>
+                          </span>
                         )}
                       </span>
                       <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
@@ -1153,12 +1163,13 @@ function LeadCardContent({
       )}
 
       {lead.nextEvent ? (
+        <div className="mt-1.5 flex items-center gap-1.5">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleConfirmed?.();
           }}
-          className={`mt-1.5 block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold ${
+          className={`block min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold ${
             lead.nextEvent.confirmed
               ? "bg-brand-teal/10 text-brand-teal"
               : "bg-amber-100 text-amber-700"
@@ -1169,6 +1180,8 @@ function LeadCardContent({
             {lead.nextEvent.confirmed ? "Confirmado ✓" : "Não confirmado · toque para marcar"}
           </span>
         </button>
+        <Atalho href={linkEvento(lead.nextEvent.id)} emoji="📅" title="Abrir o atendimento na Agenda">Agenda</Atalho>
+        </div>
       ) : (
         lead.data_evento && (
           <p className="mt-1 text-xs text-neutral-400">📅 {formatDate(lead.data_evento)} (previsto)</p>

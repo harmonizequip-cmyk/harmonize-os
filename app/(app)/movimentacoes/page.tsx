@@ -51,9 +51,25 @@ export default async function MovimentacoesPage(
     .order("ocorrido_em", { ascending: false })
     .limit(TETO);
 
+  // Locação não guarda a cliente no histórico; o atalho da linha precisa
+  // dela para abrir a locação dentro da ficha.
+  const idsLocacoes = Array.from(
+    new Set((movimentacoes ?? []).filter((m: any) => m.entidade === "rentals" && m.entidade_id).map((m: any) => m.entidade_id))
+  ) as string[];
+  const clienteDaLocacao = new Map<string, string>();
+  for (let i = 0; i < idsLocacoes.length; i += 200) {
+    const { data } = await supabase.from("rentals").select("id, client_id").in("id", idsLocacoes.slice(i, i + 200));
+    for (const r of data ?? []) if (r.client_id) clienteDaLocacao.set(r.id, r.client_id);
+  }
+  const linhas = (movimentacoes ?? []).map((m: any) =>
+    m.entidade === "rentals" && clienteDaLocacao.has(m.entidade_id) && !m.detalhes?.client_id
+      ? { ...m, detalhes: { ...(m.detalhes ?? {}), client_id: clienteDaLocacao.get(m.entidade_id) } }
+      : m
+  );
+
   return (
     <MovimentacoesClient
-      initialRows={movimentacoes ?? []}
+      initialRows={linhas}
       periodo={periodo}
       atingiuTeto={(movimentacoes ?? []).length >= TETO}
     />

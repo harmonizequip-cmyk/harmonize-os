@@ -12,6 +12,8 @@
 // é uma consulta a mais que a maioria das visitas não precisa.
 
 import { useState } from "react";
+import Link from "next/link";
+import { linkDaMovimentacao } from "@/lib/atalhos";
 import { createClient } from "@/lib/supabase/client";
 import { ACAO_META, ENTIDADE_LABEL, formatarDataHora, descreverDetalhes, type Movimentacao } from "@/lib/movimentacoes";
 
@@ -97,8 +99,14 @@ export default function HistoricoClienteSection({ clientId }: { clientId: string
               {rows.map((m) => {
                 const meta = ACAO_META[m.acao] ?? { label: m.acao, classe: "bg-neutral-100 text-neutral-600" };
                 const detalhe = descreverDetalhes(m);
-                return (
-                  <li key={m.id} className="rounded-xl border border-neutral-100 p-2.5 text-sm">
+                // Toque abre o item (locação, atendimento, lançamento...);
+                // o que foi excluído não tem mais para onde levar.
+                const href =
+                  m.acao === "excluido"
+                    ? null
+                    : linkDaMovimentacao(m.entidade, m.entidade_id, { client_id: m.detalhes?.client_id ?? clientId });
+                const conteudo = (
+                  <>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.classe}`}>{meta.label}</span>
                       <span className="text-xs text-neutral-400">{ENTIDADE_LABEL[m.entidade] ?? m.entidade}</span>
@@ -106,7 +114,21 @@ export default function HistoricoClienteSection({ clientId }: { clientId: string
                     </div>
                     <p className="mt-1 text-neutral-700">{m.descricao}</p>
                     {detalhe && <p className="mt-0.5 text-xs text-neutral-500">{detalhe}</p>}
-                    <p className="mt-1 text-[11px] text-neutral-400">por {m.usuario_nome}</p>
+                    <p className="mt-1 text-[11px] text-neutral-400">
+                      por {m.usuario_nome}
+                      {href && <span className="ml-2 text-brand-teal-dark">abrir ›</span>}
+                    </p>
+                  </>
+                );
+                return (
+                  <li key={m.id} className="rounded-xl border border-neutral-100 text-sm">
+                    {href ? (
+                      <Link href={href} className="block p-2.5 hover:bg-neutral-50">
+                        {conteudo}
+                      </Link>
+                    ) : (
+                      <div className="p-2.5">{conteudo}</div>
+                    )}
                   </li>
                 );
               })}

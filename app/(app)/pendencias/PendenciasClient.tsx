@@ -8,6 +8,8 @@ import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
+import { Atalho, Atalhos, LinkCliente } from "@/components/Atalhos";
+import { linkCliente, linkEvento, linkLocacao } from "@/lib/atalhos";
 import type { Pendencias, PendenciaLocacao, TaxaVencida, ReservaSemDisparos } from "@/lib/pendencias";
 
 type Ordem = "valor" | "atraso";
@@ -101,23 +103,23 @@ export default function PendenciasClient({
             </p>
           </div>
           {semDisparos.map((r) => (
-            <Link
-              key={r.chave}
-              href={`/agenda?date=${r.de}`}
-              className="flex items-baseline justify-between gap-2 rounded-xl bg-white/70 p-2.5"
-            >
+            // Div e não link: o nome leva à ficha e o resto ao atendimento
+            // (chave = id do primeiro evento do grupo), sem link dentro de link.
+            <div key={r.chave} className="flex items-baseline justify-between gap-2 rounded-xl bg-white/70 p-2.5">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-neutral-900">{r.cliente}</p>
-                <p className="text-xs text-neutral-500">
+                <p className="truncate text-sm font-medium text-neutral-900">
+                  <LinkCliente id={r.clientId}>{r.cliente}</LinkCliente>
+                </p>
+                <Link href={linkEvento(r.chave)} className="block text-xs text-neutral-500">
                   {r.equipamento ? `${r.equipamento} · ` : ""}
                   {r.de === r.ate ? formatDate(r.de) : `${formatDate(r.de)} a ${formatDate(r.ate)} (${r.dias} dias)`} ·
                   terminou há {r.diasDesde} {r.diasDesde === 1 ? "dia" : "dias"}
-                </p>
+                </Link>
               </div>
-              <span className="whitespace-nowrap text-xs font-medium text-amber-700">
+              <Link href={linkEvento(r.chave)} className="whitespace-nowrap text-xs font-medium text-amber-700">
                 Abrir na agenda →
-              </span>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       )}
@@ -170,6 +172,11 @@ export default function PendenciasClient({
                   Reserva para {formatDate(t.dataEvento)} · taxa sem pagar há {t.diasSemPagar}{" "}
                   {t.diasSemPagar === 1 ? "dia" : "dias"}
                 </p>
+                {t.clientId && (
+                  <Atalhos className="mt-1.5">
+                    <Atalho href={linkCliente(t.clientId)} emoji="👤">Ficha</Atalho>
+                  </Atalhos>
+                )}
                 <div className="mt-2 space-y-2">
                   <TaxaRecebidaBotao eventId={t.eventId} valor={t.valor} />
                   <div className="flex gap-2">
@@ -184,7 +191,7 @@ export default function PendenciasClient({
                       </a>
                     )}
                     <Link
-                      href={`/agenda?date=${t.dataEvento}`}
+                      href={linkEvento(t.eventId)}
                       className="flex-1 rounded-lg border border-neutral-300 py-1.5 text-center text-xs font-medium text-neutral-600"
                     >
                       Abrir na agenda
@@ -291,6 +298,9 @@ export default function PendenciasClient({
                           </span>
                         </span>
                       </div>
+                      <Atalhos>
+                        <Atalho href={linkLocacao(c.clientId, l.rentalId)} emoji="📦">Abrir locação</Atalho>
+                      </Atalhos>
                       <ReceberPagamentoBotao
                         rentalId={l.rentalId}
                         saldo={l.saldo}

@@ -7,10 +7,12 @@ import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { ORIGENS } from "@/app/(app)/funil/NovoLeadModal";
 import CompletarOrigem from "./CompletarOrigem";
+import { LinkCliente } from "@/components/Atalhos";
 
 const rotuloOrigem = (v: string) => ORIGENS.find((o) => o.value === v)?.label ?? v;
 
 interface TopClient {
+  id?: string | null;
   name: string;
   total: number;
 }
@@ -28,6 +30,7 @@ interface FollowupRow {
 }
 
 interface LucroClienteRow {
+  id?: string | null;
   name: string;
   locacoes: number;
   faturado: number;
@@ -274,7 +277,7 @@ export default function RelatoriosClient({
             {lucroClientes.map((c, i) => (
               <div key={i} className="flex items-center justify-between gap-2 text-xs">
                 <span className="text-neutral-700">
-                  {i + 1}. {c.name} ({c.locacoes} {c.locacoes === 1 ? "locação" : "locações"})
+                  {i + 1}. <LinkCliente id={c.id}>{c.name}</LinkCliente> ({c.locacoes} {c.locacoes === 1 ? "locação" : "locações"})
                 </span>
                 <span className="whitespace-nowrap font-medium text-neutral-900">
                   {formatCurrency(c.lucro)}
@@ -304,7 +307,7 @@ export default function RelatoriosClient({
             {topClients.map((c, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
                 <span className="text-neutral-700">
-                  {i + 1}. {c.name}
+                  {i + 1}. <LinkCliente id={c.id}>{c.name}</LinkCliente>
                 </span>
                 <span className="font-medium text-neutral-900">
                   {formatCurrency(c.total)} · {totalRevenue > 0 ? fmtPct(c.total / totalRevenue) : "0%"}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import AvailabilityImageModal from "./AvailabilityImageModal";
+import { LinkCliente } from "./Atalhos";
 
 export interface DormantLead {
   id: string;
@@ -110,7 +111,7 @@ export default function OpportunityRadar({
                   >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium text-neutral-900">
-                        {lead.name}
+                        <LinkCliente id={lead.id}>{lead.name}</LinkCliente>
                       </p>
                       <p className="text-[11px] text-neutral-500">
                         {STAGE_LABELS[lead.stage] ?? lead.stage}

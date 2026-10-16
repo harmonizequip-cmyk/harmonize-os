@@ -52,8 +52,15 @@ export default async function ClienteDetailPage(props: { params: Promise<{ id: s
     (situacoes ?? []).map((s: any) => [s.rental_id, { saldo: Number(s.saldo), totalPago: Number(s.total_pago) }])
   );
 
+  // Atendimento da Agenda de cada locação, para o atalho 📅.
+  const { data: eventosLocacoes } = idsLocacoes.length
+    ? await supabase.from("calendar_events").select("id, rental_id").in("rental_id", idsLocacoes)
+    : { data: [] as any[] };
+  const eventoPorLocacao = new Map<string, string>((eventosLocacoes ?? []).map((e: any) => [e.rental_id, e.id]));
+
   const normalizedRentals = (rentals ?? []).map((r: any) => ({
     ...r,
+    eventId: eventoPorLocacao.get(r.id) ?? null,
     saldo: saldoPorLocacao.get(r.id)?.saldo ?? 0,
     totalPago: saldoPorLocacao.get(r.id)?.totalPago ?? 0,
     equipments: Array.isArray(r.equipments) ? (r.equipments[0] ?? null) : (r.equipments ?? null),

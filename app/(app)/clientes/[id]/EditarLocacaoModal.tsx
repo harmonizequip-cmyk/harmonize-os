@@ -6,6 +6,8 @@ import { calculateRentalValue, type PricingConfig } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { valorParaNumero } from "@/lib/valor";
+import { Atalho, Atalhos } from "@/components/Atalhos";
+import { linkEvento, linkLancamento } from "@/lib/atalhos";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -52,6 +54,8 @@ interface RentalToEdit {
   // Leva AC: true = deslocamento já somado em calculated_value (calculadora);
   // não gera lançamento próprio no financeiro.
   deslocamento_incluso_no_valor?: boolean;
+  // Atendimento da Agenda ligado a esta locação (para o atalho).
+  eventId?: string | null;
 }
 
 interface RentalPayment {
@@ -60,6 +64,7 @@ interface RentalPayment {
   valor: number;
   data: string;
   pix_conta: string | null;
+  transaction_id: string | null;
 }
 
 export default function EditarLocacaoModal({
@@ -240,7 +245,7 @@ export default function EditarLocacaoModal({
     const [{ data: pagamentos }, { data: situacao }, { data: despesas }] = await Promise.all([
       supabase
         .from("rental_payments")
-        .select("id, forma, valor, data, pix_conta")
+        .select("id, forma, valor, data, pix_conta, transaction_id")
         .eq("rental_id", rental.id)
         .order("data", { ascending: true }),
       supabase
@@ -400,7 +405,14 @@ export default function EditarLocacaoModal({
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white/90 p-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar locação</h2>
+        <h2 className="mb-2 text-lg font-semibold text-neutral-900">Editar locação</h2>
+        <Atalhos className="mb-4">
+          {rental.eventId && (
+            <Atalho href={linkEvento(rental.eventId)} emoji="📅">
+              Atendimento na agenda
+            </Atalho>
+          )}
+        </Atalhos>
 
         <div className="space-y-3">
           <div>
@@ -519,11 +531,16 @@ export default function EditarLocacaoModal({
             ) : (
               <ul className="mb-2 space-y-1">
                 {payments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between text-sm text-neutral-700">
+                  <li key={p.id} className="flex items-center justify-between gap-2 text-sm text-neutral-700">
                     <span>
                       {formatCurrency(p.valor)} — {PAYMENT_METHODS.find((m) => m.value === p.forma)?.label ?? p.forma}
                       {p.pix_conta ? ` (${p.pix_conta})` : ""} · {new Date(p.data + "T00:00:00").toLocaleDateString("pt-BR")}
                     </span>
+                    {p.transaction_id && (
+                      <Atalho href={linkLancamento(p.transaction_id)} emoji="💰" title="Abrir o lançamento no Financeiro">
+                        Lançamento
+                      </Atalho>
+                    )}
                     <button
                       onClick={() => handleRemovePayment(p.id)}
                       className="text-xs text-red-500 underline underline-offset-2"

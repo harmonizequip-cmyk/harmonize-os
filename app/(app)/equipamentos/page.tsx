@@ -10,6 +10,9 @@ import { type AplicadorUso, situacaoAplicador } from "@/lib/aplicador";
 
 import { hojeLocal, resolverPeriodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
+import Link from "next/link";
+import { LinkCliente } from "@/components/Atalhos";
+import { linkEvento } from "@/lib/atalhos";
 const EQUIPMENT_COLORS: Record<string, string> = {
   hipro_1: "bg-brand-teal",
   hipro_2: "bg-brand-blue",
@@ -77,7 +80,7 @@ export default async function EquipamentosPage(
 
   const { data: upcoming } = await supabase
     .from("calendar_events")
-    .select("equipment_id, date_start, client_id, clients(name)")
+    .select("id, equipment_id, date_start, client_id, clients(name)")
     .neq("status", "cancelada")
     .gte("date_start", today)
     .not("equipment_id", "is", null)
@@ -148,10 +151,12 @@ export default async function EquipamentosPage(
                   <p className="mt-0.5 text-sm font-medium text-neutral-900">
                     {nextEvent ? (
                       <>
-                        {formatDate(nextEvent.date_start)}
+                        <Link href={linkEvento(nextEvent.id)} className="underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark">
+                          📅 {formatDate(nextEvent.date_start)}
+                        </Link>
                         {nextEvent.clients?.name && (
                           <span className="block text-xs font-normal text-neutral-500">
-                            {nextEvent.clients.name}
+                            <LinkCliente id={nextEvent.client_id}>{nextEvent.clients.name}</LinkCliente>
                           </span>
                         )}
                       </>

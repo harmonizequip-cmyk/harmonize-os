@@ -98,10 +98,10 @@ export default async function RelatoriosPage(
   ]);
   if (erroLucro) throw new Error(`Não consegui carregar o lucro por cliente: ${erroLucro.message}`);
 
-  const lucroPorCliente = new Map<string, { name: string; locacoes: number; faturado: number; despesas: number; lucro: number }>();
+  const lucroPorCliente = new Map<string, { id: string | null; name: string; locacoes: number; faturado: number; despesas: number; lucro: number }>();
   for (const l of lucroLinhas ?? []) {
     const id = l.client_id ?? "sem-cliente";
-    const atual = lucroPorCliente.get(id) ?? { name: l.cliente ?? "Sem cliente", locacoes: 0, faturado: 0, despesas: 0, lucro: 0 };
+    const atual = lucroPorCliente.get(id) ?? { id: l.client_id ?? null, name: l.cliente ?? "Sem cliente", locacoes: 0, faturado: 0, despesas: 0, lucro: 0 };
     atual.locacoes += 1;
     atual.faturado += Number(l.calculated_value);
     atual.despesas += Number(l.total_despesas);
@@ -165,13 +165,13 @@ export default async function RelatoriosPage(
   });
 
   // ---- 3) Concentração de receita ----
-  const revenueByClient = new Map<string, { name: string; total: number }>();
+  const revenueByClient = new Map<string, { id: string; name: string; total: number }>();
   let totalRevenue = 0;
   for (const t of entradasFaturamento) {
     totalRevenue += Number(t.amount);
     if (!t.client_id) continue;
     const clientName = oneOf<{ name: string }>(t.clients as any)?.name ?? "Sem nome";
-    const cur = revenueByClient.get(t.client_id) ?? { name: clientName, total: 0 };
+    const cur = revenueByClient.get(t.client_id) ?? { id: t.client_id, name: clientName, total: 0 };
     cur.total += Number(t.amount);
     revenueByClient.set(t.client_id, cur);
   }

@@ -8,10 +8,13 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import ReceberPagamentoBotao from "./ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "./TaxaRecebidaBotao";
+import { Atalho, LinkCliente } from "@/components/Atalhos";
+import { linkEvento } from "@/lib/atalhos";
 import { ehPdf, enviarComprovante, lerCompartilhado, limparCompartilhado } from "@/lib/comprovante";
 
 interface Aluguel {
   id: string;
+  clientId: string | null;
   cliente: string;
   equipamento: string | null;
   periodo: string;
@@ -22,6 +25,7 @@ interface Aluguel {
 
 interface Taxa {
   id: string;
+  clientId: string | null;
   cliente: string;
   dataEvento: string;
   valor: number;
@@ -89,7 +93,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
     const [locRes, taxaRes] = await Promise.all([
       supabase
         .from("rentals")
-        .select("id, event_date, event_date_end, clients(name), equipments(name)")
+        .select("id, event_date, event_date_end, client_id, clients(name), equipments(name)")
         .eq("is_test", false)
         .neq("status", "cancelada")
         .eq("pago", false)
@@ -97,7 +101,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
         .limit(300),
       supabase
         .from("calendar_events")
-        .select("id, date_start, taxa_valor, clients(name)")
+        .select("id, date_start, taxa_valor, client_id, clients(name)")
         .eq("is_test", false)
         .eq("taxa_status", "pendente")
         .neq("status", "cancelada")
@@ -140,6 +144,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
           const fim = r.event_date_end ?? r.event_date;
           return {
             id: r.id as string,
+            clientId: (r.client_id as string | null) ?? null,
             cliente: um<any>(r.clients)?.name ?? "Sem nome",
             equipamento: um<any>(r.equipments)?.name ?? null,
             periodo:
@@ -158,6 +163,7 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
     setTaxas(
       ((taxaRes.data ?? []) as any[]).map((e) => ({
         id: e.id as string,
+        clientId: (e.client_id as string | null) ?? null,
         cliente: um<any>(e.clients)?.name ?? "Sem nome",
         dataEvento: e.date_start as string,
         valor: Number(e.taxa_valor ?? 0),
@@ -278,8 +284,10 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
             {alugueisVistos.map((a) => (
               <div key={a.id} className="space-y-2 rounded-xl border border-neutral-200 p-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900">
-                    {a.cliente}
+                  {/* Captura: a janela fica aberta por cima de qualquer tela, então
+                      fecha antes de o atalho navegar. */}
+                  <p onClickCapture={onClose} className="min-w-0 truncate text-sm font-medium text-neutral-900">
+                    <LinkCliente id={a.clientId}>{a.cliente}</LinkCliente>
                   </p>
                   <p className="text-sm font-semibold text-amber-600">{formatCurrency(a.saldo)}</p>
                 </div>
@@ -305,12 +313,17 @@ export default function ReceberPagamentoModal({ onClose }: { onClose: () => void
             {taxasVistas.map((t) => (
               <div key={t.id} className="space-y-2 rounded-xl border border-neutral-200 p-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900">
-                    {t.cliente}
+                  <p onClickCapture={onClose} className="min-w-0 truncate text-sm font-medium text-neutral-900">
+                    <LinkCliente id={t.clientId}>{t.cliente}</LinkCliente>
                   </p>
                   {t.valor > 0 && <p className="text-sm font-semibold text-amber-600">{formatCurrency(t.valor)}</p>}
                 </div>
-                <p className="text-xs text-neutral-500">Reserva para {formatDate(t.dataEvento)}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-neutral-500">Reserva para {formatDate(t.dataEvento)}</p>
+                  <span onClickCapture={onClose}>
+                    <Atalho href={linkEvento(t.id)} emoji="📅">Agenda</Atalho>
+                  </span>
+                </div>
                 <TaxaRecebidaBotao eventId={t.id} valor={t.valor} onDone={() => aoReceber(`taxa/${t.id}`, t.cliente)} />
               </div>
             ))}

@@ -171,6 +171,19 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Tabela `insights` (RLS por `user_id`, como `assistente_memoria`): categoria (prospeccao, relacionamento, vendas, financeiro, agenda, marketing, operacao), título, texto, `acao` (próximo passo, com mensagem pronta), `evidencia` (números), `impacto` 1 a 3, `client_ids`, `status` (novo, feito, arquivado) e `util`. A IA lê os anteriores para não repetir e usa "útil/não útil" para calibrar.
 - Cada cartão tem "Colocar em prática com o assistente" (`/assistente?auto=1&pergunta=...`), "Fiz", "Arquivar" e 👍/👎.
 
+## Atalhos entre telas
+
+- Regra: tudo que está ligado a outra coisa abre com um toque, sem voltar ao menu. Endereços em `lib/atalhos.ts`, peças em `components/Atalhos.tsx` (`Atalho` pílula, `Atalhos` fileira, `LinkCliente`; todos param o clique para não abrir a linha de baixo). Tela nova que mostra cliente, locação, atendimento ou lançamento usa esses atalhos.
+- Endereços que abrem o item: `/agenda?evento=<id>` (abre o atendimento no dia dele), `/financeiro?lancamento=<id>` (abre a edição, mesmo de outro mês; entrada espelhada de Retirada abre a retirada), `/clientes/<id>?locacao=<rentalId>` (abre a locação na ficha), `/tarefas?highlight=<id>`, `/planejador/novo?cliente=&evento=`.
+- Movimentações e o histórico da ficha viram links por `linkDaMovimentacao` (locação ganha a cliente buscando `rentals` na carga da tela; exclusões ficam sem link).
+
+## Planejador HIPRO
+
+- O HTML do dono ("Planejador HIPRO HOF") fica em `public/ferramentas/planejador.html`, igual ao original; só mudou o salvamento: com `?plano=<chave>` ele lê/grava `localStorage` `harmonize_planejador_plano_<chave>` e avisa o app por `postMessage` (`planejador:estado` com estado e total distribuído; `planejador:novo` no botão Novo). O html2canvas do original não era usado e saiu. Mudou o planejador: trocar o arquivo e reaplicar essas quatro mudanças (`PLANO_ID`/`NO_APP`, postMessage em `salvarEstado`, `limparTudo`, `__totalDistribuido`).
+- `/ferramentas/*` tem cabeçalhos próprios em `next.config.js` (pode ser emoldurado pelo próprio site e usa as fontes do Google do original); o resto do site continua `frame-ancestors 'none'`.
+- Telas: `/planejador` (lista por cliente, busca, filtro `?cliente=`, "Retornos nos próximos 15 dias"), `/planejador/<id>` e `/planejador/novo` (`EditorPlanejamento.tsx`: moldura com o planejador, cliente e atendimento ligados, salva sozinho com intervalo; o novo só vira registro quando ganha paciente, anotação ou disparos). Profissional e data já vêm da cliente e do atendimento.
+- Tabela `planejamentos` (cliente, atendimento, paciente, datas, procedimento, saldo, total, `estado` jsonb completo), escrita só por `salvar_planejamento` e `excluir_planejamento`. Atalhos: menu, "+", atendimento na Agenda, ficha da cliente.
+
 ## Cadastros do formulário (Contourline Academy)
 
 - Formulário Google "CADASTRO CONTOURLINE ACADEMY" (planilha de respostas no Drive do dono: nome, profissão, WhatsApp, e-mail, empresa, estabelecimento, cidade/estado). O Apps Script da planilha (`scripts/apps-script-formulario.gs`, segredo só no script e no cofre `formulario_cadastro_segredo`) manda cada resposta para a Edge Function `cadastro-formulario` (sem JWT; confere o segredo por `formulario_segredo()`), que guarda em `cadastros_recebidos` (chave = carimbo|nome|email, sem duplicar) e avisa no celular.

@@ -29,6 +29,7 @@ import {
   CreditCard,
   Sparkles,
   Brain,
+  ClipboardList,
 } from "lucide-react";
 
 // Menu do espaço Pessoal (chave Harmonize | Pessoal no topo).
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard" },
   { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard" },
+  { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda" },
   { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
   { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
