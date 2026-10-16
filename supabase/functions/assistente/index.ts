@@ -798,10 +798,10 @@ Deno.serve(async (req) => {
 
   const { data: perfil } = await supabase
     .from("profiles")
-    .select("name, active, somente_leitura")
+    .select("name, active, somente_leitura, cliente_id")
     .eq("id", userId)
     .maybeSingle();
-  if (!perfil?.active || perfil.somente_leitura) return json({ erro: "Seu acesso não inclui o assistente." }, 403);
+  if (!perfil?.active || perfil.somente_leitura || perfil.cliente_id) return json({ erro: "Seu acesso não inclui o assistente." }, 403);
 
   let corpo: { mensagem?: string; conversa_id?: string | null; cliente_id?: string | null; modo?: string; foco?: string };
   try {

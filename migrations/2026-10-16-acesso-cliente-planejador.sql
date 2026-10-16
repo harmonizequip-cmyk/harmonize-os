@@ -1,7 +1,7 @@
 -- ============================================================
 -- ACESSO DA CLIENTE AO PLANEJADOR (tela /portal)
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: coluna, 4 funções, 2 políticas, anon sem execução, travas de módulo e de perfil)
 --
 -- A cliente (profissional que aluga o HIPRO) ganha login próprio e vê só o
 -- Planejador dela: os planejamentos com o client_id dela, que ela cria e
