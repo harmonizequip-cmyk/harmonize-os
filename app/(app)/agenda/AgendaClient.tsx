@@ -26,6 +26,7 @@ import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import { LinkCliente } from "@/components/Atalhos";
+import { resumoCredito, temCredito, type SaldoCredito } from "@/lib/creditos";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
@@ -190,6 +191,7 @@ export default function AgendaClient({
   mentoriaPricing,
   diasTaxa = 3,
   bloqueios = [],
+  creditos = {},
 }: {
   initialEvents: EventRow[];
   clients: ClientOption[];
@@ -199,6 +201,8 @@ export default function AgendaClient({
   mentoriaPricing?: MentoriaPricingConfig;
   diasTaxa?: number;
   bloqueios?: BloqueioAgenda[];
+  /** Saldo de crédito por client_id (só de quem tem reserva sem disparos). */
+  creditos?: Record<string, SaldoCredito>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -480,9 +484,18 @@ export default function AgendaClient({
     setSelectedDate(toDateKey(new Date()));
   }
 
+  // Reserva ainda sem disparos de cliente com crédito: selo no cartão e
+  // resumo na janela do atendimento.
+  function creditoDoEvento(e: { rental_id: string | null; client_id: string | null; status: string }) {
+    if (e.rental_id || !e.client_id || e.status === "cancelada") return null;
+    const s = creditos[e.client_id];
+    return temCredito(s) ? s : null;
+  }
+
   function renderCard(e: EventRow, comData = false) {
     const meta = eventMeta(e);
     const isPending = !e.rental_id && !!e.equipment_id && e.status === "pre_reserva";
+    const credito = creditoDoEvento(e);
     return (
       <div
         key={e.id}
@@ -528,6 +541,11 @@ export default function AgendaClient({
                     HIPRO (preço/procedimento), não tem relação com
                     mensagem de confirmação — por isso continua igual. */}
                 {isPending ? " · sem disparos ainda" : ""}
+                {credito && (
+                  <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                    tem crédito
+                  </span>
+                )}
               </p>
               {/* Rastreio do pedido de confirmação, por reserva — nunca
                   aparece para quem já está confirmado, porque nesse caso
@@ -898,6 +916,10 @@ export default function AgendaClient({
           pricingConfig={pricingConfig}
           reservationFee={reservationFee}
           mentoriaPricing={mentoriaPricing}
+          resumoCreditoCliente={(() => {
+            const c = creditoDoEvento(editingEvent);
+            return c ? resumoCredito(c) : null;
+          })()}
           onClose={() => setEditingEvent(null)}
           onSaved={() => {
             setEditingEvent(null);

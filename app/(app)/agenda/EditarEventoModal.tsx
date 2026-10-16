@@ -85,6 +85,7 @@ export default function EditarEventoModal({
   onClose,
   onSaved,
   onDeleted,
+  resumoCreditoCliente,
 }: {
   event: EventToEdit;
   clients: ClientOption[];
@@ -94,6 +95,8 @@ export default function EditarEventoModal({
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
+  /** Saldo de crédito da cliente (resumoCredito), quando ela tem. */
+  resumoCreditoCliente?: string | null;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -478,6 +481,12 @@ export default function EditarEventoModal({
               ? "Ainda sem cobrança lançada. Finalize com a quantidade de pacientes modelo quando a mentoria acontecer, ou cancele se não for mais rolar."
               : "Ainda sem contagem de disparos. Finalize quando o procedimento acontecer, ou cancele se não for mais rolar."}
           </p>
+
+          {resumoCreditoCliente && (
+            <p className="-mt-2 mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+              Tem crédito: {resumoCreditoCliente}
+            </p>
+          )}
 
           {event.client_id && (
             <Atalhos className="-mt-2 mb-4">
@@ -944,6 +953,12 @@ export default function EditarEventoModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold text-neutral-900">Editar evento</h2>
+
+        {resumoCreditoCliente && (
+          <p className="-mt-2 mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+            Tem crédito: {resumoCreditoCliente}
+          </p>
+        )}
 
         {event.client_id && (
           <Atalhos className="-mt-2 mb-4">

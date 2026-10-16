@@ -62,6 +62,7 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero, lerCustoPorDisparo, limparCampoCustoPorDisparo } from "@/lib/valor";
 import CalculoImagemBotao from "@/components/CalculoImagemBotao";
 import { montarDadosCalculo, montarDadosMentoria } from "@/lib/calculo-image";
+import { somarContagens, creditoUsavel, disparosCobrados, type Contagem } from "@/lib/creditos";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -102,6 +103,14 @@ interface PendingReservation {
   date_start: string;
   equipmentName: string;
   contagemInicial: number | null;
+}
+
+// Uma contagem como digitada na tela (texto cru; a menor leitura vale como inicial).
+interface ContagemTela {
+  id: string;
+  inicial: string;
+  final: string;
+  geraCredito: boolean;
 }
 
 interface CategoryOption {
@@ -236,7 +245,10 @@ export default function CalculadoraLocacaoModal({
     setEventDate(r.date_start);
     // Contagem inicial guardada na reserva: já entra preenchida (só se a
     // pessoa ainda não digitou outra).
-    if (r.contagemInicial != null && !initialCount) setInitialCount(String(r.contagemInicial));
+    if (r.contagemInicial != null) {
+      const salva = String(r.contagemInicial);
+      setContagensTela((prev) => prev.map((c, i) => (i === 0 && !c.inicial ? { ...c, inicial: salva } : c)));
+    }
   }
   function handleUnlinkReservation() {
     setLinkedReservationId(null);
@@ -288,20 +300,101 @@ export default function CalculadoraLocacaoModal({
   // Reserva com contagem inicial guardada: a calculadora abre com ela
   // preenchida, só falta digitar a contagem final.
   const contagemSalvaDaReserva = mode.kind === "finalize" ? (mode.reservation.contagemInicial ?? null) : null;
-  const [initialCount, setInitialCount] = useState(contagemSalvaDaReserva != null ? String(contagemSalvaDaReserva) : "");
-  const [finalCount, setFinalCount] = useState("");
+  // Lista de contagens: a primeira funciona como a contagem única de antes.
+  // Trocou a ponteira/aplicador no meio? "+ Somar outra contagem" abre outra
+  // (todas entram na soma); "Gerar crédito e continuar" marca a atual para
+  // virar crédito da cliente (ela paga hoje e usa depois) e abre outra.
+  const [contagensTela, setContagensTela] = useState<ContagemTela[]>(() => [
+    { id: newId("cont"), inicial: contagemSalvaDaReserva != null ? String(contagemSalvaDaReserva) : "", final: "", geraCredito: false },
+  ]);
   const [patientCount, setPatientCount] = useState("1");
   const [notes, setNotes] = useState("");
 
-  // A menor contagem é sempre a inicial e a maior a final, na ordem em que
-  // forem digitadas; os disparos são a diferença entre as duas.
-  const contagens = ordenarContagens(Number(onlyDigits(initialCount)), Number(onlyDigits(finalCount)));
-  const contagensPreenchidas = !!initialCount && !!finalCount;
-  const initialNumber = contagens.inicial;
-  const finalNumber = contagens.final;
-  const contagensInvertidas = contagensPreenchidas && contagens.invertidas;
-  const shots = contagensPreenchidas ? contagens.disparos : 0;
+  function updateContagem(id: string, patch: Partial<ContagemTela>) {
+    setContagensTela((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+  function addContagem(gerarCreditoDaAtual: boolean) {
+    setContagensTela((prev) => {
+      const lista = gerarCreditoDaAtual
+        ? prev.map((c, i) => (i === prev.length - 1 ? { ...c, geraCredito: true } : c))
+        : prev;
+      return [...lista, { id: newId("cont"), inicial: "", final: "", geraCredito: false }];
+    });
+  }
+  function removeContagem(id: string) {
+    setContagensTela((prev) => (prev.length > 1 ? prev.filter((c) => c.id !== id) : prev));
+  }
+
+  // Em cada contagem, a menor leitura é sempre a inicial e a maior a final,
+  // na ordem em que forem digitadas; os disparos são a diferença.
+  const contagensCalc = useMemo(() => contagensTela.map((c) => {
+    const preenchida = !!onlyDigits(c.inicial) && !!onlyDigits(c.final);
+    const o = ordenarContagens(Number(onlyDigits(c.inicial)), Number(onlyDigits(c.final)));
+    return {
+      ...c,
+      preenchida,
+      inicialN: o.inicial,
+      finalN: o.final,
+      disparos: preenchida ? o.disparos : 0,
+      invertidas: preenchida && o.invertidas,
+    };
+  }), [contagensTela]);
+  const todasContagensPreenchidas = contagensCalc.every((c) => c.preenchida);
+  const contagensParaSalvar: Contagem[] = useMemo(
+    () =>
+      contagensCalc
+        .filter((c) => c.preenchida)
+        .map((c) => ({ inicial: c.inicialN, final: c.finalN, gera_credito: c.geraCredito })),
+    [contagensCalc]
+  );
+  const { total: totalDisparos, credito: disparosViraCredito } = somarContagens(contagensParaSalvar);
+  // Para o texto e a imagem: início da primeira contagem e fim da última.
+  const initialNumber = contagensCalc[0]?.inicialN ?? 0;
+  const finalNumber = contagensCalc[contagensCalc.length - 1]?.finalN ?? 0;
   const patientCountNumber = Number(onlyDigits(patientCount)) || 0;
+
+  // ------------------------------------------------------------
+  // Crédito de disparos da cliente (view creditos_saldo)
+  // ------------------------------------------------------------
+  const [saldoCredito, setSaldoCredito] = useState<{ disponiveis: number; aguardando: number } | null>(null);
+  const [usarCredito, setUsarCredito] = useState(true);
+  // null = usa o máximo possível; texto = quantidade que o dono digitou.
+  const [creditoDigitado, setCreditoDigitado] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setSaldoCredito(null);
+    setCreditoDigitado(null);
+    if (isMentoria || !activeClientId) return;
+    supabase
+      .from("creditos_saldo")
+      .select("disparos_disponiveis, disparos_aguardando, valor_disponivel")
+      .eq("client_id", activeClientId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!active || !data) return;
+        const d = data as any;
+        setSaldoCredito({
+          disponiveis: Math.max(0, Number(d.disparos_disponiveis) || 0),
+          aguardando: Math.max(0, Number(d.disparos_aguardando) || 0),
+        });
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, isMentoria]);
+  const creditoDisponivel = saldoCredito?.disponiveis ?? 0;
+  const creditoMaximo = creditoUsavel(totalDisparos, creditoDisponivel);
+  const creditoUsado =
+    isMentoria || !usarCredito || creditoDisponivel <= 0
+      ? 0
+      : creditoDigitado === null
+      ? creditoMaximo
+      : Math.min(creditoMaximo, Number(onlyDigits(creditoDigitado)) || 0);
+  // Disparos que entram no valor (o total real continua indo para p_shots).
+  const shots = disparosCobrados(totalDisparos, creditoUsado);
+  // Tudo coberto pelo crédito: valor dos disparos é zero, mas dá para salvar.
+  const tudoNoCredito = !isMentoria && todasContagensPreenchidas && totalDisparos > 0 && shots === 0;
 
   const pricing = useMemo(() => {
     if (isMentoria || !shots || shots <= 0) return null;
@@ -426,7 +519,7 @@ export default function CalculadoraLocacaoModal({
   // ------------------------------------------------------------
   const resumo = useMemo(() => {
     if (isMentoria && !mentoriaCalc) return null;
-    if (!isMentoria && !pricing) return null;
+    if (!isMentoria && !pricing && !tudoNoCredito) return null;
     return calcularResumoLocacao({
       isMentoria,
       shots,
@@ -438,7 +531,7 @@ export default function CalculadoraLocacaoModal({
       reservationFeeStatus,
       reservationFee: fee,
     });
-  }, [isMentoria, mentoriaCalc, pricing, shots, custoManualPorDisparo, kmIdaNumber, itens, reservationFeeStatus, fee]);
+  }, [isMentoria, mentoriaCalc, pricing, tudoNoCredito, shots, custoManualPorDisparo, kmIdaNumber, itens, reservationFeeStatus, fee]);
 
   function preencherValorTotal(id: string) {
     if (!resumo) return;
@@ -487,10 +580,18 @@ export default function CalculadoraLocacaoModal({
         clientName: activeClientName,
         eventDate,
         pagamentos,
+        contagens: contagensParaSalvar,
+        disparosRealizados: totalDisparos,
+        creditoUsado,
+        viraCredito: disparosViraCredito,
       },
       resumo
     );
   }, [
+    contagensParaSalvar,
+    totalDisparos,
+    creditoUsado,
+    disparosViraCredito,
     resumo,
     isMentoria,
     shots,
@@ -524,6 +625,7 @@ export default function CalculadoraLocacaoModal({
         resumo,
       });
     }
+    // Tudo no crédito (sem faixa de preço) fica sem imagem.
     if (!pricing || !resumo || shots <= 0) return null;
     return montarDadosCalculo({
       cliente: activeClientName || null,
@@ -585,12 +687,26 @@ export default function CalculadoraLocacaoModal({
         return;
       }
     } else {
-      if (!initialCount || !finalCount) {
-        setError("Preencha a contagem inicial e final do equipamento.");
+      const incompleta = contagensCalc.findIndex((c) => !c.preenchida);
+      if (incompleta >= 0) {
+        setError(
+          contagensCalc.length > 1
+            ? `Preencha o valor inicial e o final da contagem ${incompleta + 1} (ou tire essa contagem).`
+            : "Preencha a contagem inicial e final do equipamento."
+        );
         return;
       }
-      if (finalNumber === initialNumber) {
-        setError("As duas contagens são iguais: não há disparos para cobrar.");
+      const iguais = contagensCalc.findIndex((c) => c.inicialN === c.finalN);
+      if (iguais >= 0) {
+        setError(
+          contagensCalc.length > 1
+            ? `Na contagem ${iguais + 1} as duas leituras são iguais: não há disparos. Corrija ou tire essa contagem.`
+            : "As duas contagens são iguais: não há disparos para cobrar."
+        );
+        return;
+      }
+      if (creditoUsado > creditoDisponivel) {
+        setError("O crédito usado passa do que a cliente tem disponível.");
         return;
       }
     }
@@ -622,7 +738,8 @@ export default function CalculadoraLocacaoModal({
       // da Agenda faz — uma reserva continua sendo um registro só.
       const { data, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
         p_calendar_event_id: linkedReservationId,
-        p_shots: shots,
+        // Total real de disparos (desgaste dos aplicadores); o valor já vem com o crédito descontado.
+        p_shots: totalDisparos,
         p_calculated_value: resumo.valorBruto,
         p_payment_method: primeiraForma,
         p_notes: notes || null,
@@ -640,7 +757,7 @@ export default function CalculadoraLocacaoModal({
         p_client_id: activeClientId,
         p_equipment_id: equipmentId,
         p_event_date: eventDate,
-        p_shots: shots,
+        p_shots: totalDisparos,
         p_calculated_value: resumo.valorBruto,
         p_payment_method: primeiraForma,
         p_notes: notes || null,
@@ -667,7 +784,7 @@ export default function CalculadoraLocacaoModal({
     } else {
       const { data, error: rpcError } = await supabase.rpc("finalize_rental_reservation", {
         p_calendar_event_id: mode.reservation.id,
-        p_shots: isMentoria ? patientCountNumber : shots,
+        p_shots: isMentoria ? patientCountNumber : totalDisparos,
         p_calculated_value: resumo.valorBruto,
         p_payment_method: primeiraForma,
         p_notes: notes || null,
@@ -690,6 +807,19 @@ export default function CalculadoraLocacaoModal({
     setSavedRentalId(rentalId);
 
     const avisos: string[] = [];
+
+    if (!isMentoria) {
+      const { error: eCont } = await supabase.rpc("registrar_contagens_locacao", {
+        p_rental_id: rentalId,
+        p_contagens: contagensParaSalvar.map((c) => ({ inicial: c.inicial, final: c.final, gera_credito: !!c.gera_credito })),
+        p_credito_usado: creditoUsado,
+      });
+      if (eCont) {
+        avisos.push(
+          `as contagens${creditoUsado > 0 || disparosViraCredito > 0 ? " e o crédito de disparos" : ""} não foram registradas (${eCont.message || "erro no banco"})`
+        );
+      }
+    }
 
     if (!isMentoria && custoManualPorDisparo != null) {
       const { error: e1 } = await supabase.rpc("definir_custo_disparo_manual_locacao", {
@@ -784,6 +914,10 @@ export default function CalculadoraLocacaoModal({
           clientName: activeClientName,
           eventDate,
           pagamentos,
+          contagens: contagensParaSalvar,
+          disparosRealizados: totalDisparos,
+          creditoUsado,
+          viraCredito: disparosViraCredito,
         },
         resumo
       )
@@ -968,7 +1102,7 @@ export default function CalculadoraLocacaoModal({
   // ============================================================
   // TELA DE FORMULÁRIO
   // ============================================================
-  const disparosValidos = !isMentoria && shots > 0 && !!pricing;
+  const disparosValidos = !isMentoria && todasContagensPreenchidas && totalDisparos > 0 && (!!pricing || tudoNoCredito);
   const podeSalvar = isMentoria ? !!mentoriaCalc : disparosValidos;
 
   return (
@@ -1140,51 +1274,168 @@ export default function CalculadoraLocacaoModal({
                 <p className="mt-1 text-xs text-neutral-400">Normalmente 1 (individual); já aconteceu até 3 na mesma mentoria.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-brand-teal">Valor inicial</label>
-                  <input
-                    inputMode="numeric"
-                    value={initialCount}
-                    onChange={(e) => setInitialCount(e.target.value)}
-                    placeholder="0"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <span className="pb-2 text-neutral-400">→</span>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-brand-pink">Valor final</label>
-                  <input
-                    inputMode="numeric"
-                    value={finalCount}
-                    onChange={(e) => setFinalCount(e.target.value)}
-                    placeholder="0"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-            )}
-            {!isMentoria &&
-              (() => {
-                const salva = contagemSalvaDaReserva ?? linkedReservation?.contagemInicial ?? null;
-                if (salva == null || initialCount !== String(salva)) return null;
-                return (
-                  <p className="mt-2 rounded-lg bg-brand-teal/10 px-3 py-2 text-xs text-brand-teal">
-                    Contagem inicial guardada na reserva ({salva.toLocaleString("pt-BR")}). Falta só digitar a final.
+              <div className="space-y-3">
+                {contagensCalc.map((c, idx) => {
+                  const ultima = idx === contagensCalc.length - 1;
+                  const salva = idx === 0 ? contagemSalvaDaReserva ?? linkedReservation?.contagemInicial ?? null : null;
+                  return (
+                    <div key={c.id} className={contagensCalc.length > 1 ? "rounded-xl border border-neutral-200 p-3" : ""}>
+                      {contagensCalc.length > 1 && (
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-medium text-neutral-500">
+                            Contagem {idx + 1}
+                            {c.preenchida && ` · ${c.disparos.toLocaleString("pt-BR")} disparos`}
+                          </span>
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => removeContagem(c.id)}
+                              aria-label={`Tirar contagem ${idx + 1}`}
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-red-500"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-brand-teal">Valor inicial</label>
+                          <input
+                            inputMode="numeric"
+                            value={c.inicial}
+                            onChange={(e) => updateContagem(c.id, { inicial: e.target.value })}
+                            placeholder="0"
+                            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <span className="pb-2 text-neutral-400">→</span>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-brand-pink">Valor final</label>
+                          <input
+                            inputMode="numeric"
+                            value={c.final}
+                            onChange={(e) => updateContagem(c.id, { final: e.target.value })}
+                            placeholder="0"
+                            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+                      {salva != null && c.inicial === String(salva) && (
+                        <p className="mt-2 rounded-lg bg-brand-teal/10 px-3 py-2 text-xs text-brand-teal">
+                          Contagem inicial guardada na reserva ({salva.toLocaleString("pt-BR")}). Falta só digitar a final.
+                        </p>
+                      )}
+                      {c.invertidas && (
+                        <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700">
+                          As leituras estavam invertidas. Para o cálculo, a menor ({c.inicialN.toLocaleString("pt-BR")}) vale
+                          como inicial e a maior ({c.finalN.toLocaleString("pt-BR")}) como final: {c.disparos.toLocaleString("pt-BR")}{" "}
+                          disparos.
+                        </p>
+                      )}
+                      {c.geraCredito && (
+                        <div className="mt-2 rounded-lg bg-brand-lilac/10 px-3 py-2 text-xs text-brand-lilac">
+                          <p className="font-medium">
+                            Vira crédito: {c.disparos.toLocaleString("pt-BR")} disparos (vale depois que a locação for paga)
+                          </p>
+                          <p className="mt-0.5 text-neutral-500">A cliente paga esta contagem hoje e usa os disparos na próxima locação.</p>
+                          <label className="mt-1.5 flex items-center gap-2 text-neutral-600">
+                            <input
+                              type="checkbox"
+                              checked={c.geraCredito}
+                              onChange={(e) => updateContagem(c.id, { geraCredito: e.target.checked })}
+                              className="h-4 w-4 rounded border-neutral-300"
+                            />
+                            vira crédito
+                          </label>
+                        </div>
+                      )}
+                      {ultima && c.preenchida && c.disparos > 0 && (
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addContagem(false)}
+                            className="rounded-lg border border-brand-teal py-2 text-xs font-medium text-brand-teal"
+                          >
+                            + Somar outra contagem
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addContagem(true)}
+                            className="rounded-lg border border-brand-lilac py-2 text-xs font-medium text-brand-lilac"
+                          >
+                            Gerar crédito e continuar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {contagensCalc.length > 1 && (
+                  <div className="flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                    <span>Soma das contagens</span>
+                    <span className="font-semibold">{totalDisparos.toLocaleString("pt-BR")} disparos</span>
+                  </div>
+                )}
+
+                {creditoDisponivel > 0 && (
+                  <div className="rounded-xl border border-brand-teal/30 bg-brand-teal/5 p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-brand-teal">
+                        Crédito de disparos: {creditoDisponivel.toLocaleString("pt-BR")} disponíveis
+                      </span>
+                      <label className="flex items-center gap-2 text-neutral-600">
+                        <input
+                          type="checkbox"
+                          checked={usarCredito}
+                          onChange={(e) => setUsarCredito(e.target.checked)}
+                          className="h-4 w-4 rounded border-neutral-300"
+                        />
+                        Usar crédito
+                      </label>
+                    </div>
+                    {usarCredito && (
+                      <div className="mt-2">
+                        <label className="mb-1 block text-neutral-500">
+                          Disparos do crédito usados nesta locação (máximo {creditoMaximo.toLocaleString("pt-BR")})
+                        </label>
+                        <input
+                          inputMode="numeric"
+                          value={creditoDigitado ?? String(creditoMaximo)}
+                          onChange={(e) => {
+                            const digitos = onlyDigits(e.target.value);
+                            if (digitos && Number(digitos) > creditoMaximo) setCreditoDigitado(String(creditoMaximo));
+                            else setCreditoDigitado(digitos);
+                          }}
+                          onBlur={() => {
+                            if (creditoDigitado !== null && !creditoDigitado) setCreditoDigitado("0");
+                          }}
+                          className="w-full max-w-[160px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                        />
+                        {creditoDigitado !== null && Number(creditoDigitado || 0) !== creditoMaximo && (
+                          <button
+                            type="button"
+                            onClick={() => setCreditoDigitado(null)}
+                            className="ml-2 text-brand-teal underline underline-offset-2"
+                          >
+                            usar o máximo
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {(saldoCredito?.aguardando ?? 0) > 0 && (
+                  <p className="text-xs text-neutral-500">
+                    {(saldoCredito?.aguardando ?? 0).toLocaleString("pt-BR")} disparos aguardando o pagamento da locação de origem.
                   </p>
-                );
-              })()}
-            {!isMentoria && contagensInvertidas && (
-              <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-700">
-                As contagens estavam invertidas. Para o cálculo, a menor ({initialNumber.toLocaleString("pt-BR")}) vale
-                como inicial e a maior ({finalNumber.toLocaleString("pt-BR")}) como final: {shots.toLocaleString("pt-BR")}{" "}
-                disparos.
-              </p>
+                )}
+              </div>
             )}
           </div>
 
           {/* ---- Resumo do cálculo ---- */}
-          {(pricing || mentoriaCalc) && (
+          {(pricing || mentoriaCalc || tudoNoCredito) && (
             <div className="rounded-2xl bg-white/60 p-4 shadow-sm">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Resumo do cálculo</p>
 
@@ -1200,12 +1451,42 @@ export default function CalculadoraLocacaoModal({
                   </p>
                 </div>
               ) : (
-                pricing && (
-                  <>
-                    <div className="mb-3 flex items-center justify-between text-sm">
+                <>
+                  <div className="mb-3 space-y-1 text-sm">
+                    <div className="flex items-center justify-between">
                       <span className="text-neutral-500">Disparos realizados</span>
-                      <span className="font-semibold text-neutral-700">{shots.toLocaleString("pt-BR")}</span>
+                      <span className="font-semibold text-neutral-700">{totalDisparos.toLocaleString("pt-BR")}</span>
                     </div>
+                    {creditoUsado > 0 && (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-neutral-500">Crédito usado</span>
+                          <span className="font-semibold text-brand-teal">−{creditoUsado.toLocaleString("pt-BR")}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-neutral-200 pt-1">
+                          <span className="text-neutral-600">Disparos cobrados</span>
+                          <span className="font-semibold text-neutral-800">{shots.toLocaleString("pt-BR")}</span>
+                        </div>
+                      </>
+                    )}
+                    {disparosViraCredito > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-neutral-500">Vira crédito para a próxima</span>
+                        <span className="font-medium text-brand-lilac">{disparosViraCredito.toLocaleString("pt-BR")} disparos</span>
+                      </div>
+                    )}
+                  </div>
+                  {tudoNoCredito && !pricing && (
+                    <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-neutral-600">Valor dos disparos</span>
+                        <span className="font-semibold text-brand-teal">{formatCurrency(0)}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-neutral-500">Todos os disparos foram cobertos pelo crédito da cliente.</p>
+                    </div>
+                  )}
+                {pricing && (
+                  <>
                     <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-neutral-600">Valor dos disparos (tabela)</span>
@@ -1263,7 +1544,8 @@ export default function CalculadoraLocacaoModal({
                       )}
                     </div>
                   </>
-                )
+                )}
+                </>
               )}
 
               {/* Deslocamento */}

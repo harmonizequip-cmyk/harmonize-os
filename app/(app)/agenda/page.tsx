@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import AgendaClient from "./AgendaClient";
+import type { SaldoCredito } from "@/lib/creditos";
 
 export default async function AgendaPage() {
   const supabase = createClient();
@@ -27,8 +28,29 @@ export default async function AgendaPage() {
     clients: Array.isArray(e.clients) ? (e.clients[0] ?? null) : (e.clients ?? null),
   }));
 
+  // Crédito da cliente: só para reservas ainda sem disparos.
+  const idsComReserva = Array.from(
+    new Set(normalizedEvents.filter((e: any) => !e.rental_id && e.client_id).map((e: any) => e.client_id as string))
+  );
+  const { data: saldos } = idsComReserva.length
+    ? await supabase
+        .from("creditos_saldo")
+        .select("client_id, disparos_disponiveis, disparos_aguardando, valor_disponivel")
+        .in("client_id", idsComReserva)
+    : { data: [] as any[] };
+  const creditos: Record<string, SaldoCredito> = {};
+  for (const s of saldos ?? []) {
+    creditos[s.client_id] = {
+      client_id: s.client_id,
+      disparos_disponiveis: Number(s.disparos_disponiveis ?? 0),
+      disparos_aguardando: Number(s.disparos_aguardando ?? 0),
+      valor_disponivel: Number(s.valor_disponivel ?? 0),
+    };
+  }
+
   return (
     <AgendaClient
+      creditos={creditos}
       initialEvents={normalizedEvents}
       clients={clients ?? []}
       equipments={equipments ?? []}
