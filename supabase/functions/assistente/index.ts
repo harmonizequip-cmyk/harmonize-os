@@ -49,7 +49,7 @@ type Mensagem = { role: "user" | "assistant"; content: string | Bloco[] };
 
 // Áreas do seletor (lib/planejamento.ts CATALOGO_AREAS + lib/boneco-corporal.ts CATALOGO_CORPORAL).
 const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
-const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "terco_medio", "nasolabial", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
 
 const FERRAMENTAS = [
   {
@@ -219,7 +219,7 @@ const FERRAMENTAS = [
         },
         areas_extras: {
           type: "array",
-          description: "Áreas manuais (as que não são fixas no planejador): terço médio, nasolabial, áreas corporais...",
+          description: "Áreas manuais (as que não são fixas no planejador): olhos, mento, áreas corporais... Terço médio é a área fixa arcomandibular.",
           items: {
             type: "object",
             properties: {
@@ -273,7 +273,7 @@ const FERRAMENTAS = [
   },
 ];
 
-// Áreas fixas do Planejador HIPRO (public/ferramentas/planejador.html).
+// Áreas fixas do Planejador HIPRO (lib/planejador.ts AREAS_FIXAS; arcomandibular = Terço médio).
 const PROF_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 const PROF_PAP = [...PROF_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
 // Papada pelo adipômetro (espelha profundidadesPapada/dividirDisparos de lib/planejamento.ts).
@@ -318,7 +318,7 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
   papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
   submandibular: { nome: "Submandibular", bilateral: true, profs: PROF_STD },
   jowls: { nome: "Jowls", bilateral: true, profs: PROF_STD },
-  arcomandibular: { nome: "Arco Mandibular", bilateral: true, profs: PROF_STD },
+  arcomandibular: { nome: "Terço médio", bilateral: true, profs: PROF_STD },
   temporal: { nome: "Temporal e Arco Zigomático", bilateral: true, profs: PROF_STD },
   frontal: { nome: "Frontal", bilateral: true, profs: PROF_STD },
   perioral_sup: { nome: "Perioral Superior", bilateral: true, profs: PROF_STD },
@@ -327,9 +327,9 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
 
 // Nome do procedimento pelas áreas (espelha nomeProcedimento de lib/planejamento.ts):
 // todas as áreas grandes do rosto = Full Face; papada, pescoço e submandibular somam no nome.
-const ROSTO_GRANDES = ["frontal", "temporal", "terco_medio", "nasolabial", "jowls", "arcomandibular"];
+const ROSTO_GRANDES = ["frontal", "temporal", "arcomandibular", "jowls"];
 const FORA_DO_ROSTO: [string, string][] = [["submandibular", "Submandibular"], ["papada", "Papada"], ["pescoco", "Pescoço"]];
-const ID_POR_NOME: Record<string, string> = { "terco medio": "terco_medio", nasolabial: "nasolabial", mento: "mento", olhos: "olhos" };
+const ID_POR_NOME: Record<string, string> = { "terco medio": "arcomandibular", mento: "mento", olhos: "olhos" };
 function nomeDoProcedimento(ids: Set<string>, nomes: string[]): string {
   if (ROSTO_GRANDES.every((id) => ids.has(id))) return ["Full Face", ...FORA_DO_ROSTO.filter(([id]) => ids.has(id)).map(([, n]) => n)].join(" + ");
   return nomes.join(" + ");

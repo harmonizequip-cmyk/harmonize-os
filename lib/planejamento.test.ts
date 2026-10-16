@@ -58,7 +58,7 @@ describe("planejamento", () => {
 });
 
 describe("nome do procedimento pela escolha de áreas", () => {
-  const rosto = ["frontal", "temporal", "terco_medio", "nasolabial", "jowls", "arcomandibular"];
+  const rosto = ["frontal", "temporal", "arcomandibular", "jowls"];
   it("rosto inteiro (sem as pequenas) é Full Face", () => {
     expect(nomeProcedimento(rosto)).toBe("Full Face");
     expect(nomeProcedimento([...rosto, "perioral_sup", "mento"])).toBe("Full Face");

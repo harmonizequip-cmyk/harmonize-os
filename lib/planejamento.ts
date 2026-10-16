@@ -1,11 +1,9 @@
-// Planejador HIPRO (public/ferramentas/planejador.html) dentro do app: o
-// estado é o mesmo objeto que o planejador salvava no aparelho; aqui ficam
-// as contas da lista e o que decide quando vale guardar no banco.
+// Planejador HIPRO dentro do app (tela nativa em app/(app)/planejador, contas
+// em lib/planejador.ts): aqui ficam as contas da lista, o que decide quando
+// vale guardar no banco e a montagem pelas regras. Terço médio usa o id
+// antigo "arcomandibular"; Nasolabial saiu (fica dentro do Jowls).
 
 import { urlBoneco } from "./boneco-corporal";
-
-export const PREFIXO_CHAVE = "harmonize_planejador_plano_";
-export const chaveLocal = (id: string) => PREFIXO_CHAVE + id;
 
 export interface EstadoPlanejador {
   paciente?: string;
@@ -93,13 +91,11 @@ export const CATALOGO_AREAS: AreaCatalogo[] = [
   { id: "frontal", nome: "Frontal", grupo: "face" },
   { id: "temporal", nome: "Temporal e Arco Zigomático", grupo: "face" },
   { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", grupo: "face", pequena: true },
-  { id: "terco_medio", nome: "Terço médio", grupo: "face" },
-  { id: "nasolabial", nome: "Nasolabial", grupo: "face" },
+  { id: "arcomandibular", nome: "Terço médio", grupo: "face" },
   { id: "perioral_sup", nome: "Perioral Superior", grupo: "face", pequena: true },
   { id: "perioral_inf", nome: "Perioral Inferior", grupo: "face", pequena: true },
   { id: "mento", nome: "Mento", grupo: "face", pequena: true },
   { id: "jowls", nome: "Jowls", grupo: "face" },
-  { id: "arcomandibular", nome: "Arco Mandibular", grupo: "face" },
   { id: "submandibular", nome: "Submandibular", grupo: "fora" },
   { id: "papada", nome: "Papada", grupo: "fora" },
   { id: "pescoco", nome: "Pescoço", grupo: "fora" },
@@ -171,8 +167,6 @@ export const MAXIMO_LINHA: Record<string, number> = {
   frontal: 500,
   perioral_sup: 600,
   perioral_inf: 600,
-  terco_medio: 1200,
-  nasolabial: 1200,
   olhos: 1200,
   mento: 1200,
 };
@@ -186,7 +180,7 @@ export function profundidadesRosto(id: string): number[] {
 
 const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"]);
 const AREA_UNICA = new Set(["papada", "mento"]);
-const NOME_EXTRA: Record<string, string> = { terco_medio: "Terço médio", nasolabial: "Nasolabial", olhos: "Pálpebras inferiores e lateral dos olhos", mento: "Mento" };
+const NOME_EXTRA: Record<string, string> = { olhos: "Pálpebras inferiores e lateral dos olhos", mento: "Mento" };
 
 export const PROFUNDIDADES_GORDURA = [6, 7, 8, 9, 10, 11, 12, 13];
 export const DISPAROS_CORPORAL = { min: 3200, max: 4000 };
