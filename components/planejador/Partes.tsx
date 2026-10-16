@@ -9,9 +9,8 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown, Minus, Plus, Trash2, X } from "lucide-react";
 import BonecoCorporal from "@/components/BonecoCorporal";
 import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
-import { MOVIMENTO_DA_AREA } from "@/lib/modelo-facial";
 import { imagemDaArea } from "@/lib/planejador-impressao";
-import { OPTS_PAP, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
+import { MOVIMENTO_DA_AREA, OPTS_PAP, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
 
 export const fmt = (n: number) => n.toLocaleString("pt-BR");
 
@@ -230,7 +229,7 @@ export function FolhaModelo({ area, onFechar }: { area: Area | null; onFechar: (
       {area && (
         <div className="space-y-3 pb-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imagemDaArea(area)} alt={`Movimento: ${area.nome}`} className="mx-auto aspect-square w-full max-w-[320px] rounded-3xl" />
+          <img src={imagemDaArea(area)} alt={`Movimento: ${area.nome}`} className="mx-auto aspect-square w-full max-w-[260px] rounded-3xl object-cover shadow-sm" />
           {MOVIMENTO_DA_AREA[area.id] && (
             <p className="rounded-2xl bg-brand-teal/10 px-4 py-3 text-sm text-neutral-800">
               <b className="text-brand-teal-dark">Movimento: </b>

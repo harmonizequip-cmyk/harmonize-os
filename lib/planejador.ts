@@ -56,6 +56,19 @@ export const AREAS_FIXAS: Area[] = [
   { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
 ];
 
+/** Como a ponteira anda em cada área (texto curto, para a tela e o prontuário). */
+export const MOVIMENTO_DA_AREA: Record<string, string> = {
+  frontal: "Do centro da testa para as laterais, em linhas paralelas.",
+  temporal: "Em arco, de baixo do olho subindo pela lateral até a têmpora.",
+  arcomandibular: "Em diagonal, do sulco perto da boca subindo até a frente da orelha.",
+  jowls: "Dois campos ovais (bigode chinês e jowls), com o movimento de baixo para cima.",
+  pescoco: "Da parte de baixo da orelha descendo em curva até embaixo do queixo.",
+  papada: "Movimento circular no centro da papada. Não descer para a tireoide (X).",
+  submandibular: "Do centro do queixo para os lados, em arco até perto da orelha.",
+  perioral_sup: "Entre o nariz e o lábio, do centro para os cantos.",
+  perioral_inf: "Abaixo do lábio inferior, do centro para os cantos.",
+};
+
 /** Máximo por linha (por lado; papada = campo único, soma dos lados). Jowls pode passar. */
 export function maximoDaLinha(areaId: string): number | null {
   if (areaId === "jowls") return null;

@@ -3,18 +3,16 @@
 // assinaturas). O mesmo HTML serve para a prévia na tela e para a impressão
 // (Salvar como PDF).
 
-import { urlModeloFacial } from "./modelo-facial";
 import { svgBoneco } from "./boneco-corporal";
 import { dataBr, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 
-/** Imagem da área: modelo facial com setas, boneco corporal ou rosto neutro. */
-export function imagemDaArea(a: Area): string {
+/** Imagem da área: foto do protocolo (com as setas do movimento), rosto sem setas ou boneco corporal. */
+export function imagemDaArea(a: Area, origem = ""): string {
   if (a.regiao === "corporal") return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgBoneco(a.parte ? [a.parte] : []))}`;
-  if (a.manual) return urlModeloFacial("facial");
-  return urlModeloFacial(a.id);
+  return `${origem}/ferramentas/areas/${a.manual ? "facial" : a.id}.jpg`;
 }
 
 export const CSS_PRONTUARIO = `
@@ -85,7 +83,7 @@ export function htmlProntuario(p: Plano, origem = "", agora = new Date()): strin
       const tem = a.bilateral ? (r.dispD ?? 0) + (r.dispE ?? 0) > 0 : (r.disp ?? 0) > 0;
       if (!tem) continue;
       const q = corporal ? Math.max(1, r.quad ?? 1) : 1;
-      const nome = primeira ? `<div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a)}" alt=""><span>${esc(a.nome)}</span></div>` : "";
+      const nome = primeira ? `<div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a, origem)}" alt=""><span>${esc(a.nome)}</span></div>` : "";
       const chk = `<td style="text-align:center"><span class="pront-chk${r.feito ? " on" : ""}">${r.feito ? "✓" : ""}</span></td>`;
       const lados = a.bilateral
         ? `<td>${r.dispD ?? 0}</td><td>${r.dispE ?? 0}</td>`
@@ -120,7 +118,7 @@ export function htmlFichaPaciente(p: Plano, origem = "", agora = new Date()): st
   for (const a of todasAreas(p)) {
     if (!totalArea(p, a)) continue;
     const feito = (p.DATA[a.id] ?? []).some((r) => r.feito && (a.bilateral ? (r.dispD ?? 0) + (r.dispE ?? 0) > 0 : (r.disp ?? 0) > 0));
-    linhas += `<tr><td style="text-align:center"><span class="pront-chk${feito ? " on" : ""}">${feito ? "✓" : ""}</span></td><td><div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a)}" alt=""><span>${esc(a.nome)}</span></div></td></tr>`;
+    linhas += `<tr><td style="text-align:center"><span class="pront-chk${feito ? " on" : ""}">${feito ? "✓" : ""}</span></td><td><div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a, origem)}" alt=""><span>${esc(a.nome)}</span></div></td></tr>`;
   }
   if (!linhas) linhas = `<tr><td colspan="2" style="text-align:center;color:#aaa;padding:14px">Nenhuma área registrada</td></tr>`;
   return `<div class="pront-page">

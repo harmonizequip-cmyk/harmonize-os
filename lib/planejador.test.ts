@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AREAS_FIXAS, alertas, normalizarPlano, paraEstado, situacaoSaldo, textoResumo, todasAreas, totalArea, totalDistribuido } from "./planejador";
-import { htmlFichaPaciente, htmlProntuario } from "./planejador-impressao";
-import { svgModeloFacial, VISTA_DA_AREA } from "./modelo-facial";
+import { htmlFichaPaciente, htmlProntuario, imagemDaArea } from "./planejador-impressao";
+import { existsSync } from "node:fs";
 
 // Estado salvo pelo planejador antigo (HTML): áreas manuais levavam a imagem dentro.
 const antigo = {
@@ -68,12 +68,9 @@ describe("planejador nativo: estado antigo", () => {
   });
 });
 
-describe("modelo facial", () => {
-  it("toda área fixa tem desenho com seta", () => {
-    for (const a of AREAS_FIXAS) {
-      expect(VISTA_DA_AREA[a.id]).toBeTruthy();
-      expect(svgModeloFacial(a.id)).toMatch(/marker-end|stroke="#D9577E"/);
-    }
-    expect(svgModeloFacial("facial")).not.toContain("marker-end=");
+describe("fotos das áreas", () => {
+  it("toda área fixa tem a foto do protocolo antigo", () => {
+    for (const a of AREAS_FIXAS) expect(existsSync(`public${imagemDaArea(a)}`)).toBe(true);
+    expect(existsSync("public/ferramentas/areas/facial.jpg")).toBe(true);
   });
 });
