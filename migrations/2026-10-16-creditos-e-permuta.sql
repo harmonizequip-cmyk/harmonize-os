@@ -1,7 +1,7 @@
 -- ============================================================
 -- CRÉDITOS DA CLIENTE (disparos e R$) E PERMUTA
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: 2 tabelas, view, 6 funções, forma permuta, anon sem execução, 2 gatilhos)
 --
 -- 1. Contagens da locação (locacao_contagens): a finalização pode ter mais
 --    de uma contagem (troca de ponteira). Cada uma é "somar" (só entra no
