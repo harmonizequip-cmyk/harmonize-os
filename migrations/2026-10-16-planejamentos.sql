@@ -1,7 +1,7 @@
 -- ============================================================
 -- PLANEJADOR HIPRO (tela /planejador)
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: tabela, 2 funções, anon sem execução, gatilho, 1 política)
 --
 -- O "Planejador HIPRO HOF" (HTML do dono, em public/ferramentas) roda dentro
 -- do app. Cada planejamento é de um paciente atendido numa cliente da
