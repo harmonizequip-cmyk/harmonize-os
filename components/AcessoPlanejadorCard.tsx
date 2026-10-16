@@ -25,6 +25,15 @@ interface ClienteAcesso {
   city: string | null;
 }
 
+interface Validade {
+  ultimo_atendimento: string | null;
+  liberado_ate: string | null;
+  valido_ate: string | null;
+  ativo: boolean;
+}
+
+const dataBr = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
+
 interface Acesso {
   id: string;
   email: string;
@@ -44,6 +53,8 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
   const supabase = createClient();
   const somenteLeitura = useSomenteLeitura();
   const [acessos, setAcessos] = useState<Acesso[]>([]);
+  const [validade, setValidade] = useState<Validade | null>(null);
+  const [liberando, setLiberando] = useState(false);
   const [aberto, setAberto] = useState(false);
   const [tratamento, setTratamento] = useState(cliente.treatment ?? "");
   const [nome, setNome] = useState(cliente.display_name ?? "");
@@ -58,8 +69,12 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
   const [copiado, setCopiado] = useState(false);
 
   const carregar = useCallback(async () => {
-    const { data } = await supabase.from("profiles").select("id, email, active").eq("cliente_id", cliente.id).order("email");
+    const [{ data }, { data: v }] = await Promise.all([
+      supabase.from("profiles").select("id, email, active").eq("cliente_id", cliente.id).order("email"),
+      supabase.rpc("portal_validade_cliente", { p_client_id: cliente.id }),
+    ]);
     setAcessos((data ?? []) as Acesso[]);
+    setValidade((v as Validade | null) ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente.id]);
 
@@ -119,6 +134,16 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
     if (erroLibera) return setErro(erroLibera.message);
     setPronto({ email: e, senha: jaExistia ? "" : senha, confirmar: !!data?.user && !data.session });
     setAberto(false);
+    carregar();
+  }
+
+  // Validade: 60 dias ao liberar, 45 depois de cada atendimento; passou, trava. O dono libera por mais 60.
+  async function liberar60() {
+    setErro(null);
+    setLiberando(true);
+    const { error } = await supabase.rpc("liberar_portal_cliente", { p_client_id: cliente.id, p_dias: 60 });
+    setLiberando(false);
+    if (error) return setErro(error.message);
     carregar();
   }
 
@@ -182,6 +207,29 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
           </button>
         )}
       </div>
+
+      {acessos.some((x) => x.active) && validade && (
+        <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${validade.ativo ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+          {validade.ativo ? (
+            <p>
+              Acesso liberado até <b>{dataBr(validade.valido_ate)}</b>
+              {validade.liberado_ate && validade.liberado_ate === validade.valido_ate
+                ? " (prazo da liberação)."
+                : validade.ultimo_atendimento
+                ? ` (45 dias depois do atendimento de ${dataBr(validade.ultimo_atendimento)}).`
+                : "."}
+            </p>
+          ) : (
+            <p>
+              <b>Acesso pausado</b>: passou do prazo
+              {validade.ultimo_atendimento ? ` (último em ${dataBr(validade.ultimo_atendimento)})` : ""}. Ela vê o aviso para falar com você.
+            </p>
+          )}
+          <button onClick={liberar60} disabled={liberando} className="mt-1.5 font-semibold underline disabled:opacity-60">
+            {liberando ? "Liberando..." : "Liberar por mais 60 dias"}
+          </button>
+        </div>
+      )}
 
       {acessos.length > 0 && (
         <ul className="mt-3 space-y-1.5">
