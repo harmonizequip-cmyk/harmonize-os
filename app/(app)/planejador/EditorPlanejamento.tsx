@@ -27,6 +27,7 @@ import {
 } from "@/lib/planejador";
 import { htmlFichaPaciente, htmlProntuario, imprimir } from "@/lib/planejador-impressao";
 import SeletorPlanejamento from "@/components/SeletorPlanejamento";
+import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import { CartaoArea, Folha, FolhaModelo, FolhaNovaArea, fmt } from "@/components/planejador/Partes";
 import ResumoPlano from "@/components/planejador/ResumoPlano";
 import { formatDate } from "@/lib/format";
@@ -94,6 +95,7 @@ export default function EditorPlanejamento({
   const [novaArea, setNovaArea] = useState(false);
   const [seletor, setSeletor] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [confirmarApagar, setConfirmarApagar] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [digitando, setDigitando] = useState(false);
   const rolagem = useRef<HTMLDivElement>(null);
@@ -183,6 +185,12 @@ export default function EditorPlanejamento({
   );
 
   const campo = <K extends keyof Plano>(k: K, v: Plano[K]) => mudar((p) => ({ ...p, [k]: v }));
+
+  // "Editar" na lista abre direto nos dados do paciente (?aba=paciente).
+  useEffect(() => {
+    const a = new URLSearchParams(window.location.search).get("aba");
+    if (a === "paciente" || a === "areas" || a === "resumo") setAba(a);
+  }, []);
 
   // Vindo do assistente ou do "Duplicar" (?ia=1): o plano montado entra por cima.
   useEffect(() => {
@@ -294,22 +302,24 @@ export default function EditorPlanejamento({
     window.location.href = `${destino}${destino.includes("?") ? "&" : "?"}ia=1`;
   }
 
-  async function excluir() {
+  function excluir() {
     setMenu(false);
-    if (!id) {
+    if (!idRef.current) {
+      sujo.current = false;
       router.push(base);
       return;
     }
-    if (!window.confirm("Excluir este planejamento? Não dá para desfazer.")) return;
+    setConfirmarApagar(true);
+  }
+
+  async function apagarDeVez(): Promise<string | null> {
     if (timer.current) clearTimeout(timer.current);
     sujo.current = false;
-    const { error } = await supabase.rpc("excluir_planejamento", { p_id: id });
-    if (error) {
-      setStatus("erro");
-      return;
-    }
+    const { error } = await supabase.rpc("excluir_planejamento", { p_id: idRef.current });
+    if (error) return error.message || "Não consegui apagar. Confira a internet.";
     router.push(base);
     router.refresh();
+    return null;
   }
 
   function irPara(a: Aba) {
@@ -443,7 +453,7 @@ export default function EditorPlanejamento({
                   </button>
                   {!somenteLeitura && (
                     <button onClick={excluir} className="flex w-full items-center gap-2.5 border-t border-neutral-100 px-4 py-3 text-left text-sm text-rose-600 active:bg-rose-50">
-                      <Trash2 size={16} /> Excluir planejamento
+                      <Trash2 size={16} /> Excluir paciente
                     </button>
                   )}
                 </div>
@@ -745,6 +755,14 @@ export default function EditorPlanejamento({
         </div>
       )}
 
+      {confirmarApagar && (
+        <ConfirmarApagarModal
+          titulo={`Excluir ${plano.paciente || "este paciente"}?`}
+          descricao="Apaga o planejamento deste paciente, com as áreas e os disparos."
+          onCancelar={() => setConfirmarApagar(false)}
+          onConfirmar={apagarDeVez}
+        />
+      )}
       <FolhaModelo area={modelo} onFechar={() => setModelo(null)} />
       <FolhaNovaArea aberta={novaArea} onFechar={() => setNovaArea(false)} onCriar={criarArea} />
       <Folha aberta={seletor} onFechar={() => setSeletor(false)} titulo="Montar pelas regras">

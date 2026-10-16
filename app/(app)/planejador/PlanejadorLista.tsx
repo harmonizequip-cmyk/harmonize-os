@@ -8,7 +8,10 @@ import { LinkCliente } from "@/components/Atalhos";
 import { linkNovoPlanejamento, linkEvento } from "@/lib/atalhos";
 import { agruparPorCliente, diasAte, retornosProximos, type PlanejamentoLinha } from "@/lib/planejamento";
 import { formatDate } from "@/lib/format";
-import { CalendarClock, ClipboardList, Plus, Search } from "lucide-react";
+import { CalendarClock, ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
+import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { createClient } from "@/lib/supabase/client";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -20,10 +23,14 @@ function quando(dias: number) {
 
 function Linha({ p, hoje, mostrarCliente, portal }: { p: PlanejamentoLinha; hoje: string; mostrarCliente?: boolean; portal?: boolean }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
+  const [apagar, setApagar] = useState(false);
+  const base = portal ? "/portal" : "/planejador";
   const passou = p.saldo_total > 0 && p.total_disparos > p.saldo_total;
   const retorno = p.data_retorno ? diasAte(p.data_retorno, hoje) : null;
   return (
-    <Link href={`${portal ? "/portal" : "/planejador"}/${p.id}`} className="block rounded-xl border border-neutral-200 bg-white px-3 py-2.5 hover:border-brand-teal/40">
+    <>
+    <Link href={`${base}/${p.id}`} className="block rounded-xl border border-neutral-200 bg-white px-3 py-2.5 hover:border-brand-teal/40">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-neutral-900">{p.paciente || "Paciente sem nome"}</p>
@@ -69,7 +76,49 @@ function Linha({ p, hoje, mostrarCliente, portal }: { p: PlanejamentoLinha; hoje
           )}
         </div>
       ) : null}
+      {!somenteLeitura && (
+        <div className="mt-2 flex gap-2 border-t border-neutral-100 pt-2">
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              router.push(`${base}/${p.id}?aba=paciente`);
+            }}
+            className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700"
+          >
+            <Pencil size={12} /> Editar
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setApagar(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600"
+          >
+            <Trash2 size={12} /> Excluir
+          </span>
+        </div>
+      )}
     </Link>
+    {apagar && (
+      <ConfirmarApagarModal
+        titulo={`Excluir ${p.paciente || "este paciente"}?`}
+        descricao="Apaga o planejamento deste paciente, com as áreas e os disparos."
+        onCancelar={() => setApagar(false)}
+        onConfirmar={async () => {
+          const { error } = await createClient().rpc("excluir_planejamento", { p_id: p.id });
+          if (error) return error.message || "Não consegui apagar. Confira a internet.";
+          setApagar(false);
+          router.refresh();
+        }}
+      />
+    )}
+    </>
   );
 }
 
