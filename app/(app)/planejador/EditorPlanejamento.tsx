@@ -28,7 +28,10 @@ export default function EditorPlanejamento({
   clienteId,
   eventoId,
   clientes,
+  portal,
 }: {
+  /** Login da cliente (/portal): sem escolha de cliente/atendimento, sem IA. */
+  portal?: boolean;
   planoId: string | null;
   estado: EstadoPlanejador;
   clienteId: string | null;
@@ -38,6 +41,7 @@ export default function EditorPlanejamento({
   const supabase = createClient();
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
+  const base = portal ? "/portal" : "/planejador";
   const [id, setId] = useState<string | null>(planoId);
   const [cliente, setCliente] = useState(clienteId ?? "");
   const [evento, setEvento] = useState(eventoId ?? "");
@@ -107,7 +111,7 @@ export default function EditorPlanejamento({
       idRef.current = data as string;
       setId(data as string);
       // Troca o endereço sem recarregar a moldura.
-      window.history.replaceState(null, "", `/planejador/${data}`);
+      window.history.replaceState(null, "", `${base}/${data}`);
     }
     setStatus("salvo");
   }, [supabase, somenteLeitura]);
@@ -132,7 +136,7 @@ export default function EditorPlanejamento({
         // "Novo" dentro do planejador: guarda este e abre outro para a mesma cliente.
         if (timer.current) clearTimeout(timer.current);
         salvar().finally(() => {
-          window.location.href = linkNovoPlanejamento(ligacao.current.cliente || null, ligacao.current.evento || null);
+          window.location.href = portal ? "/portal/novo" : linkNovoPlanejamento(ligacao.current.cliente || null, ligacao.current.evento || null);
         });
       }
     }
@@ -159,7 +163,7 @@ export default function EditorPlanejamento({
   // Atendimentos HIPRO da cliente (60 dias para trás e para frente).
   useEffect(() => {
     let ativo = true;
-    if (!cliente) {
+    if (!cliente || portal) {
       setEventos([]);
       return;
     }
@@ -181,7 +185,7 @@ export default function EditorPlanejamento({
     return () => {
       ativo = false;
     };
-  }, [cliente, supabase]);
+  }, [cliente, supabase, portal]);
 
   function mudarLigacao(novoCliente: string, novoEvento: string) {
     setCliente(novoCliente);
@@ -218,7 +222,7 @@ export default function EditorPlanejamento({
 
   async function excluir() {
     if (!id) {
-      router.push("/planejador");
+      router.push(base);
       return;
     }
     if (!window.confirm("Excluir este planejamento? Não dá para desfazer.")) return;
@@ -229,7 +233,7 @@ export default function EditorPlanejamento({
       setStatus("erro");
       return;
     }
-    router.push("/planejador");
+    router.push(base);
     router.refresh();
   }
 
@@ -239,7 +243,7 @@ export default function EditorPlanejamento({
     <div className="-mx-4 -mt-2 flex flex-col sm:mx-0 sm:mt-0">
       <div className="space-y-2 border-b border-neutral-200 bg-white px-3 py-2.5 sm:rounded-t-2xl sm:border">
         <div className="flex items-center justify-between gap-2">
-          <Link href={cliente ? `/planejador?cliente=${cliente}` : "/planejador"} className="flex items-center gap-1 text-sm font-medium text-neutral-600">
+          <Link href={portal ? base : cliente ? `/planejador?cliente=${cliente}` : "/planejador"} className="flex items-center gap-1 text-sm font-medium text-neutral-600">
             <ArrowLeft size={16} /> Planejamentos
           </Link>
           <div className="flex items-center gap-3">
@@ -267,6 +271,7 @@ export default function EditorPlanejamento({
             )}
           </div>
         </div>
+        {!portal && (
         <div className="grid gap-2 sm:grid-cols-2">
           <ClientPicker
             clients={clientes}
@@ -296,18 +301,19 @@ export default function EditorPlanejamento({
             </select>
           </div>
         </div>
+        )}
         <Atalhos>
-          {cliente && (
+          {cliente && !portal && (
             <Atalho href={linkCliente(cliente)} emoji="👤">
               Ficha {nomeCliente ? `de ${nomeCliente.split(" ")[0]}` : ""}
             </Atalho>
           )}
-          {evento && (
+          {evento && !portal && (
             <Atalho href={linkEvento(evento)} emoji="📅">
               Atendimento
             </Atalho>
           )}
-          {cliente && (
+          {cliente && !portal && (
             <Atalho href={`/planejador?cliente=${cliente}`} emoji="📋">
               Outros pacientes dela
             </Atalho>
@@ -321,7 +327,7 @@ export default function EditorPlanejamento({
               <ListChecks size={13} /> Montar pelas regras
             </button>
           )}
-          {!somenteLeitura && (
+          {!somenteLeitura && !portal && (
             <Atalho
               href={`/assistente?${cliente ? `cliente=${cliente}&` : ""}pergunta=${encodeURIComponent(
                 "Monta um planejamento: paciente , saldo de  disparos, queixa principal: "

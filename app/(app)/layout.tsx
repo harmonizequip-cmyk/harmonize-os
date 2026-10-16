@@ -28,9 +28,12 @@ export default async function AppLayout({
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("name, permissions, is_admin, somente_leitura")
+    .select("name, permissions, is_admin, somente_leitura, cliente_id")
     .eq("id", user.id)
     .single();
+
+  // Login de cliente só tem o Planejador dela (/portal).
+  if (profile?.cliente_id) redirect("/portal");
 
   const permissions = (profile?.permissions as Record<string, boolean>) ?? {};
   const isAdmin = !!profile?.is_admin;

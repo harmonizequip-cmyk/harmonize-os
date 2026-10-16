@@ -10,13 +10,13 @@ export default async function PlanejadorPage(props: { searchParams: Promise<{ cl
   const [{ data, error }, clientes] = await Promise.all([
     supabase
       .from("planejamentos")
-      .select("id, client_id, calendar_event_id, paciente, data, data_retorno, procedimento, saldo_total, total_disparos, updated_at, clients(name, display_name, treatment)")
+      .select("id, client_id, calendar_event_id, paciente, data, data_retorno, procedimento, saldo_total, total_disparos, updated_at, clients(name, display_name, treatment), autor:profiles!planejamentos_created_by_fkey(cliente_id)")
       .order("data", { ascending: false })
       .order("updated_at", { ascending: false })
       .limit(1000),
     carregarClientes(supabase),
   ]);
-  const lista: PlanejamentoLinha[] = (data ?? []).map((p: any) => ({ ...p, clients: undefined, cliente_nome: nomeProfissional(um(p.clients)) }));
+  const lista: PlanejamentoLinha[] = (data ?? []).map((p: any) => ({ ...p, clients: undefined, autor: undefined, cliente_nome: nomeProfissional(um(p.clients)), pela_cliente: !!um<any>(p.autor)?.cliente_id }));
   return (
     <PlanejadorLista
       planejamentos={lista}

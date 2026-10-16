@@ -32,6 +32,8 @@ export interface PlanejamentoLinha {
   total_disparos: number;
   updated_at: string;
   cliente_nome: string | null;
+  /** Criado pelo login da própria cliente (portal). */
+  pela_cliente?: boolean;
 }
 
 /** Estado com que um planejamento novo abre: profissional e data já preenchidos. */

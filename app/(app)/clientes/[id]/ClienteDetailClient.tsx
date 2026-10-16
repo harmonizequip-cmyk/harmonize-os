@@ -16,6 +16,7 @@ import ReservarHiproModal from "../../agenda/ReservarHiproModal";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import HistoricoClienteSection from "./HistoricoClienteSection";
+import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento } from "@/lib/atalhos";
 
@@ -606,6 +607,8 @@ export default function ClienteDetailClient({
           </tbody>
         </table>
       </div>
+
+      <AcessoPlanejadorCard cliente={client} onCadastroAtualizado={() => router.refresh()} />
 
       <HistoricoClienteSection clientId={client.id} />
 
