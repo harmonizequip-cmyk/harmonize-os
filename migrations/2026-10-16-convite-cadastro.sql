@@ -1,7 +1,7 @@
 -- ============================================================
 -- FORMULÁRIO DE CADASTRO PARA A CLIENTE PREENCHER (acesso ao Planejador)
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: tabela, 3 funções, receber só service_role, anon sem execução, gatilho, token de 64)
 --
 -- O dono gera um link (convite com token, vale 14 dias, uso único) e manda
 -- no WhatsApp. A cliente abre /cadastro/<token>, preenche os dados e cria a
