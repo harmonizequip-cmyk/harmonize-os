@@ -111,7 +111,30 @@ interface ContagemTela {
   inicial: string;
   final: string;
   geraCredito: boolean;
+  // Ponteira (aplicador) usada nesta contagem. undefined = ainda não mexeu:
+  // a primeira contagem assume a ponteira montada no HIPRO da locação.
+  aplicadorId?: string;
+  padraoMontada?: boolean;
 }
+
+interface AplicadorOpcao {
+  id: string;
+  nome: string;
+  numero_serie: string | null;
+}
+
+// Linha de pagamento da tela: as de permuta levam o que veio e para onde vai.
+interface PagamentoTela extends PagamentoLinha {
+  permutaDescricao?: string;
+  permutaDestino?: "empresa" | "pessoal";
+  permutaCategoria?: string;
+}
+
+// Formas da finalização: as de sempre e a permuta (parceiro paga com produto/serviço).
+const FORMAS_PAGAMENTO_LOCACAO: { value: string; label: string }[] = [
+  ...PAYMENT_METHODS.map((p) => ({ value: p.value as string, label: p.label as string })),
+  { value: "permuta", label: "Permuta" },
+];
 
 interface CategoryOption {
   id: string;
@@ -305,7 +328,13 @@ export default function CalculadoraLocacaoModal({
   // (todas entram na soma); "Gerar crédito e continuar" marca a atual para
   // virar crédito da cliente (ela paga hoje e usa depois) e abre outra.
   const [contagensTela, setContagensTela] = useState<ContagemTela[]>(() => [
-    { id: newId("cont"), inicial: contagemSalvaDaReserva != null ? String(contagemSalvaDaReserva) : "", final: "", geraCredito: false },
+    {
+      id: newId("cont"),
+      inicial: contagemSalvaDaReserva != null ? String(contagemSalvaDaReserva) : "",
+      final: "",
+      geraCredito: false,
+      padraoMontada: true,
+    },
   ]);
   const [patientCount, setPatientCount] = useState("1");
   const [notes, setNotes] = useState("");
@@ -318,7 +347,7 @@ export default function CalculadoraLocacaoModal({
       const lista = gerarCreditoDaAtual
         ? prev.map((c, i) => (i === prev.length - 1 ? { ...c, geraCredito: true } : c))
         : prev;
-      return [...lista, { id: newId("cont"), inicial: "", final: "", geraCredito: false }];
+      return [...lista, { id: newId("cont"), inicial: "", final: "", geraCredito: false, aplicadorId: "" }];
     });
   }
   function removeContagem(id: string) {
@@ -352,6 +381,75 @@ export default function CalculadoraLocacaoModal({
   const initialNumber = contagensCalc[0]?.inicialN ?? 0;
   const finalNumber = contagensCalc[contagensCalc.length - 1]?.finalN ?? 0;
   const patientCountNumber = Number(onlyDigits(patientCount)) || 0;
+
+  // ------------------------------------------------------------
+  // Ponteira (aplicador) de cada contagem e troca de ponteira no HIPRO
+  // ------------------------------------------------------------
+  const [aplicadores, setAplicadores] = useState<AplicadorOpcao[]>([]);
+  // aplicador_id -> equipment_id onde está montado agora (ate nulo).
+  const [montagens, setMontagens] = useState<Record<string, string>>({});
+  const [nomesEquip, setNomesEquip] = useState<Record<string, string>>({});
+  // No "finalize" a reserva não traz o equipamento: busca pelo agendamento.
+  const [equipFinalizeId, setEquipFinalizeId] = useState<string | null>(null);
+  const [registrarTroca, setRegistrarTroca] = useState(true);
+  useEffect(() => {
+    let active = true;
+    if (isMentoria) return;
+    Promise.all([
+      supabase.from("aplicadores").select("id, nome, numero_serie").eq("ativo", true).order("nome"),
+      supabase.from("aplicador_montagens").select("aplicador_id, equipment_id, equipments(name)").is("ate", null),
+      mode.kind === "finalize"
+        ? supabase.from("calendar_events").select("equipment_id").eq("id", mode.reservation.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]).then(([ap, mo, ev]) => {
+      if (!active) return;
+      setAplicadores((ap.data ?? []) as AplicadorOpcao[]);
+      const m: Record<string, string> = {};
+      const nomes: Record<string, string> = {};
+      for (const r of (mo.data ?? []) as any[]) {
+        m[r.aplicador_id] = r.equipment_id;
+        const eq = Array.isArray(r.equipments) ? r.equipments[0] : r.equipments;
+        if (eq?.name) nomes[r.equipment_id] = eq.name;
+      }
+      setMontagens(m);
+      setNomesEquip(nomes);
+      setEquipFinalizeId(((ev as any)?.data?.equipment_id as string | null) ?? null);
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMentoria]);
+  const temAplicadores = !isMentoria && aplicadores.length > 0;
+  const equipLocacaoId = mode.kind === "finalize" ? equipFinalizeId : linkedReservation?.equipment_id ?? equipmentId;
+  const nomeEquipLocacao =
+    (mode.kind === "create" ? equipmentsList.find((e) => e.id === equipLocacaoId)?.name : null) ||
+    (equipLocacaoId ? nomesEquip[equipLocacaoId] : null) ||
+    equipmentLabel ||
+    "HIPRO";
+  const montadaNoHipro = equipLocacaoId
+    ? aplicadores.find((a) => montagens[a.id] === equipLocacaoId)?.id ?? ""
+    : "";
+  function nomeEquip(id: string): string {
+    return nomesEquip[id] || equipmentsList.find((e) => e.id === id)?.name || "outro HIPRO";
+  }
+  function nomeAplicador(id: string): string {
+    const a = aplicadores.find((x) => x.id === id);
+    return a ? a.nome : "ponteira";
+  }
+  function aplicadorDaContagem(c: ContagemTela): string {
+    if (!temAplicadores) return "";
+    if (c.aplicadorId !== undefined) return c.aplicadorId;
+    return c.padraoMontada ? montadaNoHipro : "";
+  }
+  // Sugestão: as que não estão montadas em nenhum HIPRO vêm primeiro.
+  const aplicadoresOrdenados = useMemo(
+    () => [...aplicadores].sort((a, b) => Number(!!montagens[a.id]) - Number(!!montagens[b.id])),
+    [aplicadores, montagens]
+  );
+  const ultimaContagemTela = contagensTela[contagensTela.length - 1];
+  const aplicadorUltima = ultimaContagemTela ? aplicadorDaContagem(ultimaContagemTela) : "";
+  const trocaPonteira = temAplicadores && !!aplicadorUltima && aplicadorUltima !== montadaNoHipro;
 
   // ------------------------------------------------------------
   // Crédito de disparos da cliente (view creditos_saldo)
@@ -499,12 +597,12 @@ export default function CalculadoraLocacaoModal({
   // Pagamento: lista de linhas (forma/valor/conta pix). 0 = a receber,
   // 1 = integral, 2+ = parcial.
   // ------------------------------------------------------------
-  const [pagamentos, setPagamentos] = useState<PagamentoLinha[]>([
+  const [pagamentos, setPagamentos] = useState<PagamentoTela[]>([
     { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() },
   ]);
   const primeiraFormaPagamento = pagamentos[0]?.forma ?? "";
 
-  function updatePagamento(id: string, patch: Partial<PagamentoLinha>) {
+  function updatePagamento(id: string, patch: Partial<PagamentoTela>) {
     setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
   function addPagamento() {
@@ -542,7 +640,39 @@ export default function CalculadoraLocacaoModal({
   }
 
   const somaPagamentos = useMemo(() => Math.round(pagamentos.reduce((acc, p) => acc + (p.valor || 0), 0) * 100) / 100, [pagamentos]);
+  const somaDinheiro = useMemo(
+    () => Math.round(pagamentos.reduce((acc, p) => acc + (p.forma === "permuta" ? 0 : p.valor || 0), 0) * 100) / 100,
+    [pagamentos]
+  );
   const saldoAposPagamentos = resumo ? Math.round((resumo.totalAPagarAgora - somaPagamentos) * 100) / 100 : 0;
+  // Permuta abate o que sobra depois do dinheiro; o que passar vira crédito em R$.
+  const divisaoPermuta = useMemo(() => {
+    const mapa: Record<string, { abate: number; credito: number }> = {};
+    let restante = resumo ? Math.max(0, Math.round((resumo.totalAPagarAgora - somaDinheiro) * 100) / 100) : 0;
+    let creditoTotal = 0;
+    for (const p of pagamentos) {
+      if (p.forma !== "permuta" || !(p.valor > 0)) continue;
+      const abate = Math.min(restante, p.valor);
+      restante = Math.round((restante - abate) * 100) / 100;
+      const credito = Math.round((p.valor - abate) * 100) / 100;
+      creditoTotal += credito;
+      mapa[p.id] = { abate, credito };
+    }
+    return { mapa, creditoTotal: Math.round(creditoTotal * 100) / 100 };
+  }, [pagamentos, resumo, somaDinheiro]);
+  const temPermutaPessoal = pagamentos.some((p) => p.forma === "permuta" && p.permutaDestino === "pessoal");
+  const [categoriasPessoais, setCategoriasPessoais] = useState<CategoryOption[] | null>(null);
+  useEffect(() => {
+    if (!temPermutaPessoal || categoriasPessoais !== null) return;
+    supabase
+      .from("categories")
+      .select("id, name")
+      .eq("type", "saida")
+      .eq("scope", "pessoal")
+      .order("name")
+      .then(({ data }) => setCategoriasPessoais(data ?? []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temPermutaPessoal]);
 
   // ------------------------------------------------------------
   // Salvar
@@ -625,25 +755,35 @@ export default function CalculadoraLocacaoModal({
         resumo,
       });
     }
-    // Tudo no crédito (sem faixa de preço) fica sem imagem.
-    if (!pricing || !resumo || shots <= 0) return null;
+    // Tudo no crédito: sai a imagem com o valor dos disparos zerado.
+    if (!resumo) return null;
+    if (!tudoNoCredito && (!pricing || shots <= 0)) return null;
     return montarDadosCalculo({
       cliente: activeClientName || null,
       dataEvento: eventDate || null,
       contagemInicial: initialNumber,
       contagemFinal: finalNumber,
       disparos: shots,
-      pricing,
+      pricing: tudoNoCredito ? null : pricing,
       custoManualPorDisparo,
       itens,
       descontoPercentual: descontoTipo === "percentual" ? descontoRawNumero : null,
       kmIda: kmIdaNumber,
       resumo,
+      contagens: contagensCalc
+        .filter((c) => c.preenchida)
+        .map((c) => ({ inicial: c.inicialN, final: c.finalN, disparos: c.disparos, viraCredito: c.geraCredito })),
+      disparosRealizados: totalDisparos,
+      creditoUsado,
     });
   }, [
     isMentoria,
     mentoriaCalc,
     pricing,
+    tudoNoCredito,
+    contagensCalc,
+    totalDisparos,
+    creditoUsado,
     resumo,
     shots,
     activeClientName,
@@ -719,13 +859,27 @@ export default function CalculadoraLocacaoModal({
         setError("Informe em qual conta o PIX de cada pagamento caiu.");
         return;
       }
+      if (p.valor > 0 && p.forma === "permuta") {
+        if (!p.permutaDescricao?.trim()) {
+          setError("Na permuta, escreva o que veio (produto ou serviço).");
+          return;
+        }
+        if (p.permutaDestino === "pessoal" && !p.permutaCategoria) {
+          setError("Na permuta pessoal, escolha a categoria do gasto.");
+          return;
+        }
+      }
     }
 
     setSaving(true);
     setError(null);
     setWarning(null);
 
-    const primeiraForma = (pagamentos.find((p) => p.valor > 0)?.forma as any) ?? "pix";
+    // Forma registrada na locação: o primeiro pagamento em dinheiro; só permuta, fica permuta.
+    const primeiraForma =
+      (pagamentos.find((p) => p.valor > 0 && p.forma !== "permuta")?.forma as any) ??
+      (pagamentos.find((p) => p.valor > 0)?.forma as any) ??
+      "pix";
     const primeiraPixConta = pagamentos.find((p) => p.valor > 0 && p.forma === "pix")?.pixConta || null;
 
     let rentalId: string | null = null;
@@ -811,13 +965,39 @@ export default function CalculadoraLocacaoModal({
     if (!isMentoria) {
       const { error: eCont } = await supabase.rpc("registrar_contagens_locacao", {
         p_rental_id: rentalId,
-        p_contagens: contagensParaSalvar.map((c) => ({ inicial: c.inicial, final: c.final, gera_credito: !!c.gera_credito })),
+        p_contagens: contagensCalc
+          .filter((c) => c.preenchida)
+          .map((c) => {
+            const aplicadorId = aplicadorDaContagem(c);
+            return {
+              inicial: c.inicialN,
+              final: c.finalN,
+              gera_credito: !!c.geraCredito,
+              ...(aplicadorId ? { aplicador_id: aplicadorId } : {}),
+            };
+          }),
         p_credito_usado: creditoUsado,
       });
       if (eCont) {
         avisos.push(
           `as contagens${creditoUsado > 0 || disparosViraCredito > 0 ? " e o crédito de disparos" : ""} não foram registradas (${eCont.message || "erro no banco"})`
         );
+      }
+
+      // A última contagem usou outra ponteira: ela fica montada no HIPRO a partir da data da locação.
+      if (trocaPonteira && registrarTroca) {
+        if (!equipLocacaoId) {
+          avisos.push(`a troca de ponteira não foi registrada (não achei o equipamento da locação; registre em Equipamentos)`);
+        } else {
+          const { error: eTroca } = await supabase.rpc("montar_aplicador", {
+            p_aplicador_id: aplicadorUltima,
+            p_equipment_id: equipLocacaoId,
+            p_desde: eventDate,
+          });
+          if (eTroca) {
+            avisos.push(`a troca de ponteira não foi registrada (${eTroca.message || "erro no banco"}; registre em Equipamentos)`);
+          }
+        }
       }
     }
 
@@ -864,13 +1044,16 @@ export default function CalculadoraLocacaoModal({
 
     // Com a taxa cobrada agora, ela já virou lançamento próprio e crédito da
     // locação: dos valores recebidos, só o que passa dela é pagamento da locação.
-    let pagamentosDaLocacao = pagamentos;
+    // Permuta não é dinheiro: não paga a taxa e é lançada depois dos outros pagamentos.
+    const pagamentosDinheiro = pagamentos.filter((p) => p.forma !== "permuta");
+    const pagamentosPermuta = pagamentos.filter((p) => p.forma === "permuta" && p.valor > 0);
+    let pagamentosDaLocacao = pagamentosDinheiro;
     if (taxaRegistrada) {
-      const { linhas, taxaNaoCoberta } = descontarTaxaDosPagamentos(pagamentos, fee);
+      const { linhas, taxaNaoCoberta } = descontarTaxaDosPagamentos(pagamentosDinheiro, fee);
       pagamentosDaLocacao = linhas;
       if (taxaNaoCoberta > 0) {
         avisos.push(
-          `o valor recebido (${formatCurrency(somaPagamentos)}) é menor que a taxa de reserva (${formatCurrency(fee)}), então nada foi lançado como pagamento da locação`
+          `o valor recebido (${formatCurrency(somaDinheiro)}) é menor que a taxa de reserva (${formatCurrency(fee)}), então nada foi lançado como pagamento da locação`
         );
       }
     }
@@ -889,6 +1072,22 @@ export default function CalculadoraLocacaoModal({
         p_notes: null,
       });
       if (ePag) avisos.push(`um pagamento (${PAYMENT_LABELS[p.forma] ?? p.forma} · ${formatCurrency(p.valor)}) não foi registrado`);
+    }
+
+    // Permuta: sai do caixa como Outros (empresa) ou Retirada (pessoal), abate a
+    // locação e o que passar fica de crédito em R$ para a cliente.
+    for (const p of pagamentosPermuta) {
+      const destino = p.permutaDestino === "pessoal" ? "pessoal" : "empresa";
+      const { error: ePerm } = await supabase.rpc("registrar_permuta", {
+        p_client_id: activeClientId,
+        p_valor: p.valor,
+        p_descricao: (p.permutaDescricao ?? "").trim(),
+        p_destino: destino,
+        p_categoria_pessoal: destino === "pessoal" ? p.permutaCategoria || null : null,
+        p_rental_id: rentalId,
+        p_data: p.data || eventDate,
+      });
+      if (ePerm) avisos.push(`a permuta (${formatCurrency(p.valor)}) não foi registrada (${ePerm.message || "erro no banco"})`);
     }
 
     setSaving(false);
@@ -1321,6 +1520,33 @@ export default function CalculadoraLocacaoModal({
                           />
                         </div>
                       </div>
+                      {temAplicadores && (
+                        <div className="mt-2">
+                          <label className="mb-1 block text-xs font-medium text-neutral-600">Ponteira</label>
+                          <select
+                            value={aplicadorDaContagem(c)}
+                            onChange={(e) => updateContagem(c.id, { aplicadorId: e.target.value })}
+                            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                          >
+                            <option value="">Escolha a ponteira...</option>
+                            {aplicadoresOrdenados.map((a) => {
+                              const ondeEsta = montagens[a.id];
+                              const sufixo = !ondeEsta
+                                ? " (de reserva)"
+                                : ondeEsta === equipLocacaoId
+                                ? ` (montada no ${nomeEquipLocacao})`
+                                : ` (montada no ${nomeEquip(ondeEsta)})`;
+                              return (
+                                <option key={a.id} value={a.id}>
+                                  {a.nome}
+                                  {a.numero_serie ? ` · ${a.numero_serie}` : ""}
+                                  {sufixo}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
                       {salva != null && c.inicial === String(salva) && (
                         <p className="mt-2 rounded-lg bg-brand-teal/10 px-3 py-2 text-xs text-brand-teal">
                           Contagem inicial guardada na reserva ({salva.toLocaleString("pt-BR")}). Falta só digitar a final.
@@ -1376,6 +1602,21 @@ export default function CalculadoraLocacaoModal({
                     <span>Soma das contagens</span>
                     <span className="font-semibold">{totalDisparos.toLocaleString("pt-BR")} disparos</span>
                   </div>
+                )}
+
+                {trocaPonteira && (
+                  <label className="flex items-start gap-2 rounded-xl border border-brand-teal/30 bg-brand-teal/5 p-3 text-xs text-neutral-700">
+                    <input
+                      type="checkbox"
+                      checked={registrarTroca}
+                      onChange={(e) => setRegistrarTroca(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-300"
+                    />
+                    <span>
+                      Registrar a troca: <strong>{nomeAplicador(aplicadorUltima)}</strong> fica montada no{" "}
+                      <strong>{nomeEquipLocacao}</strong> a partir de {formatDate(eventDate)}
+                    </span>
+                  </label>
                 )}
 
                 {creditoDisponivel > 0 && (
@@ -1741,10 +1982,16 @@ export default function CalculadoraLocacaoModal({
                       <div className="grid grid-cols-2 gap-2">
                         <select
                           value={p.forma}
-                          onChange={(e) => updatePagamento(p.id, { forma: e.target.value, pixConta: e.target.value === "pix" ? p.pixConta || "harmonize" : "" })}
+                          onChange={(e) =>
+                            updatePagamento(p.id, {
+                              forma: e.target.value,
+                              pixConta: e.target.value === "pix" ? p.pixConta || "harmonize" : "",
+                              ...(e.target.value === "permuta" && !p.permutaDestino ? { permutaDestino: "empresa" as const } : {}),
+                            })
+                          }
                           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                         >
-                          {PAYMENT_METHODS.map((pm) => (
+                          {FORMAS_PAGAMENTO_LOCACAO.map((pm) => (
                             <option key={pm.value} value={pm.value}>
                               {pm.label}
                             </option>
@@ -1785,6 +2032,57 @@ export default function CalculadoraLocacaoModal({
                           ))}
                         </select>
                       )}
+                      {p.forma === "permuta" && (
+                        <div className="mt-2 space-y-2 rounded-lg bg-brand-lilac/5 p-2.5">
+                          <div>
+                            <label className="mb-1 block text-[11px] font-medium text-neutral-600">O que veio</label>
+                            <input
+                              value={p.permutaDescricao ?? ""}
+                              onChange={(e) => updatePagamento(p.id, { permutaDescricao: e.target.value })}
+                              placeholder="Ex: 10 frascos de enzima, ensaio de fotos"
+                              maxLength={120}
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <div className="flex rounded-lg border border-neutral-300 p-0.5">
+                            {(["empresa", "pessoal"] as const).map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => updatePagamento(p.id, { permutaDestino: d })}
+                                className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
+                                  (p.permutaDestino ?? "empresa") === d ? "bg-brand-teal text-white" : "text-neutral-500"
+                                }`}
+                              >
+                                {d === "empresa" ? "Da empresa" : "Pessoal"}
+                              </button>
+                            ))}
+                          </div>
+                          {p.permutaDestino === "pessoal" && (
+                            <select
+                              value={p.permutaCategoria ?? ""}
+                              onChange={(e) => updatePagamento(p.id, { permutaCategoria: e.target.value })}
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                            >
+                              <option value="">{categoriasPessoais === null ? "Carregando categorias..." : "Categoria do gasto pessoal..."}</option>
+                              {(categoriasPessoais ?? []).map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <p className="text-[11px] text-neutral-500">
+                            Não entra dinheiro no caixa. Empresa: sai em Outros. Pessoal: sai como Retirada e vira gasto no Pessoal.
+                          </p>
+                          {(divisaoPermuta.mapa[p.id]?.credito ?? 0) > 0 && (
+                            <p className="text-[11px] font-medium text-brand-lilac">
+                              {formatCurrency(divisaoPermuta.mapa[p.id].abate)} abate e {formatCurrency(divisaoPermuta.mapa[p.id].credito)} fica de
+                              crédito
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-2">
                         <label className="mb-1 block text-[11px] font-medium text-neutral-500">
                           Data em que caiu/recebeu (não precisa ser o dia do HIPRO)
@@ -1813,7 +2111,12 @@ export default function CalculadoraLocacaoModal({
                   <div className="flex items-center justify-between text-xs text-neutral-500">
                     <span>Soma dos pagamentos: {formatCurrency(somaPagamentos)}</span>
                     {saldoAposPagamentos > 0.009 && <span className="font-medium text-amber-600">Saldo em aberto: {formatCurrency(saldoAposPagamentos)}</span>}
-                    {saldoAposPagamentos < -0.009 && <span className="font-medium text-red-500">Excedeu o total em {formatCurrency(-saldoAposPagamentos)}</span>}
+                    {saldoAposPagamentos < -0.009 &&
+                      (divisaoPermuta.creditoTotal > 0.009 && Math.abs(-saldoAposPagamentos - divisaoPermuta.creditoTotal) < 0.01 ? (
+                        <span className="font-medium text-brand-lilac">{formatCurrency(divisaoPermuta.creditoTotal)} fica de crédito</span>
+                      ) : (
+                        <span className="font-medium text-red-500">Excedeu o total em {formatCurrency(-saldoAposPagamentos)}</span>
+                      ))}
                   </div>
                 </div>
               )}
