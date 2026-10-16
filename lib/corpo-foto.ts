@@ -3,7 +3,7 @@
 // joelho). Costas, glúteos, coxa posterior e panturrilhas não aparecem nesta
 // foto: seguem no desenho (svgBoneco) até chegar uma foto de costas.
 
-import { svgBoneco } from "./boneco-corporal";
+import { svgCostas } from "./boneco-corporal";
 import { FOTO_CORPO } from "./corpo-foto-dados";
 
 export const FOTO_LARGURA = 114;
@@ -56,6 +56,6 @@ export function svgCorpoFoto(destacar: string[]): string {
 
 /** Imagem de uma área corporal: na foto quando a região aparece nela; senão o desenho. */
 export function urlImagemCorporal(parte?: string | null): string {
-  const svg = !parte || naFoto(parte) ? svgCorpoFoto(parte ? [parte] : []) : svgBoneco([parte]);
+  const svg = !parte || naFoto(parte) ? svgCorpoFoto(parte ? [parte] : []) : svgCostas([parte]);
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

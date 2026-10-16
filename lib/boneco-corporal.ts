@@ -129,3 +129,19 @@ export function svgBoneco(destacar: string[]): string {
     `</svg>`,
   ].join("");
 }
+
+/** Só a figura de costas (x 100..200), com as regiões marcadas. Usada ao lado da foto de frente. */
+export function svgCostas(destacar: string[]): string {
+  const c = CORES_BONECO;
+  const corpo = formasDoCorpo().filter((f) => (f.e ? f.e[0] >= 100 : /M1\d\d/.test(f.d ?? "")));
+  const regioes = destacar.flatMap(formasDaRegiao).filter((f) => (f.e ? f.e[0] >= 100 : /M1\d\d/.test(f.d ?? "")));
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 0 100 214" width="200" height="428">`,
+    `<rect x="100" y="0" width="100" height="214" fill="${c.fundo}"/>`,
+    `<g fill="${c.contorno}" stroke="${c.contorno}" stroke-width="2.4" stroke-linejoin="round">${corpo.map((f) => forma(f, "")).join("")}</g>`,
+    `<g fill="${c.pele}">${corpo.map((f) => forma(f, "")).join("")}</g>`,
+    `<path d="M150,44 C150,70 150,96 150,120" stroke="${c.contorno}" stroke-width="1" fill="none"/>`,
+    `<g fill="${c.regiao}" fill-opacity="0.6" stroke="${c.regiaoBorda}" stroke-width="1.1" stroke-linejoin="round">${regioes.map((f) => forma(f, "")).join("")}</g>`,
+    `</svg>`,
+  ].join("");
+}
