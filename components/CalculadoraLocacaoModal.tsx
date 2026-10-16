@@ -272,6 +272,8 @@ export default function CalculadoraLocacaoModal({
       const salva = String(r.contagemInicial);
       setContagensTela((prev) => prev.map((c, i) => (i === 0 && !c.inicial ? { ...c, inicial: salva } : c)));
     }
+    // Trocas de ponteira já feitas na reserva: traz as contagens fechadas.
+    carregarContagensDaReserva(r.id);
   }
   function handleUnlinkReservation() {
     setLinkedReservationId(null);
@@ -338,6 +340,57 @@ export default function CalculadoraLocacaoModal({
   ]);
   const [patientCount, setPatientCount] = useState("1");
   const [notes, setNotes] = useState("");
+
+  // Trocas de ponteira feitas na reserva (antes de finalizar): as contagens
+  // fechadas (reserva_contagens) entram completas e, por último, a contagem
+  // aberta com a inicial e a ponteira atuais, faltando só a final.
+  const [inicialAtualDaReserva, setInicialAtualDaReserva] = useState<number | null>(contagemSalvaDaReserva);
+  async function carregarContagensDaReserva(eventId: string) {
+    const [ev, rc] = await Promise.all([
+      supabase.from("calendar_events").select("contagem_inicial, contagem_aplicador_id").eq("id", eventId).maybeSingle(),
+      supabase
+        .from("reserva_contagens")
+        .select("ordem, inicial, final, gera_credito, aplicador_id")
+        .eq("calendar_event_id", eventId)
+        .order("ordem"),
+    ]);
+    if (ev.error || rc.error) return; // banco ainda sem as colunas: segue como antes
+    const evRow = ev.data as { contagem_inicial: number | null; contagem_aplicador_id: string | null } | null;
+    const fechadas = (rc.data ?? []) as {
+      inicial: number;
+      final: number;
+      gera_credito: boolean;
+      aplicador_id: string | null;
+    }[];
+    const inicialAtual = evRow?.contagem_inicial != null ? Number(evRow.contagem_inicial) : null;
+    setInicialAtualDaReserva(inicialAtual);
+    if (fechadas.length === 0 && !evRow?.contagem_aplicador_id) return;
+    const lista: ContagemTela[] = fechadas.map((f) => ({
+      id: newId("cont"),
+      inicial: String(f.inicial),
+      final: String(f.final),
+      geraCredito: !!f.gera_credito,
+      aplicadorId: f.aplicador_id ?? "",
+    }));
+    lista.push({
+      id: newId("cont"),
+      inicial: inicialAtual != null ? String(inicialAtual) : "",
+      final: "",
+      geraCredito: false,
+      ...(evRow?.contagem_aplicador_id
+        ? { aplicadorId: evRow.contagem_aplicador_id }
+        : fechadas.length === 0
+        ? { padraoMontada: true }
+        : { aplicadorId: "" }),
+    });
+    // Só substitui se a pessoa ainda não digitou nenhuma contagem final.
+    setContagensTela((prev) => (prev.every((c) => !onlyDigits(c.final)) ? lista : prev));
+  }
+  useEffect(() => {
+    if (mode.kind !== "finalize" || isMentoria) return;
+    carregarContagensDaReserva(mode.reservation.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateContagem(id: string, patch: Partial<ContagemTela>) {
     setContagensTela((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
@@ -455,12 +508,14 @@ export default function CalculadoraLocacaoModal({
   // Crédito de disparos da cliente (view creditos_saldo)
   // ------------------------------------------------------------
   const [saldoCredito, setSaldoCredito] = useState<{ disponiveis: number; aguardando: number } | null>(null);
-  const [usarCredito, setUsarCredito] = useState(true);
+  // Crédito nunca é usado sozinho: o dono liga e escolhe quanto abater.
+  const [usarCredito, setUsarCredito] = useState(false);
   // null = usa o máximo possível; texto = quantidade que o dono digitou.
   const [creditoDigitado, setCreditoDigitado] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     setSaldoCredito(null);
+    setUsarCredito(false);
     setCreditoDigitado(null);
     if (isMentoria || !activeClientId) return;
     supabase
@@ -1476,7 +1531,9 @@ export default function CalculadoraLocacaoModal({
               <div className="space-y-3">
                 {contagensCalc.map((c, idx) => {
                   const ultima = idx === contagensCalc.length - 1;
-                  const salva = idx === 0 ? contagemSalvaDaReserva ?? linkedReservation?.contagemInicial ?? null : null;
+                  const salva = ultima
+                    ? (mode.kind === "finalize" ? inicialAtualDaReserva : linkedReservation ? inicialAtualDaReserva ?? linkedReservation.contagemInicial : null)
+                    : null;
                   return (
                     <div key={c.id} className={contagensCalc.length > 1 ? "rounded-xl border border-neutral-200 p-3" : ""}>
                       {contagensCalc.length > 1 && (
@@ -1547,9 +1604,9 @@ export default function CalculadoraLocacaoModal({
                           </select>
                         </div>
                       )}
-                      {salva != null && c.inicial === String(salva) && (
+                      {salva != null && c.inicial === String(salva) && !c.final && (
                         <p className="mt-2 rounded-lg bg-brand-teal/10 px-3 py-2 text-xs text-brand-teal">
-                          Contagem inicial guardada na reserva ({salva.toLocaleString("pt-BR")}). Falta só digitar a final.
+                          {contagensCalc.length > 1 ? "Contagem inicial da ponteira atual" : "Contagem inicial"} guardada na reserva ({salva.toLocaleString("pt-BR")}). Falta só digitar a final.
                         </p>
                       )}
                       {c.invertidas && (
@@ -1635,6 +1692,9 @@ export default function CalculadoraLocacaoModal({
                         Usar crédito
                       </label>
                     </div>
+                    {!usarCredito && (
+                      <p className="mt-1 text-neutral-500">Não abate nada sozinho. Ligue &quot;Usar crédito&quot; para escolher quanto abater.</p>
+                    )}
                     {usarCredito && (
                       <div className="mt-2">
                         <label className="mb-1 block text-neutral-500">

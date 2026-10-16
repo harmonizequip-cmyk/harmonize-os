@@ -45,6 +45,14 @@ interface EventToEdit {
   contagem_inicial_em?: string | null;
 }
 
+interface ContagemFechada {
+  ordem: number;
+  inicial: number;
+  final: number;
+  gera_credito: boolean;
+  aplicador_id: string | null;
+}
+
 interface EquipamentoContratoInfo {
   name: string;
   serial_number?: string | null;
@@ -138,6 +146,105 @@ export default function EditarEventoModal({
     setContagemSalva(numero);
     if (apagar) setContagemTexto("");
     setContagemOk(apagar ? "Contagem inicial apagada." : "Contagem inicial salva.");
+    router.refresh();
+  }
+
+  // Troca de ponteira no meio do atendimento (antes de finalizar): fecha a
+  // contagem da ponteira atual (somar ou gerar crédito) e a contagem inicial
+  // passa a ser a da ponteira nova. Na finalização tudo vem preenchido.
+  const [contagensFechadas, setContagensFechadas] = useState<ContagemFechada[]>([]);
+  const [aplicadoresAtivos, setAplicadoresAtivos] = useState<{ id: string; nome: string; numero_serie: string | null }[]>([]);
+  const [aplicadorAtualId, setAplicadorAtualId] = useState<string | null>(null);
+  const [recarregarTrocas, setRecarregarTrocas] = useState(0);
+  const [showTroca, setShowTroca] = useState(false);
+  const [trocaFinal, setTrocaFinal] = useState("");
+  const [trocaGeraCredito, setTrocaGeraCredito] = useState(false);
+  const [trocaAplicador, setTrocaAplicador] = useState("");
+  const [trocaInicialNova, setTrocaInicialNova] = useState("");
+  const [salvandoTroca, setSalvandoTroca] = useState(false);
+
+  useEffect(() => {
+    if (!isPendingReservation || event.is_mentoria) return;
+    let ativo = true;
+    Promise.all([
+      supabase
+        .from("reserva_contagens")
+        .select("ordem, inicial, final, gera_credito, aplicador_id")
+        .eq("calendar_event_id", event.id)
+        .order("ordem"),
+      supabase.from("calendar_events").select("contagem_inicial, contagem_aplicador_id").eq("id", event.id).maybeSingle(),
+      supabase.from("aplicadores").select("id, nome, numero_serie").eq("ativo", true).order("nome"),
+    ]).then(([rc, ev, ap]) => {
+      if (!ativo) return;
+      if (!rc.error) setContagensFechadas((rc.data ?? []) as ContagemFechada[]);
+      if (!ev.error && ev.data) {
+        const d = ev.data as { contagem_inicial: number | null; contagem_aplicador_id: string | null };
+        setAplicadorAtualId(d.contagem_aplicador_id ?? null);
+        const ini = d.contagem_inicial != null ? Number(d.contagem_inicial) : null;
+        setContagemSalva(ini);
+        setContagemTexto(ini != null ? String(ini) : "");
+      }
+      if (!ap.error) setAplicadoresAtivos((ap.data ?? []) as { id: string; nome: string; numero_serie: string | null }[]);
+    });
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPendingReservation, event.id, recarregarTrocas]);
+
+  function nomeAplicador(id: string | null): string | null {
+    if (!id) return null;
+    return aplicadoresAtivos.find((a) => a.id === id)?.nome ?? null;
+  }
+
+  async function salvarTroca() {
+    const finalN = Number(trocaFinal.replace(/\D/g, ""));
+    const inicialN = Number(trocaInicialNova.replace(/\D/g, ""));
+    if (!trocaFinal.trim() || !trocaInicialNova.trim()) {
+      setContagemErro("Preencha o disparo final da ponteira atual e a contagem inicial da nova.");
+      return;
+    }
+    setSalvandoTroca(true);
+    setContagemErro(null);
+    setContagemOk(null);
+    const { error: rpcError } = await supabase.rpc("trocar_ponteira_reserva", {
+      p_event_id: event.id,
+      p_final_atual: finalN,
+      p_gera_credito: trocaGeraCredito,
+      p_inicial_nova: inicialN,
+      p_aplicador_novo: trocaAplicador || null,
+      p_registrar_troca: true,
+    });
+    setSalvandoTroca(false);
+    if (rpcError) {
+      setContagemErro(rpcError.message || "Não foi possível registrar a troca de ponteira.");
+      return;
+    }
+    setShowTroca(false);
+    setTrocaFinal("");
+    setTrocaGeraCredito(false);
+    setTrocaAplicador("");
+    setTrocaInicialNova("");
+    setContagemSalva(inicialN);
+    setContagemTexto(String(inicialN));
+    setContagemOk("Troca de ponteira registrada.");
+    setRecarregarTrocas((n) => n + 1);
+    router.refresh();
+  }
+
+  async function desfazerTroca() {
+    if (!window.confirm("Desfazer a última troca de ponteira? A contagem fechada volta a ser a atual.")) return;
+    setSalvandoTroca(true);
+    setContagemErro(null);
+    setContagemOk(null);
+    const { error: rpcError } = await supabase.rpc("desfazer_troca_ponteira_reserva", { p_event_id: event.id });
+    setSalvandoTroca(false);
+    if (rpcError) {
+      setContagemErro(rpcError.message || "Não foi possível desfazer a troca.");
+      return;
+    }
+    setContagemOk("Última troca desfeita.");
+    setRecarregarTrocas((n) => n + 1);
     router.refresh();
   }
   const [cancelling, setCancelling] = useState(false);
@@ -688,6 +795,148 @@ export default function EditarEventoModal({
                         apagar
                       </button>
                     </p>
+                  )}
+                  {contagemSalva != null && (
+                    <div className="mt-3 border-t border-neutral-200 pt-3">
+                      {contagensFechadas.length > 0 && (
+                        <ul className="mb-2 space-y-1">
+                          {contagensFechadas.map((f) => {
+                            const nome = nomeAplicador(f.aplicador_id);
+                            return (
+                              <li key={f.ordem} className="text-xs text-neutral-600">
+                                Ponteira {f.ordem}
+                                {nome ? ` (${nome})` : ""}: {Number(f.inicial).toLocaleString("pt-BR")} →{" "}
+                                {Number(f.final).toLocaleString("pt-BR")} ={" "}
+                                <strong>{(Number(f.final) - Number(f.inicial)).toLocaleString("pt-BR")} disparos</strong>
+                                {f.gera_credito && <span className="text-brand-lilac"> · vira crédito</span>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <p className="text-xs text-neutral-600">
+                        Ponteira atual{nomeAplicador(aplicadorAtualId) ? ` (${nomeAplicador(aplicadorAtualId)})` : ""}: começou em{" "}
+                        <strong>{contagemSalva.toLocaleString("pt-BR")}</strong>
+                      </p>
+
+                      {showTroca ? (
+                        <div className="mt-2 space-y-2 rounded-lg bg-neutral-50 p-3">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-neutral-600">
+                              Disparo final da ponteira atual
+                            </label>
+                            <input
+                              inputMode="numeric"
+                              value={trocaFinal}
+                              onChange={(e) => setTrocaFinal(e.target.value.replace(/\D/g, ""))}
+                              placeholder="0"
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setTrocaGeraCredito(false)}
+                              className={`rounded-lg border py-2 text-xs font-medium ${
+                                !trocaGeraCredito ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-300 text-neutral-600"
+                              }`}
+                            >
+                              Somar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTrocaGeraCredito(true)}
+                              className={`rounded-lg border py-2 text-xs font-medium ${
+                                trocaGeraCredito ? "border-brand-lilac bg-brand-lilac text-white" : "border-neutral-300 text-neutral-600"
+                              }`}
+                            >
+                              Gerar crédito
+                            </button>
+                          </div>
+                          {trocaGeraCredito && (
+                            <p className="text-[11px] text-brand-lilac">
+                              A cliente paga tudo e esses disparos ficam de crédito para a próxima.
+                            </p>
+                          )}
+                          {aplicadoresAtivos.length > 0 && (
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-neutral-600">Ponteira nova (opcional)</label>
+                              <select
+                                value={trocaAplicador}
+                                onChange={(e) => setTrocaAplicador(e.target.value)}
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                              >
+                                <option value="">Não informar</option>
+                                {aplicadoresAtivos
+                                  .filter((a) => a.id !== aplicadorAtualId)
+                                  .map((a) => (
+                                    <option key={a.id} value={a.id}>
+                                      {a.nome}
+                                      {a.numero_serie ? ` · ${a.numero_serie}` : ""}
+                                    </option>
+                                  ))}
+                              </select>
+                              {trocaAplicador && (
+                                <p className="mt-1 text-[11px] text-neutral-400">Ela passa a ficar montada neste HIPRO.</p>
+                              )}
+                            </div>
+                          )}
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-neutral-600">
+                              Contagem inicial da ponteira nova
+                            </label>
+                            <input
+                              inputMode="numeric"
+                              value={trocaInicialNova}
+                              onChange={(e) => setTrocaInicialNova(e.target.value.replace(/\D/g, ""))}
+                              placeholder="0"
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowTroca(false)}
+                              className="flex-1 rounded-lg border border-neutral-300 py-2 text-xs font-medium text-neutral-600"
+                            >
+                              Voltar
+                            </button>
+                            <button
+                              type="button"
+                              disabled={salvandoTroca}
+                              onClick={salvarTroca}
+                              className="flex-1 rounded-lg bg-brand-teal py-2 text-xs font-medium text-white disabled:opacity-60"
+                            >
+                              {salvandoTroca ? "Salvando..." : "Salvar troca"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowTroca(true);
+                              setContagemOk(null);
+                              setContagemErro(null);
+                            }}
+                            className="rounded-lg border border-brand-teal px-3 py-2 text-xs font-medium text-brand-teal"
+                          >
+                            Trocar ponteira
+                          </button>
+                          {contagensFechadas.length > 0 && (
+                            <button
+                              type="button"
+                              disabled={salvandoTroca}
+                              onClick={desfazerTroca}
+                              className="text-xs text-neutral-500 underline underline-offset-2 disabled:opacity-60"
+                            >
+                              Desfazer última troca
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                   {contagemOk && <p className="mt-1 text-xs text-brand-teal">{contagemOk}</p>}
                   {contagemErro && <p className="mt-1 text-xs text-red-600">{contagemErro}</p>}
