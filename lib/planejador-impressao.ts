@@ -9,11 +9,19 @@ import { dataBr, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } f
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 
-/** Imagem da área: foto do protocolo (com as setas do movimento), rosto sem setas ou boneco corporal. */
+/** Quadro com a inicial, para área manual do rosto sem foto (a modelo antiga saiu a pedido do dono). */
+function quadroSemFoto(nome: string): string {
+  const letra = esc((nome.trim()[0] ?? "?").toUpperCase());
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6F7F6"/><stop offset="1" stop-color="#F1ECF8"/></linearGradient></defs><rect width="120" height="120" rx="24" fill="url(#g)"/><text x="60" y="76" font-family="Arial,sans-serif" font-size="46" font-weight="700" text-anchor="middle" fill="#2E9A94">${letra}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/** Imagem da área: foto do protocolo (com as setas do movimento), foto da modelo corporal ou quadro com a inicial. */
 export function imagemDaArea(a: Area, origem = ""): string {
   if (a.regiao === "corporal") return urlImagemCorporal(a.parte);
-  const foto = !a.manual ? a.id : /p[aá]lpebra|olho/i.test(a.nome) ? "olhos" : "facial";
-  return `${origem}/ferramentas/areas/${foto}.jpg`;
+  if (!a.manual) return `${origem}/ferramentas/areas/${a.id}.jpg`;
+  if (/p[aá]lpebra|olho/i.test(a.nome)) return `${origem}/ferramentas/areas/olhos.jpg`;
+  return quadroSemFoto(a.nome);
 }
 
 export const CSS_PRONTUARIO = `

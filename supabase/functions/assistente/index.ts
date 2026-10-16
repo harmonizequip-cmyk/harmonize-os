@@ -49,7 +49,7 @@ type Mensagem = { role: "user" | "assistant"; content: string | Bloco[] };
 
 // Áreas do seletor (lib/planejamento.ts CATALOGO_AREAS + lib/boneco-corporal.ts CATALOGO_CORPORAL).
 const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
-const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_SELETOR = ["pescoco", "papada", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
 
 const FERRAMENTAS = [
   {
@@ -189,7 +189,7 @@ const FERRAMENTAS = [
           items: {
             type: "object",
             properties: {
-              id: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"] },
+              id: { type: "string", enum: ["pescoco", "papada", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"] },
               linhas: {
                 type: "array",
                 items: {
@@ -305,7 +305,6 @@ function dividirDisparos(total: number, partes: number): number[] {
 const MAXIMO_POR_LINHA: Record<string, number | null> = {
   pescoco: 1200,
   papada: 2400,
-  submandibular: 1200,
   jowls: null,
   arcomandibular: 1200,
   temporal: 1200,
@@ -315,8 +314,7 @@ const MAXIMO_POR_LINHA: Record<string, number | null> = {
 };
 const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs: string[] }> = {
   pescoco: { nome: "Pescoço", bilateral: true, profs: PROF_STD },
-  papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
-  submandibular: { nome: "Submandibular", bilateral: true, profs: PROF_STD },
+  papada: { nome: "Submandibular e Papada", bilateral: false, profs: PROF_PAP },
   jowls: { nome: "Jowls", bilateral: true, profs: PROF_STD },
   arcomandibular: { nome: "Terço médio", bilateral: true, profs: PROF_STD },
   temporal: { nome: "Temporal e Arco Zigomático", bilateral: true, profs: PROF_STD },
@@ -326,9 +324,9 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
 };
 
 // Nome do procedimento pelas áreas (espelha nomeProcedimento de lib/planejamento.ts):
-// todas as áreas grandes do rosto = Full Face; papada, pescoço e submandibular somam no nome.
+// todas as áreas grandes do rosto = Full Face; "Submandibular e Papada" e pescoço somam no nome.
 const ROSTO_GRANDES = ["frontal", "temporal", "arcomandibular", "jowls"];
-const FORA_DO_ROSTO: [string, string][] = [["submandibular", "Submandibular"], ["papada", "Papada"], ["pescoco", "Pescoço"]];
+const FORA_DO_ROSTO: [string, string][] = [["papada", "Submandibular e Papada"], ["pescoco", "Pescoço"]];
 const ID_POR_NOME: Record<string, string> = { "terco medio": "arcomandibular", mento: "mento", olhos: "olhos" };
 function nomeDoProcedimento(ids: Set<string>, nomes: string[]): string {
   if (ROSTO_GRANDES.every((id) => ids.has(id))) return ["Full Face", ...FORA_DO_ROSTO.filter(([id]) => ids.has(id)).map(([, n]) => n)].join(" + ");

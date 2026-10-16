@@ -64,11 +64,11 @@ describe("nome do procedimento pela escolha de áreas", () => {
     expect(nomeProcedimento([...rosto, "perioral_sup", "mento"])).toBe("Full Face");
   });
   it("o que é de fora do rosto soma no nome, na ordem", () => {
-    expect(nomeProcedimento([...rosto, "papada"])).toBe("Full Face + Papada");
-    expect(nomeProcedimento([...rosto, "pescoco", "papada"])).toBe("Full Face + Papada + Pescoço");
+    expect(nomeProcedimento([...rosto, "papada"])).toBe("Full Face + Submandibular e Papada");
+    expect(nomeProcedimento([...rosto, "pescoco", "papada"])).toBe("Full Face + Submandibular e Papada + Pescoço");
   });
   it("sem o rosto completo, lista as áreas", () => {
-    expect(nomeProcedimento(["papada", "jowls"])).toBe("Jowls + Papada");
+    expect(nomeProcedimento(["papada", "jowls"])).toBe("Jowls + Submandibular e Papada");
   });
 });
 
@@ -125,10 +125,10 @@ describe("montagem pelas regras", () => {
       papada: { adipometro: 20, profundidades: 3, disparos: 1500 },
       corporais: [{ nome: "Abdômen", tipo: "gordura", adipometro: 30, profundidades: 3, quadrantes: 2, disparosPorProfundidade: 3200 }],
     });
-    expect(m.resumo.find((r) => r.area === "Papada")?.total).toBe(1500);
+    expect(m.resumo.find((r) => r.area === "Submandibular e Papada")?.total).toBe(1500);
     expect(m.resumo.find((r) => r.area.startsWith("Abdômen"))?.total).toBe(3 * 3200 * 2);
     expect(m.resumo.find((r) => r.area === "Jowls")?.total).toBe(7200);
-    expect(m.estado.procNome).toBe("Jowls + Papada + Abdômen");
+    expect(m.estado.procNome).toBe("Jowls + Submandibular e Papada + Abdômen");
     expect((m.estado.customAreas as unknown[]).length).toBe(1);
   });
   it("disparos corporais ficam entre 3.200 e 4.000", () => {

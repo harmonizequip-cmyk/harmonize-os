@@ -33,6 +33,16 @@ describe("planejador nativo: estado antigo", () => {
     expect(p.recomendacoes).toBe("Beber bastante água e passar protetor solar");
     expect(p.data).toBe("2026-10-16");
   });
+  it("submandibular antigo entra na papada e nasolabial manual vai para o jowls", () => {
+    const q = normalizarPlano({
+      customAreas: [{ id: "custom_1", nome: "Nasolabial", bilateral: true, regiao: "facial" }],
+      DATA: { submandibular: [{ prof: "4.5", dispD: 600, dispE: 600 }], papada: [{ prof: "10.0", disp: 800 }], custom_1: [{ prof: "3.0", dispD: 400, dispE: 400 }] },
+    });
+    expect(q.DATA.papada).toEqual([{ prof: "10.0", disp: 800 }, { prof: "4.5", disp: 1200 }]);
+    expect(q.DATA.jowls).toEqual([{ prof: "3.0", dispD: 400, dispE: 400 }]);
+    expect(q.customAreas).toEqual([]);
+    expect(q.DATA.submandibular).toBeUndefined();
+  });
   it("Terço médio é o antigo arco mandibular e não há nasolabial", () => {
     expect(AREAS_FIXAS.find((a) => a.id === "arcomandibular")?.nome).toBe("Terço médio");
     expect(AREAS_FIXAS.some((a) => /nasolabial/i.test(a.nome))).toBe(false);
@@ -71,6 +81,6 @@ describe("planejador nativo: estado antigo", () => {
 describe("fotos das áreas", () => {
   it("toda área fixa tem a foto do protocolo antigo", () => {
     for (const a of AREAS_FIXAS) expect(existsSync(`public${imagemDaArea(a)}`)).toBe(true);
-    expect(existsSync("public/ferramentas/areas/facial.jpg")).toBe(true);
+    expect(imagemDaArea({ id: "custom_9", nome: "Mento", bilateral: true, opts: [], manual: true })).toMatch(/^data:image\/svg/);
   });
 });

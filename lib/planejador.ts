@@ -43,17 +43,16 @@ export interface Area {
   manual?: boolean;
 }
 
-/** Áreas fixas, de cima para baixo no rosto. Nasolabial saiu (fica no Jowls). */
+/** Áreas fixas, na ordem do dono (pescoço, papada, jowls, terço médio...). Nasolabial saiu (fica no Jowls) e o Submandibular entrou na Papada (regra do dono, 16/10/2026). */
 export const AREAS_FIXAS: Area[] = [
-  { id: "frontal", nome: "Frontal", bilateral: true, opts: OPTS_STD },
-  { id: "temporal", nome: "Temporal e Arco Zigomático", bilateral: true, opts: OPTS_STD, hint: "Usar óculos/gaze. Não tratar pálpebra." },
-  { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD },
+  { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
+  { id: "papada", nome: "Submandibular e Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
   { id: "jowls", nome: "Jowls", bilateral: true, opts: OPTS_STD },
+  { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD },
+  { id: "temporal", nome: "Temporal e Arco Zigomático", bilateral: true, opts: OPTS_STD, hint: "Usar óculos/gaze. Não tratar pálpebra." },
+  { id: "frontal", nome: "Frontal", bilateral: true, opts: OPTS_STD },
   { id: "perioral_sup", nome: "Perioral Superior", bilateral: true, opts: OPTS_STD },
   { id: "perioral_inf", nome: "Perioral Inferior", bilateral: true, opts: OPTS_STD },
-  { id: "submandibular", nome: "Submandibular", bilateral: true, opts: OPTS_STD },
-  { id: "papada", nome: "Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
-  { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
 ];
 
 /** Como a ponteira anda em cada área (texto curto, para a tela e o prontuário). */
@@ -63,8 +62,7 @@ export const MOVIMENTO_DA_AREA: Record<string, string> = {
   arcomandibular: "Em diagonal, do sulco perto da boca subindo até a frente da orelha.",
   jowls: "Dois campos ovais (bigode chinês e jowls), com o movimento de baixo para cima.",
   pescoco: "Da parte de baixo da orelha descendo em curva até embaixo do queixo.",
-  papada: "Movimento circular no centro da papada. Não descer para a tireoide (X).",
-  submandibular: "Do centro do queixo para os lados, em arco até perto da orelha.",
+  papada: "Movimento circular no centro, abaixo do queixo, pegando a região submandibular. Não descer para a tireoide (X).",
   perioral_sup: "Entre o nariz e o lábio, do centro para os cantos.",
   perioral_inf: "Abaixo do lábio inferior, do centro para os cantos.",
 };
@@ -135,12 +133,43 @@ export function hojeIso(): string {
 /** Estado salvo (formato antigo ou novo) → plano completo, com toda área fixa presente. */
 export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = hojeIso()): Plano {
   const s = (e ?? {}) as Record<string, unknown>;
-  const customAreas = (Array.isArray(s.customAreas) ? s.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
+  let customAreas = (Array.isArray(s.customAreas) ? s.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
   const bruto = (s.DATA && typeof s.DATA === "object" ? s.DATA : {}) as Record<string, unknown>;
   const DATA: Record<string, Linha[]> = {};
   for (const a of [...AREAS_FIXAS, ...customAreas]) {
     const linhas = Array.isArray(bruto[a.id]) ? (bruto[a.id] as unknown[]) : [];
     DATA[a.id] = linhas.length ? linhas.map((r) => normalizarLinha(a, r)) : [linhaVazia(a)];
+  }
+  // Planos antigos: o Submandibular (D/E) vira linhas da área única "Submandibular e
+  // Papada" (soma dos lados) e a área manual Nasolabial vai para o Jowls.
+  const juntar = (destino: string, novas: Linha[]) => {
+    if (!novas.length) return;
+    const atuais = DATA[destino].filter((l) => (l.disp ?? 0) + (l.dispD ?? 0) + (l.dispE ?? 0) > 0);
+    DATA[destino] = [...atuais, ...novas];
+  };
+  if (Array.isArray(bruto.submandibular)) {
+    const papada = AREAS_FIXAS.find((a) => a.id === "papada")!;
+    juntar(
+      "papada",
+      (bruto.submandibular as unknown[])
+        .map((r) => normalizarLinha({ ...papada, bilateral: true }, r))
+        .filter((l) => (l.dispD ?? 0) + (l.dispE ?? 0) > 0)
+        .map((l) => ({ prof: l.prof, disp: (l.dispD ?? 0) + (l.dispE ?? 0), ...(l.feito ? { feito: true } : {}) }))
+    );
+  }
+  const nasolabiais = customAreas.filter((a) => a.regiao !== "corporal" && /nasolabial/i.test(a.nome));
+  if (nasolabiais.length) {
+    const jowls = AREAS_FIXAS.find((a) => a.id === "jowls")!;
+    for (const a of nasolabiais) {
+      juntar(
+        "jowls",
+        (DATA[a.id] ?? [])
+          .filter((l) => subtotalLinha(a, l) > 0)
+          .map((l) => (a.bilateral ? normalizarLinha(jowls, l) : normalizarLinha(jowls, { prof: l.prof, dispD: Math.ceil((l.disp ?? 0) / 2), dispE: Math.floor((l.disp ?? 0) / 2), feito: l.feito })))
+      );
+      delete DATA[a.id];
+    }
+    customAreas = customAreas.filter((a) => !nasolabiais.includes(a));
   }
   const seqSalvo = num(s.customSeq);
   const maiorId = customAreas.reduce((m, a) => Math.max(m, Number(a.id.replace(/\D/g, "")) || 0), 0);
