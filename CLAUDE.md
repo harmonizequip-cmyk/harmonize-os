@@ -145,7 +145,8 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Cabeçalhos em `next.config.js`: CSP (só o próprio site e `*.supabase.co`; `wasm-unsafe-eval` pelo PDF do contrato), HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy e Permissions-Policy (microfone só `self`). Serviço externo novo precisa entrar na CSP, senão é bloqueado sem aviso.
 - Banco: funções de gatilho sem EXECUTE para `authenticated`, `disponibilidade_publica` fechada, `anon` sem acesso a tabelas/views (também para tabelas futuras), `search_path` fixo (migration `2026-10-14-endurecer-seguranca.sql`).
-- Next.js atualizado para 16.3.8 em 14/10/2026 (`npm audit` sem vulnerabilidades). Em aberto: ligar "Leaked password protection" no Auth; cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
+- Senhas (Auth > Providers > Email, 16/10/2026): mínimo 8 caracteres com minúscula, maiúscula e número; as telas conferem antes por `problemaSenha` (`lib/senha.ts`). "Leaked password protection" só existe no plano Pro (o projeto é gratuito).
+- Next.js atualizado para 16.3.8 em 14/10/2026 (`npm audit` sem vulnerabilidades). Em aberto: cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
 
 ## Assistente (IA)
 

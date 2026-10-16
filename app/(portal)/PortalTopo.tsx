@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { problemaSenha, REGRA_SENHA } from "@/lib/senha";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { KeyRound, LogOut } from "lucide-react";
@@ -20,7 +21,8 @@ export default function PortalTopo({ nome }: { nome: string }) {
 
   async function salvarSenha() {
     setAviso(null);
-    if (senha.length < 6) return setAviso("A senha precisa ter pelo menos 6 caracteres.");
+    const ruimSenha = problemaSenha(senha);
+    if (ruimSenha) return setAviso(ruimSenha);
     const { error } = await supabase.auth.updateUser({ password: senha });
     if (error) return setAviso("Não consegui trocar a senha. Tente de novo.");
     setSenha("");
@@ -62,6 +64,7 @@ export default function PortalTopo({ nome }: { nome: string }) {
               </button>
             </>
           )}
+          {trocando && !aviso && <p className="w-full text-[11px] text-neutral-400">{REGRA_SENHA}</p>}
           {aviso && <p className="w-full text-xs text-neutral-500">{aviso}</p>}
         </div>
       )}

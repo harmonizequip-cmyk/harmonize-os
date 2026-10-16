@@ -5,6 +5,7 @@
 // Configurações, e o banco recusa qualquer alteração vinda dela.
 
 import { useCallback, useEffect, useState } from "react";
+import { problemaSenha } from "@/lib/senha";
 import { Eye } from "lucide-react";
 import { createClient as criarClienteSupabase } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -42,7 +43,8 @@ export default function AcessoVisualizacaoCard() {
     setMensagem(null);
     const e = email.trim().toLowerCase();
     if (!e || !nome.trim()) return setErro("Preencha nome e e-mail.");
-    if (senha && senha.length < 6) return setErro("A senha precisa ter pelo menos 6 caracteres.");
+    const ruimSenha = senha ? problemaSenha(senha) : null;
+    if (ruimSenha) return setErro(ruimSenha);
     setOcupado(true);
     let precisaConfirmar = false;
     if (senha) {
@@ -138,7 +140,7 @@ export default function AcessoVisualizacaoCard() {
           <input
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            placeholder="Senha (mínimo 6)"
+            placeholder="Senha (8+, maiúscula e número)"
             type="password"
             className={campo}
           />

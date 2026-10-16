@@ -6,6 +6,7 @@
 // endereço do sistema e cai direto no Planejador dela (/portal).
 
 import { useCallback, useEffect, useState } from "react";
+import { problemaSenha } from "@/lib/senha";
 import { createClient as criarClienteSupabase } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
@@ -79,7 +80,8 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
     setErro(null);
     const e = email.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(e)) return setErro("Informe um e-mail válido.");
-    if (senha.length < 6) return setErro("A senha precisa ter pelo menos 6 caracteres.");
+    const ruimSenha = problemaSenha(senha);
+    if (ruimSenha) return setErro(ruimSenha);
     setOcupado(true);
 
     // 1) Completa o cadastro com o que foi preenchido.
