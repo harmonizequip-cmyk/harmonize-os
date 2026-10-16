@@ -1,7 +1,7 @@
 -- ============================================================
 -- CRÉDITOS: AJUSTES (corrigir contagens, ponteira por contagem, permuta pessoal)
 --
--- STATUS: AGUARDANDO O DONO
+-- STATUS: APLICADA (16/10/2026, conferida: 2 colunas, 3 funções, gatilho, função interna fechada, view com ponteira)
 --
 -- 1. Cada contagem pode dizer qual ponteira (aplicador) foi usada. A view
 --    aplicadores_uso passa a dar os disparos dessa contagem para ela; o
