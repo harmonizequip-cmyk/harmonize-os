@@ -3,7 +3,7 @@
 // assinaturas). O mesmo HTML serve para a prévia na tela e para a impressão
 // (Salvar como PDF).
 
-import { svgBoneco } from "./boneco-corporal";
+import { urlImagemCorporal } from "./corpo-foto";
 import { dataBr, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -11,8 +11,9 @@ const fmt = (n: number) => n.toLocaleString("pt-BR");
 
 /** Imagem da área: foto do protocolo (com as setas do movimento), rosto sem setas ou boneco corporal. */
 export function imagemDaArea(a: Area, origem = ""): string {
-  if (a.regiao === "corporal") return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgBoneco(a.parte ? [a.parte] : []))}`;
-  return `${origem}/ferramentas/areas/${a.manual ? "facial" : a.id}.jpg`;
+  if (a.regiao === "corporal") return urlImagemCorporal(a.parte);
+  const foto = !a.manual ? a.id : /p[aá]lpebra|olho/i.test(a.nome) ? "olhos" : "facial";
+  return `${origem}/ferramentas/areas/${foto}.jpg`;
 }
 
 export const CSS_PRONTUARIO = `

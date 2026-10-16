@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import BonecoCorporal from "@/components/BonecoCorporal";
-import { CATALOGO_CORPORAL, urlBoneco } from "@/lib/boneco-corporal";
+import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
+import { urlImagemCorporal } from "@/lib/corpo-foto";
 import {
   CATALOGO_AREAS,
   DISPAROS_CORPORAL,
@@ -270,7 +271,7 @@ export default function SeletorPlanejamento({
           <div key={c.chave} className="space-y-2 rounded-lg border border-brand-teal/30 bg-white p-2.5">
             <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={urlBoneco(c.regiao || "corpo")} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg border border-neutral-200" />
+              <img src={urlImagemCorporal(c.regiao || null)} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg border border-neutral-200 object-cover object-top" />
               <input
                 value={c.nome}
                 onChange={(e) => mudar(c.chave, { nome: e.target.value })}
