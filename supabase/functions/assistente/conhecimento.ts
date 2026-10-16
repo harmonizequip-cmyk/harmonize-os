@@ -134,6 +134,12 @@ Pendência (quem deve): locação não cancelada, is_test = false, pago = false,
 View locacoes_a_receber: id, client_id, cliente, event_date, calculated_value, credito_taxa, valor_a_receber.
 Taxa de reserva: calendar_events.taxa_status/taxa_valor. Parceiro não paga taxa. View clientes_taxas: client_id, taxas_pendentes, taxas_pagas, valor_pendente, valor_pago, proxima_pendente.
 
+## Créditos da cliente e permuta
+creditos_cliente: client_id, tipo (disparos, valor), quantidade (positivo = entrada, negativo = uso), origem (contagem = troca de ponteira, permuta, manual, uso), rental_id, descricao, data. View creditos_saldo: client_id, disparos_disponiveis, disparos_aguardando (crédito de contagem só vale depois que a locação de origem for paga), valor_disponivel (R$).
+locacao_contagens: rental_id, ordem, inicial, final, gera_credito (contagens de cada ponteira na locação; "gerar crédito" = a cliente pagou hoje e esses disparos ficam de crédito).
+Crédito de disparos abate os disparos da próxima locação antes do cálculo do valor. Crédito em R$ abate como pagamento com forma 'permuta'.
+Permuta (forma de pagamento 'permuta'): o parceiro paga com produto ou serviço. Da empresa sai em "Outros"; pessoal sai como "Retiradas" e vira gasto no Pessoal. Lançamento com payment_method = 'permuta' não é dinheiro: fica fora do saldo do caixa (mas conta em Entradas/Saídas).
+
 ## Lucro
 View rentals_lucro: rental_id, client_id, cliente, event_date, calculated_value, valor_deslocamento, total_pago, total_despesas, lucro_liquido.
 View clientes_lucro: client_id, cliente, locacoes, faturado, recebido, despesas, lucro_liquido.

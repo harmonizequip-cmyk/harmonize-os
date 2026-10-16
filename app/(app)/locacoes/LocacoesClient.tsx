@@ -17,6 +17,7 @@ const PAGAMENTOS: Record<string, string> = {
   debito: "Débito",
   credito: "Crédito",
   transferencia: "Transferência",
+  permuta: "Permuta",
   outros: "Outros",
 };
 

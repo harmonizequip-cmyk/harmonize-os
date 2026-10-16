@@ -14,6 +14,11 @@ export function foraDoSaldoPorCartao(mov: CartaoMov): boolean {
   return mov === "compra";
 }
 
+/** Fica fora do saldo da conta: compra no cartão (sai na fatura) e permuta (não é dinheiro). */
+export function foraDoSaldo(t: { cartao_mov?: CartaoMov; payment_method?: string | null }): boolean {
+  return foraDoSaldoPorCartao(t.cartao_mov ?? null) || t.payment_method === "permuta";
+}
+
 /** Fatura (mês do vencimento, "AAAA-MM") em que cai uma compra. Espelha fatura_da_compra do banco. */
 export function faturaDaCompra(data: string, fechamento: number, vencimento: number): string {
   const [a, m, d] = data.split("-").map(Number);

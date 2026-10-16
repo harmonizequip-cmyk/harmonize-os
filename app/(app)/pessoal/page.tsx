@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { foraDoSaldo } from "@/lib/cartao";
 import { fetchSettings } from "@/lib/settings";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
@@ -23,7 +24,7 @@ export default async function PessoalInicioPage() {
   const [settings, { data: todos }, { data: doMesRaw }, { data: faturasRaw }, { data: cartoesRaw }, { data: catsRaw }, { data: clientes }] =
     await Promise.all([
       fetchSettings(supabase),
-      supabase.from("transactions").select("type, amount, cartao_mov").eq("scope", "pessoal").eq("is_test", false).limit(20000),
+      supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).limit(20000),
       supabase
         .from("transactions_contabilizaveis")
         .select("id, type, amount, date, description, cartao_mov, categories(name)")
@@ -40,7 +41,7 @@ export default async function PessoalInicioPage() {
 
   // Compra no cartão só sai da conta quando a fatura é paga.
   const saldo = (todos ?? [])
-    .filter((t: any) => t.cartao_mov !== "compra")
+    .filter((t: any) => !foraDoSaldo(t))
     .reduce((s, t: any) => s + (t.type === "entrada" ? 1 : -1) * Number(t.amount), 0);
   const linhas: (LinhaFinanceira & { id: string; description: string })[] = ((doMesRaw ?? []) as any[]).map((t) => ({
     id: t.id,

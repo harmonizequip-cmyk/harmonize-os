@@ -14,7 +14,7 @@ import PrevisaoCaixaCard from "@/components/PrevisaoCaixaCard";
 import { preverCaixa, type ReservaFutura, type LocacaoPassada } from "@/lib/previsao";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
-import { foraDoResultadoPorCartao, foraDoSaldoPorCartao } from "@/lib/cartao";
+import { foraDoResultadoPorCartao, foraDoSaldo } from "@/lib/cartao";
 import { diasDoPeriodo } from "@/lib/period";
 import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
@@ -64,7 +64,7 @@ export default async function DashboardPage(
   // Todos os lançamentos históricos, para o Saldo acumulado (não depende do filtro de período)
   const { data: allTimeTransactions } = await supabase
     .from("transactions_contabilizaveis")
-    .select("type, amount, cartao_mov")
+    .select("type, amount, cartao_mov, payment_method")
     .eq("scope", "harmonize");
 
   // Contagem de locações do período, sem cancelada nem teste (as canceladas
@@ -490,7 +490,7 @@ export default async function DashboardPage(
   const resultado = entradas - saidas;
 
   // Compra no cartão só tira dinheiro quando a fatura é paga.
-  const saldoTotal = (allTimeTransactions ?? []).filter((t: any) => !foraDoSaldoPorCartao(t.cartao_mov)).reduce(
+  const saldoTotal = (allTimeTransactions ?? []).filter((t: any) => !foraDoSaldo(t)).reduce(
     (sum, t) => sum + (t.type === "entrada" ? Number(t.amount) : -Number(t.amount)),
     0
   );
