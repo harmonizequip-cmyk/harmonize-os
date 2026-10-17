@@ -79,7 +79,7 @@ export default function SeletorPlanejamento({
   paciente?: string | null;
   textoAplicar: string;
   /** Devolva false para continuar editando (ex.: cancelou a confirmação). */
-  onAplicar: (m: PlanejamentoMontado) => boolean | void;
+  onAplicar: (m: PlanejamentoMontado) => boolean | void | Promise<boolean | void>;
   onPedirIA?: (texto: string) => void;
 }) {
   const [sel, setSel] = useState<Set<string>>(() => new Set(marcadas.filter((m) => !IDS_CORPORAIS.has(m))));
@@ -126,8 +126,8 @@ export default function SeletorPlanejamento({
     setCorporais((l) => (l.some((c) => c.regiao === id) ? l.filter((c) => c.regiao !== id) : [...l, novaCorporal(id)]));
   const mudar = (chave: string, campo: Partial<Corporal>) => setCorporais((l) => l.map((c) => (c.chave === chave ? { ...c, ...campo } : c)));
 
-  function aplicar() {
-    if (onAplicar(montado) !== false) setFeito(true);
+  async function aplicar() {
+    if ((await onAplicar(montado)) !== false) setFeito(true);
   }
 
   function pedirIA() {

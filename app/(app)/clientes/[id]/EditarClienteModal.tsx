@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
+import { confirmar } from "@/components/Dialogos";
 
 interface Client {
   id: string;
@@ -77,7 +78,7 @@ export default function EditarClienteModal({
       setError("Informe o nome do cliente.");
       return;
     }
-    if (!window.confirm("Salvar essas alterações no cliente?")) return;
+    if (!(await confirmar({ titulo: "Salvar as alterações no cliente?", confirmar: "Salvar" }))) return;
     setSaving(true);
     setError(null);
     const { error } = await supabase

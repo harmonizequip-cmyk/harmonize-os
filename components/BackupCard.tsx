@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { DatabaseBackup } from "lucide-react";
 
-const CHAVE = "harmonize-ultimo-backup";
+export const CHAVE_BACKUP = "harmonize-ultimo-backup";
+const CHAVE = CHAVE_BACKUP;
 
 /**
  * Cartão de backup manual em Configurações. O plano gratuito do Supabase não

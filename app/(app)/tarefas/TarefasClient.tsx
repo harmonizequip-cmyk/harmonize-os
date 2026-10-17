@@ -12,6 +12,7 @@ import { Atalho, Atalhos, LinkCliente } from "@/components/Atalhos";
 import { linkEvento } from "@/lib/atalhos";
 
 import { hojeLocal } from "@/lib/period";
+import { confirmar, avisar } from "@/components/Dialogos";
 export interface TarefaRow {
   id: string;
   client_id: string | null;
@@ -115,7 +116,7 @@ export default function TarefasClient({
     const { error } = await supabase.rpc("register_contact_attempt", { p_task_id: taskId, p_responded: responded });
     setTaskBusyId(null);
     if (error) {
-      window.alert(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.");
+      avisar(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.", "erro");
     }
     router.refresh();
   }
@@ -129,14 +130,14 @@ export default function TarefasClient({
       .eq("id", taskId);
     setTaskBusyId(null);
     if (error) {
-      window.alert(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.");
+      avisar(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.", "erro");
     }
     router.refresh();
   }
 
   async function adiarPara(taskId: string, data: string) {
     const { error } = await supabase.from("tasks").update({ due_date: data }).eq("id", taskId);
-    if (error) window.alert(error.message || "Não foi possível adiar. A tarefa continua na fila.");
+    if (error) avisar(error.message || "Não foi possível adiar. A tarefa continua na fila.", "erro");
     setPendentes((prev) => prev.filter((t) => t.id !== taskId));
     router.refresh();
   }
@@ -160,7 +161,7 @@ export default function TarefasClient({
   }
 
   async function desfazerConclusao(taskId: string) {
-    if (!window.confirm("Desfazer a conclusão desta tarefa? Ela volta pra lista de pendentes.")) return;
+    if (!(await confirmar({ titulo: "Desfazer a conclusão desta tarefa?", texto: "Ela volta para a lista de pendentes.", confirmar: "Desfazer" }))) return;
     setTaskBusyId(taskId);
     setDesfazerErro((prev) => {
       const { [taskId]: _omit, ...rest } = prev;

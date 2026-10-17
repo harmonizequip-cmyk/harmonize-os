@@ -138,4 +138,5 @@ body {
 
 /* Planejador HIPRO: folhas que sobem e abas que aparecem. */
 @keyframes subir { from { transform: translateY(28px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+@keyframes aviso-entra { from { transform: translateY(12px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes aparecer { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }

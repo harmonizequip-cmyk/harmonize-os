@@ -1,50 +1,40 @@
-import Link from "next/link";
-import { FlaskConical } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
-import BackupCard from "@/components/BackupCard";
-import AvisosCelularCard from "@/components/AvisosCelularCard";
-import DigitalCard from "@/components/DigitalCard";
-import AcessoVisualizacaoCard from "@/components/AcessoVisualizacaoCard";
-import ContasFixasCard from "@/components/ContasFixasCard";
-import ConfiguracoesClient from "./ConfiguracoesClient";
+import ConfiguracoesHub from "./ConfiguracoesHub";
+import { ehSecao } from "./secoes-ids";
 
-export default async function ConfiguracoesPage() {
+// Central de Configurações: check-up e assuntos em grupos. ?secao=<id> abre um
+// assunto; ?acao=backup (aviso de domingo) abre o Backup com o arquivo pronto.
+export default async function ConfiguracoesPage(props: { searchParams: Promise<{ secao?: string; acao?: string }> }) {
+  const sp = await props.searchParams;
   const supabase = createClient();
 
-  const settings = await fetchSettings(supabase);
-  const { data: tags } = await supabase.from("tags").select("id, name, color, is_automatic").order("name");
+  const [settings, { data: tags }, { data: teste }, { data: auth }, { count: acessos }] = await Promise.all([
+    fetchSettings(supabase),
+    supabase.from("tags").select("id, name, color, is_automatic").order("name"),
+    supabase.from("settings").select("test_mode").eq("id", true).single(),
+    supabase.auth.getUser(),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("somente_leitura", true).eq("active", true),
+  ]);
 
-  // A porta de entrada do modo teste fica aqui em cima, e não no menu
-  // principal, porque é coisa de ajuste pontual: liga, testa, desliga.
-  // Quando está ligado, a faixa amarela no topo de todas as telas leva
-  // direto pra lá, então não depende deste link pra achar o caminho.
+  const user = auth.user;
+  const { data: perfil } = user
+    ? await supabase.from("profiles").select("name").eq("id", user.id).single()
+    : { data: null };
+
+  const secao = sp.acao === "backup" ? "backup" : ehSecao(sp.secao) ? sp.secao : null;
+
   return (
-    <div className="space-y-6">
-      <Link
-        href="/configuracoes/dados-teste"
-        className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4 transition hover:border-brand-teal"
-      >
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-          <FlaskConical size={17} strokeWidth={1.75} />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-sm font-medium text-neutral-900">Dados de teste</span>
-          <span className="block text-xs text-neutral-500">
-            Ligar o modo teste, marcar o que é teste e limpar depois
-          </span>
-        </span>
-      </Link>
-
-      <AvisosCelularCard />
-      <DigitalCard />
-      <AcessoVisualizacaoCard />
-
-      <BackupCard />
-
-      <ContasFixasCard inicial={settings.despesasFixas} />
-
-      <ConfiguracoesClient initialSettings={settings} initialTags={tags ?? []} />
-    </div>
+    <ConfiguracoesHub
+      secao={secao}
+      dados={{
+        settings,
+        tags: tags ?? [],
+        testMode: !!teste?.test_mode,
+        nome: perfil?.name ?? "",
+        email: user?.email ?? "",
+        acessosVisualizacao: acessos ?? 0,
+      }}
+    />
   );
 }

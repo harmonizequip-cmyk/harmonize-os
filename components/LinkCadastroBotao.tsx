@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { pedirTexto } from "@/components/Dialogos";
 
 export default function LinkCadastroBotao({ className }: { className?: string }) {
   const supabase = createClient();
@@ -36,7 +37,7 @@ export default function LinkCadastroBotao({ className }: { className?: string })
       await navigator.clipboard.writeText(texto);
       setAviso("Link copiado. Cole na conversa dela.");
     } catch {
-      window.prompt("Copie o link:", link);
+      await pedirTexto({ titulo: "Copie o link", valorInicial: link, soCopiar: true });
     }
   }
 

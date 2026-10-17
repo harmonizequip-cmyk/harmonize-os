@@ -30,6 +30,7 @@ import {
 
 import { hojeLocal } from "@/lib/period";
 import { CLIENT_STAGES, type ClientStageKey } from "@/lib/funil-clientes";
+import { avisar } from "@/components/Dialogos";
 export const STAGES = [
   { key: "lead", label: "Novo contato", dot: "bg-neutral-400" },
   { key: "contato", label: "Tentativa de contato", dot: "bg-brand-blue" },
@@ -199,7 +200,7 @@ export default function FunilClient({
     });
     setTaskBusyId(null);
     if (error) {
-      window.alert(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.");
+      avisar(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.", "erro");
     }
     router.refresh();
   }
@@ -213,7 +214,7 @@ export default function FunilClient({
       .eq("id", taskId);
     setTaskBusyId(null);
     if (error) {
-      window.alert(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.");
+      avisar(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.", "erro");
     }
     router.refresh();
   }
@@ -376,7 +377,7 @@ export default function FunilClient({
       if (etapaAnterior) {
         setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage: etapaAnterior } : l)));
       }
-      window.alert(error.message || "Não foi possível mover o card. Ele voltou para a etapa anterior.");
+      avisar(error.message || "Não foi possível mover o card. Ele voltou para a etapa anterior.", "erro");
     }
     router.refresh();
     return !error;
@@ -398,7 +399,7 @@ export default function FunilClient({
       p_confirmado: !lead.nextEvent.confirmed,
     });
     if (error) {
-      window.alert("Não foi possível atualizar a confirmação. Tente novamente.");
+      avisar("Não foi possível atualizar a confirmação. Tente novamente.", "erro");
       return;
     }
     router.refresh();
@@ -421,7 +422,7 @@ export default function FunilClient({
     if (!pedidoLead?.nextEvent) return;
     const link = buildWhatsAppLink(pedidoLead.whatsapp, pedidoMessage);
     if (!link) {
-      window.alert("Este cliente não tem WhatsApp cadastrado.");
+      avisar("Este cliente não tem WhatsApp cadastrado.", "erro");
       return;
     }
     setPedidoEnviando(true);
@@ -430,7 +431,7 @@ export default function FunilClient({
     });
     setPedidoEnviando(false);
     if (error) {
-      window.alert("Não foi possível registrar o envio. Tente novamente.");
+      avisar("Não foi possível registrar o envio. Tente novamente.", "erro");
       return;
     }
     openInNewTab(link);

@@ -32,6 +32,7 @@ import NovoEventoModal from "./NovoEventoModal";
 import EditarEventoModal from "./EditarEventoModal";
 import ReservarHiproModal from "./ReservarHiproModal";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
+import { avisar } from "@/components/Dialogos";
 
 // `hex` é a mesma cor de `dot`, só que em valor puro — necessário porque o
 // indicador do dia no calendário (abaixo) usa conic-gradient via style
@@ -425,7 +426,7 @@ export default function AgendaClient({
       p_confirmado: nextConfirmed,
     });
     if (error) {
-      window.alert("Não foi possível atualizar a confirmação. Tente novamente.");
+      avisar("Não foi possível atualizar a confirmação. Tente novamente.", "erro");
       return;
     }
     router.refresh();
@@ -452,7 +453,7 @@ export default function AgendaClient({
     if (!pedidoEvent) return;
     const link = buildWhatsAppLink(pedidoEvent.clients?.whatsapp, pedidoMessage);
     if (!link) {
-      window.alert("Este cliente não tem WhatsApp cadastrado.");
+      avisar("Este cliente não tem WhatsApp cadastrado.", "erro");
       return;
     }
     setPedidoEnviando(true);
@@ -465,7 +466,7 @@ export default function AgendaClient({
     });
     setPedidoEnviando(false);
     if (error) {
-      window.alert("Não foi possível registrar o envio. Tente novamente.");
+      avisar("Não foi possível registrar o envio. Tente novamente.", "erro");
       return;
     }
     openInNewTab(link);

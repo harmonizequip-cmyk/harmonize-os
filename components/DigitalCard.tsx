@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Fingerprint } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { digitalSuportada, mensagemErroDigital } from "@/lib/digital";
+import { confirmar } from "@/components/Dialogos";
 
 interface Aparelho {
   id: string;
@@ -60,7 +61,7 @@ export default function DigitalCard() {
   }
 
   async function apagar(a: Aparelho) {
-    if (!window.confirm(`Tirar "${a.friendly_name ?? "este aparelho"}"? Ele volta a entrar só com senha.`)) return;
+    if (!(await confirmar({ titulo: `Tirar "${a.friendly_name ?? "este aparelho"}"?`, texto: "Ele volta a entrar só com senha.", confirmar: "Tirar", perigo: true }))) return;
     setErro(null);
     setMensagem(null);
     const { error } = await supabase.auth.passkey.delete({ passkeyId: a.id });

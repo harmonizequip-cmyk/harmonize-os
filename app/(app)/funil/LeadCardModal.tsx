@@ -14,6 +14,7 @@ import AgendamentosDoCliente from "@/components/AgendamentosDoCliente";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 
 import { hojeLocal } from "@/lib/period";
+import { confirmar } from "@/components/Dialogos";
 const QUICK_COLOR = "#3DBFB8";
 
 export default function LeadCardModal({
@@ -109,9 +110,11 @@ export default function LeadCardModal({
   // Reativar, por não ter locação recente).
   async function handleConverterEmCliente() {
     if (
-      !window.confirm(
-        `Mover ${lead.name} para o funil de clientes? Ele sai da aba Leads e essa mudança não é desfeita por aqui.`
-      )
+      !(await confirmar({
+        titulo: `Mover ${lead.name} para o funil de clientes?`,
+        texto: "Ele sai da aba Leads e essa mudança não é desfeita por aqui.",
+        confirmar: "Mover",
+      }))
     )
       return;
     setSaving(true);
@@ -126,7 +129,7 @@ export default function LeadCardModal({
   }
 
   async function handleSave() {
-    if (!window.confirm("Salvar essas alterações?")) return;
+    if (!(await confirmar({ titulo: "Salvar as alterações?", confirmar: "Salvar" }))) return;
     setSaving(true);
     setError(null);
 

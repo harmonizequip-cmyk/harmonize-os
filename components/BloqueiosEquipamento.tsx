@@ -13,6 +13,7 @@ import { Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import { hojeLocal, somarDias } from "@/lib/period";
+import { confirmar } from "@/components/Dialogos";
 
 export interface Bloqueio {
   id: string;
@@ -114,7 +115,7 @@ export default function BloqueiosEquipamento({
   }
 
   async function excluir(b: Bloqueio) {
-    if (!window.confirm(`Excluir o bloqueio de ${formatDate(b.data_inicio)} a ${formatDate(b.data_fim)}? A agenda volta a aceitar reservas nesses dias.`)) return;
+    if (!(await confirmar({ titulo: `Excluir o bloqueio de ${formatDate(b.data_inicio)} a ${formatDate(b.data_fim)}?`, texto: "A agenda volta a aceitar reservas nesses dias.", confirmar: "Excluir", perigo: true }))) return;
     setSalvando(true);
     setErro(null);
     const { error } = await supabase.rpc("excluir_bloqueio_equipamento", { p_bloqueio_id: b.id });

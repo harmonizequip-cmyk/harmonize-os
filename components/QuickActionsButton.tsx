@@ -52,20 +52,22 @@ type ActionKey =
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
 // sem aquele acesso não ver a opção aqui também.
-const ACTIONS: { key: ActionKey; label: string; emoji: string; module: string }[] = [
-  { key: "receber", label: "Receber pagamento (aluguel ou taxa)", emoji: "💵", module: "financeiro" },
-  { key: "tarefa", label: "Nova tarefa", emoji: "🗒️", module: "clientes" },
-  { key: "lancamento", label: "Novo lançamento financeiro", emoji: "💰", module: "financeiro" },
-  { key: "despesa_voz", label: "Despesa por voz", emoji: "🎙️", module: "financeiro" },
-  { key: "lead", label: "Novo lead/cliente", emoji: "🧲", module: "clientes" },
-  { key: "evento", label: "Novo evento na agenda", emoji: "📅", module: "agenda" },
-  // Pedido 1 da auditoria: antes só existia a reserva sem disparos aqui no
-  // "+", e pra lançar disparos direto era preciso entrar na ficha do
-  // cliente. Nomes escolhidos pra não se confundirem entre si.
-  { key: "locacao_disparos", label: "Lançar locação (com disparos)", emoji: "🎯", module: "agenda" },
-  { key: "locacao", label: "Reservar data (sem disparos ainda)", emoji: "📦", module: "agenda" },
-  { key: "tabela", label: "Tabela de preços (arte para mandar)", emoji: "🏷️", module: "clientes" },
-  { key: "planejador", label: "Planejador HIPRO (novo planejamento)", emoji: "📋", module: "agenda" },
+// Em grupos e em blocos de duas colunas, como o Menu (pedido do dono,
+// 17/10/2026). Receber pagamento, o mais usado, vem em destaque no topo.
+const GRUPOS_ACAO = ["Agenda", "Dinheiro", "Clientes"] as const;
+const ACTIONS: { key: ActionKey; label: string; dica: string; emoji: string; module: string; grupo: (typeof GRUPOS_ACAO)[number] | "destaque" }[] = [
+  { key: "receber", label: "Receber pagamento", dica: "Aluguel ou taxa de reserva", emoji: "💵", module: "financeiro", grupo: "destaque" },
+  // Pedido 1 da auditoria: lançar disparos direto pelo "+", sem entrar na
+  // ficha do cliente. Nomes escolhidos pra não se confundirem entre si.
+  { key: "locacao", label: "Reservar data", dica: "Sem disparos ainda", emoji: "📦", module: "agenda", grupo: "Agenda" },
+  { key: "locacao_disparos", label: "Lançar locação", dica: "Com os disparos", emoji: "🎯", module: "agenda", grupo: "Agenda" },
+  { key: "evento", label: "Evento", dica: "Na agenda", emoji: "📅", module: "agenda", grupo: "Agenda" },
+  { key: "planejador", label: "Planejamento", dica: "Planejador HIPRO", emoji: "📋", module: "agenda", grupo: "Agenda" },
+  { key: "lancamento", label: "Lançamento", dica: "Entrada ou saída", emoji: "💰", module: "financeiro", grupo: "Dinheiro" },
+  { key: "despesa_voz", label: "Despesa por voz", dica: "Fale o gasto", emoji: "🎙️", module: "financeiro", grupo: "Dinheiro" },
+  { key: "lead", label: "Novo lead", dica: "Ou cliente", emoji: "🧲", module: "clientes", grupo: "Clientes" },
+  { key: "tarefa", label: "Tarefa", dica: "Lembrete com data", emoji: "🗒️", module: "clientes", grupo: "Clientes" },
+  { key: "tabela", label: "Tabela de preços", dica: "Arte para mandar", emoji: "🏷️", module: "clientes", grupo: "Clientes" },
 ];
 
 // Botão "+" único, disponível em toda tela (fica no layout, não em cada
@@ -164,12 +166,12 @@ export default function QuickActionsButton({
           onClick={() => setMenuOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-t-2xl bg-white/95 p-4 pb-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
+            className="w-full max-w-md rounded-t-3xl bg-neutral-50/95 p-4 pb-6 shadow-2xl backdrop-blur-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300" />
             <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-neutral-700">Criar rápido</p>
+              <p className="text-base font-bold text-neutral-900">Criar</p>
               <button
                 onClick={() => setMenuOpen(false)}
                 aria-label="Fechar menu"
@@ -178,17 +180,46 @@ export default function QuickActionsButton({
                 <X size={16} strokeWidth={1.75} />
               </button>
             </div>
-            <div className="space-y-1">
-              {visibleActions.map((a) => (
-                <button
-                  key={a.key}
-                  onClick={() => handlePick(a.key)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
-                >
-                  <span className="text-lg">{a.emoji}</span>
-                  {a.label}
-                </button>
-              ))}
+            <div className="max-h-[78dvh] space-y-3 overflow-y-auto">
+              {visibleActions
+                .filter((a) => a.grupo === "destaque")
+                .map((a) => (
+                  <button
+                    key={a.key}
+                    onClick={() => handlePick(a.key)}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-brand-gradient px-4 py-3 text-left text-white shadow-glow-teal active:scale-[0.99]"
+                  >
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-xl">{a.emoji}</span>
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-bold leading-tight">{a.label}</span>
+                      <span className="block text-xs text-white/85">{a.dica}</span>
+                    </span>
+                  </button>
+                ))}
+              {GRUPOS_ACAO.map((g) => {
+                const itens = visibleActions.filter((a) => a.grupo === g);
+                if (!itens.length) return null;
+                return (
+                  <section key={g}>
+                    <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400">{g}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {itens.map((a) => (
+                        <button
+                          key={a.key}
+                          onClick={() => handlePick(a.key)}
+                          className="flex items-center gap-2 rounded-2xl bg-white px-2.5 py-2.5 text-left ring-1 ring-neutral-200 transition active:bg-neutral-50"
+                        >
+                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-base">{a.emoji}</span>
+                          <span className="min-w-0">
+                            <span className="block text-[13.5px] font-semibold leading-tight text-neutral-800">{a.label}</span>
+                            <span className="block truncate text-[11px] leading-tight text-neutral-500">{a.dica}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           </div>
         </div>

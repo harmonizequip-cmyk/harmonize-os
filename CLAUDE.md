@@ -83,6 +83,15 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - O "Mais" da barra de baixo (`components/BottomNav.tsx`, título "Menu") é organizado em grupos com blocos em duas colunas: Atendimento (Clientes, Tarefas, Planejador, Contratos), Dinheiro (Locações, Pendências, Cartões, Empréstimos), Inteligência (Assistente, Cérebro, Relatórios) e Sistema (Equipamentos, Movimentações, Configurações). Tudo cabe numa tela; item novo entra no grupo certo (`grupo` em `MORE_ITEMS`).
 
+## Configurações (central)
+
+- `/configuracoes` é uma central (`app/(app)/configuracoes/ConfiguracoesHub.tsx`): cartão "Minha conta" (trocar senha, sair), "Check-up do app" (backup em dia, avisos ligados, digital cadastrada, modo teste desligado; o que falta leva ao lugar) e blocos em grupos: O negócio (Preços com simulação antes/depois, Contas fixas, Tags, Automações), Este celular (Avisos, Digital, Aparência) e Dados e acesso (Backup, Visualização, Dados de teste, Histórico). `?secao=<id>` abre um assunto (ids em `secoes-ids.ts`, que o servidor também usa); `?acao=backup` abre o Backup. Seções em `secoes/`, peças comuns (chave, campo, barra "Salvar alterações" que só aparece com mudança) em `ui.tsx`. O selo "Inativo" mudou de Preços para Automações.
+
+## Diálogos e avisos
+
+- Não usar `confirm`/`alert`/`prompt` do navegador: usar `confirmar`, `avisar` e `pedirTexto` de `components/Dialogos.tsx` (montado em `app/layout.tsx`). `perigo: true` e rótulo próprio ("Apagar") quando apaga ou cancela.
+- O "+" (`QuickActionsButton`) segue o Menu: Receber pagamento em destaque e grupos Agenda, Dinheiro e Clientes em duas colunas. A barra lateral do computador usa os mesmos grupos do Menu.
+
 ## Temas (Clássico e Aurora)
 
 - O tema escuro foi retirado a pedido do dono (14/10/2026); não usar classes `dark:`. O Suave também saiu (o dono não gostou). No lugar há o tema Aurora: botão de paleta no topo/menu (`components/ThemeToggle.tsx`), guardado em `localStorage` `harmonize-tema` = `aurora` e aplicado pela classe `tema-aurora` no `<html>` (script em `app/layout.tsx`). Os cinzas `neutral-*` do Tailwind saem de variáveis (`--n-50`…`--n-950`, em `app/globals.css`): o Aurora usa cinzas frios, brilho da marca no topo, cartões brancos com sombra e a barra de baixo flutuante com item ativo em degradê. Ajustes ficam só no `globals.css`.

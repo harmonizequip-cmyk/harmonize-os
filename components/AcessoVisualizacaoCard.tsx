@@ -9,6 +9,7 @@ import { problemaSenha } from "@/lib/senha";
 import { Eye } from "lucide-react";
 import { createClient as criarClienteSupabase } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { confirmar } from "@/components/Dialogos";
 
 interface Acesso {
   id: string;
@@ -82,7 +83,7 @@ export default function AcessoVisualizacaoCard() {
   }
 
   async function remover(a: Acesso) {
-    if (!window.confirm(`Tirar o acesso de ${a.name}?`)) return;
+    if (!(await confirmar({ titulo: `Tirar o acesso de ${a.name}?`, confirmar: "Tirar acesso", perigo: true }))) return;
     setErro(null);
     const { error } = await supabase.rpc("remover_acesso_visualizacao", { p_user_id: a.id });
     if (error) return setErro(error.message);

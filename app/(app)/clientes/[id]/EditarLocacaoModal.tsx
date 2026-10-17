@@ -9,6 +9,7 @@ import { valorParaNumero } from "@/lib/valor";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamento } from "@/lib/atalhos";
 import { somarContagens, disparosCobrados } from "@/lib/creditos";
+import { confirmar } from "@/components/Dialogos";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -323,7 +324,7 @@ export default function EditarLocacaoModal({
   }
 
   async function handleRemovePayment(paymentId: string) {
-    if (!window.confirm("Remover este pagamento? O lançamento no caixa também será apagado.")) return;
+    if (!(await confirmar({ titulo: "Remover este pagamento?", texto: "O lançamento no caixa também será apagado.", confirmar: "Remover", perigo: true }))) return;
     setPaymentError(null);
     const { error: rpcError } = await supabase.rpc("remover_pagamento_locacao", {
       p_payment_id: paymentId,
@@ -470,7 +471,7 @@ export default function EditarLocacaoModal({
     }
     const precisaCorrigir =
       status !== "cancelada" && (porContagens || contagensOriginais.length > 0) && (contagensMudaram || creditoMudou);
-    if (!window.confirm("Salvar essas alterações na locação?")) return;
+    if (!(await confirmar({ titulo: "Salvar as alterações na locação?", confirmar: "Salvar" }))) return;
     setSaving(true);
     setError(null);
 

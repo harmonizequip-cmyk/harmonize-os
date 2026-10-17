@@ -48,6 +48,7 @@ import {
   UserRound,
   CalendarDays,
 } from "lucide-react";
+import { confirmar } from "@/components/Dialogos";
 
 type Cliente = ClientOption & { profissional: string };
 type Evento = { id: string; date_start: string; event_type: string };
@@ -266,8 +267,12 @@ export default function EditorPlanejamento({
   }
 
   // "Montar pelas regras": troca áreas e disparos, mantém paciente, datas e anotações.
-  function aplicarSeletor(m: PlanejamentoMontado) {
-    if (totalDistribuido(plano) > 0 && !window.confirm("Trocar as áreas e disparos deste planejamento pelo que foi montado?")) return false;
+  async function aplicarSeletor(m: PlanejamentoMontado) {
+    if (
+      totalDistribuido(plano) > 0 &&
+      !(await confirmar({ titulo: "Trocar as áreas e disparos?", texto: "O que está neste planejamento é trocado pelo que foi montado.", confirmar: "Trocar" }))
+    )
+      return false;
     const montado = normalizarPlano({ ...paraEstado(plano), DATA: m.estado.DATA, customAreas: m.estado.customAreas, customSeq: m.estado.customSeq, saldoTotal: m.estado.saldoTotal, procNome: m.estado.procNome, ...(m.estado.queixa ? { queixa: m.estado.queixa } : {}) });
     mudar(() => montado);
     setAbertas(new Set(todasAreas(montado).filter((a) => totalArea(montado, a) > 0).map((a) => a.id)));
@@ -343,8 +348,8 @@ export default function EditorPlanejamento({
     setTimeout(() => document.getElementById(`area-${area.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
   }
 
-  function removerArea(a: Area) {
-    if (!window.confirm(`Remover a área "${a.nome}"?`)) return;
+  async function removerArea(a: Area) {
+    if (!(await confirmar({ titulo: `Remover a área "${a.nome}"?`, confirmar: "Remover", perigo: true }))) return;
     mudar((p) => {
       const DATA = { ...p.DATA };
       delete DATA[a.id];

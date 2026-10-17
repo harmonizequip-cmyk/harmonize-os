@@ -9,6 +9,7 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
 import { DEVEDORES_SUGERIDOS, type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { confirmar, avisar } from "@/components/Dialogos";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -90,12 +91,15 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
       return;
     }
     if (!Number.isFinite(numero) || numero <= 0) return setErro("Informe um valor maior que zero.");
-    const texto = semCaixa
-      ? `Registrar ${form.tipo === "concedido" ? "empréstimo" : "devolução"} de ${formatCurrency(numero)} (${nome.toUpperCase()}) só como pendência, sem mexer no caixa?`
+    const pergunta = semCaixa
+      ? {
+          titulo: `Registrar ${form.tipo === "concedido" ? "empréstimo" : "devolução"} de ${formatCurrency(numero)} (${nome.toUpperCase()})?`,
+          texto: "Fica só como pendência, sem mexer no caixa.",
+        }
       : form.tipo === "concedido"
-        ? `Registrar empréstimo de ${formatCurrency(numero)} para ${nome.toUpperCase()}? Sai do caixa como saída, fora do resultado.`
-        : `Registrar devolução de ${formatCurrency(numero)} de ${nome.toUpperCase()}? Entra no caixa como entrada, fora do faturamento.`;
-    if (!window.confirm(texto)) return;
+        ? { titulo: `Registrar empréstimo de ${formatCurrency(numero)} para ${nome.toUpperCase()}?`, texto: "Sai do caixa como saída, fora do resultado." }
+        : { titulo: `Registrar devolução de ${formatCurrency(numero)} de ${nome.toUpperCase()}?`, texto: "Entra no caixa como entrada, fora do faturamento." };
+    if (!(await confirmar({ ...pergunta, confirmar: "Registrar" }))) return;
     setSalvando(true);
     setErro(null);
     const { error } = await supabase.rpc("registrar_emprestimo", {
@@ -114,12 +118,12 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
   }
 
   async function remover(id: string, rotulo: string) {
-    if (!window.confirm(`Apagar "${rotulo}"? O lançamento do Financeiro ligado a ele também sai.`)) return;
+    if (!(await confirmar({ titulo: `Apagar "${rotulo}"?`, texto: "O lançamento do Financeiro ligado a ele também sai.", confirmar: "Apagar", perigo: true }))) return;
     setRemovendo(id);
     const { error } = await supabase.rpc("remover_emprestimo", { p_id: id });
     setRemovendo(null);
     if (error) {
-      window.alert(error.message || "Não foi possível apagar.");
+      avisar(error.message || "Não foi possível apagar.", "erro");
       return;
     }
     router.refresh();

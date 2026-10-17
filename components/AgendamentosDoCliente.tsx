@@ -11,6 +11,7 @@ import DespesasDaReserva from "@/components/DespesasDaReserva";
 import AjudaCustoReserva from "@/components/AjudaCustoReserva";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLocacao } from "@/lib/atalhos";
+import { confirmar, pedirTexto } from "@/components/Dialogos";
 // Uma linha por agendamento do cliente, já com o rótulo de situação
 // resolvido pelo banco. A função agendamentos_do_cliente é quem combina
 // os dois eixos (status da locação e marca de confirmado) num rótulo só,
@@ -183,12 +184,21 @@ export default function AgendamentosDoCliente({
     executar("reagendar_agendamento", { p_event_id: eventId, p_nova_data: novaData }, eventId);
   }
 
-  function cancelar(eventId: string) {
-    const motivo = window.prompt("Motivo do cancelamento (opcional):") ?? "";
+  async function cancelar(eventId: string) {
+    const motivoDigitado = await pedirTexto({
+      titulo: "Cancelar este agendamento?",
+      texto: "Motivo do cancelamento (opcional).",
+      placeholder: "Motivo",
+      confirmar: "Continuar",
+    });
+    if (motivoDigitado === null) return;
+    const motivo = motivoDigitado;
     // Leva S: distingue não-comparecimento de um cancelamento comum.
-    const noShow = window.confirm(
-      "O cliente não compareceu (no-show)? OK = sim, Cancelar = não / não se aplica."
-    );
+    const noShow = await confirmar({
+      titulo: "O cliente não compareceu (no-show)?",
+      confirmar: "Sim, não veio",
+      cancelar: "Não / não se aplica",
+    });
     executar("cancelar_agendamento", { p_event_id: eventId, p_motivo: motivo, p_no_show: noShow }, eventId);
   }
 

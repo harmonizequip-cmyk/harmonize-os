@@ -20,6 +20,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import { valorParaNumero } from "@/lib/valor";
 import { duracaoEmDias, somarDias } from "@/lib/period";
+import { confirmar } from "@/components/Dialogos";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
@@ -233,7 +234,7 @@ export default function EditarEventoModal({
   }
 
   async function desfazerTroca() {
-    if (!window.confirm("Desfazer a última troca de ponteira? A contagem fechada volta a ser a atual.")) return;
+    if (!(await confirmar({ titulo: "Desfazer a última troca de ponteira?", texto: "A contagem fechada volta a ser a atual.", confirmar: "Desfazer" }))) return;
     setSalvandoTroca(true);
     setContagemErro(null);
     setContagemOk(null);
@@ -1024,7 +1025,7 @@ export default function EditarEventoModal({
       setError("Informe o título e a data.");
       return;
     }
-    if (!window.confirm("Salvar essas alterações no evento?")) return;
+    if (!(await confirmar({ titulo: "Salvar as alterações no evento?", confirmar: "Salvar" }))) return;
     setSaving(true);
     setError(null);
     const { error } = await supabase

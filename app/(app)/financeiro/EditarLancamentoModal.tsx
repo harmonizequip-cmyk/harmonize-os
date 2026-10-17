@@ -10,6 +10,7 @@ import { PIX_CONTAS } from "@/lib/rental-calculator";
 import { formatCurrency } from "@/lib/format";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
+import { confirmar } from "@/components/Dialogos";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -159,7 +160,7 @@ export default function EditarLancamentoModal({
       setError("Informe a data em que o dinheiro entrou.");
       return;
     }
-    if (!window.confirm("Corrigir este pagamento? O caixa e o saldo da locação são atualizados juntos.")) return;
+    if (!(await confirmar({ titulo: "Corrigir este pagamento?", texto: "O caixa e o saldo da locação são atualizados juntos.", confirmar: "Corrigir" }))) return;
     setSaving(true);
     setError(null);
     const { error: rpcError } = await supabase.rpc("editar_pagamento_locacao", {
@@ -180,9 +181,12 @@ export default function EditarLancamentoModal({
   async function removerPagamento() {
     if (!pagLocacao) return;
     if (
-      !window.confirm(
-        "Remover só este pagamento? O lançamento no caixa é apagado e o valor volta a ficar em aberto na locação. A locação em si não é apagada."
-      )
+      !(await confirmar({
+        titulo: "Remover só este pagamento?",
+        texto: "O lançamento no caixa é apagado e o valor volta a ficar em aberto na locação. A locação em si não é apagada.",
+        confirmar: "Remover",
+        perigo: true,
+      }))
     )
       return;
     setSaving(true);
@@ -211,7 +215,7 @@ export default function EditarLancamentoModal({
       setError("Preencha descrição, valor e data.");
       return;
     }
-    if (!window.confirm("Salvar essas alterações no lançamento?")) return;
+    if (!(await confirmar({ titulo: "Salvar as alterações no lançamento?", confirmar: "Salvar" }))) return;
     setSaving(true);
     setError(null);
     const { error } = await supabase

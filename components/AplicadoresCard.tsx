@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { type AplicadorUso, situacaoAplicador, lerContador, formatarContador, GARANTIA_PADRAO } from "@/lib/aplicador";
+import { confirmar } from "@/components/Dialogos";
 
 interface Equip {
   id: string;
@@ -100,7 +101,7 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
   }
 
   async function editar(a: AplicadorUso, ativo = true) {
-    if (!ativo && !window.confirm(`Desativar ${a.nome}? Ele sai do aparelho e da lista.`)) return;
+    if (!ativo && !(await confirmar({ titulo: `Desativar ${a.nome}?`, texto: "Ele sai do aparelho e da lista.", confirmar: "Desativar", perigo: true }))) return;
     await rodar(async () =>
       supabase.rpc("salvar_aplicador", {
         p_id: a.id,

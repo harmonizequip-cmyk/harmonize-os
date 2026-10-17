@@ -24,6 +24,7 @@ import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { buildWhatsAppLink } from "@/lib/format";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { Copy, FileSpreadsheet, History, MessageCircle, Mic, Plus, Send, Sparkles, Square, Trash2, UserRound, Volume2, VolumeX, X } from "lucide-react";
+import { confirmar } from "@/components/Dialogos";
 
 const CHAVE_VOZ = "harmonize-assistente-voz";
 
@@ -413,7 +414,7 @@ export default function AssistenteClient() {
   }
 
   async function apagarConversa(id: string) {
-    if (!confirm("Apagar esta conversa?")) return;
+    if (!(await confirmar({ titulo: "Apagar esta conversa?", confirmar: "Apagar", perigo: true }))) return;
     await supabase.from("assistente_conversas").delete().eq("id", id);
     setConversas((c) => c.filter((x) => x.id !== id));
     if (id === conversaId) novaConversa();

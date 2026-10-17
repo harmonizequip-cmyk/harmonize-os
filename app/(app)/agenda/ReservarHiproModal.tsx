@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 
 import { hojeLocal } from "@/lib/period";
+import { confirmar } from "@/components/Dialogos";
 interface EquipmentOption {
   id: string;
   code: string;
@@ -120,12 +121,16 @@ export default function ReservarHiproModal({
       setError("A data final precisa ser depois da data inicial.");
       return;
     }
-    const confirmMsg = outroEquipAviso
-      ? `${outroEquipAviso}\n\nReservar mesmo assim?`
-      : "Reservar este equipamento para essa data? A contagem de disparos e o valor entram depois, quando o procedimento acontecer.";
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
+    const ok = await confirmar(
+      outroEquipAviso
+        ? { titulo: "Reservar mesmo assim?", texto: outroEquipAviso, confirmar: "Reservar" }
+        : {
+            titulo: "Reservar este equipamento para essa data?",
+            texto: "A contagem de disparos e o valor entram depois, quando o procedimento acontecer.",
+            confirmar: "Reservar",
+          }
+    );
+    if (!ok) return;
     setSaving(true);
     setError(null);
 

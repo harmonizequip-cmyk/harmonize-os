@@ -16,6 +16,7 @@ import { faturaDaCompra, rotuloFatura, somarMesesRef } from "@/lib/cartao";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { Atalho } from "@/components/Atalhos";
 import { linkLancamento } from "@/lib/atalhos";
+import { confirmar } from "@/components/Dialogos";
 
 export interface Cartao {
   id: string;
@@ -154,7 +155,7 @@ export default function CartoesClient({
 
   async function excluirCompra(c: Compra) {
     if (!c.compra_grupo) return;
-    if (!window.confirm(`Apagar a compra "${c.description.replace(/ \(\d+\/\d+\)$/, "")}" com todas as parcelas?`)) return;
+    if (!(await confirmar({ titulo: `Apagar a compra "${c.description.replace(/ \(\d+\/\d+\)$/, "")}"?`, texto: "Todas as parcelas são apagadas.", confirmar: "Apagar", perigo: true }))) return;
     setErro(null);
     const { error } = await supabase.rpc("excluir_compra_cartao", { p_compra_grupo: c.compra_grupo });
     if (error) return setErro(error.message || "Não consegui apagar.");

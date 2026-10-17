@@ -40,32 +40,27 @@ const PESSOAL_ITEMS = [
   { href: "/pessoal/relatorios", label: "Relatórios", icon: BarChart3, module: "pessoal" },
 ];
 
-const NAV_ITEMS = [
+// Mesma organização do Menu do celular (BottomNav): o dia a dia no topo e os
+// grupos Atendimento, Dinheiro, Inteligência e Sistema.
+const NAV_ITEMS: { href: string; label: string; icon: typeof Users; module: string; grupo?: string }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
-  { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard" },
-  { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard" },
-  { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda" },
-  { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
-  { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
-  { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
-  { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
   { href: "/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
-  // Histórico de locações realizadas: os FATOS. Fica ao lado de
-  // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
-  { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
-  // Quem está devendo e quanto (o total também aparece no Dashboard).
-  { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
-  { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },
-  { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro" },
-  // Controle dos contratos de locação já emitidos (leva X). Fica perto de
-  // Locações porque nasce de lá (um contrato é sempre de uma locação).
-  { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda" },
-  { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
-  // Histórico de movimentações: fica no módulo de configurações porque é
-  // ferramenta de controle, não de operação do dia a dia.
-  { href: "/movimentacoes", label: "Movimentações", icon: History, module: "configuracoes" },
-  { href: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
+  { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
+  { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
+  { href: "/clientes", label: "Clientes", icon: Users, module: "clientes", grupo: "Atendimento" },
+  { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes", grupo: "Atendimento" },
+  { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda", grupo: "Atendimento" },
+  { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda", grupo: "Atendimento" },
+  { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard", grupo: "Inteligência" },
+  { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard", grupo: "Inteligência" },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios", grupo: "Inteligência" },
+  { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos", grupo: "Sistema" },
+  { href: "/movimentacoes", label: "Movimentações", icon: History, module: "configuracoes", grupo: "Sistema" },
+  { href: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes", grupo: "Sistema" },
 ];
 
 // Chave de localStorage pra lembrar a preferência de menu recolhido —
@@ -164,12 +159,16 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-0.5">
-        {items.map((item) => {
+        {items.map((item, i) => {
+          const grupo = "grupo" in item ? (item.grupo as string | undefined) : undefined;
+          const anterior = i > 0 && "grupo" in items[i - 1] ? (items[i - 1] as { grupo?: string }).grupo : undefined;
+          const titulo = grupo && grupo !== anterior && !collapsed;
           const active = item.href === "/pessoal" ? pathname === "/pessoal" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
+            <div key={item.href}>
+            {titulo && <p className="mb-1 mt-4 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400">{grupo}</p>}
             <Link
-              key={item.href}
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={`flex items-center rounded-lg text-sm transition ${
@@ -183,6 +182,7 @@ export default function Sidebar({
               <Icon size={17} strokeWidth={1.75} className={active ? "" : "text-neutral-400"} />
               {!collapsed && <span>{item.label}</span>}
             </Link>
+            </div>
           );
         })}
       </nav>

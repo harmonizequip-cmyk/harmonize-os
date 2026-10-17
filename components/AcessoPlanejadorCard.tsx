@@ -15,6 +15,7 @@ import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { buildWhatsAppLink, toUpperOrNull } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
 import { Check, ClipboardList, Copy, MessageCircle } from "lucide-react";
+import { confirmar } from "@/components/Dialogos";
 
 interface ClienteAcesso {
   id: string;
@@ -193,7 +194,7 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
   }
 
   async function remover(a: Acesso) {
-    if (!window.confirm(`Tirar o acesso de ${a.email} ao Planejador?`)) return;
+    if (!(await confirmar({ titulo: `Tirar o acesso de ${a.email} ao Planejador?`, confirmar: "Tirar acesso", perigo: true }))) return;
     setErro(null);
     const { error } = await supabase.rpc("remover_acesso_planejador", { p_user_id: a.id });
     if (error) return setErro(error.message);

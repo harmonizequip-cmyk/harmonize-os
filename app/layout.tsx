@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import DialogosHost from "@/components/Dialogos";
 
 export const metadata: Metadata = {
   title: "Harmonize OS",
@@ -43,6 +44,7 @@ export default function RootLayout({
       </head>
       <body className="bg-brand-mesh bg-neutral-50 text-neutral-900 antialiased">
         {children}
+        <DialogosHost />
       </body>
     </html>
   );

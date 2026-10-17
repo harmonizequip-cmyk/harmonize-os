@@ -11,6 +11,7 @@ import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
+import { avisar } from "@/components/Dialogos";
 
 const ETAPAS: Record<string, string> = {
   lead: "Lead",
@@ -97,7 +98,7 @@ export default function ClientesClient({
       p_confirmado: !currentEvent.confirmed,
     });
     if (error) {
-      window.alert(error.message || "Não foi possível atualizar a confirmação. Tente novamente.");
+      avisar(error.message || "Não foi possível atualizar a confirmação. Tente novamente.", "erro");
       return;
     }
     router.refresh();

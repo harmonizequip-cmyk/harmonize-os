@@ -16,6 +16,7 @@ import {
   type CadastroRecebido,
   type ClienteParaComparar,
 } from "@/lib/cadastro-formulario";
+import { confirmar as confirmarDialogo } from "@/components/Dialogos";
 
 const input = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 
@@ -170,7 +171,7 @@ function Cartao({
   }
 
   async function descartar() {
-    if (!confirm("Descartar este cadastro? Ele não entra no Harmonize.")) return;
+    if (!(await confirmarDialogo({ titulo: "Descartar este cadastro?", texto: "Ele não entra no Harmonize.", confirmar: "Descartar", perigo: true }))) return;
     setSalvando(true);
     const { error } = await supabase.rpc("descartar_cadastro_recebido", { p_id: cad.id });
     setSalvando(false);
