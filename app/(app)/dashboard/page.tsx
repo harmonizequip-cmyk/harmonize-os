@@ -22,6 +22,8 @@ import { situacaoRevisao } from "@/lib/revisao";
 import { LinkCliente } from "@/components/Atalhos";
 import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
 import { CalendarDays } from "lucide-react";
+import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
+import { LIMITE_DIARIO } from "@/lib/relacionamento";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
 // máxima. Ficam aqui, juntas, para mudar num lugar só.
@@ -617,6 +619,22 @@ export default async function DashboardPage(
       detalhe: resumoTarefas,
       href: "/tarefas?fila=1",
       nivel: tarefasAtrasadas > 0 ? "atencao" : "info",
+    });
+  // Relacionamento: quem está na hora de uma conversa (no máximo 8 por dia).
+  let paraChamar = 0;
+  try {
+    paraChamar = (await carregarRelacionamento(supabase, todayStr)).filter((p) => p.devida).length;
+  } catch {
+    // aviso opcional: sem ele o Dashboard segue
+  }
+  if (paraChamar > 0)
+    avisos.push({
+      id: "relacionamento",
+      emoji: "💬",
+      texto: `${Math.min(paraChamar, LIMITE_DIARIO)} ${Math.min(paraChamar, LIMITE_DIARIO) === 1 ? "pessoa para chamar hoje" : "pessoas para chamar hoje"}`,
+      detalhe: "Clientes e leads na hora de uma conversa, com o WhatsApp pronto",
+      href: "/relacionamento",
+      nivel: "info",
     });
   if (aplicadoresAlerta.length > 0)
     avisos.push({

@@ -81,7 +81,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 ## Menu do celular
 
-- O "Mais" da barra de baixo (`components/BottomNav.tsx`, título "Menu") é organizado em grupos com blocos em duas colunas: Atendimento (Clientes, Tarefas, Planejador, Contratos), Dinheiro (Locações, Pendências, Cartões, Empréstimos), Inteligência (Assistente, Cérebro, Relatórios) e Sistema (Equipamentos, Movimentações, Configurações). Tudo cabe numa tela; item novo entra no grupo certo (`grupo` em `MORE_ITEMS`).
+- O "Mais" da barra de baixo (`components/BottomNav.tsx`, título "Menu") é organizado em grupos com blocos em duas colunas: Atendimento (Relacionamento, Clientes, Tarefas, Planejador, Contratos), Dinheiro (Locações, Pendências, Cartões, Empréstimos), Inteligência (Assistente, Cérebro, Relatórios) e Sistema (Equipamentos, Movimentações, Configurações). Tudo cabe numa tela; item novo entra no grupo certo (`grupo` em `MORE_ITEMS`).
 
 ## Configurações (central)
 
@@ -100,6 +100,13 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Abre no mês (período padrão "Este mês"; `PeriodFilter padrao="mes"`). Ordem: destaque do mês (`components/dashboard/MesCard.tsx`: saudação, locações contra a meta 25 a 30, faturado, contas fixas), "Precisa de você" (`components/dashboard/PrecisaDeVoce.tsx`: todos os avisos num cartão, urgentes primeiro, 4 visíveis; cada um leva à sua lista; tarefas levam a `/tarefas?fila=1`), Saldo e A receber, Previsão de caixa, Radar, Próximos dias (3 dias com atendimento, hoje incluso) e "Números do período" (locações, ticket médio, concluídas/canceladas/reagendadas, HIPROs e gráficos). Aviso novo entra na lista `avisos` de `dashboard/page.tsx`.
 - `settings.inactive_days_threshold` não tem efeito em nenhuma tela; saiu de Configurações.
+
+## Relacionamento (17/10/2026)
+
+- Tela `/relacionamento` (Menu > Atendimento; `app/(app)/relacionamento/`): "Chamar hoje" (no máximo 8 por dia, por prioridade, com WhatsApp pronto, "Já falei" e "Pular hoje" só no aparelho) e a carteira em abas Clientes/Leads com filtro por classe. Regras puras em `lib/relacionamento.ts` (testadas), dados em `lib/carregar-relacionamento.ts`.
+- Classificação automática (nada para marcar à mão). Clientes (`is_client` ou com locação): Agendada (reserva futura), Nova (1 locação, até 60 dias), Ativa, Em risco (passou de 1,5x o ritmo dela, mínimo 30 dias; sem ritmo, 60), Sumida (mais de 120 dias ou cliente sem locação no sistema). Leads: Quente (etapa Interesse/Agendamento), Morna (Em contato ou conversa nos últimos 14 dias), Fria. Valor pela curva ABC do faturamento: VIP (primeira metade), Frequente (30% seguintes).
+- Cadência (dias sem conversa para voltar à lista): Nova 10, Ativa 21, Em risco 14, Sumida 30, Quente 3, Morna 7, Fria 30. Último contato = tarefa concluída, agenda enviada ou pedido de confirmação. Conversar fecha as tarefas de recontato/contato pendentes da pessoa ou grava uma tarefa concluída (o recontato automático conta daí).
+- Aparece também no Dashboard ("N pessoas para chamar hoje") e na ficha do cliente (`components/RelacaoFicha.tsx`).
 
 ## Gráficos do Dashboard
 

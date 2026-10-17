@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ehEspacoPessoal } from "@/lib/espaco";
 import {
+  HeartHandshake,
   LayoutDashboard,
   GitBranch,
   Wallet,
@@ -50,6 +51,7 @@ const PESSOAL_ITEMS = [
 // tela só, sem rolar.
 const GRUPOS = ["Atendimento", "Dinheiro", "Inteligência", "Sistema"] as const;
 const MORE_ITEMS: { href: string; label: string; icon: typeof Users; module: string; grupo: (typeof GRUPOS)[number] }[] = [
+  { href: "/relacionamento", label: "Relacionamento", icon: HeartHandshake, module: "clientes", grupo: "Atendimento" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes", grupo: "Atendimento" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes", grupo: "Atendimento" },
   { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda", grupo: "Atendimento" },

@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import ClienteDetailClient from "./ClienteDetailClient";
+import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
+import { hojeLocal } from "@/lib/period";
 
 export default async function ClienteDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -109,8 +111,17 @@ export default async function ClienteDetailPage(props: { params: Promise<{ id: s
     .eq("is_test", false)
     .order("name");
 
+  // Classificação do Relacionamento (precisa de todos para a curva de valor).
+  let relacao = null;
+  try {
+    relacao = (await carregarRelacionamento(supabase, hojeLocal())).find((p) => p.id === params.id) ?? null;
+  } catch {
+    // só um selo: sem ele a ficha abre igual
+  }
+
   return (
     <ClienteDetailClient
+      relacao={relacao}
       indicador={indicador ?? null}
       indicados={indicados ?? []}
       client={client}

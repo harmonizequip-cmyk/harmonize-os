@@ -1,5 +1,7 @@
 "use client";
 
+import RelacaoFicha from "@/components/RelacaoFicha";
+import type { PessoaClassificada } from "@/lib/relacionamento";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -116,6 +118,7 @@ function openInNewTab(url: string) {
 }
 
 export default function ClienteDetailClient({
+  relacao,
   indicador,
   indicados,
   client,
@@ -128,6 +131,7 @@ export default function ClienteDetailClient({
   reservationFee,
   reagendadasPreReservaCount,
 }: {
+  relacao?: PessoaClassificada | null;
   // Item 7: quem indicou este cliente e a lista de quem ele indicou.
   indicador: { id: string; name: string } | null;
   indicados: { id: string; name: string }[];
@@ -217,6 +221,7 @@ export default function ClienteDetailClient({
             </button>
           </div>
           {client.clinic_name && <p className="text-sm text-neutral-500">{client.clinic_name}</p>}
+          {relacao && <RelacaoFicha p={relacao} />}
           {!somenteLeitura && (
             <Link href={`/assistente?cliente=${client.id}`} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-teal-dark">
               ✨ Conversar com o assistente sobre este cliente

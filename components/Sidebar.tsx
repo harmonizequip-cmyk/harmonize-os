@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
 import {
+  HeartHandshake,
   LayoutDashboard,
   Wallet,
   Users,
@@ -47,6 +48,7 @@ const NAV_ITEMS: { href: string; label: string; icon: typeof Users; module: stri
   { href: "/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
   { href: "/funil", label: "Funil", icon: GitBranch, module: "clientes" },
   { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
+  { href: "/relacionamento", label: "Relacionamento", icon: HeartHandshake, module: "clientes", grupo: "Atendimento" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes", grupo: "Atendimento" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes", grupo: "Atendimento" },
   { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda", grupo: "Atendimento" },
