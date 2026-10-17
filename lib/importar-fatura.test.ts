@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lerOfx, planejarImportacao, refDaFatura, somarMesesData, sugerirCategoria } from "./importar-fatura";
+import { lerCsv, lerFatura, lerOfx, planejarImportacao, refDaFatura, refDoNomeDoArquivo, somarMesesData, sugerirCategoria } from "./importar-fatura";
 
 const bloco = (tipo: string, data: string, valor: string, fitid: string, memo: string) =>
   `<STMTTRN>\n<TRNTYPE>${tipo}</TRNTYPE>\n<DTPOSTED>${data}000000[-3:BRT]</DTPOSTED>\n<TRNAMT>${valor}</TRNAMT>\n<FITID>${fitid}</FITID>\n<MEMO>${memo}</MEMO>\n</STMTTRN>\n`;
@@ -131,5 +131,65 @@ describe("categoria sugerida", () => {
     expect(sugerirCategoria("Posto Ipiranga", cats)).toBe("2");
     expect(sugerirCategoria("Raia Drogasil", cats)).toBe("3");
     expect(sugerirCategoria("Loja Qualquer", cats)).toBe("");
+  });
+});
+
+const CSV = [
+  "date,title,amount",
+  '2026-09-24,Lojas Americanas,"43,74"',
+  '2026-09-19,Pagamento recebido,"- 1.000,00"',
+  '2026-09-19,Desconto Antecipação Unidas,"- 4,29"',
+  '2026-09-05,"IOF de ""Anthropic""","3,73"',
+  '2026-08-26,Latam Air - Parcela 1/4,"1.573,84"',
+  '2026-08-26,Lavagem - Parcela 3/12,"125,83"',
+  '2026-08-26,Lavagem - Parcela 5/12,"125,83"',
+  '2026-08-26,Lavagem - Parcela 4/12,"125,83"',
+  '2026-09-16,Posto,"81,00"',
+  '2026-09-16,Posto,"81,00"',
+].join("\n");
+
+describe("CSV do banco", () => {
+  const f = lerCsv(CSV);
+
+  it("lê data, título e valor no formato brasileiro, com crédito entre aspas", () => {
+    expect(f.formato).toBe("csv");
+    expect(f.linhas).toHaveLength(10);
+    expect(f.linhas.find((l) => l.memo === "Lojas Americanas")).toMatchObject({ valor: 43.74, tipo: "compra", data: "2026-09-24" });
+    expect(f.linhas.find((l) => l.memo.startsWith("Latam"))!.valor).toBe(1573.84);
+    expect(f.linhas.find((l) => l.memo === "Pagamento recebido")).toMatchObject({ tipo: "pagamento", valor: 1000 });
+    expect(f.linhas.find((l) => l.memo.startsWith("Desconto"))).toMatchObject({ tipo: "credito", valor: 4.29 });
+    expect(f.linhas.find((l) => l.memo.startsWith("IOF"))!.memo).toBe('IOF de "Anthropic"');
+  });
+
+  it("escolhe o leitor pelo conteúdo e recusa coluna desconhecida", () => {
+    expect(lerFatura(CSV).formato).toBe("csv");
+    expect(lerFatura(OFX).formato).toBe("ofx");
+    expect(() => lerCsv("a,b,c\n1,2,3")).toThrow(/colunas/);
+  });
+
+  it("parcelas se ligam por nome e valor; as que vieram juntas contam pela maior", () => {
+    const p = planejarImportacao(f, { diaVencimento: 2, modo: "paga", faturaRef: "2026-10" });
+    const lavagem = p.itens.filter((i) => i.nome === "Lavagem");
+    expect(lavagem.map((i) => i.parcela_num)).toEqual([6, 7, 8, 9, 10, 11, 12]);
+    expect(p.itens.filter((i) => i.nome === "Latam Air").map((i) => i.fatura_ref)).toEqual(["2026-11", "2026-12", "2027-01"]);
+  });
+
+  it("compra avulsa leva a data na chave: mesmo valor em outro mês não é repetição", () => {
+    const p = planejarImportacao(f, { diaVencimento: 2, modo: "aberta", faturaRef: "2026-10" });
+    const postos = p.itens.filter((i) => i.nome === "Posto").map((i) => i.chave);
+    expect(postos).toEqual(["csv|2026-09-16|Posto|81.00", "csv|2026-09-16|Posto|81.00#2"]);
+    const outroMes = lerCsv("date,title,amount\n2026-10-16,Posto,\"81,00\"");
+    expect(planejarImportacao(outroMes, { diaVencimento: 2, modo: "aberta" }).itens[0].chave).toBe("csv|2026-10-16|Posto|81.00");
+  });
+
+  it("sem período no arquivo, a fatura sai da última data", () => {
+    expect(planejarImportacao(f, { diaVencimento: 2, modo: "paga" }).faturaRef).toBe("2026-10");
+  });
+});
+
+describe("mês pelo nome do arquivo", () => {
+  it("usa a data do vencimento no nome", () => {
+    expect(refDoNomeDoArquivo("Nubank_2026-10-02.csv")).toBe("2026-10");
+    expect(refDoNomeDoArquivo("fatura.ofx")).toBeNull();
   });
 });

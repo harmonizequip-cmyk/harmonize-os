@@ -12,7 +12,8 @@ import { rotuloFatura } from "@/lib/cartao";
 import { avisar } from "@/components/Dialogos";
 import {
   decodificarArquivo,
-  lerOfx,
+  lerFatura,
+  refDoNomeDoArquivo,
   planejarImportacao,
   refDaFatura,
   sugerirCategoria,
@@ -63,10 +64,15 @@ export default function ImportarFaturaModal({
     [fatura, cartao, modo, faturaRef]
   );
 
-  // Fatura de referência padrão: o primeiro vencimento depois do fechamento.
+  // Fatura de referência padrão: a data no nome do arquivo (Nubank_2026-10-02 = vence em outubro);
+  // sem ela, o primeiro vencimento depois do fechamento.
   useEffect(() => {
-    if (fatura?.fim && cartao) setFaturaRef(refDaFatura(fatura.fim, cartao.dia_vencimento));
-  }, [fatura, cartao]);
+    if (!fatura || !cartao) return;
+    const doNome = refDoNomeDoArquivo(nomeArquivo);
+    if (doNome) setFaturaRef(doNome);
+    else if (fatura.fim) setFaturaRef(refDaFatura(fatura.fim, cartao.dia_vencimento));
+    else setFaturaRef("");
+  }, [fatura, cartao, nomeArquivo]);
 
   // Linhas que já foram lançadas antes (mesma chave neste cartão) ficam de fora.
   useEffect(() => {
@@ -92,7 +98,7 @@ export default function ImportarFaturaModal({
     if (!arq) return;
     setErro(null);
     try {
-      const lida = lerOfx(decodificarArquivo(await arq.arrayBuffer()));
+      const lida = lerFatura(decodificarArquivo(await arq.arrayBuffer()));
       setFatura(lida);
       setNomeArquivo(arq.name);
       // Palpite de categoria por estabelecimento (o dono ajusta na prévia).
@@ -104,6 +110,14 @@ export default function ImportarFaturaModal({
       setErro((err as Error).message);
     }
   }
+
+  // Os dois formatos usam chaves diferentes: misturar no mesmo cartão duplicaria compras.
+  const misturaFormato = useMemo(() => {
+    if (!fatura) return false;
+    const existentesCsv = Array.from(jaLancadas).some((c) => c.startsWith("csv|"));
+    const existentesOfx = Array.from(jaLancadas).some((c) => !c.startsWith("csv|"));
+    return fatura.formato === "csv" ? existentesOfx : existentesCsv;
+  }, [fatura, jaLancadas]);
 
   const novos = useMemo(() => (plano ? plano.itens.filter((i) => !jaLancadas.has(i.chave)) : []), [plano, jaLancadas]);
   const repetidos = plano ? plano.itens.length - novos.length : 0;
@@ -185,10 +199,10 @@ export default function ImportarFaturaModal({
           <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-neutral-300 px-4 py-4 text-sm text-neutral-700 active:bg-neutral-50">
             <FileUp size={20} className="shrink-0 text-neutral-500" />
             <span className="min-w-0 flex-1">
-              <span className="block font-medium">{nomeArquivo || "Escolher o arquivo da fatura (.ofx)"}</span>
-              <span className="block text-[11px] text-neutral-500">No app do banco: fatura, exportar, formato OFX.</span>
+              <span className="block font-medium">{nomeArquivo || "Escolher o arquivo da fatura (.ofx ou .csv)"}</span>
+              <span className="block text-[11px] text-neutral-500">No app do banco: fatura, exportar. Prefira o OFX.</span>
             </span>
-            <input type="file" accept=".ofx,.OFX,text/plain,application/x-ofx" className="hidden" onChange={escolherArquivo} />
+            <input type="file" accept=".ofx,.OFX,.csv,.CSV,text/plain,text/csv,application/x-ofx" className="hidden" onChange={escolherArquivo} />
           </label>
 
           {erro && <p className="text-xs text-red-600">{erro}</p>}
@@ -214,6 +228,12 @@ export default function ImportarFaturaModal({
                   <input type="month" className={`${campo} mt-1`} value={faturaRef} onChange={(e) => setFaturaRef(e.target.value)} />
                 </label>
               </div>
+
+              {misturaFormato && (
+                <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+                  Este cartão já tem compras importadas por {fatura.formato === "csv" ? "OFX" : "CSV"}. Importar também por {fatura.formato === "csv" ? "CSV" : "OFX"} pode duplicar as compras. Use sempre o mesmo formato.
+                </p>
+              )}
 
               <div className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
                 <p>

@@ -22,6 +22,8 @@ export interface LinhaFatura {
 }
 
 export interface FaturaLida {
+  /** "ofx" tem o código da compra (FITID); "csv" não tem, então a chave sai do conteúdo. */
+  formato: "ofx" | "csv";
   inicio: string | null;
   fim: string | null;
   saldo: number | null;
@@ -97,11 +99,92 @@ export function lerOfx(texto: string): FaturaLida {
   if (linhas.length === 0) throw new Error("Nenhuma compra encontrada no arquivo.");
   const saldo = Number((etiqueta(texto, "BALAMT") ?? "").replace(",", "."));
   return {
+    formato: "ofx",
     inicio: dataOfx(etiqueta(texto, "DTSTART")),
     fim: dataOfx(etiqueta(texto, "DTEND")),
     saldo: Number.isFinite(saldo) ? saldo : null,
     linhas,
   };
+}
+
+/** Divide uma linha de CSV respeitando aspas ("" dentro de aspas vira "). */
+function camposCsv(linha: string): string[] {
+  const campos: string[] = [];
+  let atual = "";
+  let aspas = false;
+  for (let i = 0; i < linha.length; i++) {
+    const c = linha[i];
+    if (aspas) {
+      if (c === '"' && linha[i + 1] === '"') {
+        atual += '"';
+        i++;
+      } else if (c === '"') aspas = false;
+      else atual += c;
+    } else if (c === '"') aspas = true;
+    else if (c === ",") {
+      campos.push(atual);
+      atual = "";
+    } else atual += c;
+  }
+  campos.push(atual);
+  return campos;
+}
+
+/** "1.234,56" e "- 300,00" (crédito) viram número; devolve negativo para crédito. */
+function valorBr(txt: string): number {
+  const negativo = /^\s*-/.test(txt);
+  const n = Number(txt.replace(/[^\d,]/g, "").replace(",", "."));
+  return negativo ? -n : n;
+}
+
+/** CSV do Nubank: date,title,amount (valor com vírgula; "- 300,00" é pagamento ou desconto). Sem código da compra. */
+export function lerCsv(texto: string): FaturaLida {
+  const linhasTexto = texto.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim());
+  const cab = camposCsv(linhasTexto[0] ?? "").map((c) => semAcento(c.trim()));
+  const iData = cab.indexOf("date") >= 0 ? cab.indexOf("date") : cab.indexOf("data");
+  const iTitulo = cab.indexOf("title") >= 0 ? cab.indexOf("title") : cab.indexOf("descricao");
+  const iValor = cab.indexOf("amount") >= 0 ? cab.indexOf("amount") : cab.indexOf("valor");
+  if (iData < 0 || iTitulo < 0 || iValor < 0) throw new Error("Não reconheci as colunas do CSV (esperava data, descrição e valor).");
+  const linhas: LinhaFatura[] = [];
+  for (const l of linhasTexto.slice(1)) {
+    const c = camposCsv(l);
+    const data = /^\d{4}-\d{2}-\d{2}$/.test((c[iData] ?? "").trim())
+      ? c[iData].trim()
+      : (() => {
+          const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((c[iData] ?? "").trim());
+          return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+        })();
+    const bruto = valorBr(c[iValor] ?? "");
+    const memo = (c[iTitulo] ?? "").trim();
+    if (!data || !memo || !Number.isFinite(bruto) || bruto === 0) continue;
+    const credito = bruto < 0;
+    const valor = Math.round(Math.abs(bruto) * 100) / 100;
+    const parcela = PARCELA.exec(memo);
+    const descricao = parcela ? memo.replace(PARCELA, "").trim() : memo;
+    linhas.push({
+      // Sem código de compra: parcelas se ligam por nome e valor; compra avulsa, pela data.
+      fitid: parcela && !credito ? `csv|${descricao}|${valor.toFixed(2)}` : `csv|${data}`,
+      data,
+      valor,
+      tipo: !credito ? "compra" : /pagamento/i.test(memo) ? "pagamento" : "credito",
+      memo,
+      descricao,
+      parcela: parcela && !credito ? { k: Number(parcela[1]), n: Number(parcela[2]) } : null,
+    });
+  }
+  if (linhas.length === 0) throw new Error("Nenhuma compra encontrada no arquivo.");
+  return { formato: "csv", inicio: null, fim: null, saldo: null, linhas };
+}
+
+/** Lê OFX ou CSV, pelo conteúdo. */
+export function lerFatura(texto: string): FaturaLida {
+  return /<OFX>/i.test(texto) ? lerOfx(texto) : lerCsv(texto);
+}
+
+/** Nubank_2026-10-02.ofx: a data no nome é o vencimento da fatura. */
+export function refDoNomeDoArquivo(nome: string): string | null {
+  const m = /(\d{4})-(\d{2})-\d{2}/.exec(nome);
+  return m && Number(m[2]) >= 1 && Number(m[2]) <= 12 ? `${m[1]}-${m[2]}` : null;
 }
 
 /** Primeiro vencimento depois do fechamento: é o mês (AAAA-MM) da fatura. */
