@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { avisosPessoais, comparacaoPorCategoria, diasDoMes, mesComDesvio, resumoDoMes, usoDosOrcamentos } from "./pessoal-controle";
-import type { LinhaFinanceira } from "./relatorio-financeiro";
+import { lancamentosPorCategoria, type LinhaFinanceira } from "./relatorio-financeiro";
 
 const HOJE = "2026-10-15";
 const s = (date: string, amount: number, categoria = "Mercado"): LinhaFinanceira => ({ type: "saida", amount, date, categoria });
@@ -111,5 +111,22 @@ describe("orçamento por categoria", () => {
     expect(a.some((x) => x.id === "orcamento-Mercado")).toBe(false);
     const b = avisosPessoais({ ...base, orcamentos: [{ categoria: "Restaurantes", limite: 400 }] });
     expect(b.find((x) => x.id === "orcamento-Restaurantes")?.nivel).toBe("urgente");
+  });
+});
+
+describe("lançamentos por categoria", () => {
+  it("agrupa, ordena do mais recente e ignora fatura e empréstimo", () => {
+    const linhas: LinhaFinanceira[] = [
+      { id: "a", type: "saida", amount: 50, date: "2026-10-02", categoria: "Mercado", description: "Feira" },
+      { id: "b", type: "saida", amount: 80, date: "2026-10-09", categoria: "Mercado", description: " Atacadão ", parcela: "1/3" },
+      { id: "c", type: "saida", amount: 900, date: "2026-10-10", categoria: "Pagamento de fatura", cartao_mov: "pagamento" },
+      { id: "d", type: "saida", amount: 30, date: "2026-10-11", categoria: null },
+      { type: "saida", amount: 5, date: "2026-10-12", categoria: "Mercado" },
+    ];
+    const r = lancamentosPorCategoria(linhas, "saida");
+    expect(r["Mercado"].map((x) => x.id)).toEqual(["b", "a"]);
+    expect(r["Mercado"][0]).toMatchObject({ description: "Atacadão", parcela: "1/3" });
+    expect(r["Sem categoria"][0].description).toBe("Sem descrição");
+    expect(Object.keys(r)).not.toContain("Pagamento de fatura");
   });
 });

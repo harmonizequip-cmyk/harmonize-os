@@ -7,7 +7,9 @@
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { rotuloFatura } from "@/lib/cartao";
-import type { CategoriaSoma, MesResumo } from "@/lib/relatorio-financeiro";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import type { CategoriaSoma, ItemLancamento, MesResumo } from "@/lib/relatorio-financeiro";
 
 export interface FaturaRelatorio {
   cartao: string;
@@ -40,30 +42,73 @@ function Cartao({ titulo, children, dica }: { titulo: string; children: React.Re
   );
 }
 
-function Barras({ itens, cor }: { itens: CategoriaSoma[]; cor: string }) {
+function Barras({
+  itens,
+  cor,
+  detalhes,
+  hrefLancamento,
+}: {
+  itens: CategoriaSoma[];
+  cor: string;
+  detalhes: Record<string, ItemLancamento[]>;
+  hrefLancamento: (id: string) => string;
+}) {
+  const [aberta, setAberta] = useState<string | null>(null);
   if (itens.length === 0) return <p className="text-xs text-neutral-400">Nada no período.</p>;
   const total = itens.reduce((s, i) => s + i.total, 0);
   return (
     <>
-      <ul className="space-y-2">
-        {itens.slice(0, 10).map((i) => (
-          <li key={i.categoria}>
-            <div className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="truncate text-neutral-700">{i.categoria}</span>
-              <span className="shrink-0 font-medium text-neutral-900">
-                {formatCurrency(i.total)} <span className="font-normal text-neutral-400">· {Math.round(i.pct * 100)}%</span>
-              </span>
-            </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200">
-              <div className={`h-full rounded-full ${cor}`} style={{ width: `${Math.max(2, Math.round(i.pct * 100))}%` }} />
-            </div>
-          </li>
-        ))}
+      <ul className="space-y-1">
+        {itens.map((i) => {
+          const lista = detalhes[i.categoria] ?? [];
+          const aberto = aberta === i.categoria;
+          return (
+            <li key={i.categoria}>
+              <button
+                type="button"
+                onClick={() => setAberta(aberto ? null : i.categoria)}
+                aria-expanded={aberto}
+                className="-mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-1.5 text-left active:bg-neutral-100"
+              >
+                <div className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className="flex min-w-0 items-center gap-1 text-neutral-700">
+                    <ChevronDown size={14} className={`shrink-0 text-neutral-400 transition ${aberto ? "rotate-180" : "-rotate-90"}`} />
+                    <span className="truncate">{i.categoria}</span>
+                    <span className="shrink-0 text-[10.5px] text-neutral-400">({lista.length})</span>
+                  </span>
+                  <span className="shrink-0 font-medium text-neutral-900">
+                    {formatCurrency(i.total)} <span className="font-normal text-neutral-400">· {Math.round(i.pct * 100)}%</span>
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200">
+                  <div className={`h-full rounded-full ${cor}`} style={{ width: `${Math.max(2, Math.round(i.pct * 100))}%` }} />
+                </div>
+              </button>
+              {aberto && (
+                <ul className="mb-2 ml-2 mt-1 max-h-80 divide-y divide-neutral-200/70 overflow-y-auto rounded-xl bg-neutral-50 px-3">
+                  {lista.length === 0 && <li className="py-2 text-xs text-neutral-400">Sem lançamentos para mostrar.</li>}
+                  {lista.map((l) => (
+                    <li key={l.id}>
+                      <Link href={hrefLancamento(l.id)} className="flex items-center gap-3 py-2 text-xs active:opacity-60">
+                        <span className="w-10 shrink-0 text-neutral-400">{formatDate(l.date).slice(0, 5)}</span>
+                        <span className="min-w-0 flex-1 truncate text-neutral-800">
+                          {l.description}
+                          {l.parcela && <span className="ml-1 text-neutral-400">({l.parcela})</span>}
+                        </span>
+                        <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(l.amount)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ul>
-      {itens.length > 10 && <p className="mt-2 text-[11px] text-neutral-400">+ {itens.length - 10} categorias menores</p>}
       <p className="mt-2 border-t border-neutral-200/70 pt-2 text-xs font-medium text-neutral-700">
         Total: {formatCurrency(total)}
       </p>
+      <p className="mt-1 text-[11px] text-neutral-400">Toque numa categoria para ver os lançamentos; toque num lançamento para abrir.</p>
     </>
   );
 }
@@ -73,6 +118,8 @@ export default function RelatorioFinanceiro({
   rotuloPeriodo,
   gastos,
   entradas,
+  lancamentosGastos,
+  lancamentosEntradas,
   evolucao,
   faturas,
   hoje,
@@ -82,6 +129,8 @@ export default function RelatorioFinanceiro({
   rotuloPeriodo: string;
   gastos: CategoriaSoma[];
   entradas: CategoriaSoma[];
+  lancamentosGastos: Record<string, ItemLancamento[]>;
+  lancamentosEntradas: Record<string, ItemLancamento[]>;
   evolucao: MesResumo[];
   faturas: FaturaRelatorio[];
   hoje: string;
@@ -93,6 +142,7 @@ export default function RelatorioFinanceiro({
   const maior = Math.max(1, ...meses.map((m) => Math.max(m.entradas, m.saidas)));
   const totalAno = evolucao.reduce((s, m) => ({ e: s.e + m.entradas, s: s.s + m.saidas }), { e: 0, s: 0 });
   const mesAtual = hoje.slice(0, 7);
+  const hrefLancamento = (id: string) => (escopo === "pessoal" ? `/pessoal/lancamentos?lancamento=${id}` : `/financeiro?lancamento=${id}`);
   const faturasFuturas = faturas.filter((f) => f.fatura_ref > mesAtual && f.total_compras - f.total_pago > 0.009);
   const comprometido = faturasFuturas.reduce((s, f) => s + (f.total_compras - f.total_pago), 0);
   const faturasRecentes = faturas.filter((f) => f.fatura_ref <= mesAtual).slice(-6);
@@ -101,11 +151,11 @@ export default function RelatorioFinanceiro({
   return (
     <div className="space-y-4">
       <Cartao titulo={`Para onde foi o dinheiro (${rotuloPeriodo})`} dica="Gastos por categoria. Empréstimo e pagamento de fatura ficam fora (a compra no cartão já conta).">
-        <Barras itens={gastos} cor="bg-brand-pink" />
+        <Barras itens={gastos} cor="bg-brand-pink" detalhes={lancamentosGastos} hrefLancamento={hrefLancamento} />
       </Cartao>
 
       <Cartao titulo={`De onde entrou (${rotuloPeriodo})`}>
-        <Barras itens={entradas} cor="bg-brand-teal" />
+        <Barras itens={entradas} cor="bg-brand-teal" detalhes={lancamentosEntradas} hrefLancamento={hrefLancamento} />
       </Cartao>
 
       <Cartao

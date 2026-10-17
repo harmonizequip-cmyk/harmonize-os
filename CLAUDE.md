@@ -166,6 +166,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - "Novo lançamento" tem a caixinha "Conta pessoal". Despesa pessoal ligada a locação/reserva: "custo do atendimento pago do bolso" (`conta_no_lucro = true`, entra em `rentals_lucro`) ou "gasto meu" (fora do lucro). Despesas da reserva têm "Pago com" (caixa, bolso-custo, gasto pessoal) via `registrar_despesa_reserva(..., p_pessoal)`.
 - Contas fixas pessoais (Configurações) não entram no quadro "Este mês", na previsão de caixa nem no fechamento de domingo; aparecem no Pessoal.
 - Relatórios financeiros (`components/RelatorioFinanceiro.tsx`, carga em `lib/carregar-relatorio-financeiro.ts`, contas em `lib/relatorio-financeiro.ts`): gastos e entradas por categoria, 12 meses, cartões (recentes e próximas faturas) e, na Harmonize, empréstimos. Na Harmonize aparece no topo de Relatórios ("Financeiro da Harmonize"); no Pessoal, em `/pessoal/relatorios`. Ficam fora das somas: empréstimo/devolução e pagamento de fatura.
+- Em "Para onde foi o dinheiro" e "De onde entrou" cada categoria abre com um toque e mostra os lançamentos dela (data, descrição, parcela, valor); cada lançamento abre a edição (`/financeiro?lancamento=` ou `/pessoal/lancamentos?lancamento=`). Dados por `lancamentosPorCategoria` (`lib/relatorio-financeiro.ts`).
 
 ## Pessoal: controle geral (17/10/2026)
 

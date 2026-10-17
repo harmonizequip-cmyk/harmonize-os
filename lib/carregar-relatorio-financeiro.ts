@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { hojeLocal, type Periodo } from "@/lib/period";
 import { resumirEmprestimos, type MovimentoEmprestimo } from "@/lib/emprestimos";
-import { porCategoria, evolucaoMensal, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
+import { porCategoria, evolucaoMensal, lancamentosPorCategoria, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
 import type { FaturaRelatorio } from "@/components/RelatorioFinanceiro";
 
 function oneOf<T>(value: T | T[] | null | undefined): T | null {
@@ -18,7 +18,7 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
   const [{ data: linhasRaw }, { data: faturasRaw }, { data: cartoesRaw }, emprestimosRes] = await Promise.all([
     supabase
       .from("transactions_contabilizaveis")
-      .select("type, amount, date, cartao_mov, categories(name)")
+      .select("id, type, amount, date, description, parcela_num, parcelas_total, cartao_mov, categories(name)")
       .eq("scope", escopo)
       .gte("date", desde)
       .lte("date", periodo.fim > hoje ? periodo.fim : hoje)
@@ -30,6 +30,9 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
       : Promise.resolve({ data: null }),
   ]);
   const linhas: LinhaFinanceira[] = ((linhasRaw ?? []) as any[]).map((l) => ({
+    id: l.id,
+    description: l.description,
+    parcela: l.parcelas_total && l.parcelas_total > 1 ? `${l.parcela_num}/${l.parcelas_total}` : null,
     type: l.type,
     amount: Number(l.amount),
     date: l.date,
@@ -54,6 +57,8 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
     hoje,
     gastos: porCategoria(doPeriodo, "saida"),
     entradas: porCategoria(doPeriodo, "entrada"),
+    lancamentosGastos: lancamentosPorCategoria(doPeriodo, "saida"),
+    lancamentosEntradas: lancamentosPorCategoria(doPeriodo, "entrada"),
     evolucao: evolucaoMensal(linhas, hoje, 12),
     faturas,
     emprestimos,

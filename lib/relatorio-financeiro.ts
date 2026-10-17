@@ -11,6 +11,19 @@ export interface LinhaFinanceira {
   date: string;
   categoria: string | null;
   cartao_mov?: CartaoMov;
+  /** Só para o detalhe por categoria (lançamento de origem). */
+  id?: string;
+  description?: string;
+  parcela?: string | null;
+}
+
+/** Um lançamento dentro de uma categoria (o "micro" do relatório). */
+export interface ItemLancamento {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  parcela: string | null;
 }
 
 export interface CategoriaSoma {
@@ -44,6 +57,24 @@ export function porCategoria(linhas: LinhaFinanceira[], tipo: "entrada" | "saida
   return Array.from(mapa.entries())
     .map(([categoria, v]) => ({ categoria, total: r2(v), pct: total > 0 ? v / total : 0 }))
     .sort((a, b) => b.total - a.total);
+}
+
+/** Lançamentos de cada categoria (mesmas regras de porCategoria), do mais recente ao mais antigo. */
+export function lancamentosPorCategoria(linhas: LinhaFinanceira[], tipo: "entrada" | "saida"): Record<string, ItemLancamento[]> {
+  const mapa: Record<string, ItemLancamento[]> = {};
+  for (const l of linhas) {
+    if (l.type !== tipo || !contaNoResultado(l) || !l.id) continue;
+    const nome = l.categoria ?? "Sem categoria";
+    (mapa[nome] ??= []).push({
+      id: l.id,
+      date: l.date,
+      description: l.description?.trim() || "Sem descrição",
+      amount: Number(l.amount),
+      parcela: l.parcela ?? null,
+    });
+  }
+  for (const lista of Object.values(mapa)) lista.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.amount - a.amount));
+  return mapa;
 }
 
 /** Últimos `meses` meses até o mês de `hoje`, do mais antigo ao atual (mês sem lançamento entra zerado). */
