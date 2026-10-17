@@ -8704,7 +8704,9 @@ where t.is_test = false
 -- Grava de uma vez as compras lidas da fatura. Cada item:
 --   chave, grupo, data, valor, descricao, fatura_ref ('AAAA-MM'),
 --   parcela_num e parcelas_total (opcionais), category_id (opcional).
--- Item cuja chave já existe no cartão é pulado. Parcelas da mesma compra
+-- Item cuja chave já existe no cartão é pulado, com uma exceção: parcela que o banco
+-- trouxe para uma fatura anterior à que estava lançada (antecipação das parcelas, que
+-- dá desconto) é movida para essa fatura, com o valor novo. Parcelas da mesma compra
 -- (mesmo grupo) ficam juntas, para "Apagar compra" apagar todas.
 create or replace function public.importar_compras_cartao(p_cartao_id uuid, p_itens jsonb)
 returns jsonb
@@ -8717,7 +8719,8 @@ declare
   v_item jsonb;
   v_ins int := 0;
   v_rep int := 0;
-  v_n int;
+  v_mov int := 0;
+  v_novo boolean;
   v_cat uuid;
   v_valor numeric;
   v_data date;
@@ -8772,16 +8775,24 @@ begin
       p_cartao_id, 'compra', v_item->>'fatura_ref', v_pn, v_pt,
       md5(p_cartao_id::text || '|' || (v_item->>'grupo'))::uuid, v_item->>'chave'
     )
-    on conflict (cartao_id, importacao_chave) where importacao_chave is not null do nothing;
-    get diagnostics v_n = row_count;
-    if v_n = 1 then v_ins := v_ins + 1; else v_rep := v_rep + 1; end if;
+    on conflict (cartao_id, importacao_chave) where importacao_chave is not null do update
+      set fatura_ref = excluded.fatura_ref, amount = excluded.amount, date = excluded.date
+      where excluded.fatura_ref < transactions.fatura_ref
+    returning (xmax = 0) into v_novo;
+    if v_novo is null then
+      v_rep := v_rep + 1;
+    elsif v_novo then
+      v_ins := v_ins + 1;
+    else
+      v_mov := v_mov + 1;
+    end if;
   end loop;
 
   perform public.registrar_movimentacao(
     'criado', 'cartoes', p_cartao_id, 'Importação de fatura no cartão ' || v_cartao.nome,
-    jsonb_build_object('inseridos', v_ins, 'repetidos', v_rep)
+    jsonb_build_object('inseridos', v_ins, 'repetidos', v_rep, 'movidos', v_mov)
   );
-  return jsonb_build_object('inseridos', v_ins, 'repetidos', v_rep);
+  return jsonb_build_object('inseridos', v_ins, 'repetidos', v_rep, 'movidos', v_mov);
 end;
 $$;
 

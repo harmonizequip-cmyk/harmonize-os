@@ -193,3 +193,31 @@ describe("mês pelo nome do arquivo", () => {
     expect(refDoNomeDoArquivo("fatura.ofx")).toBeNull();
   });
 });
+
+describe("descontos e estornos do banco", () => {
+  it("OFX: o desconto abate as compras de mesmo código, repartido pelo peso de cada uma", () => {
+    const p = planejarImportacao(lerOfx(OFX), { diaVencimento: 2, modo: "aberta" });
+    const curso = p.itens.filter((i) => i.nome === "Curso Online" && i.origem === "fatura");
+    expect(curso).toHaveLength(3);
+    expect(curso.reduce((s, i) => s + i.valor, 0)).toBeCloseTo(3 * 30.72 - 13.75, 2);
+    expect(curso.every((i) => i.abatido! > 0 && i.valor < 30.72)).toBe(true);
+    expect(p.abatimentos).toEqual([{ descricao: "Desconto Antecipação Curso Online", valor: 13.75, aplicado: 13.75, linhas: 3 }]);
+  });
+
+  it("CSV: acha a compra pelo nome depois de tirar 'Desconto Antecipação' ou 'Estorno'", () => {
+    const csv = lerCsv(
+      ["date,title,amount", '2026-08-26,Lavagem - Parcela 3/12,"100,00"', '2026-08-26,Lavagem - Parcela 4/12,"100,00"', '2026-08-26,Desconto Antecipação Lavagem,"- 20,00"', '2026-09-02,Loja Y,"50,00"', '2026-09-03,Estorno de Loja Y,"- 50,00"', '2026-09-04,Estorno Sem Dono,"- 9,00"'].join("\n")
+    );
+    const p = planejarImportacao(csv, { diaVencimento: 2, modo: "aberta", faturaRef: "2026-10" });
+    const doArquivo = p.itens.filter((i) => i.origem === "fatura");
+    expect(doArquivo.filter((i) => i.nome === "Lavagem").map((i) => i.valor)).toEqual([90, 90]);
+    expect(doArquivo.find((i) => i.nome === "Loja Y")!.valor).toBe(0.01); // estorno total nunca zera a linha
+    expect(p.abatimentos.find((a) => a.descricao === "Estorno Sem Dono")).toMatchObject({ aplicado: 0, linhas: 0 });
+  });
+
+  it("fatura já paga não abate nada (só cria parcelas futuras com valor cheio)", () => {
+    const p = planejarImportacao(lerOfx(OFX), { diaVencimento: 2, modo: "paga" });
+    expect(p.abatimentos).toEqual([]);
+    expect(p.itens.find((i) => i.nome === "Lavagem")!.valor).toBe(125.83);
+  });
+});

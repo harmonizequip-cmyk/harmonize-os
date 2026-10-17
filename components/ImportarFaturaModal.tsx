@@ -55,7 +55,8 @@ export default function ImportarFaturaModal({
   const [modo, setModo] = useState<"paga" | "aberta">("paga");
   const [faturaRef, setFaturaRef] = useState("");
   const [categoriaPorNome, setCategoriaPorNome] = useState<Record<string, string>>({});
-  const [jaLancadas, setJaLancadas] = useState<Set<string>>(new Set());
+  // chave -> fatura em que a linha já está lançada neste cartão.
+  const [jaLancadas, setJaLancadas] = useState<Map<string, string>>(new Map());
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -80,12 +81,12 @@ export default function ImportarFaturaModal({
     let vivo = true;
     supabase
       .from("transactions")
-      .select("importacao_chave")
+      .select("importacao_chave, fatura_ref")
       .eq("cartao_id", cartaoId)
       .not("importacao_chave", "is", null)
       .limit(20000)
       .then(({ data }) => {
-        if (vivo) setJaLancadas(new Set(((data ?? []) as { importacao_chave: string }[]).map((r) => r.importacao_chave)));
+        if (vivo) setJaLancadas(new Map(((data ?? []) as { importacao_chave: string; fatura_ref: string | null }[]).map((r) => [r.importacao_chave, r.fatura_ref ?? ""])));
       });
     return () => {
       vivo = false;
@@ -114,12 +115,19 @@ export default function ImportarFaturaModal({
   // Os dois formatos usam chaves diferentes: misturar no mesmo cartão duplicaria compras.
   const misturaFormato = useMemo(() => {
     if (!fatura) return false;
-    const existentesCsv = Array.from(jaLancadas).some((c) => c.startsWith("csv|"));
-    const existentesOfx = Array.from(jaLancadas).some((c) => !c.startsWith("csv|"));
+    const chaves = Array.from(jaLancadas.keys());
+    const existentesCsv = chaves.some((c) => c.startsWith("csv|"));
+    const existentesOfx = chaves.some((c) => !c.startsWith("csv|"));
     return fatura.formato === "csv" ? existentesOfx : existentesCsv;
   }, [fatura, jaLancadas]);
 
-  const novos = useMemo(() => (plano ? plano.itens.filter((i) => !jaLancadas.has(i.chave)) : []), [plano, jaLancadas]);
+  // Já lançada na mesma fatura (ou numa anterior) fica de fora. Parcela que estava numa fatura
+  // futura e o banco trouxe para esta (antecipação) é movida para esta fatura.
+  const novos = useMemo(
+    () => (plano ? plano.itens.filter((i) => !jaLancadas.has(i.chave) || i.fatura_ref < (jaLancadas.get(i.chave) ?? "")) : []),
+    [plano, jaLancadas]
+  );
+  const antecipadas = novos.filter((i) => jaLancadas.has(i.chave)).length;
   const repetidos = plano ? plano.itens.length - novos.length : 0;
   const total = novos.reduce((s, i) => s + i.valor, 0);
 
@@ -146,6 +154,7 @@ export default function ImportarFaturaModal({
     setErro(null);
     let inseridos = 0;
     let pulados = 0;
+    let movidos = 0;
     for (let i = 0; i < novos.length; i += LOTE) {
       const lote = novos.slice(i, i + LOTE).map((x) => ({
         chave: x.chave,
@@ -166,9 +175,14 @@ export default function ImportarFaturaModal({
       }
       inseridos += Number((data as { inseridos: number }).inseridos);
       pulados += Number((data as { repetidos: number }).repetidos);
+      movidos += Number((data as { movidos?: number }).movidos ?? 0);
     }
     setSalvando(false);
-    avisar(`${inseridos} lançamento${inseridos === 1 ? "" : "s"} entraram no cartão ${cartao.nome}${pulados ? ` (${pulados} já existiam)` : ""}.`);
+    avisar(
+      `${inseridos} lançamento${inseridos === 1 ? "" : "s"} entraram no cartão ${cartao.nome}` +
+        `${movidos ? `, ${movidos} parcela${movidos === 1 ? "" : "s"} antecipada${movidos === 1 ? "" : "s"} passaram para esta fatura` : ""}` +
+        `${pulados ? ` (${pulados} já existiam)` : ""}.`
+    );
     onFeito();
   }
 
@@ -240,11 +254,31 @@ export default function ImportarFaturaModal({
                   Arquivo: {fatura.linhas.length} linhas
                   {fatura.saldo !== null && <>, total da fatura {formatCurrency(Math.abs(fatura.saldo))}</>}.
                 </p>
-                {(plano.pagamentos.qtd > 0 || plano.creditos.qtd > 0) && (
+                {plano.pagamentos.qtd > 0 && (
                   <p className="mt-1 text-neutral-500">
-                    Não entram como compra: {plano.pagamentos.qtd} pagamento{plano.pagamentos.qtd === 1 ? "" : "s"} ({formatCurrency(plano.pagamentos.total)}) e{" "}
-                    {plano.creditos.qtd} desconto{plano.creditos.qtd === 1 ? "" : "s"} do banco ({formatCurrency(plano.creditos.total)}).
+                    Não entram como compra: {plano.pagamentos.qtd} pagamento{plano.pagamentos.qtd === 1 ? "" : "s"} ({formatCurrency(plano.pagamentos.total)}), que você registra em Pagar fatura.
                   </p>
+                )}
+                {plano.creditos.qtd > 0 && modo === "paga" && (
+                  <p className="mt-1 text-neutral-500">
+                    {plano.creditos.qtd} desconto{plano.creditos.qtd === 1 ? "" : "s"} ou estorno{plano.creditos.qtd === 1 ? "" : "s"} do banco ({formatCurrency(plano.creditos.total)}) não entram: a fatura já foi paga.
+                  </p>
+                )}
+                {plano.abatimentos.length > 0 && (
+                  <div className="mt-2 border-t border-neutral-200 pt-2">
+                    <p className="font-medium text-neutral-700">Descontos e estornos abatidos das compras</p>
+                    <ul className="mt-1 space-y-0.5 text-neutral-600">
+                      {plano.abatimentos.map((a, i) => (
+                        <li key={i}>
+                          {a.descricao}: -{formatCurrency(a.aplicado)}
+                          {a.linhas > 0 ? ` em ${a.linhas} linha${a.linhas === 1 ? "" : "s"}` : ""}
+                          {a.aplicado < a.valor - 0.009 && (
+                            <span className="text-amber-700"> (sem compra correspondente para {formatCurrency(a.valor - a.aplicado)})</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
 
@@ -258,6 +292,11 @@ export default function ImportarFaturaModal({
                     <p className="text-sm font-semibold text-neutral-900">
                       {novos.length} lançamento{novos.length === 1 ? "" : "s"}, {formatCurrency(total)}
                     </p>
+                    {antecipadas > 0 && (
+                      <p className="text-[11px] text-neutral-500">
+                        {antecipadas} parcela{antecipadas === 1 ? "" : "s"} antecipada{antecipadas === 1 ? "" : "s"}: já estavam em faturas futuras e passam para esta.
+                      </p>
+                    )}
                     {repetidos > 0 && <p className="text-[11px] text-neutral-500">{repetidos} já lançada{repetidos === 1 ? "" : "s"} antes e ficam de fora.</p>}
                     <p className="mt-1 text-[11px] text-neutral-500">
                       Por fatura: {porFatura.map(([r, v]) => `${rotuloFatura(r)} ${formatCurrency(v)}`).join(" · ")}

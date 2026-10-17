@@ -43,6 +43,16 @@ export interface ItemImportacao {
   parcelas_total: number | null;
   /** "fatura" = linha que está no arquivo; "futura" = parcela que ainda vai vir. */
   origem: "fatura" | "futura";
+  /** Quanto de desconto ou estorno do banco já foi tirado do valor desta linha. */
+  abatido?: number;
+}
+
+export interface Abatimento {
+  descricao: string;
+  valor: number;
+  /** Parte que achou onde abater (o resto fica de fora). */
+  aplicado: number;
+  linhas: number;
 }
 
 export interface PlanoImportacao {
@@ -50,6 +60,8 @@ export interface PlanoImportacao {
   faturaRef: string;
   pagamentos: { qtd: number; total: number };
   creditos: { qtd: number; total: number };
+  /** Descontos e estornos do banco abatidos das compras a que se referem. */
+  abatimentos: Abatimento[];
 }
 
 /** Lê o arquivo em UTF-8 e, se vier com caracteres quebrados, em Windows-1252. */
@@ -279,11 +291,50 @@ export function planejarImportacao(fatura: FaturaLida, opcoes: { diaVencimento: 
     }
   }
 
+  const abatimentos = opcoes.modo === "aberta" ? abaterCreditos(fatura, itens) : [];
+
   const soma = (tipo: TipoLinha) => {
     const ls = fatura.linhas.filter((l) => l.tipo === tipo);
     return { qtd: ls.length, total: r2(ls.reduce((s, l) => s + l.valor, 0)) };
   };
-  return { itens, faturaRef, pagamentos: soma("pagamento"), creditos: soma("credito") };
+  return { itens, faturaRef, pagamentos: soma("pagamento"), creditos: soma("credito"), abatimentos };
+}
+
+const semPrefixoDeCredito = (memo: string) =>
+  memo.replace(/^\s*(desconto\s+(de\s+)?antecipa\S*|estorno(\s+de)?|cr[eé]dito(\s+de)?)\s+/i, "").trim();
+
+/**
+ * Desconto de antecipação e estorno reduzem o que se paga na fatura. O app não guarda valor
+ * negativo, então o crédito é abatido das compras a que se refere (no OFX, as de mesmo código;
+ * no CSV, as de mesmo nome), repartido pelo peso de cada uma. Só mexe nas linhas da fatura
+ * que estão sendo lançadas; as parcelas futuras ficam com o valor cheio.
+ */
+function abaterCreditos(fatura: FaturaLida, itens: ItemImportacao[]): Abatimento[] {
+  const resultado: Abatimento[] = [];
+  const doArquivo = itens.filter((i) => i.origem === "fatura");
+  for (const c of fatura.linhas) {
+    if (c.tipo !== "credito") continue;
+    const alvoNome = semAcento(semPrefixoDeCredito(c.memo));
+    let alvos =
+      fatura.formato === "ofx" ? doArquivo.filter((i) => i.grupo === c.fitid || i.grupo.startsWith(`${c.fitid}|`)) : [];
+    if (alvos.length === 0) alvos = doArquivo.filter((i) => semAcento(i.nome) === alvoNome);
+    const base = alvos.reduce((s, i) => s + i.valor, 0);
+    // Nunca deixa uma linha em zero: o que passar do valor das compras fica sem abater.
+    const aplicavel = Math.min(c.valor, Math.max(0, base - 0.01 * alvos.length));
+    if (alvos.length === 0 || aplicavel <= 0) {
+      resultado.push({ descricao: c.memo, valor: c.valor, aplicado: 0, linhas: 0 });
+      continue;
+    }
+    let restante = r2(aplicavel);
+    alvos.forEach((i, idx) => {
+      const parte = idx === alvos.length - 1 ? restante : Math.min(restante, r2((aplicavel * i.valor) / base));
+      restante = r2(restante - parte);
+      i.valor = r2(i.valor - parte);
+      i.abatido = r2((i.abatido ?? 0) + parte);
+    });
+    resultado.push({ descricao: c.memo, valor: c.valor, aplicado: r2(aplicavel), linhas: alvos.length });
+  }
+  return resultado;
 }
 
 const semAcento = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
