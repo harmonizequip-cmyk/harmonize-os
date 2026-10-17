@@ -1,11 +1,11 @@
 "use client";
 
 // Automações: tarefas que a agenda cria sozinha e as regras do funil de
-// clientes (recontato, Reativar e o selo "Inativo").
+// clientes (recontato e Reativar).
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, HandCoins, MessageCircleHeart, RefreshCcw, UserX } from "lucide-react";
+import { CalendarCheck, HandCoins, MessageCircleHeart, RefreshCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { AppSettings } from "@/lib/settings";
 import { BarraSalvar, Bloco, Chave, numero } from "../ui";
@@ -21,7 +21,6 @@ function estado(s: AppSettings) {
     recontatoAtivo: s.recontatoAutomatico,
     recontatoIntervalo: String(s.recontatoIntervaloDias),
     diasAteReativar: String(s.diasAteReativar),
-    inativoDias: String(s.inactiveDaysThreshold),
   };
 }
 
@@ -107,12 +106,12 @@ export default function Automacoes({ settings }: { settings: AppSettings }) {
   async function salvar() {
     const n = (v: string) => Math.round(numero(v));
     const conf = n(e.confDias), pos = n(e.posDias), taxa = n(e.taxaDias);
-    const intervalo = n(e.recontatoIntervalo), reativar = n(e.diasAteReativar), inativo = n(e.inativoDias);
+    const intervalo = n(e.recontatoIntervalo), reativar = n(e.diasAteReativar);
     if (![conf, pos, taxa].every((x) => Number.isFinite(x) && x >= 0 && x <= 30) || taxa < 1) {
       setErro("Tarefas da agenda: de 0 a 30 dias (cobrança da taxa, de 1 a 30).");
       return;
     }
-    if (!(intervalo >= 1 && intervalo <= 365) || !(reativar >= 1) || !(inativo >= 1)) {
+    if (!(intervalo >= 1 && intervalo <= 365) || !(reativar >= 1)) {
       setErro("Funil: números a partir de 1 (recontato até 365 dias).");
       return;
     }
@@ -133,7 +132,6 @@ export default function Automacoes({ settings }: { settings: AppSettings }) {
         recontato_automatico: e.recontatoAtivo,
         recontato_intervalo_dias: intervalo,
         dias_ate_reativar: reativar,
-        inactive_days_threshold: inativo,
         updated_at: new Date().toISOString(),
         updated_by: user?.id ?? null,
       })
@@ -199,13 +197,6 @@ export default function Automacoes({ settings }: { settings: AppSettings }) {
             frase={(d) => `Depois de ${d || 0} ${plural(d)} sem locação. Quem tem reserva futura não cai em Reativar.`}
             dias={e.diasAteReativar}
             onDias={muda("diasAteReativar")}
-          />
-          <Linha
-            icone={<UserX size={17} />}
-            titulo="Selo Inativo na lista"
-            frase={(d) => `Cliente sem locação há ${d || 0} ${plural(d)} ganha o selo "Inativo"`}
-            dias={e.inativoDias}
-            onDias={muda("inativoDias")}
           />
         </div>
       </Bloco>

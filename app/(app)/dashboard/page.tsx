@@ -9,7 +9,8 @@ import { buscarPendencias, buscarTaxasAReceber, buscarReservasSemDisparos } from
 import PeriodFilter from "@/components/PeriodFilter";
 import DashboardCharts from "@/components/DashboardCharts";
 import OpportunityRadar from "@/components/OpportunityRadar";
-import EsteMesCard from "@/components/EsteMesCard";
+import MesCard from "@/components/dashboard/MesCard";
+import PrecisaDeVoce, { type AvisoDash } from "@/components/dashboard/PrecisaDeVoce";
 import PrevisaoCaixaCard from "@/components/PrevisaoCaixaCard";
 import { preverCaixa, type ReservaFutura, type LocacaoPassada } from "@/lib/previsao";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
@@ -20,6 +21,7 @@ import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
 import { LinkCliente } from "@/components/Atalhos";
 import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
+import { CalendarDays } from "lucide-react";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
 // máxima. Ficam aqui, juntas, para mudar num lugar só.
@@ -37,7 +39,9 @@ export default async function DashboardPage(
     searchParams: Promise<{ period?: string; from?: string; to?: string }>;
   }
 ) {
-  const searchParams = await props.searchParams;
+  const recebidos = await props.searchParams;
+  // O Dashboard abre no mês (pedido do dono, 17/10/2026); "Hoje" fica no filtro.
+  const searchParams = { ...recebidos, period: recebidos.period ?? (recebidos.from ? "personalizado" : "mes") };
   const supabase = createClient();
   const { from, to } = resolvePeriod(searchParams.period, searchParams.from, searchParams.to);
   const fromStr = from.toISOString().slice(0, 10);
@@ -176,13 +180,12 @@ export default async function DashboardPage(
   ]);
   const locMes = locacoesMesCount ?? 0;
   const preMes = preReservasMesCount ?? 0;
-  const metaStatus =
-    locMes > META_MAX
-      ? { texto: "Acima da meta máxima", cor: "text-brand-teal" }
-      : locMes >= META_MIN
-        ? { texto: "Dentro da meta", cor: "text-brand-teal" }
-        : { texto: `Faltam ${META_MIN - locMes} para a meta`, cor: "text-amber-600" };
-  const metaEscala = Math.max(META_MAX + 5, locMes + preMes);
+  const { data: valoresMes } = await supabase
+    .from("rentals_contabilizaveis")
+    .select("calculated_value")
+    .gte("event_date", mesInicio)
+    .lte("event_date", mesFim);
+  const faturamentoMes = (valoresMes ?? []).reduce((soma, r: any) => soma + Number(r.calculated_value ?? 0), 0);
 
   // Reservas de HIPRO com a taxa ainda pendente e data por vir; as que
   // passaram do prazo de cobrança (settings.dias_cobranca_taxa) ficam em
@@ -555,314 +558,229 @@ export default async function DashboardPage(
 
   const periodQuery = new URLSearchParams({ from: fromStr, to: toStr }).toString();
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Dashboard</h1>
-        <PeriodFilter />
-      </div>
+  // Saudação do topo.
+  const { data: { user: usuario } } = await supabase.auth.getUser();
+  const { data: perfilDash } = usuario
+    ? await supabase.from("profiles").select("name").eq("id", usuario.id).single()
+    : { data: null };
+  const primeiroNome = ((perfilDash?.name as string | undefined) ?? "").trim().split(/\s+/)[0] ?? "";
+  const hora = Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date()));
+  const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+  const dataHojeExtenso = format(new Date(`${todayStr}T12:00:00`), "EEE, d 'de' MMM", { locale: ptBR });
+  const tarefasAtrasadas = tarefasDeHoje.filter((t: any) => t.due_date < todayStr).length;
 
-      <EsteMesCard meta={metaDoMes} rotuloMes={rotuloMesAtual} />
+  // Todos os avisos num bloco só, cada um levando à lista do que avisa.
+  const avisos: AvisoDash[] = [];
+  if (taxasAReceberCount > 0)
+    avisos.push({
+      id: "taxas",
+      emoji: "💳",
+      texto: `${taxasAReceberCount} ${taxasAReceberCount === 1 ? "taxa de reserva" : "taxas de reserva"} a receber`,
+      detalhe: `${formatCurrency(taxasAReceberTotal)}${taxasVencidasCount > 0 ? ` · ${taxasVencidasCount} ${taxasVencidasCount === 1 ? "vencida" : "vencidas"} (mais de ${diasCobrancaTaxa} dias)` : ""}`,
+      href: "/pendencias#taxas",
+      nivel: taxasVencidasCount > 0 ? "urgente" : "atencao",
+    });
+  if (semDisparos.length > 0)
+    avisos.push({
+      id: "sem-disparos",
+      emoji: "🧾",
+      texto: `${semDisparos.length} ${semDisparos.length === 1 ? "atendimento sem disparos lançados" : "atendimentos sem disparos lançados"}`,
+      detalhe: "Já passaram e ainda não foram cobrados",
+      href: "/pendencias#sem-disparos",
+      nivel: "urgente",
+    });
+  if (revisoesAlerta.length > 0)
+    avisos.push({
+      id: "revisao",
+      emoji: "🛠️",
+      texto: "Revisão anual dos HIPROs",
+      detalhe: revisoesAlerta
+        .map((e) => (e.situacao === "vencida" ? `${e.nome} vencida` : e.dias === 0 ? `${e.nome} hoje` : `${e.nome} em ${e.dias} ${e.dias === 1 ? "dia" : "dias"}`))
+        .join(", "),
+      href: `/equipamentos#revisao-${revisoesAlerta[0].code}`,
+      nivel: revisoesAlerta.some((e) => e.situacao === "vencida") ? "urgente" : "atencao",
+    });
+  if (pendingConfirmations && pendingConfirmations > 0)
+    avisos.push({
+      id: "confirmacoes",
+      emoji: "📞",
+      texto: `${pendingConfirmations} ${pendingConfirmations === 1 ? "atendimento sem confirmação" : "atendimentos sem confirmação"}`,
+      detalhe: "Nos próximos 7 dias",
+      href: "/agenda#confirmacoes",
+      nivel: "atencao",
+    });
+  if (tarefasDeHoje.length > 0)
+    avisos.push({
+      id: "tarefas",
+      emoji: "🗒️",
+      texto: `Atacar a fila: ${tarefasDeHoje.length} ${tarefasDeHoje.length === 1 ? "tarefa" : "tarefas"}${tarefasAtrasadas > 0 ? ` (${tarefasAtrasadas} atrasada${tarefasAtrasadas > 1 ? "s" : ""})` : ""}`,
+      detalhe: resumoTarefas,
+      href: "/tarefas?fila=1",
+      nivel: tarefasAtrasadas > 0 ? "atencao" : "info",
+    });
+  if (aplicadoresAlerta.length > 0)
+    avisos.push({
+      id: "aplicadores",
+      emoji: "🔧",
+      texto: "Garantia de aplicador acabando",
+      detalhe: aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", "),
+      href: "/equipamentos#aplicadores",
+      nivel: "atencao",
+    });
+  if (cadastrosNovos && cadastrosNovos > 0)
+    avisos.push({
+      id: "cadastros",
+      emoji: "📝",
+      texto: `${cadastrosNovos} ${cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"}`,
+      detalhe: "Conferir e liberar na Academy",
+      href: "/clientes/cadastros",
+      nivel: "info",
+    });
+  for (const c of acessosParaLiberar)
+    avisos.push({
+      id: `acesso-${c.clientId}`,
+      emoji: "📋",
+      texto: `${c.nome} quer acesso ao Planejador`,
+      detalhe: "Preencheu o cadastro: toque para liberar",
+      href: `/clientes/${c.clientId}`,
+      nivel: "info",
+    });
+
+  // Próximos dias na prévia: hoje e os próximos, até 3 dias com atendimento.
+  const proximosDias = upcomingGroups.slice(0, 3);
+  const rotuloPeriodo = resolverPeriodo(searchParams.period, searchParams.from, searchParams.to).rotulo;
+
+  return (
+    <div className="space-y-4">
+      <MesCard
+        saudacao={`${saudacao}${primeiroNome ? `, ${primeiroNome}` : ""} · ${dataHojeExtenso}`}
+        rotuloMes={rotuloMesAtual}
+        locacoes={locMes}
+        preReservas={preMes}
+        metaMin={META_MIN}
+        metaMax={META_MAX}
+        meta={metaDoMes}
+        faturamento={faturamentoMes}
+      />
+
+      <PrecisaDeVoce avisos={avisos} />
+
+      {/* Dinheiro agora */}
+      <div className="grid grid-cols-2 gap-2">
+        <Link href="/financeiro" className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80 active:bg-neutral-50">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Saldo em caixa</p>
+          <p className={`mt-1 text-lg font-extrabold tabular-nums ${saldoTotal < 0 ? "text-rose-600" : "text-neutral-900"}`}>{formatCurrency(saldoTotal)}</p>
+          <p className="text-[11px] text-neutral-400">Ver o financeiro →</p>
+        </Link>
+        <Link href="/pendencias" className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80 active:bg-neutral-50">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">A receber</p>
+          <p className={`mt-1 text-lg font-extrabold tabular-nums ${pendencias.total > 0 ? "text-amber-600" : "text-neutral-900"}`}>{formatCurrency(pendencias.total)}</p>
+          <p className="truncate text-[11px] text-neutral-400">
+            {pendencias.clientes.length === 0
+              ? "Ninguém devendo"
+              : `${pendencias.clientes.length} ${pendencias.clientes.length === 1 ? "cliente" : "clientes"} · mais antigo ${pendencias.maiorAtraso}d`}
+          </p>
+        </Link>
+      </div>
 
       <PrevisaoCaixaCard p30={previsao30} p60={previsao60} />
 
-      {!!cadastrosNovos && cadastrosNovos > 0 && (
-        <Link
-          href="/clientes/cadastros"
-          className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-        >
-          📝 {cadastrosNovos} {cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"} para conferir →
-        </Link>
-      )}
-
-      {acessosParaLiberar.map((c) => (
-        <Link
-          key={c.clientId}
-          href={`/clientes/${c.clientId}`}
-          className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-        >
-          📋 {c.nome} preencheu o cadastro do Planejador: toque para liberar o acesso →
-        </Link>
-      ))}
-
-      {!!pendingConfirmations && pendingConfirmations > 0 && (
-        <Link
-          href="/agenda#confirmacoes"
-          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-        >
-          ⚠️ {pendingConfirmations} {pendingConfirmations === 1 ? "evento precisa" : "eventos precisam"} de confirmação nos próximos 7 dias →
-        </Link>
-      )}
-
-      {tarefasDeHoje.length > 0 && (
-        <Link
-          href="/tarefas"
-          className="block rounded-2xl border border-brand-blue/30 bg-brand-blue/5 p-3 text-sm text-brand-blue"
-        >
-          🗒️ {tarefasDeHoje.length} {tarefasDeHoje.length === 1 ? "tarefa para hoje ou atrasada" : "tarefas para hoje ou atrasadas"}{" "}
-          ({resumoTarefas}): abrir a lista →
-        </Link>
-      )}
-
-      {semDisparos.length > 0 && (
-        <Link
-          href="/pendencias#sem-disparos"
-          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-        >
-          🧾 {semDisparos.length}{" "}
-          {semDisparos.length === 1
-            ? "atendimento já passou e está sem disparos lançados"
-            : "atendimentos já passaram e estão sem disparos lançados"}
-          : ainda não foram cobrados →
-        </Link>
-      )}
-
-      {aplicadoresAlerta.length > 0 && (
-        <Link
-          href="/equipamentos#aplicadores"
-          className="block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-        >
-          🔧 Garantia acabando: {aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", ")}. Ver
-          aplicadores →
-        </Link>
-      )}
-
-      {revisoesAlerta.length > 0 && (
-        <Link
-          href={`/equipamentos#revisao-${revisoesAlerta[0].code}`}
-          className={
-            revisoesAlerta.some((e) => e.situacao === "vencida")
-              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-          }
-        >
-          🛠️ Revisão anual:{" "}
-          {revisoesAlerta
-            .map((e) => (e.situacao === "vencida" ? `${e.nome} vencida` : e.dias === 0 ? `${e.nome} hoje` : `${e.nome} em ${e.dias} ${e.dias === 1 ? "dia" : "dias"}`))
-            .join(", ")}
-          : marcar e travar a agenda →
-        </Link>
-      )}
-
-      {taxasAReceberCount > 0 && (
-        <Link
-          href="/pendencias#taxas"
-          className={
-            taxasVencidasCount > 0
-              ? "block rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              : "block rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-          }
-        >
-          💳 {taxasAReceberCount} {taxasAReceberCount === 1 ? "taxa de reserva a receber" : "taxas de reserva a receber"} (
-          {formatCurrency(taxasAReceberTotal)})
-          {taxasVencidasCount > 0
-            ? `, ${taxasVencidasCount} ${taxasVencidasCount === 1 ? "vencida" : "vencidas"} (mais de ${diasCobrancaTaxa} dias)`
-            : ""}
-          : dar baixa →
-        </Link>
-      )}
-
-      <Link
-        href="/pendencias"
-        className="flex items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal"
-      >
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber (pendências)</p>
-          <p className="text-lg font-semibold text-amber-600">{formatCurrency(pendencias.total)}</p>
-        </div>
-        <p className="text-right text-xs text-neutral-500">
-          {pendencias.clientes.length === 0
-            ? "Ninguém devendo"
-            : `${pendencias.clientes.length} ${pendencias.clientes.length === 1 ? "cliente devendo" : "clientes devendo"} · mais antigo há ${pendencias.maiorAtraso} ${pendencias.maiorAtraso === 1 ? "dia" : "dias"}`}{" "}
-          →
-        </p>
-      </Link>
-
       <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
 
-      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <p className="text-xs text-neutral-500">
-            Meta do mês: {META_MIN} a {META_MAX} locações (máxima: acima de {META_MAX})
-          </p>
-          <p className={`text-xs font-semibold ${metaStatus.cor}`}>{metaStatus.texto}</p>
-        </div>
-        <p className="mt-1 text-lg font-semibold text-neutral-900">
-          {locMes} {locMes === 1 ? "locação" : "locações"} no mês
-          {preMes > 0 && (
-            <span className="ml-2 text-xs font-normal text-neutral-500">
-              + {preMes} {preMes === 1 ? "pré-reserva" : "pré-reservas"} ainda sem disparos
-            </span>
-          )}
-        </p>
-        <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-neutral-200">
-          <div
-            className="absolute inset-y-0 left-0 bg-brand-teal"
-            style={{ width: `${Math.min(100, (locMes / metaEscala) * 100)}%` }}
-          />
-          <div
-            className="absolute inset-y-0 bg-brand-blue/50"
-            style={{
-              left: `${Math.min(100, (locMes / metaEscala) * 100)}%`,
-              width: `${Math.max(0, Math.min(100, ((locMes + preMes) / metaEscala) * 100) - Math.min(100, (locMes / metaEscala) * 100))}%`,
-            }}
-          />
-          <div className="absolute inset-y-0 w-px bg-neutral-500" style={{ left: `${(META_MIN / metaEscala) * 100}%` }} />
-          <div className="absolute inset-y-0 w-px bg-neutral-500" style={{ left: `${(META_MAX / metaEscala) * 100}%` }} />
-        </div>
-        <p className="mt-1 text-[11px] text-neutral-500">
-          Traços na barra: {META_MIN} e {META_MAX}. A parte azul são pré-reservas do mês que ainda podem virar locação.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        {cards.map((card) => (
-          <div key={card.label} className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-            <p className="text-xs text-neutral-500">{card.label}</p>
-            <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(card.value)}</p>
-          </div>
-        ))}
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <p className="text-xs text-neutral-500">Locações</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{billableRentalsCount ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <p className="text-xs text-neutral-500">Ticket médio</p>
-          <p className="mt-1 text-lg font-semibold text-neutral-900">{formatCurrency(ticketMedio)}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <p className="text-xs text-neutral-500">Concluídas</p>
-          <p className="mt-1 text-lg font-semibold text-brand-teal">{concluidasCount ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <p className="text-xs text-neutral-500">Canceladas</p>
-          <p className="mt-1 text-lg font-semibold text-brand-pink">{canceladasCount ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <p className="text-xs text-neutral-500">Reagendadas</p>
-          <p className="mt-1 text-lg font-semibold text-brand-blue">{reagendadasCount}</p>
-        </div>
-      </div>
-
-      {equipmentSummary.length > 0 && (
-        <div>
-          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-            <p className="text-sm font-semibold text-neutral-700">Equipamentos</p>
-            <p className="text-xs text-neutral-500">
-              Ocupação geral {rotuloOcupacao}:{" "}
-              <span className="font-semibold text-neutral-900">
-                {Math.round(ocupacaoGeralPct * 100)}%
-              </span>{" "}
-              ({ocupacaoGeral.ocupados} de {ocupacaoGeral.disponiveis} dias-máquina)
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {equipmentSummary.map((eq) => (
-              <Link
-                key={eq.id}
-                href={`/dashboard/equipamentos/${eq.id}?${periodQuery}`}
-                className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal/40 hover:bg-white/90"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
-                  <p className="text-sm font-medium text-neutral-900">{eq.name}</p>
-                </div>
-                <p className="mt-2 text-lg font-semibold text-brand-teal">{formatCurrency(eq.receita)}</p>
-                <p className="text-xs text-neutral-500">
-                  {eq.locacoes} {eq.locacoes === 1 ? "locação" : "locações"} no período
-                </p>
-                <div className="mt-2">
-                  <div className="flex items-baseline justify-between text-xs text-neutral-500">
-                    <span>Ocupação</span>
-                    <span className="font-medium text-neutral-900">
-                      {Math.round(eq.ocupacao.pct * 100)}% · {eq.ocupacao.ocupados} de {eq.ocupacao.disponiveis} dias
-                    </span>
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-200">
-                    <div
-                      className="h-full rounded-full bg-brand-teal"
-                      style={{ width: `${Math.min(100, Math.round(eq.ocupacao.pct * 100))}%` }}
-                    />
-                  </div>
-                </div>
-                {eq.pendente > 0 && (
-                  <p className="mt-1 text-xs font-medium text-amber-600">
-                    Pendente: {formatCurrency(eq.pendente)}
-                  </p>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {upcomingGroups.length > 0 && (
-        <div>
+      {proximosDias.length > 0 && (
+        <section className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold text-neutral-700">Próximas locações</p>
-            <Link href="/agenda" className="text-xs text-brand-teal underline underline-offset-2">
-              Ver agenda →
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Próximos dias</p>
+            <Link href="/agenda" className="flex items-center gap-1 text-xs font-semibold text-brand-teal-dark">
+              <CalendarDays size={13} /> Agenda
             </Link>
           </div>
-          <div className="space-y-2">
-            {upcomingGroups.map(({ date, events }) => {
-              const bothHipros = events.length > 1;
-              return (
-                <div
-                  key={date}
-                  className={`rounded-2xl border p-3 shadow-sm backdrop-blur-xl ${
-                    bothHipros
-                      ? "border-brand-pink/50 bg-brand-pink/5"
-                      : "border-white/60 bg-white/70"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <Link href={linkDiaAgenda(date)} className="text-xs font-medium text-neutral-500 hover:text-brand-teal-dark">
-                      {formatWeekdayDate(date)}
-                    </Link>
-                    {bothHipros && (
-                      <span className="rounded-full bg-brand-pink/15 px-2 py-0.5 text-[10px] font-medium text-brand-pink-dark">
-                        2 HIPROs no mesmo dia
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1.5 space-y-1">
-                    {events.map((e) => (
-                      <div key={e.id} className="flex items-center gap-2 text-sm">
-                        <span
-                          className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                            e.event_type === "hipro_1" ? "bg-brand-teal" : "bg-brand-blue"
-                          }`}
-                        />
-                        <Link href={linkEvento(e.id)} className="font-medium text-neutral-900 underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark">
-                          📅 {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
-                        </Link>
-                        {e.clients?.name && (
-                          <span className="text-neutral-500">
-                            · <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
-                          </span>
-                        )}
-                        {!e.confirmed && (
-                          <span className="ml-auto whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                            não confirmado
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+          <ul className="space-y-2">
+            {proximosDias.map(({ date, events }) => (
+              <li key={date} className="flex gap-3">
+                <Link href={linkDiaAgenda(date)} className="w-[86px] flex-shrink-0 pt-0.5 text-xs font-semibold text-neutral-500">
+                  {date === todayStr ? "Hoje" : formatWeekdayDate(date)}
+                </Link>
+                <div className="min-w-0 flex-1 space-y-1">
+                  {events.map((e) => (
+                    <div key={e.id} className="flex items-center gap-2 text-sm">
+                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${e.event_type === "hipro_1" ? "bg-brand-teal" : "bg-brand-blue"}`} />
+                      <Link href={linkEvento(e.id)} className="flex-shrink-0 font-semibold text-neutral-900">
+                        {e.event_type === "hipro_1" ? "HIPRO 1" : "HIPRO 2"}
+                      </Link>
+                      {e.clients?.name && (
+                        <span className="min-w-0 truncate text-neutral-500">
+                          <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
+                        </span>
+                      )}
+                      {!e.confirmed && <span className="ml-auto h-2 w-2 flex-shrink-0 rounded-full bg-amber-400" title="não confirmado" />}
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
-      <DashboardCharts
-        transactions={normalizedRows}
-        inicio={from.toISOString().slice(0, 10)}
-        ate={[to.toISOString().slice(0, 10), hojeLocal()].sort()[0]}
-        rotuloPeriodo={resolverPeriodo(searchParams.period, searchParams.from, searchParams.to).rotulo}
-      />
+      {/* Números do período escolhido */}
+      <section className="space-y-3 pt-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-bold text-neutral-800">Números do período · {rotuloPeriodo}</p>
+          <PeriodFilter padrao="mes" />
+        </div>
+
+        <div className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
+          <div className="grid grid-cols-2 gap-3">
+            <Link href={`/locacoes?${periodQuery}`}>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Locações</p>
+              <p className="mt-0.5 text-2xl font-extrabold tabular-nums text-neutral-900">{billableRentalsCount ?? 0}</p>
+            </Link>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Ticket médio</p>
+              <p className="mt-0.5 text-2xl font-extrabold tabular-nums text-neutral-900">{formatCurrency(ticketMedio)}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[11.5px] font-semibold">
+            <span className="rounded-full bg-brand-teal/10 px-2.5 py-1 text-brand-teal-dark">{concluidasCount ?? 0} concluídas</span>
+            <span className="rounded-full bg-brand-pink/10 px-2.5 py-1 text-brand-pink-dark">{canceladasCount ?? 0} canceladas</span>
+            <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 text-brand-blue">{reagendadasCount} reagendadas</span>
+          </div>
+
+          {equipmentSummary.length > 0 && (
+            <div className="mt-4 border-t border-neutral-100 pt-3">
+              <p className="mb-2 text-[11px] text-neutral-500">
+                Ocupação {rotuloOcupacao}: <span className="font-bold text-neutral-900">{Math.round(ocupacaoGeralPct * 100)}%</span>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {equipmentSummary.map((eq) => (
+                  <Link key={eq.id} href={`/dashboard/equipamentos/${eq.id}?${periodQuery}`} className="rounded-2xl bg-neutral-50 p-3 active:bg-neutral-100">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
+                      <span className={`h-2 w-2 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
+                      {eq.name}
+                    </p>
+                    <p className="mt-1 text-base font-extrabold tabular-nums text-brand-teal-dark">{formatCurrency(eq.receita)}</p>
+                    <p className="text-[11px] text-neutral-500">
+                      {eq.locacoes} {eq.locacoes === 1 ? "locação" : "locações"} · {Math.round(eq.ocupacao.pct * 100)}% ocupado
+                    </p>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-neutral-200">
+                      <div className="h-full rounded-full bg-brand-teal" style={{ width: `${Math.min(100, Math.round(eq.ocupacao.pct * 100))}%` }} />
+                    </div>
+                    {eq.pendente > 0 && <p className="mt-1 text-[11px] font-semibold text-amber-600">Pendente {formatCurrency(eq.pendente)}</p>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DashboardCharts
+          transactions={normalizedRows}
+          inicio={from.toISOString().slice(0, 10)}
+          ate={[to.toISOString().slice(0, 10), hojeLocal()].sort()[0]}
+          rotuloPeriodo={rotuloPeriodo}
+        />
+      </section>
     </div>
   );
 }

@@ -33,9 +33,9 @@ export default function PrevisaoCaixaCard({ p30, p60 }: { p30: PrevisaoCaixa; p6
   );
 
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+    <div className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] uppercase tracking-wide text-neutral-400">Previsão de caixa</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Previsão de caixa</p>
         <div className="flex rounded-lg bg-neutral-100 p-0.5 text-[11px]">
           {([30, 60] as const).map((d) => (
             <button

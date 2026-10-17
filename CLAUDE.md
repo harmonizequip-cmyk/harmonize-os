@@ -96,6 +96,11 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - O tema escuro foi retirado a pedido do dono (14/10/2026); não usar classes `dark:`. O Suave também saiu (o dono não gostou). No lugar há o tema Aurora: botão de paleta no topo/menu (`components/ThemeToggle.tsx`), guardado em `localStorage` `harmonize-tema` = `aurora` e aplicado pela classe `tema-aurora` no `<html>` (script em `app/layout.tsx`). Os cinzas `neutral-*` do Tailwind saem de variáveis (`--n-50`…`--n-950`, em `app/globals.css`): o Aurora usa cinzas frios, brilho da marca no topo, cartões brancos com sombra e a barra de baixo flutuante com item ativo em degradê. Ajustes ficam só no `globals.css`.
 
+## Dashboard (17/10/2026)
+
+- Abre no mês (período padrão "Este mês"; `PeriodFilter padrao="mes"`). Ordem: destaque do mês (`components/dashboard/MesCard.tsx`: saudação, locações contra a meta 25 a 30, faturado, contas fixas), "Precisa de você" (`components/dashboard/PrecisaDeVoce.tsx`: todos os avisos num cartão, urgentes primeiro, 4 visíveis; cada um leva à sua lista; tarefas levam a `/tarefas?fila=1`), Saldo e A receber, Previsão de caixa, Radar, Próximos dias (3 dias com atendimento, hoje incluso) e "Números do período" (locações, ticket médio, concluídas/canceladas/reagendadas, HIPROs e gráficos). Aviso novo entra na lista `avisos` de `dashboard/page.tsx`.
+- `settings.inactive_days_threshold` não tem efeito em nenhuma tela; saiu de Configurações.
+
 ## Gráficos do Dashboard
 
 - `components/DashboardCharts.tsx` (SVG próprio, sem recharts), contas em `lib/grafico-fluxo.ts`: resultado do período com anel de margem, resultado acumulado (área) e entradas/saídas por dia em barras para cima e para baixo (mês a mês acima de 62 dias), com toque mostrando o dia; e "Para onde foi / De onde veio" por categoria. Recebe os mesmos lançamentos dos quadros (sem empréstimo e sem pagamento de fatura). Paleta validada para daltonismo: #1F9E97 (entradas), #D9577E (saídas).

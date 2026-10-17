@@ -11,11 +11,11 @@ const OPTIONS = [
   { key: "personalizado", label: "Personalizado" },
 ];
 
-export default function PeriodFilter() {
+export default function PeriodFilter({ padrao = "hoje" }: { padrao?: string } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const current = searchParams.get("period") ?? "hoje";
+  const current = searchParams.get("period") ?? (searchParams.get("from") ? "personalizado" : padrao);
   const [customFrom, setCustomFrom] = useState(searchParams.get("from") ?? "");
   const [customTo, setCustomTo] = useState(searchParams.get("to") ?? "");
 

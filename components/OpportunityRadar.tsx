@@ -64,7 +64,7 @@ export default function OpportunityRadar({
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-brand-teal/30 bg-brand-teal/5">
+      <div className="overflow-hidden rounded-3xl border border-brand-teal/30 bg-brand-teal/5">
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm text-brand-teal"
