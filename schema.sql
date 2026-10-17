@@ -176,6 +176,9 @@ create table public.clients (
   -- Parceiro conhecido: reserva data sem pagar a taxa de compromisso.
   -- Agendamentos deste cliente nascem com taxa_status = nao_aplica.
   parceiro boolean not null default false,
+  -- Isenta da taxa de reserva sem ser parceiro (clientes antigos que nunca
+  -- pagaram). Migration 2026-10-17-cliente-isento-taxa.sql.
+  isento_taxa boolean not null default false,
   -- Item 7: cliente que indicou este cadastro (opcional). Só registro por
   -- enquanto; o benefício ao indicador ainda será definido.
   indicado_por uuid references public.clients(id) on delete set null,
@@ -3355,7 +3358,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_parceiro boolean;
+  v_isenta boolean;
 begin
   if new.taxa_status is distinct from 'nao_aplica' then
     return new;
@@ -3369,8 +3372,8 @@ begin
     return new;
   end if;
 
-  select parceiro into v_parceiro from clients where id = new.client_id;
-  if coalesce(v_parceiro, false) then
+  select (parceiro or isento_taxa) into v_isenta from clients where id = new.client_id;
+  if coalesce(v_isenta, false) then
     return new;
   end if;
 
@@ -3397,7 +3400,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.parceiro and not coalesce(old.parceiro, false) then
+  if (new.parceiro and not coalesce(old.parceiro, false))
+     or (new.isento_taxa and not coalesce(old.isento_taxa, false)) then
     update calendar_events
        set taxa_status = 'nao_aplica'
      where client_id = new.id
@@ -3416,7 +3420,7 @@ grant execute on function public.isentar_taxa_de_parceiro() to authenticated, se
 
 drop trigger if exists clients_isentar_taxa_parceiro on public.clients;
 create trigger clients_isentar_taxa_parceiro
-  after update of parceiro on public.clients
+  after update of parceiro, isento_taxa on public.clients
   for each row execute function public.isentar_taxa_de_parceiro();
 
 create or replace function public.isentar_taxa_ao_trocar_cliente()
@@ -3428,7 +3432,7 @@ as $$
 begin
   if new.taxa_status = 'pendente'
      and new.client_id is distinct from old.client_id
-     and exists (select 1 from clients where id = new.client_id and parceiro) then
+     and exists (select 1 from clients where id = new.client_id and (parceiro or isento_taxa)) then
     new.taxa_status := 'nao_aplica';
     delete from tasks where event_id = new.id and type = 'cobranca_taxa' and status = 'pendente';
   end if;
@@ -3507,7 +3511,7 @@ declare
   v_equipment_code equipment_code_type;
   v_client_name text;
   v_created_by uuid := auth.uid();
-  v_parceiro boolean;
+  v_isenta boolean;
   v_taxa_status text;
   v_taxa_valor numeric;
   v_pix_conta text;
@@ -3523,7 +3527,7 @@ begin
   v_date_end := coalesce(p_event_date_end, p_event_date);
 
   select code into v_equipment_code from equipments where id = p_equipment_id;
-  select name, parceiro into v_client_name, v_parceiro from clients where id = p_client_id;
+  select name, (parceiro or isento_taxa) into v_client_name, v_isenta from clients where id = p_client_id;
   select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
 
   if v_category_id is null then
@@ -3551,7 +3555,7 @@ begin
   -- Taxa de compromisso inicial: pendente só quando há data futura a
   -- garantir e o cliente não é parceiro. definir_taxa_agendamento muda o
   -- estado depois.
-  if coalesce(v_parceiro, false) or p_event_date <= public.hoje_local() then
+  if coalesce(v_isenta, false) or p_event_date <= public.hoje_local() then
     v_taxa_status := 'nao_aplica';
     v_taxa_valor  := null;
   else

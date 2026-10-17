@@ -1,5 +1,6 @@
 "use client";
 
+import CaixaIsencaoTaxa from "@/components/CaixaIsencaoTaxa";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,6 +40,7 @@ export default function LeadCardModal({
   const [newTagName, setNewTagName] = useState("");
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [parceiro, setParceiro] = useState(lead.parceiro ?? false);
+  const [isentoTaxa, setIsentoTaxa] = useState(lead.isento_taxa ?? false);
   const [indicadoPor, setIndicadoPor] = useState<string | null>(
     (lead as LeadRow & { indicado_por?: string | null }).indicado_por ?? null
   );
@@ -143,6 +145,7 @@ export default function LeadCardModal({
         address: toUpperOrNull(address),
         notes: notes || null,
         parceiro,
+        isento_taxa: isentoTaxa,
         indicado_por: indicadoPor,
       })
       .eq("id", lead.id);
@@ -327,6 +330,7 @@ export default function LeadCardModal({
               isentos, sem ninguém precisar lembrar disso a cada reserva.
             </span>
           </label>
+          <CaixaIsencaoTaxa checked={isentoTaxa} onChange={setIsentoTaxa} parceiro={parceiro} />
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

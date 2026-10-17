@@ -43,6 +43,7 @@ interface Client {
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
+  isento_taxa?: boolean;
   indicado_por?: string | null;
   treatment?: string | null;
   display_name?: string | null;
@@ -375,6 +376,11 @@ export default function ClienteDetailClient({
             🤝 Parceiro · reserva sem taxa
           </span>
         )}
+        {!client.parceiro && client.isento_taxa && (
+          <span className="rounded-full bg-brand-blue/10 px-3 py-1 font-medium text-brand-blue">
+            Isenta de taxa de reserva
+          </span>
+        )}
       </div>
 
       {preReservas.length > 0 && (
@@ -628,7 +634,7 @@ export default function ClienteDetailClient({
             clientId: client.id,
             clientName: client.name,
             clientWhatsapp: client.whatsapp,
-            clientParceiro: client.parceiro,
+            clientParceiro: client.parceiro || client.isento_taxa,
             equipments,
           }}
           pricingConfig={pricingConfig}

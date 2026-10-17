@@ -1,5 +1,6 @@
 "use client";
 
+import CaixaIsencaoTaxa from "@/components/CaixaIsencaoTaxa";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
@@ -27,6 +28,7 @@ export default function NovoClienteModal({
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [parceiro, setParceiro] = useState(false);
+  const [isentoTaxa, setIsentoTaxa] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export default function NovoClienteModal({
       address: toUpperOrNull(address),
       notes: notes || null,
       parceiro,
+      isento_taxa: isentoTaxa,
     });
     setSaving(false);
     if (error) {
@@ -166,6 +169,7 @@ export default function NovoClienteModal({
             />
             Parceiro: reserva data sem pagar a taxa
           </label>
+          <CaixaIsencaoTaxa compacta checked={isentoTaxa} onChange={setIsentoTaxa} />
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

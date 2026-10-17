@@ -1,5 +1,6 @@
 "use client";
 
+import CaixaIsencaoTaxa from "@/components/CaixaIsencaoTaxa";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
@@ -17,6 +18,7 @@ interface Client {
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
+  isento_taxa?: boolean;
   indicado_por?: string | null;
   treatment?: string | null;
   display_name?: string | null;
@@ -69,6 +71,7 @@ export default function EditarClienteModal({
   );
   const [notes, setNotes] = useState(client.notes ?? "");
   const [parceiro, setParceiro] = useState(client.parceiro ?? false);
+  const [isentoTaxa, setIsentoTaxa] = useState(client.isento_taxa ?? false);
   const [indicadoPor, setIndicadoPor] = useState<string | null>(client.indicado_por ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +100,7 @@ export default function EditarClienteModal({
         contrato_endereco: contratoEndereco.trim() || null,
         notes: notes || null,
         parceiro,
+        isento_taxa: isentoTaxa,
         indicado_por: indicadoPor,
       })
       .eq("id", client.id);
@@ -279,6 +283,7 @@ export default function EditarClienteModal({
               Reserva data sem pagar a taxa de compromisso.
             </span>
           </label>
+          <CaixaIsencaoTaxa checked={isentoTaxa} onChange={setIsentoTaxa} parceiro={parceiro} />
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

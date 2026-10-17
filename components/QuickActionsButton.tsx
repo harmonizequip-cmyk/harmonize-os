@@ -118,11 +118,12 @@ export default function QuickActionsButton({
   async function openMenu() {
     setMenuOpen(true);
     const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
-      supabase.from("clients").select("id, name, city, whatsapp, parceiro").order("name"),
+      supabase.from("clients").select("id, name, city, whatsapp, parceiro, isento_taxa").order("name"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
       supabase.from("equipments").select("id, code, name").order("code"),
     ]);
-    setClients(clientsRes.data ?? []);
+    // Para a Calculadora e a reserva, isenta da taxa vale como parceiro.
+    setClients(((clientsRes.data ?? []) as any[]).map((c) => ({ ...c, parceiro: !!(c.parceiro || c.isento_taxa) })));
     setCategories(categoriesRes.data ?? []);
     setEquipments(equipmentsRes.data ?? []);
   }

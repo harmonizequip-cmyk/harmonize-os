@@ -1,5 +1,6 @@
 "use client";
 
+import CaixaIsencaoTaxa from "@/components/CaixaIsencaoTaxa";
 import { useEffect, useState } from "react";
 import { BookUser } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -39,6 +40,7 @@ export default function NovoLeadModal({
   const [indicadoPor, setIndicadoPor] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [parceiro, setParceiro] = useState(false);
+  const [isentoTaxa, setIsentoTaxa] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [temContatos, setTemContatos] = useState(false);
@@ -77,6 +79,7 @@ export default function NovoLeadModal({
       notes: notes || null,
       stage: "lead",
       parceiro,
+      isento_taxa: isentoTaxa,
     });
     setSaving(false);
     if (error) {
@@ -208,6 +211,7 @@ export default function NovoLeadModal({
             />
             Parceiro: reserva data sem pagar a taxa
           </label>
+          <CaixaIsencaoTaxa compacta checked={isentoTaxa} onChange={setIsentoTaxa} />
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

@@ -87,6 +87,7 @@ export interface LeadRow {
   origem: string | null;
   notes: string | null;
   parceiro?: boolean;
+  isento_taxa?: boolean;
   treatment?: string | null;
   display_name?: string | null;
   taxasPendentes: number;
@@ -1133,6 +1134,11 @@ function LeadCardContent({
         {lead.parceiro && (
           <span className="flex-shrink-0 rounded-full bg-brand-lilac/15 px-2 py-0.5 text-[11px] font-semibold text-brand-lilac">
             🤝 Parceiro
+          </span>
+        )}
+        {!lead.parceiro && lead.isento_taxa && (
+          <span className="flex-shrink-0 rounded-full bg-brand-lilac/15 px-2 py-0.5 text-[11px] font-semibold text-brand-lilac">
+            Sem taxa
           </span>
         )}
       </div>
