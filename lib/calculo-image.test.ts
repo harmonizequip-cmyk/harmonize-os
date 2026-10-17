@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { calculateMentoriaValue, calculateRentalValue, DEFAULT_PRICING } from "./rental-pricing";
 import { calcularResumoLocacao } from "./rental-calculator";
 import { descreverFaixa, montarAjustes, montarDadosCalculo, montarDadosMentoria, reais } from "./calculo-image";
+import { disparosQueViramCredito, linhasRecibo, separarLinhaFaixa } from "./calculo-image";
 
 describe("tabela de preços do HIPRO", () => {
   it("pacote fixo, excedente a 0,10 e, acima de 80.000, 0,07 sobre o total", () => {
@@ -223,5 +224,30 @@ describe("imagem do cálculo com várias contagens e crédito", () => {
     expect(d.faixaTitulo).toBe("CRÉDITO DA CLIENTE");
     expect(d.faixaLinhas[0]).toBe(`3.000 disparos do crédito: ${reais(0)}`);
     expect(d.total).toBe(resumo.totalAPagarAgora);
+  });
+});
+
+describe("recibo da imagem", () => {
+  const base = {
+    cliente: "Dra. Vânia", dataEvento: "2026-10-16", contagemInicial: 0, contagemFinal: 0, disparos: 24394,
+    faixaTitulo: "FAIXA 2 APLICADA", faixaSubtitulo: "", faixaChip: "R$ 0,10",
+    faixaLinhas: ["Pacote fixo (até 20.000 disparos): R$ 2.500,00", "4.394 disparos x R$ 0,10 = R$ 439,40"],
+    valorDisparos: 2939.4, ajustes: [{ rotulo: "Taxa de reserva já paga (crédito)", valor: "-R$ 250,00", tom: "menos" as const }],
+    total: 2689.4, observacaoTotal: null,
+    contagens: [{ inicial: 7787870, final: 7796737, disparos: 8867, viraCredito: true }, { inicial: 657593, final: 673120, disparos: 15527, viraCredito: false }],
+  };
+  it("separa rótulo e valor das linhas da faixa", () => {
+    expect(separarLinhaFaixa("4.394 disparos x R$ 0,10 = R$ 439,40")).toEqual({ rotulo: "4.394 disparos x R$ 0,10", valor: "R$ 439,40" });
+    expect(separarLinhaFaixa("Pacote fixo (até 20.000 disparos): R$ 2.500,00")).toEqual({ rotulo: "Pacote fixo (até 20.000 disparos)", valor: "R$ 2.500,00" });
+  });
+  it("monta o recibo na ordem e soma o crédito gerado", () => {
+    const l = linhasRecibo(base);
+    expect(l.map((x) => x.rotulo)).toEqual([
+      "Contagem do aparelho", "Contagem 1 · vira crédito", "Contagem 2", "Disparos realizados",
+      "Faixa 2 aplicada · R$ 0,10", "Pacote fixo (até 20.000 disparos)", "4.394 disparos x R$ 0,10", "Valor dos disparos",
+      "Ajustes", "Taxa de reserva já paga (crédito)", "Total a pagar",
+    ]);
+    expect(l[l.length - 1].valor).toBe(reais(2689.4));
+    expect(disparosQueViramCredito(base)).toBe(8867);
   });
 });

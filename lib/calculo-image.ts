@@ -5,13 +5,13 @@ import type { MentoriaPricingBreakdown, RentalPricingBreakdown } from "./rental-
 // ============================================================
 // IMAGEM DO CÁLCULO DOS DISPAROS
 //
-// Uma única imagem, na ordem em que a conta é feita (contagem, disparos,
-// faixa aplicada, valor dos disparos, ajustes e total a cobrar), para mandar
-// ao cliente conferir. Mesmo estilo da tela de cálculo: cartões claros, rosa
-// para a faixa, azul-petróleo para o valor, degradê no total.
+// Uma imagem para mandar ao cliente conferir. O total a pagar fica no topo,
+// num destaque com o degradê da marca (o WhatsApp corta a prévia de imagem
+// alta pela parte de baixo); embaixo, o detalhe em formato de recibo
+// (contagens, faixa, ajustes) e, quando há, o crédito que fica para a próxima.
 //
-// A montagem dos números (montarDadosCalculo) é separada do desenho
-// (drawCalculoImage) para poder ser testada sem canvas.
+// A montagem dos números (montarDadosCalculo, linhasRecibo) é separada do
+// desenho (drawCalculoImage) para poder ser testada sem canvas.
 // ============================================================
 
 export interface LinhaAjusteImagem {
@@ -263,46 +263,95 @@ export function montarDadosMentoria(params: {
 }
 
 // ------------------------------------------------------------
-// Desenho
+// Recibo (pura, testável): o que vai na imagem, na ordem.
+// ------------------------------------------------------------
+
+export interface LinhaRecibo {
+  tipo: "secao" | "linha" | "subtotal" | "total";
+  rotulo: string;
+  detalhe?: string;
+  valor?: string;
+  tom?: "mais" | "menos" | "credito" | "neutro";
+}
+
+/** Separa "Pacote fixo (...): R$ 2.500,00" e "4.394 disparos x R$ 0,10 = R$ 439,40" em rótulo e valor. */
+export function separarLinhaFaixa(l: string): { rotulo: string; valor?: string } {
+  const igual = l.lastIndexOf(" = ");
+  if (igual > 0) return { rotulo: l.slice(0, igual), valor: l.slice(igual + 3) };
+  const dois = l.lastIndexOf(": ");
+  if (dois > 0) return { rotulo: l.slice(0, dois), valor: l.slice(dois + 2) };
+  return { rotulo: l };
+}
+
+/** Disparos que viram crédito nesta locação (contagens marcadas). */
+export function disparosQueViramCredito(d: DadosImagemCalculo): number {
+  return (d.contagens ?? []).filter((c) => c.viraCredito).reduce((s, c) => s + c.disparos, 0);
+}
+
+export function linhasRecibo(d: DadosImagemCalculo): LinhaRecibo[] {
+  const ehMentoria = d.modo === "mentoria";
+  const out: LinhaRecibo[] = [];
+  if (ehMentoria) {
+    out.push({ tipo: "secao", rotulo: "Mentoria" });
+    out.push({ tipo: "linha", rotulo: "Pacientes modelo", valor: inteiro(d.disparos) });
+  } else {
+    out.push({ tipo: "secao", rotulo: "Contagem do aparelho" });
+    const contagens = d.contagens && d.contagens.length > 1 ? d.contagens : null;
+    if (contagens) {
+      contagens.forEach((c, i) =>
+        out.push({
+          tipo: "linha",
+          rotulo: `Contagem ${i + 1}${c.viraCredito ? " · vira crédito" : ""}`,
+          detalhe: `${inteiro(c.inicial)} → ${inteiro(c.final)}`,
+          valor: inteiro(c.disparos),
+          tom: c.viraCredito ? "credito" : "neutro",
+        })
+      );
+    } else {
+      out.push({ tipo: "linha", rotulo: "Contagem", detalhe: `${inteiro(d.contagemInicial)} → ${inteiro(d.contagemFinal)}`, valor: inteiro(d.disparos + (d.creditoUsado ?? 0)) });
+    }
+    const realizados = (d.creditoUsado ?? 0) > 0 ? d.disparosRealizados ?? d.disparos : d.disparos;
+    out.push({ tipo: "subtotal", rotulo: "Disparos realizados", valor: inteiro(realizados) });
+    if ((d.creditoUsado ?? 0) > 0) {
+      out.push({ tipo: "linha", rotulo: "Crédito usado", valor: `−${inteiro(d.creditoUsado ?? 0)}`, tom: "credito" });
+      out.push({ tipo: "linha", rotulo: "Disparos cobrados", valor: inteiro(d.disparos) });
+    }
+  }
+  out.push({ tipo: "secao", rotulo: ehMentoria ? "Valor" : `${d.faixaTitulo.charAt(0)}${d.faixaTitulo.slice(1).toLowerCase()} · ${d.faixaChip}` });
+  for (const l of d.faixaLinhas) {
+    const { rotulo, valor } = separarLinhaFaixa(l);
+    out.push({ tipo: "linha", rotulo, valor });
+  }
+  out.push({ tipo: "subtotal", rotulo: ehMentoria ? "Valor da mentoria" : "Valor dos disparos", valor: reais(d.valorDisparos) });
+  if (d.ajustes.length) {
+    out.push({ tipo: "secao", rotulo: "Ajustes" });
+    for (const a of d.ajustes) out.push({ tipo: "linha", rotulo: a.rotulo, valor: a.valor, tom: a.tom });
+  }
+  out.push({ tipo: "total", rotulo: "Total a pagar", valor: reais(d.total) });
+  return out;
+}
+
+// ------------------------------------------------------------
+// Desenho: o total vem no topo (o WhatsApp corta a prévia da imagem pela
+// parte de baixo) e o detalhe segue em formato de recibo, compacto.
 // ------------------------------------------------------------
 
 const COR = {
-  fundo: "#f4fbfb",
-  tinta: "#1f2937",
-  suave: "#6b7280",
-  cinzaCard: "#f3f4f6",
-  teal: "#2e9a94",
-  tealClaro: "#e9f8f7",
-  tealBorda: "#b9e6e3",
-  rosa: "#e0679b",
-  rosaClaro: "#fdf1f6",
-  rosaBorda: "#f6c9dc",
-  ouro: "#b8860b",
-  ouroClaro: "#fffaea",
-  ouroBorda: "#f1dd9b",
-  branco: "#ffffff",
+  fundo: "#F3F8F8",
+  cartao: "#FFFFFF",
+  tinta: "#17202A",
+  suave: "#6B7480",
+  linha: "#E6ECEE",
+  teal: "#1F8F88",
+  tealClaro: "#E8F7F6",
+  rosa: "#D65A8A",
+  rosaClaro: "#FDF0F5",
+  ouro: "#A87808",
 };
 const FONTE = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-const LARGURA = 420;
-const MARGEM = 20;
-const ESCALA = 2;
-
-function quebrar(ctx: CanvasRenderingContext2D, texto: string, larguraMax: number): string[] {
-  const palavras = texto.split(" ");
-  const linhas: string[] = [];
-  let atual = "";
-  for (const p of palavras) {
-    const teste = atual ? `${atual} ${p}` : p;
-    if (ctx.measureText(teste).width > larguraMax && atual) {
-      linhas.push(atual);
-      atual = p;
-    } else {
-      atual = teste;
-    }
-  }
-  if (atual) linhas.push(atual);
-  return linhas;
-}
+const LARGURA = 440;
+const MARGEM = 18;
+const ESCALA = 2.5;
 
 function formatarData(iso: string | null): string {
   if (!iso) return "";
@@ -310,267 +359,197 @@ function formatarData(iso: string | null): string {
   return `${d}/${m}/${a}`;
 }
 
+function cortar(ctx: CanvasRenderingContext2D, texto: string, larguraMax: number): string {
+  if (ctx.measureText(texto).width <= larguraMax) return texto;
+  let t = texto;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > larguraMax) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
 export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLCanvasElement> {
-  const medidor = document.createElement("canvas").getContext("2d") as CanvasRenderingContext2D;
+  const ehMentoria = dados.modo === "mentoria";
+  const linhas = linhasRecibo(dados).filter((l) => l.tipo !== "total");
+  const credito = ehMentoria ? 0 : disparosQueViramCredito(dados);
   const larguraUtil = LARGURA - MARGEM * 2;
 
-  // 1ª passada: mede a altura para o canvas já nascer do tamanho certo.
-  medidor.font = `500 13px ${FONTE}`;
-  const linhasFaixa = dados.faixaLinhas.flatMap((l) => quebrar(medidor, l, larguraUtil - 32));
-  const alturaFaixa = 78 + linhasFaixa.length * 20;
-  const alturaAjustes = dados.ajustes.length > 0 ? 40 + dados.ajustes.length * 52 : 0;
-  const alturaObs = dados.observacaoTotal ? 24 : 0;
-  const ehMentoria = dados.modo === "mentoria";
-  const variasContagens = !ehMentoria && (dados.contagens?.length ?? 0) > 1;
-  const comCredito = !ehMentoria && (dados.creditoUsado ?? 0) > 0;
-  const alturaContagens = ehMentoria ? 0 : variasContagens ? (dados.contagens?.length ?? 0) * 64 : 2 * 60;
-  const alturaCredito = comCredito ? 2 * 60 + 10 : 0;
-  const altura = 96 + alturaContagens + 60 + alturaCredito + 70 + alturaFaixa + 20 + 90 + 20 + alturaAjustes + 130 + alturaObs + 56;
+  // Altura: cabeçalho + destaque + recibo + crédito + rodapé.
+  const altLinha = (l: LinhaRecibo) => (l.tipo === "secao" ? 30 : l.detalhe ? 40 : 30);
+  const altRecibo = 24 + linhas.reduce((s, l) => s + altLinha(l), 0) + 16;
+  const altCredito = credito > 0 ? 74 : 0;
+  const altObs = dados.observacaoTotal ? 20 : 0;
+  const altura = 78 + 168 + altObs + 14 + altRecibo + (altCredito ? altCredito + 12 : 0) + 40;
 
   const canvas = document.createElement("canvas");
-  canvas.width = LARGURA * ESCALA;
-  canvas.height = altura * ESCALA;
+  canvas.width = Math.round(LARGURA * ESCALA);
+  canvas.height = Math.round(altura * ESCALA);
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
   ctx.scale(ESCALA, ESCALA);
+  ctx.textBaseline = "alphabetic";
 
   ctx.fillStyle = COR.fundo;
   ctx.fillRect(0, 0, LARGURA, altura);
+  // faixa da marca no topo
+  const faixa = ctx.createLinearGradient(0, 0, LARGURA, 0);
+  faixa.addColorStop(0, "#3DBFB8");
+  faixa.addColorStop(0.55, "#7EC8E3");
+  faixa.addColorStop(1, "#B8A0D0");
+  ctx.fillStyle = faixa;
+  ctx.fillRect(0, 0, LARGURA, 5);
 
-  let y = 28;
-
-  // Cabeçalho
-  ctx.textBaseline = "alphabetic";
+  // Cabeçalho: cliente e data
+  let y = 30;
   ctx.textAlign = "left";
   ctx.fillStyle = COR.teal;
-  ctx.font = `700 12px ${FONTE}`;
+  ctx.font = `800 10.5px ${FONTE}`;
   ctx.fillText(ehMentoria ? "HARMONIZE  ·  CÁLCULO DA MENTORIA" : "HARMONIZE  ·  CÁLCULO DOS DISPAROS", MARGEM, y);
-  y += 26;
-  ctx.fillStyle = COR.tinta;
-  ctx.font = `700 22px ${FONTE}`;
-  ctx.fillText(dados.cliente ? dados.cliente.slice(0, 32) : "Cliente", MARGEM, y);
-  y += 20;
   if (dados.dataEvento) {
-    ctx.fillStyle = COR.suave;
-    ctx.font = `500 13px ${FONTE}`;
-    ctx.fillText(formatarData(dados.dataEvento), MARGEM, y);
-  }
-  y += 22;
-
-  // Linha cinza com rótulo à esquerda e valor à direita.
-  const linhaCinza = (rotulo: string, valor: string) => {
-    roundedRectPath(ctx, MARGEM, y, larguraUtil, 48, 14);
-    ctx.fillStyle = COR.cinzaCard;
-    ctx.fill();
-    ctx.fillStyle = COR.suave;
-    ctx.font = `500 15px ${FONTE}`;
-    ctx.textAlign = "left";
-    ctx.fillText(rotulo, MARGEM + 16, y + 30);
-    ctx.fillStyle = COR.tinta;
-    ctx.font = `700 21px ${FONTE}`;
     ctx.textAlign = "right";
-    ctx.fillText(valor, MARGEM + larguraUtil - 16, y + 31);
+    ctx.fillStyle = COR.suave;
+    ctx.font = `600 11px ${FONTE}`;
+    ctx.fillText(formatarData(dados.dataEvento), LARGURA - MARGEM, y);
     ctx.textAlign = "left";
-    y += 60;
-  };
-  if (variasContagens) {
-    // Uma linha por contagem (troca de ponteira): inicial → final = disparos.
-    (dados.contagens ?? []).forEach((c, i) => {
-      roundedRectPath(ctx, MARGEM, y, larguraUtil, 54, 14);
-      ctx.fillStyle = c.viraCredito ? COR.rosaClaro : COR.cinzaCard;
-      ctx.fill();
-      if (c.viraCredito) {
-        ctx.strokeStyle = COR.rosaBorda;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-      ctx.textAlign = "left";
-      ctx.fillStyle = COR.tinta;
-      ctx.font = `600 14px ${FONTE}`;
-      const rotulo = `Contagem ${i + 1}`;
-      ctx.fillText(rotulo, MARGEM + 16, y + 22);
-      if (c.viraCredito) {
-        const larguraRotulo = ctx.measureText(rotulo).width;
-        ctx.fillStyle = COR.rosa;
-        ctx.font = `700 12px ${FONTE}`;
-        ctx.fillText("·  vira crédito", MARGEM + 16 + larguraRotulo + 8, y + 22);
-      }
-      ctx.fillStyle = COR.suave;
-      ctx.font = `500 13px ${FONTE}`;
-      ctx.fillText(`${inteiro(c.inicial)} → ${inteiro(c.final)}`, MARGEM + 16, y + 41);
-      ctx.fillStyle = c.viraCredito ? COR.rosa : COR.tinta;
-      ctx.font = `700 19px ${FONTE}`;
-      ctx.textAlign = "right";
-      ctx.fillText(`= ${inteiro(c.disparos)}`, MARGEM + larguraUtil - 16, y + 34);
-      ctx.textAlign = "left";
-      y += 64;
-    });
-  } else if (!ehMentoria) {
-    linhaCinza("Contagem inicial", inteiro(dados.contagemInicial));
-    linhaCinza("Contagem final", inteiro(dados.contagemFinal));
   }
-
-  // Disparos realizados
-  roundedRectPath(ctx, MARGEM, y, larguraUtil, 56, 14);
-  ctx.fillStyle = COR.tealClaro;
-  ctx.fill();
-  ctx.strokeStyle = COR.tealBorda;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  y += 28;
   ctx.fillStyle = COR.tinta;
-  ctx.font = `600 15px ${FONTE}`;
-  ctx.fillText(ehMentoria ? "Pacientes modelo" : "Disparos realizados", MARGEM + 16, y + 34);
-  ctx.fillStyle = COR.teal;
-  ctx.font = `700 26px ${FONTE}`;
-  ctx.textAlign = "right";
-  ctx.fillText(inteiro(comCredito ? dados.disparosRealizados ?? dados.disparos : dados.disparos), MARGEM + larguraUtil - 16, y + 36);
-  ctx.textAlign = "left";
-  y += 74;
+  ctx.font = `800 21px ${FONTE}`;
+  ctx.fillText(cortar(ctx, (dados.cliente ?? "Cliente").toUpperCase(), larguraUtil), MARGEM, y);
+  y += 20;
 
-  if (comCredito) {
-    linhaCinza("Crédito usado", `−${inteiro(dados.creditoUsado ?? 0)}`);
-    linhaCinza("Disparos cobrados", inteiro(dados.disparos));
-    y += 10;
-  }
-
-  // Faixa aplicada
-  roundedRectPath(ctx, MARGEM, y, larguraUtil, alturaFaixa, 14);
-  ctx.fillStyle = COR.rosaClaro;
-  ctx.fill();
-  ctx.strokeStyle = COR.rosaBorda;
-  ctx.stroke();
-  ctx.fillStyle = COR.rosa;
-  ctx.font = `700 12px ${FONTE}`;
-  ctx.fillText(dados.faixaTitulo.split("").join(" ").replace(/ {2,}/g, "  "), MARGEM + 16, y + 26);
-  ctx.fillStyle = COR.suave;
-  ctx.font = `500 14px ${FONTE}`;
-  ctx.fillText(dados.faixaSubtitulo, MARGEM + 16, y + 46);
-  // chip da taxa
-  ctx.font = `700 15px ${FONTE}`;
-  const larguraChip = ctx.measureText(dados.faixaChip).width + 24;
-  roundedRectPath(ctx, MARGEM + larguraUtil - 16 - larguraChip, y + 14, larguraChip, 32, 10);
-  ctx.fillStyle = "#fbe0ec";
-  ctx.fill();
-  ctx.strokeStyle = COR.rosaBorda;
-  ctx.stroke();
-  ctx.fillStyle = COR.rosa;
-  ctx.textAlign = "center";
-  ctx.fillText(dados.faixaChip, MARGEM + larguraUtil - 16 - larguraChip / 2, y + 36);
-  ctx.textAlign = "left";
-  // pontilhado + linhas da conta
-  ctx.strokeStyle = COR.rosaBorda;
-  ctx.setLineDash([3, 4]);
-  ctx.beginPath();
-  ctx.moveTo(MARGEM + 16, y + 60);
-  ctx.lineTo(MARGEM + larguraUtil - 16, y + 60);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = COR.tinta;
-  ctx.font = `500 13px ${FONTE}`;
-  linhasFaixa.forEach((l, i) => ctx.fillText(l, MARGEM + 16, y + 82 + i * 20));
-  y += alturaFaixa + 18;
-
-  // Valor dos disparos
-  roundedRectPath(ctx, MARGEM, y, larguraUtil, 92, 16);
-  ctx.fillStyle = COR.tealClaro;
-  ctx.fill();
-  ctx.strokeStyle = COR.tealBorda;
-  ctx.stroke();
-  ctx.fillStyle = COR.teal;
-  ctx.font = `700 12px ${FONTE}`;
-  ctx.textAlign = "center";
-  ctx.fillText(ehMentoria ? "V A L O R   D A   M E N T O R I A" : "V A L O R   D O S   D I S P A R O S", LARGURA / 2, y + 28);
-  ctx.font = `700 34px ${FONTE}`;
-  ctx.fillText(reais(dados.valorDisparos), LARGURA / 2, y + 66);
-  ctx.textAlign = "left";
-  y += 92 + 22;
-
-  // Ajustes finais
-  if (dados.ajustes.length > 0) {
-    ctx.fillStyle = COR.teal;
-    ctx.font = `700 12px ${FONTE}`;
-    ctx.fillText("A J U S T E S   F I N A I S", MARGEM, y + 6);
-    y += 20;
-    for (const a of dados.ajustes) {
-      const [fundo, borda, texto] =
-        a.tom === "menos"
-          ? [COR.rosaClaro, COR.rosaBorda, COR.rosa]
-          : a.tom === "mais"
-            ? [COR.ouroClaro, COR.ouroBorda, COR.ouro]
-            : [COR.cinzaCard, "#e5e7eb", COR.tinta];
-      roundedRectPath(ctx, MARGEM, y, larguraUtil, 42, 12);
-      ctx.fillStyle = fundo;
-      ctx.fill();
-      ctx.strokeStyle = borda;
-      ctx.stroke();
-      ctx.fillStyle = texto;
-      ctx.font = `600 14px ${FONTE}`;
-      ctx.textAlign = "left";
-      const sinal = a.tom === "mais" ? "+ " : a.tom === "menos" ? "- " : "";
-      ctx.fillText(`${sinal}${a.rotulo}`.slice(0, 30), MARGEM + 14, y + 26);
-      ctx.font = `700 14px ${FONTE}`;
-      ctx.textAlign = "right";
-      ctx.fillText(a.valor, MARGEM + larguraUtil - 14, y + 26);
-      ctx.textAlign = "left";
-      y += 52;
-    }
-    y += 4;
-  }
-
-  // Total a cobrar, com o degradê da marca
-  const alturaTotal = 104;
-  roundedRectPath(ctx, MARGEM, y, larguraUtil, alturaTotal, 18);
-  ctx.fillStyle = "#fbf3f7";
-  ctx.fill();
-  ctx.strokeStyle = COR.tealBorda;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.lineWidth = 1.5;
-  ctx.fillStyle = COR.teal;
-  ctx.font = `700 12px ${FONTE}`;
-  ctx.textAlign = "center";
-  ctx.fillText("T O T A L   A   C O B R A R   D O   C L I E N T E", LARGURA / 2, y + 30);
-  const texto = reais(dados.total);
-  ctx.font = `800 40px ${FONTE}`;
-  const larguraTexto = ctx.measureText(texto).width;
-  const grad = ctx.createLinearGradient(LARGURA / 2 - larguraTexto / 2, 0, LARGURA / 2 + larguraTexto / 2, 0);
-  grad.addColorStop(0, "#3DBFB8");
-  grad.addColorStop(0.55, "#7EC8E3");
-  grad.addColorStop(1, "#B8A0D0");
+  // Destaque: total a pagar (o que precisa aparecer na prévia do WhatsApp)
+  const altDestaque = 168;
+  roundedRectPath(ctx, MARGEM, y, larguraUtil, altDestaque, 22);
+  const grad = ctx.createLinearGradient(MARGEM, y, MARGEM + larguraUtil, y + altDestaque);
+  grad.addColorStop(0, "#2FB3AC");
+  grad.addColorStop(0.6, "#6FBFDC");
+  grad.addColorStop(1, "#A995CF");
   ctx.fillStyle = grad;
-  ctx.fillText(texto, LARGURA / 2, y + 76);
+  ctx.fill();
+  // brilho
+  ctx.save();
+  roundedRectPath(ctx, MARGEM, y, larguraUtil, altDestaque, 22);
+  ctx.clip();
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.beginPath();
+  ctx.arc(MARGEM + larguraUtil - 30, y + 10, 110, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
   ctx.textAlign = "left";
-  y += alturaTotal;
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = `800 11px ${FONTE}`;
+  ctx.fillText("T O T A L   A   P A G A R", MARGEM + 22, y + 34);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `900 44px ${FONTE}`;
+  ctx.fillText(reais(dados.total), MARGEM + 20, y + 84);
+
+  // pílulas: disparos e faixa
+  const pilulas: string[] = [];
+  if (ehMentoria) pilulas.push(`${inteiro(dados.disparos)} paciente(s)`);
+  else pilulas.push(`${inteiro((dados.creditoUsado ?? 0) > 0 ? dados.disparosRealizados ?? dados.disparos : dados.disparos)} disparos`);
+  pilulas.push(ehMentoria ? `${dados.faixaChip} por paciente` : `${dados.faixaTitulo.replace(" APLICADA", "").charAt(0)}${dados.faixaTitulo.replace(" APLICADA", "").slice(1).toLowerCase()} · ${dados.faixaChip}`);
+  if (credito > 0) pilulas.push(`+${inteiro(credito)} de crédito`);
+  let px = MARGEM + 22;
+  const py = y + 108;
+  ctx.font = `700 12px ${FONTE}`;
+  for (const t of pilulas) {
+    const w = ctx.measureText(t).width + 22;
+    if (px + w > MARGEM + larguraUtil - 16) break;
+    roundedRectPath(ctx, px, py, w, 26, 13);
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(t, px + 11, py + 17.5);
+    px += w + 8;
+  }
+  y += altDestaque;
 
   if (dados.observacaoTotal) {
     ctx.fillStyle = COR.suave;
-    ctx.font = `500 12px ${FONTE}`;
+    ctx.font = `500 11px ${FONTE}`;
     ctx.textAlign = "center";
-    ctx.fillText(dados.observacaoTotal, LARGURA / 2, y + 20);
+    ctx.fillText(cortar(ctx, dados.observacaoTotal, larguraUtil), LARGURA / 2, y + 16);
     ctx.textAlign = "left";
-    y += 24;
+    y += altObs;
+  }
+  y += 14;
+
+  // Recibo: como chegamos no valor
+  roundedRectPath(ctx, MARGEM, y, larguraUtil, altRecibo, 18);
+  ctx.fillStyle = COR.cartao;
+  ctx.fill();
+  ctx.strokeStyle = COR.linha;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  let ry = y + 14;
+  const xi = MARGEM + 18;
+  const xf = MARGEM + larguraUtil - 18;
+  for (const l of linhas) {
+    if (l.tipo === "secao") {
+      ctx.fillStyle = COR.teal;
+      ctx.font = `800 10.5px ${FONTE}`;
+      ctx.textAlign = "left";
+      ctx.fillText(l.rotulo.toUpperCase(), xi, ry + 22);
+      ry += 30;
+      continue;
+    }
+    const alt = altLinha(l);
+    const base = l.detalhe ? ry + 18 : ry + 20;
+    if (l.tipo === "subtotal") {
+      ctx.strokeStyle = COR.linha;
+      ctx.beginPath();
+      ctx.moveTo(xi, ry + 2);
+      ctx.lineTo(xf, ry + 2);
+      ctx.stroke();
+    }
+    const corValor = l.tom === "credito" ? COR.rosa : l.tom === "menos" ? COR.rosa : l.tom === "mais" ? COR.ouro : COR.tinta;
+    ctx.textAlign = "right";
+    ctx.font = l.tipo === "subtotal" ? `800 15px ${FONTE}` : `700 13.5px ${FONTE}`;
+    ctx.fillStyle = l.tipo === "subtotal" ? COR.teal : corValor;
+    const valor = l.valor ?? "";
+    ctx.fillText(valor, xf, base);
+    const larguraValor = ctx.measureText(valor).width;
+    ctx.textAlign = "left";
+    ctx.font = l.tipo === "subtotal" ? `700 13.5px ${FONTE}` : `500 13px ${FONTE}`;
+    ctx.fillStyle = l.tom === "credito" ? COR.rosa : l.tipo === "subtotal" ? COR.tinta : "#3A4552";
+    ctx.fillText(cortar(ctx, l.rotulo, xf - xi - larguraValor - 12), xi, base);
+    if (l.detalhe) {
+      ctx.fillStyle = COR.suave;
+      ctx.font = `500 11px ${FONTE}`;
+      ctx.fillText(l.detalhe, xi, base + 15);
+    }
+    ry += alt;
+  }
+  y += altRecibo;
+
+  // Crédito: explica o que é a contagem que "vira crédito"
+  if (credito > 0) {
+    y += 12;
+    roundedRectPath(ctx, MARGEM, y, larguraUtil, altCredito, 18);
+    ctx.fillStyle = COR.rosaClaro;
+    ctx.fill();
+    ctx.strokeStyle = "#F4C6D8";
+    ctx.stroke();
+    ctx.fillStyle = COR.rosa;
+    ctx.font = `800 10.5px ${FONTE}`;
+    ctx.textAlign = "left";
+    ctx.fillText("CRÉDITO PARA O PRÓXIMO ATENDIMENTO", MARGEM + 18, y + 24);
+    ctx.font = `800 20px ${FONTE}`;
+    ctx.fillText(`${inteiro(credito)} disparos`, MARGEM + 18, y + 50);
+    ctx.fillStyle = COR.suave;
+    ctx.font = `500 11px ${FONTE}`;
+    ctx.fillText("Pagos hoje e guardados para usar na próxima locação.", MARGEM + 18, y + 66);
+    y += altCredito;
   }
 
   ctx.fillStyle = COR.suave;
-  ctx.font = `500 11px ${FONTE}`;
+  ctx.font = `500 10.5px ${FONTE}`;
   ctx.textAlign = "center";
-  ctx.fillText("Harmonize  ·  conferência do cálculo, sujeita a confirmação", LARGURA / 2, y + 34);
+  ctx.fillText("Harmonize  ·  conferência do cálculo, sujeita a confirmação", LARGURA / 2, y + 26);
 
-  // A altura da primeira passada é só uma estimativa folgada: recorta no
-  // ponto exato em que o desenho terminou, para a imagem não ter vazio no fim.
-  const alturaFinal = Math.ceil(y + 50);
+  const alturaFinal = Math.ceil(y + 40);
   const saida = document.createElement("canvas");
-  saida.width = LARGURA * ESCALA;
-  saida.height = alturaFinal * ESCALA;
-  (saida.getContext("2d") as CanvasRenderingContext2D).drawImage(
-    canvas,
-    0,
-    0,
-    canvas.width,
-    alturaFinal * ESCALA,
-    0,
-    0,
-    saida.width,
-    saida.height
-  );
+  saida.width = Math.round(LARGURA * ESCALA);
+  saida.height = Math.round(alturaFinal * ESCALA);
+  (saida.getContext("2d") as CanvasRenderingContext2D).drawImage(canvas, 0, 0, canvas.width, saida.height, 0, 0, saida.width, saida.height);
   return saida;
 }
