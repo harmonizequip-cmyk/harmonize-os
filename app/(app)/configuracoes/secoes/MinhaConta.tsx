@@ -10,14 +10,35 @@ import { problemaSenha, REGRA_SENHA } from "@/lib/senha";
 import { avisar, confirmar } from "@/components/Dialogos";
 import { Bloco } from "../ui";
 
-export default function MinhaConta({ nome, email }: { nome: string; email: string }) {
+export default function MinhaConta({ nome: nomeInicial, email }: { nome: string; email: string }) {
   const supabase = createClient();
   const router = useRouter();
+  const [nome, setNome] = useState(nomeInicial.includes("@") ? "" : nomeInicial);
+  const [salvoNome, setSalvoNome] = useState(nomeInicial.includes("@") ? "" : nomeInicial);
+  const [salvandoNome, setSalvandoNome] = useState(false);
   const [senha, setSenha] = useState("");
   const [repetir, setRepetir] = useState("");
   const [ver, setVer] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // O nome aparece na saudação do Dashboard ("Bom dia, Eder") e nos avisos.
+  async function salvarNome() {
+    const novo = nome.trim().replace(/\s+/g, " ");
+    if (!novo) return avisar("Escreva o nome que quer ver.", "erro");
+    if (novo.includes("@")) return avisar("Use o nome, não o e-mail.", "erro");
+    setSalvandoNome(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = user ? await supabase.from("profiles").update({ name: novo }).eq("id", user.id) : { error: new Error("sem login") };
+    setSalvandoNome(false);
+    if (error) return avisar("Não consegui salvar o nome. Tente de novo.", "erro");
+    setNome(novo);
+    setSalvoNome(novo);
+    avisar(`Pronto: agora é "${novo}".`);
+    router.refresh();
+  }
 
   async function trocar() {
     setErro(null);
@@ -40,7 +61,7 @@ export default function MinhaConta({ nome, email }: { nome: string; email: strin
     router.refresh();
   }
 
-  const inicial = (nome || email || "?").trim().charAt(0).toUpperCase();
+  const inicial = (salvoNome || email || "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="space-y-4">
@@ -49,10 +70,32 @@ export default function MinhaConta({ nome, email }: { nome: string; email: strin
           {inicial}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-base font-bold text-neutral-900">{nome || "Sem nome"}</span>
+          <span className="block truncate text-base font-bold text-neutral-900">{salvoNome || "Sem nome"}</span>
           <span className="block truncate text-sm text-neutral-500">{email}</span>
         </span>
       </section>
+
+      <Bloco titulo="Seu nome" dica={'Como você quer ser chamado. Aparece na saudação do Dashboard (por exemplo, "Bom dia, Eder") no lugar do e-mail.'}>
+        <div className="space-y-2">
+          <input
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && salvarNome()}
+            placeholder="Ex.: Eder"
+            autoComplete="given-name"
+            maxLength={60}
+            className="w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-brand-teal"
+          />
+          <button
+            type="button"
+            onClick={salvarNome}
+            disabled={salvandoNome || !nome.trim() || nome.trim() === salvoNome}
+            className="w-full rounded-xl bg-brand-gradient py-3 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {salvandoNome ? "Salvando..." : "Salvar nome"}
+          </button>
+        </div>
+      </Bloco>
 
       <Bloco titulo="Trocar a senha" dica={REGRA_SENHA}>
         <div className="space-y-2">

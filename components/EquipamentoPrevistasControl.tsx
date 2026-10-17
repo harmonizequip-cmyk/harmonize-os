@@ -14,7 +14,7 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
 
   if (items.length === 0) {
     return (
-      <p className="mt-0.5 text-sm font-medium text-neutral-900">0</p>
+      <p className="mt-1 text-2xl font-extrabold leading-none tabular-nums text-slate-900">0</p>
     );
   }
 
@@ -23,7 +23,7 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-0.5 text-sm font-medium text-brand-blue underline underline-offset-2 hover:text-brand-blue/80"
+        className="mt-1 text-2xl font-extrabold leading-none tabular-nums text-teal-600 underline decoration-2 underline-offset-4"
       >
         {items.length}
       </button>
@@ -34,7 +34,7 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -54,7 +54,7 @@ export default function EquipamentoPrevistasControl({ items }: { items: Prevista
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-xl border border-neutral-200/60 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-2.5 text-sm"
                 >
                   <span className="font-medium text-neutral-900">
                     {item.client_name ?? "Cliente não identificado"}

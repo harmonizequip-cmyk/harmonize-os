@@ -320,7 +320,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
     },
   ];
 
-  const inicial = (dados.nome || dados.email || "?").trim().charAt(0).toUpperCase();
+  const inicial = (dados.nome && !dados.nome.includes("@") ? dados.nome : dados.email || "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="space-y-5 pb-4">
@@ -331,7 +331,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           {inicial}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold text-neutral-900">{dados.nome || "Minha conta"}</span>
+          <span className="block truncate text-sm font-bold text-neutral-900">{dados.nome && !dados.nome.includes("@") ? dados.nome : "Colocar meu nome"}</span>
           <span className="block truncate text-xs text-neutral-500">{dados.email} · senha e sair</span>
         </span>
         <ChevronRight size={18} className="text-neutral-300" />

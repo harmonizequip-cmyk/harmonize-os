@@ -176,9 +176,9 @@ export default function AplicadoresCard({ aplicadores, equipamentos }: { aplicad
   return (
     <div
       id="aplicadores"
-      className="scroll-mt-20 rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl"
+      className="cartao scroll-mt-20 p-5"
     >
-      <h2 className="text-lg font-semibold text-neutral-900">Aplicadores</h2>
+      <h2 className="text-xl font-extrabold text-slate-900">Aplicadores</h2>
       <p className="mt-0.5 text-xs text-neutral-500">
         Disparos estimados: última leitura do contador + locações do HIPRO onde ele está (mentoria não entra). Leia o contador de vez
         em quando para acertar a conta.

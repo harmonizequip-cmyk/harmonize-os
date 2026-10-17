@@ -128,9 +128,9 @@ export default function BloqueiosEquipamento({
     "w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-xs";
 
   return (
-    <div className="mt-4 border-t border-neutral-200/70 pt-3">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-600">
-        <Lock size={13} /> Agenda bloqueada
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <p className="flex items-center gap-1.5 text-[13px] font-bold text-slate-600">
+        <Lock size={15} /> Agenda bloqueada
       </p>
 
       {bloqueios.length === 0 ? (
@@ -203,9 +203,9 @@ export default function BloqueiosEquipamento({
         <button
           type="button"
           onClick={() => setAberto(true)}
-          className="mt-2 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700"
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-700 active:bg-slate-50"
         >
-          Bloquear período
+          <Lock size={15} /> Bloquear período
         </button>
       ) : (
         <div className="mt-2 space-y-2 rounded-lg bg-neutral-50 p-2.5">

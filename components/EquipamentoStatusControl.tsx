@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CircleCheck, Wrench } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatarDataHora } from "@/lib/movimentacoes";
 
@@ -103,15 +104,16 @@ export default function EquipamentoStatusControl({
 
   return (
     <div>
-      <p
-        className={`mt-0.5 text-sm font-medium capitalize ${
-          emManutencao ? "text-amber-600" : "text-neutral-900"
+      <span
+        className={`mt-1 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[15px] font-bold ${
+          emManutencao ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
         }`}
       >
+        {emManutencao ? <Wrench size={17} strokeWidth={2.2} /> : <CircleCheck size={19} strokeWidth={2.2} className="fill-emerald-500 text-white" />}
         {emManutencao ? "Em manutenção" : "Ativo"}
-      </p>
+      </span>
       {emManutencao && statusMotivo && (
-        <p className="mt-0.5 text-[11px] text-neutral-500">Motivo: {statusMotivo}</p>
+        <p className="mt-1 text-[12px] text-neutral-500">Motivo: {statusMotivo}</p>
       )}
       {emManutencao && statusDesde && (
         <p className="text-[11px] text-neutral-400">Desde {formatarDataHora(statusDesde)}</p>
@@ -189,7 +191,7 @@ export default function EquipamentoStatusControl({
           </button>
         )
       ) : (
-        <p className="mt-1 text-[10px] text-neutral-400">Para manutenção, use &quot;Bloquear período&quot; abaixo.</p>
+        <p className="mt-2 text-[13px] leading-snug text-slate-500">Para manutenção, use &quot;Bloquear período&quot; abaixo.</p>
       )}
     </div>
   );

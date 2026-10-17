@@ -1,18 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/format";
-import EquipamentoStatusControl from "@/components/EquipamentoStatusControl";
-import BloqueiosEquipamento, { type Bloqueio } from "@/components/BloqueiosEquipamento";
-import EquipamentoInfoControl from "@/components/EquipamentoInfoControl";
-import EquipamentoPrevistasControl from "@/components/EquipamentoPrevistasControl";
 import AplicadoresCard from "@/components/AplicadoresCard";
-import RevisaoAnualControl from "@/components/RevisaoAnualControl";
-import { type AplicadorUso, situacaoAplicador } from "@/lib/aplicador";
+import { type Bloqueio } from "@/components/BloqueiosEquipamento";
+import { type AplicadorUso } from "@/lib/aplicador";
 
 import { hojeLocal, resolverPeriodo } from "@/lib/period";
-import FiltroBarra from "@/components/FiltroBarra";
-import Link from "next/link";
-import { LinkCliente } from "@/components/Atalhos";
-import { linkEvento } from "@/lib/atalhos";
+import SeletorPeriodo from "@/components/equipamentos/SeletorPeriodo";
+import { IconeChip } from "@/components/ui/Visual";
+import { Server } from "lucide-react";
+import EquipamentoCard, { type EquipamentoDados } from "@/components/equipamentos/EquipamentoCard";
 const EQUIPMENT_COLORS: Record<string, string> = {
   hipro_1: "bg-brand-teal",
   hipro_2: "bg-brand-blue",
@@ -112,11 +108,14 @@ export default async function EquipamentosPage(
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900">Equipamentos</h1>
+      <section className="cartao p-4">
+        <div className="flex items-center gap-2.5">
+          <IconeChip icone={Server} cor="teal" />
+          <h1 className="min-w-0 flex-1 truncate text-lg font-extrabold text-slate-900">Equipamentos</h1>
+          <SeletorPeriodo padrao="mes" />
+        </div>
+        <p className="mt-2 text-[12px] text-slate-500">Período: {periodo.rotulo}</p>
 
-      <FiltroBarra periodoPadrao="mes" rotuloPeriodo={periodo.rotulo} />
-
-      <div className="grid gap-4 sm:grid-cols-2">
         {(equipments ?? []).map((eq) => {
           const eqRentals = (rentals ?? []).filter((r) => r.equipment_id === eq.id);
           const totalLocacoes = eqRentals.length;
@@ -126,117 +125,26 @@ export default async function EquipamentosPage(
           const nextEvent = normalizedUpcoming.find((e) => e.equipment_id === eq.id);
           const eqPrevistas = normalizedPrevistas.filter((p) => p.equipment_id === eq.id);
           const aplicador = aplicadores.find((a) => a.ativo && a.equipment_id === eq.id);
-          const situacao = aplicador ? situacaoAplicador(aplicador) : null;
 
           return (
-            <div key={eq.id} className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
-              <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-neutral-400"}`} />
-                <h2 className="text-lg font-semibold text-neutral-900">{eq.name}</h2>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-neutral-500">Status</p>
-                  <EquipamentoStatusControl
-                    equipmentId={eq.id}
-                    status={eq.status}
-                    statusMotivo={eq.status_motivo ?? null}
-                    statusDesde={eq.status_desde ?? null}
-                    statusPrevistoFim={eq.status_previsto_fim ?? null}
-                  />
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-500">Próxima reserva</p>
-                  <p className="mt-0.5 text-sm font-medium text-neutral-900">
-                    {nextEvent ? (
-                      <>
-                        <Link href={linkEvento(nextEvent.id)} className="underline decoration-dotted underline-offset-2 hover:text-brand-teal-dark">
-                          📅 {formatDate(nextEvent.date_start)}
-                        </Link>
-                        {nextEvent.clients?.name && (
-                          <span className="block text-xs font-normal text-neutral-500">
-                            <LinkCliente id={nextEvent.client_id}>{nextEvent.clients.name}</LinkCliente>
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      "Nenhuma"
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-500">Locações no período</p>
-                  <p className="mt-0.5 text-sm font-medium text-neutral-900">{totalLocacoes}</p>
-                  <p className="text-xs text-neutral-500">
-                    {disparosTotal.toLocaleString("pt-BR")} disparos
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-500">Receita no período</p>
-                  <p className="mt-0.5 text-sm font-medium text-brand-teal">{formatCurrency(receitaTotal)}</p>
-                  {pendenteTotal > 0 && (
-                    <p className="mt-0.5 text-xs font-medium text-amber-600">
-                      Pendente: {formatCurrency(pendenteTotal)}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-500">Locações previstas</p>
-                  <EquipamentoPrevistasControl items={eqPrevistas} />
-                </div>
-                <div id={`revisao-${eq.code}`} className="col-span-2 scroll-mt-20">
-                  <p className="text-xs text-neutral-500">Revisão anual</p>
-                  <RevisaoAnualControl equipmentId={eq.id} ultimaRevisao={eq.ultima_revisao ?? null} />
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-neutral-500">Aplicador montado</p>
-                  <a href="#aplicadores" className="mt-0.5 block text-sm font-medium text-neutral-900">
-                    {aplicador ? (
-                      <>
-                        {aplicador.nome} · ≈ {aplicador.disparos.toLocaleString("pt-BR")} disparos
-                        {situacao?.pct != null && (
-                          <span
-                            className={`ml-1 text-xs ${
-                              situacao.situacao === "fora"
-                                ? "font-normal text-neutral-500"
-                                : situacao.situacao === "perto"
-                                  ? "font-semibold text-amber-600"
-                                  : "font-normal text-neutral-500"
-                            }`}
-                          >
-                            ({situacao.situacao === "fora" ? "fora da garantia" : `${Math.round(situacao.pct * 100)}% da garantia`})
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-xs font-normal text-neutral-400">Nenhum registrado →</span>
-                    )}
-                  </a>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-neutral-500">Número de série</p>
-                  <EquipamentoInfoControl
-                    equipmentId={eq.id}
-                    serialNumber={eq.serial_number ?? null}
-                    anvisaRegistro={eq.anvisa_registro ?? null}
-                  />
-                </div>
-              </div>
-              <BloqueiosEquipamento
-                equipmentId={eq.id}
-                equipmentName={eq.name}
-                bloqueios={bloqueios.filter((b) => b.equipment_id === eq.id)}
-              />
-            </div>
+            <EquipamentoCard
+              key={eq.id}
+              eq={eq as EquipamentoDados}
+              totalLocacoes={totalLocacoes}
+              receitaTotal={receitaTotal}
+              pendenteTotal={pendenteTotal}
+              disparosTotal={disparosTotal}
+              nextEvent={nextEvent ?? null}
+              previstas={eqPrevistas}
+              aplicador={aplicador ?? null}
+              bloqueios={bloqueios.filter((b) => b.equipment_id === eq.id)}
+            />
           );
         })}
         {(!equipments || equipments.length === 0) && (
-          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300/70 bg-white/50 py-12 text-center text-neutral-400 backdrop-blur-xl">
-            Nenhum equipamento cadastrado.
-          </div>
+          <p className="py-10 text-center text-slate-400">Nenhum equipamento cadastrado.</p>
         )}
-      </div>
+      </section>
 
       <AplicadoresCard aplicadores={aplicadores} equipamentos={(equipments ?? []).map((e) => ({ id: e.id, name: e.name }))} />
     </div>

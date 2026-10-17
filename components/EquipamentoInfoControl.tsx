@@ -49,7 +49,7 @@ export default function EquipamentoInfoControl({
   if (!editing) {
     return (
       <div>
-        <p className="mt-0.5 text-sm font-medium text-neutral-900">
+        <p className="mt-0.5 break-all text-sm font-bold text-slate-900">
           {serialNumber || "Não informado"}
         </p>
         {anvisaRegistro && <p className="text-[11px] text-neutral-400">ANVISA: {anvisaRegistro}</p>}

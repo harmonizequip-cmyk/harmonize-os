@@ -97,6 +97,11 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Modelo: o Dashboard (imagem enviada pelo dono). Fundo cinza-claro frio (#f4f6f9, cinzas ardósia em `--n-*`), cartões brancos com borda bem leve, sombra suave e cantos bem redondos (classe `.cartao` em `app/globals.css`), ícones lucide em quadradinho de cor clara (`IconeChip`), selos com ícone (`Pilula`), onda da marca no canto dos destaques (`OndaMarca`), tudo em `components/ui/Visual.tsx`. Sem emoji como ícone em tela nova.
 - As telas antigas com cartão de vidro (`bg-white/70` + `border-white/60` + `backdrop-blur`) e `shadow-sm` caem no mesmo padrão pelo `globals.css`, sem mexer em cada arquivo. Barra de baixo branca com o item ativo em turquesa claro.
 
+## Tela Equipamentos (17/10/2026, desenho enviado pelo dono)
+
+- `/equipamentos`: um cartão "Equipamentos" com ícone e o seletor de período em pílula (`components/equipamentos/SeletorPeriodo.tsx`, "Este mês ⌄", vive na URL como o FiltroBarra). Cada HIPRO é um `components/equipamentos/EquipamentoCard.tsx`: nome, status em pílula (Ativo verde com check; Em manutenção âmbar), próxima reserva em destaque, três números (locações e disparos, receita e pendente, locações previstas), faixa "Revisão anual" (`RevisaoAnualControl`) e, abaixo, aplicador montado, número de série e "Agenda bloqueada / Bloquear período". Aplicadores continuam em cartão próprio.
+- Seu nome: Configurações > Minha conta > "Seu nome" grava `profiles.name` (campo livre, sem migration). É o nome da saudação do Dashboard; se o perfil tiver e-mail no lugar do nome, a saudação vem sem nome.
+
 ## Temas (Clássico e Aurora)
 
 - O tema escuro foi retirado a pedido do dono (14/10/2026); não usar classes `dark:`. O Suave também saiu (o dono não gostou). No lugar há o tema Aurora: botão de paleta no topo/menu (`components/ThemeToggle.tsx`), guardado em `localStorage` `harmonize-tema` = `aurora` e aplicado pela classe `tema-aurora` no `<html>` (script em `app/layout.tsx`). Os cinzas `neutral-*` do Tailwind saem de variáveis (`--n-50`…`--n-950`, em `app/globals.css`): o Aurora usa cinzas frios, brilho da marca no topo, cartões brancos com sombra e a barra de baixo flutuante com item ativo em degradê. Ajustes ficam só no `globals.css`.
