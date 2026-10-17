@@ -11,6 +11,10 @@ import {
   ChevronRight,
   ClipboardCheck,
   CreditCard,
+  LineChart,
+  PenLine,
+  TrendingUp,
+  Wallet,
   FileSignature,
   MessageCircle,
   PartyPopper,
@@ -35,6 +39,12 @@ const ICONES: Record<string, { icone: LucideIcon; cor: CorVisual }> = {
   equipamento: { icone: Wrench, cor: "cinza" },
   cadastro: { icone: UserPlus, cor: "rosa" },
   acesso: { icone: FileSignature, cor: "rosa" },
+  // Pessoal (lib/pessoal-controle.ts)
+  fatura: { icone: CreditCard, cor: "roxo" },
+  alta: { icone: TrendingUp, cor: "rosa" },
+  saldo: { icone: Wallet, cor: "vermelho" },
+  lancar: { icone: PenLine, cor: "azul" },
+  projecao: { icone: LineChart, cor: "ambar" },
 };
 
 export interface AvisoDash {
@@ -54,7 +64,17 @@ const PONTO: Record<NivelAviso, string> = {
   info: "bg-brand-teal",
 };
 
-export default function PrecisaDeVoce({ avisos }: { avisos: AvisoDash[] }) {
+export default function PrecisaDeVoce({
+  avisos,
+  titulo = "Precisa de você",
+  vazioTitulo = "Nada pendente agora",
+  vazioTexto = "Sem cobrança atrasada, confirmação ou tarefa vencida.",
+}: {
+  avisos: AvisoDash[];
+  titulo?: string;
+  vazioTitulo?: string;
+  vazioTexto?: string;
+}) {
   const [aberto, setAberto] = useState(false);
   const lista = [...avisos].sort((a, b) => ORDEM[a.nivel] - ORDEM[b.nivel]);
   const urgentes = lista.filter((a) => a.nivel === "urgente").length;
@@ -65,8 +85,8 @@ export default function PrecisaDeVoce({ avisos }: { avisos: AvisoDash[] }) {
       <div className="cartao flex items-center gap-3 p-4">
         <IconeChip icone={PartyPopper} cor="verde" />
         <div>
-          <p className="text-sm font-bold text-neutral-900">Nada pendente agora</p>
-          <p className="text-xs text-neutral-500">Sem cobrança atrasada, confirmação ou tarefa vencida.</p>
+          <p className="text-sm font-bold text-neutral-900">{vazioTitulo}</p>
+          <p className="text-xs text-neutral-500">{vazioTexto}</p>
         </div>
       </div>
     );
@@ -76,7 +96,7 @@ export default function PrecisaDeVoce({ avisos }: { avisos: AvisoDash[] }) {
     <section className="cartao px-3 pb-1 pt-1">
       <div className="flex items-center justify-between px-2 pb-1 pt-3">
         <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-slate-600">
-          Precisa de você <span className="text-slate-400">· {lista.length}</span>
+          {titulo} <span className="text-slate-400">· {lista.length}</span>
         </p>
         {urgentes > 0 && (
           <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600">

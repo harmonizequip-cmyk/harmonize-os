@@ -167,6 +167,13 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Contas fixas pessoais (Configurações) não entram no quadro "Este mês", na previsão de caixa nem no fechamento de domingo; aparecem no Pessoal.
 - Relatórios financeiros (`components/RelatorioFinanceiro.tsx`, carga em `lib/carregar-relatorio-financeiro.ts`, contas em `lib/relatorio-financeiro.ts`): gastos e entradas por categoria, 12 meses, cartões (recentes e próximas faturas) e, na Harmonize, empréstimos. Na Harmonize aparece no topo de Relatórios ("Financeiro da Harmonize"); no Pessoal, em `/pessoal/relatorios`. Ficam fora das somas: empréstimo/devolução e pagamento de fatura.
 
+## Pessoal: controle geral (17/10/2026)
+
+- Identidade própria para não confundir com a Harmonize: tema violeta/fucsia aplicado pela classe `espaco-pessoal` no `<html>` (script em `app/layout.tsx` + `components/EspacoTema.tsx`, recolor em `app/globals.css`), chave do topo em degradê violeta e selo "Pessoal" no cabeçalho do celular.
+- `/pessoal` ("Meu dinheiro"): destaque escuro `components/pessoal/HeroPessoal.tsx` (sobrou/faltou, rosca do gasto, comparação com o mês passado, projeção), três números (Na conta, Faturas, Contas fixas), "Atenção" (reusa `PrecisaDeVoce` com título próprio), faturas em cartões (`FaturasCartoes.tsx`), rosca por categoria com média dos 3 meses anteriores (`RosquinhaGastos.tsx`), contas fixas e linha do tempo.
+- Contas puras e testadas em `lib/pessoal-controle.ts` (`resumoDoMes`, `comparacaoPorCategoria`, `avisosPessoais`); ícones e cores por categoria em `lib/pessoal-icones.ts`. Avisos: fatura vencida/vencendo (5 dias), saldo negativo, faturas + fixas acima do saldo, mês projetado no vermelho (depois do dia 7), categoria 30% acima da média, 5 dias sem lançar.
+- Ainda não feito: assistente de IA do Pessoal (precisa de coluna `escopo` nas tabelas do assistente, migration com aval do dono).
+
 ## Cartão de crédito
 
 - `cartoes` (cada um da Harmonize ou pessoal; dia de fechamento, vencimento, limite), escrito só por `salvar_cartao`. Tela Cartões (`/financeiro/cartoes` só os da Harmonize, `/pessoal/cartoes` só os pessoais; `CartoesClient.tsx` com `escopo`): fatura atual e as outras, movimentos, "Pagar fatura", cadastro.

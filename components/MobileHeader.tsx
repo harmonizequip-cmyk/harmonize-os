@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { ehEspacoPessoal } from "@/lib/espaco";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
@@ -14,6 +15,7 @@ import { useSomenteLeitura } from "./SomenteLeitura";
 // demais na tela; agora a barra de baixo é o único lugar de navegação.
 export default function MobileHeader() {
   const router = useRouter();
+  const pessoal = ehEspacoPessoal(usePathname());
   const supabase = createClient();
   const somenteLeitura = useSomenteLeitura();
 
@@ -25,8 +27,13 @@ export default function MobileHeader() {
 
   return (
     <header className="flex items-center justify-between bg-white/75 px-4 py-2.5 backdrop-blur-xl md:hidden">
-      <div className="w-fit">
+      <div className="flex w-fit items-center gap-2">
         <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-8 w-auto" />
+        {pessoal && (
+          <span className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white">
+            Pessoal
+          </span>
+        )}
         <img
           src="/harmonize-logo-full-dark.png"
           alt="Harmonize"

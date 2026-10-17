@@ -12,6 +12,7 @@ import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
 import ReciboHost from "@/components/ReciboHost";
 import { SomenteLeituraProvider } from "@/components/SomenteLeitura";
 import EspacoSwitch from "@/components/EspacoSwitch";
+import EspacoTema from "@/components/EspacoTema";
 
 export default async function AppLayout({
   children,
@@ -63,6 +64,7 @@ export default async function AppLayout({
     <SomenteLeituraProvider valor={somenteLeitura}>
     <div className="flex min-h-screen">
       {!somenteLeitura && <RegistrarServiceWorker />}
+      <EspacoTema />
       <GuardarAgendaOffline />
       {!somenteLeitura && <ReciboHost />}
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />

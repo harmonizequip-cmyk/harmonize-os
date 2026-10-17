@@ -38,6 +38,12 @@ export default function RootLayout({
                   document.documentElement.classList.add('tema-aurora');
                 }
               } catch (e) {}
+              try {
+                var p = location.pathname;
+                if (p === '/pessoal' || p.indexOf('/pessoal/') === 0) {
+                  document.documentElement.classList.add('espaco-pessoal');
+                }
+              } catch (e) {}
             `,
           }}
         />

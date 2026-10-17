@@ -60,6 +60,36 @@ h1 {
 }
 
 /* ============================================================
+   ESPAÇO PESSOAL (17/10/2026): paleta própria (violeta e coral, no lugar do
+   turquesa da Harmonize) para nunca confundir os dois espaços. A classe
+   espaco-pessoal fica no <html> enquanto o endereço é /pessoal (script do
+   app/layout.tsx + components/EspacoTema.tsx). Recolore o que já existe sem
+   mexer em cada tela; as telas do Pessoal usam violet/fuchsia direto.
+   ============================================================ */
+.espaco-pessoal body { background-color: #f4f1fb; }
+.espaco-pessoal .bg-brand-gradient { background-image: linear-gradient(135deg, #6d4af6 0%, #9b6bff 55%, #f08bb5 100%); }
+.espaco-pessoal .shadow-glow-teal { box-shadow: 0 8px 30px -8px rgba(109, 74, 246, 0.55); }
+.espaco-pessoal .bg-brand-teal,
+.espaco-pessoal .bg-teal-500 { background-color: #6d4af6; }
+.espaco-pessoal .text-brand-teal,
+.espaco-pessoal .text-brand-teal-dark,
+.espaco-pessoal .text-teal-600,
+.espaco-pessoal .text-teal-700 { color: #5b3fe0; }
+.espaco-pessoal .bg-teal-50,
+.espaco-pessoal .bg-teal-50\/70,
+.espaco-pessoal .bg-brand-teal\/10,
+.espaco-pessoal .bg-brand-teal\/5 { background-color: #efeafe; }
+.espaco-pessoal .border-brand-teal,
+.espaco-pessoal .border-brand-teal\/30,
+.espaco-pessoal .border-brand-teal\/40 { border-color: #a78bfa; }
+.espaco-pessoal .accent-brand-teal { accent-color: #6d4af6; }
+.espaco-pessoal .cartao {
+  border-color: rgb(221 214 254 / 0.7);
+  box-shadow: 0 1px 2px rgb(76 29 149 / 0.04), 0 12px 32px -18px rgb(76 29 149 / 0.28);
+}
+.espaco-pessoal .ring-neutral-200\/80 { --tw-ring-color: rgb(221 214 254 / 0.8); }
+
+/* ============================================================
    TEMAS
    Clássico (padrão): cinzas neutros do Tailwind.
    Aurora (classe tema-aurora no <html>): cinzas frios, brilho da marca no

@@ -28,17 +28,21 @@ export default function EspacoSwitch() {
     iniciar(() => router.push(para === "pessoal" ? "/pessoal" : "/dashboard"));
   }
 
-  const estilo = (ativo: boolean) =>
-    `flex-1 rounded-lg py-1.5 text-center text-xs font-semibold transition ${
-      ativo ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+  const estilo = (ativo: boolean, pessoalBotao = false) =>
+    `flex-1 rounded-xl py-2 text-center text-sm font-bold transition ${
+      ativo
+        ? pessoalBotao
+          ? "bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white shadow-[0_8px_18px_-8px_rgb(124_58_237/0.8)]"
+          : "bg-white text-slate-900 shadow-sm"
+        : "text-slate-500"
     }`;
   return (
     <div className="mb-4">
-      <div className="flex rounded-xl bg-neutral-200/70 p-1">
+      <div className={`flex rounded-2xl p-1 ${pessoal ? "bg-violet-100/80" : "bg-neutral-200/70"}`}>
         <button type="button" onClick={() => ir("harmonize")} className={estilo(!pessoal)}>
           Harmonize
         </button>
-        <button type="button" onClick={() => ir("pessoal")} className={estilo(pessoal)}>
+        <button type="button" onClick={() => ir("pessoal")} className={estilo(pessoal, true)}>
           Pessoal
         </button>
       </div>
