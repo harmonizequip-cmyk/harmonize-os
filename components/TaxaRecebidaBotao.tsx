@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
+import { avisar, confirmar as confirmarDialogo } from "@/components/Dialogos";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -26,10 +27,13 @@ export default function TaxaRecebidaBotao({
   eventId,
   valor,
   onDone,
+  isentar = true,
 }: {
   eventId: string;
   valor?: number;
   onDone?: () => void;
+  /** Mostra "Isentar taxa" (não cobrar esta reserva). Ligado em toda tela da taxa. */
+  isentar?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -64,20 +68,59 @@ export default function TaxaRecebidaBotao({
     else router.refresh();
   }
 
+  // Isenta só esta reserva (clientes antigos que nunca pagaram a taxa, por
+  // exemplo). Só aparece com a taxa pendente, então nunca mexe em taxa paga.
+  async function isentarTaxa() {
+    const ok = await confirmarDialogo({
+      titulo: "Isentar a taxa desta reserva?",
+      texto: 'A cobrança some e a reserva segue sem taxa. Para voltar a cobrar, use "Cobrar taxa" no agendamento, na ficha da cliente.',
+      confirmar: "Isentar taxa",
+    });
+    if (!ok) return;
+    setSalvando(true);
+    setErro(null);
+    const { error } = await supabase.rpc("definir_taxa_agendamento", {
+      p_event_id: eventId,
+      p_status: "nao_aplica",
+      p_payment_method: "pix",
+    });
+    setSalvando(false);
+    if (error) {
+      setErro(error.message || "Não foi possível isentar a taxa.");
+      return;
+    }
+    avisar("Taxa isentada.");
+    if (onDone) onDone();
+    else router.refresh();
+  }
+
   const rotulo = valor && valor > 0 ? `Taxa recebida (${formatCurrency(valor)})` : "Taxa recebida";
 
   if (!aberto) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setData(hojeLocal());
-          setAberto(true);
-        }}
-        className="w-full rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white"
-      >
-        {rotulo}
-      </button>
+      <div className="space-y-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            setData(hojeLocal());
+            setAberto(true);
+          }}
+          className="w-full rounded-lg bg-brand-teal py-1.5 text-xs font-medium text-white"
+        >
+          {rotulo}
+        </button>
+        {isentar && (
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={isentarTaxa}
+            className="w-full rounded-lg border border-neutral-300 bg-white py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
+          >
+            {salvando ? "Salvando..." : "Isentar taxa"}
+          </button>
+        )}
+        {erro && <p className="text-xs text-red-600">{erro}</p>}
+      </div>
     );
   }
 

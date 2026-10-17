@@ -62,6 +62,7 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero, lerCustoPorDisparo, limparCampoCustoPorDisparo } from "@/lib/valor";
 import CalculoImagemBotao from "@/components/CalculoImagemBotao";
 import { montarDadosCalculo, montarDadosMentoria } from "@/lib/calculo-image";
+import { avisar as avisarApp, confirmar as confirmarApp } from "@/components/Dialogos";
 import { somarContagens, creditoUsavel, disparosCobrados, type Contagem } from "@/lib/creditos";
 
 let idSeq = 0;
@@ -636,12 +637,39 @@ export default function CalculadoraLocacaoModal({
   // Taxa de reserva
   // ------------------------------------------------------------
   const feeIsPaid = mode.kind === "finalize" && mode.reservation.taxaStatus === "paga";
-  const feePending = mode.kind === "finalize" && mode.reservation.taxaStatus === "pendente";
+  // "Isentar taxa" na finalização: marca esta reserva como sem taxa e some o aviso.
+  const [taxaIsentada, setTaxaIsentada] = useState(false);
+  const [isentando, setIsentando] = useState(false);
+  const feePending = mode.kind === "finalize" && mode.reservation.taxaStatus === "pendente" && !taxaIsentada;
   // Em modo "create", a taxa nasce pendente sozinha (gatilho do banco)
   // quando a data é futura e o cliente não é parceiro — mesma conta de
   // definir_taxa_ao_criar_evento. Só decide se a opção aparece na tela.
   const feeWouldApplyOnCreate = mode.kind === "create" && !activeClientParceiro && eventDate > hojeLocal();
   const [chargeFeeNow, setChargeFeeNow] = useState(false);
+  async function isentarTaxaDestaReserva() {
+    if (mode.kind !== "finalize") return;
+    const ok = await confirmarApp({
+      titulo: "Isentar a taxa desta reserva?",
+      texto: "A cobrança some e esta locação segue sem taxa de reserva.",
+      confirmar: "Isentar taxa",
+    });
+    if (!ok) return;
+    setIsentando(true);
+    const { error: erroIsentar } = await supabase.rpc("definir_taxa_agendamento", {
+      p_event_id: mode.reservation.id,
+      p_status: "nao_aplica",
+      p_payment_method: "pix",
+    });
+    setIsentando(false);
+    if (erroIsentar) {
+      avisarApp(erroIsentar.message || "Não consegui isentar a taxa.", "erro");
+      return;
+    }
+    setChargeFeeNow(false);
+    setTaxaIsentada(true);
+    avisarApp("Taxa isentada.");
+  }
+
   const reservationFeeStatus: ReservationFeeStatus = feeIsPaid
     ? "ja_paga"
     : (feePending || feeWouldApplyOnCreate) && chargeFeeNow
@@ -1440,6 +1468,14 @@ export default function CalculadoraLocacaoModal({
         {feePending && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
             💳 A taxa de reserva desta data está pendente. Marque "Cobrar taxa de reserva agora" mais abaixo se for cobrar junto.
+            <button
+              type="button"
+              disabled={isentando}
+              onClick={isentarTaxaDestaReserva}
+              className="mt-2 block rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 disabled:opacity-60"
+            >
+              {isentando ? "Salvando..." : "Isentar taxa desta reserva"}
+            </button>
           </div>
         )}
 
