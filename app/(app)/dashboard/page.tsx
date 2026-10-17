@@ -21,7 +21,8 @@ import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
 import { LinkCliente } from "@/components/Atalhos";
 import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, HandCoins, Wallet } from "lucide-react";
+import { IconeChip } from "@/components/ui/Visual";
 import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
 import { LIMITE_DIARIO } from "@/lib/relacionamento";
 
@@ -565,7 +566,8 @@ export default async function DashboardPage(
   const { data: perfilDash } = usuario
     ? await supabase.from("profiles").select("name").eq("id", usuario.id).single()
     : { data: null };
-  const primeiroNome = ((perfilDash?.name as string | undefined) ?? "").trim().split(/\s+/)[0] ?? "";
+  const nomePerfil = ((perfilDash?.name as string | undefined) ?? "").trim();
+  const primeiroNome = nomePerfil.includes("@") ? "" : (nomePerfil.split(/\s+/)[0] ?? "");
   const hora = Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date()));
   const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
   const dataHojeExtenso = format(new Date(`${todayStr}T12:00:00`), "EEE, d 'de' MMM", { locale: ptBR });
@@ -576,7 +578,7 @@ export default async function DashboardPage(
   if (taxasAReceberCount > 0)
     avisos.push({
       id: "taxas",
-      emoji: "💳",
+      icone: "taxa",
       texto: `${taxasAReceberCount} ${taxasAReceberCount === 1 ? "taxa de reserva" : "taxas de reserva"} a receber`,
       detalhe: `${formatCurrency(taxasAReceberTotal)}${taxasVencidasCount > 0 ? ` · ${taxasVencidasCount} ${taxasVencidasCount === 1 ? "vencida" : "vencidas"} (mais de ${diasCobrancaTaxa} dias)` : ""}`,
       href: "/pendencias#taxas",
@@ -585,7 +587,7 @@ export default async function DashboardPage(
   if (semDisparos.length > 0)
     avisos.push({
       id: "sem-disparos",
-      emoji: "🧾",
+      icone: "disparos",
       texto: `${semDisparos.length} ${semDisparos.length === 1 ? "atendimento sem disparos lançados" : "atendimentos sem disparos lançados"}`,
       detalhe: "Já passaram e ainda não foram cobrados",
       href: "/pendencias#sem-disparos",
@@ -594,7 +596,7 @@ export default async function DashboardPage(
   if (revisoesAlerta.length > 0)
     avisos.push({
       id: "revisao",
-      emoji: "🛠️",
+      icone: "equipamento",
       texto: "Revisão anual dos HIPROs",
       detalhe: revisoesAlerta
         .map((e) => (e.situacao === "vencida" ? `${e.nome} vencida` : e.dias === 0 ? `${e.nome} hoje` : `${e.nome} em ${e.dias} ${e.dias === 1 ? "dia" : "dias"}`))
@@ -605,7 +607,7 @@ export default async function DashboardPage(
   if (pendingConfirmations && pendingConfirmations > 0)
     avisos.push({
       id: "confirmacoes",
-      emoji: "📞",
+      icone: "confirmacao",
       texto: `${pendingConfirmations} ${pendingConfirmations === 1 ? "atendimento sem confirmação" : "atendimentos sem confirmação"}`,
       detalhe: "Nos próximos 7 dias",
       href: "/agenda#confirmacoes",
@@ -614,7 +616,7 @@ export default async function DashboardPage(
   if (tarefasDeHoje.length > 0)
     avisos.push({
       id: "tarefas",
-      emoji: "🗒️",
+      icone: "tarefas",
       texto: `Atacar a fila: ${tarefasDeHoje.length} ${tarefasDeHoje.length === 1 ? "tarefa" : "tarefas"}${tarefasAtrasadas > 0 ? ` (${tarefasAtrasadas} atrasada${tarefasAtrasadas > 1 ? "s" : ""})` : ""}`,
       detalhe: resumoTarefas,
       href: "/tarefas?fila=1",
@@ -630,7 +632,7 @@ export default async function DashboardPage(
   if (paraChamar > 0)
     avisos.push({
       id: "relacionamento",
-      emoji: "💬",
+      icone: "conversa",
       texto: `${Math.min(paraChamar, LIMITE_DIARIO)} ${Math.min(paraChamar, LIMITE_DIARIO) === 1 ? "pessoa para chamar hoje" : "pessoas para chamar hoje"}`,
       detalhe: "Clientes e leads na hora de uma conversa, com o WhatsApp pronto",
       href: "/relacionamento",
@@ -639,7 +641,7 @@ export default async function DashboardPage(
   if (aplicadoresAlerta.length > 0)
     avisos.push({
       id: "aplicadores",
-      emoji: "🔧",
+      icone: "equipamento",
       texto: "Garantia de aplicador acabando",
       detalhe: aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", "),
       href: "/equipamentos#aplicadores",
@@ -648,7 +650,7 @@ export default async function DashboardPage(
   if (cadastrosNovos && cadastrosNovos > 0)
     avisos.push({
       id: "cadastros",
-      emoji: "📝",
+      icone: "cadastro",
       texto: `${cadastrosNovos} ${cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"}`,
       detalhe: "Conferir e liberar na Academy",
       href: "/clientes/cadastros",
@@ -657,7 +659,7 @@ export default async function DashboardPage(
   for (const c of acessosParaLiberar)
     avisos.push({
       id: `acesso-${c.clientId}`,
-      emoji: "📋",
+      icone: "acesso",
       texto: `${c.nome} quer acesso ao Planejador`,
       detalhe: "Preencheu o cadastro: toque para liberar",
       href: `/clientes/${c.clientId}`,
@@ -685,12 +687,14 @@ export default async function DashboardPage(
 
       {/* Dinheiro agora */}
       <div className="grid grid-cols-2 gap-2">
-        <Link href="/financeiro" className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80 active:bg-neutral-50">
+        <Link href="/financeiro" className="cartao p-4 active:bg-neutral-50">
+          <IconeChip icone={Wallet} cor="teal" className="mb-2" />
           <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Saldo em caixa</p>
           <p className={`mt-1 text-lg font-extrabold tabular-nums ${saldoTotal < 0 ? "text-rose-600" : "text-neutral-900"}`}>{formatCurrency(saldoTotal)}</p>
           <p className="text-[11px] text-neutral-400">Ver o financeiro →</p>
         </Link>
-        <Link href="/pendencias" className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80 active:bg-neutral-50">
+        <Link href="/pendencias" className="cartao p-4 active:bg-neutral-50">
+          <IconeChip icone={HandCoins} cor="ambar" className="mb-2" />
           <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">A receber</p>
           <p className={`mt-1 text-lg font-extrabold tabular-nums ${pendencias.total > 0 ? "text-amber-600" : "text-neutral-900"}`}>{formatCurrency(pendencias.total)}</p>
           <p className="truncate text-[11px] text-neutral-400">
@@ -706,7 +710,7 @@ export default async function DashboardPage(
       <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
 
       {proximosDias.length > 0 && (
-        <section className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
+        <section className="cartao p-4">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Próximos dias</p>
             <Link href="/agenda" className="flex items-center gap-1 text-xs font-semibold text-brand-teal-dark">
@@ -748,7 +752,7 @@ export default async function DashboardPage(
           <PeriodFilter padrao="mes" />
         </div>
 
-        <div className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
+        <div className="cartao p-4">
           <div className="grid grid-cols-2 gap-3">
             <Link href={`/locacoes?${periodQuery}`}>
               <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Locações</p>

@@ -42,7 +42,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-brand-mesh bg-neutral-50 text-neutral-900 antialiased">
+      <body className="bg-brand-mesh bg-[#f4f6f9] text-neutral-900 antialiased">
         {children}
         <DialogosHost />
       </body>

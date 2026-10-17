@@ -9,7 +9,26 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, MessageCircle, Search, SkipForward, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarCheck,
+  Check,
+  ChevronRight,
+  CircleCheck,
+  Flame,
+  Gem,
+  Star,
+  MessageCircle,
+  Moon,
+  Search,
+  SkipForward,
+  Snowflake,
+  Sparkles,
+  Sprout,
+  Sun,
+  type LucideIcon,
+} from "lucide-react";
+import { IconeChip, OndaMarca, type CorVisual } from "@/components/ui/Visual";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatCurrency } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
@@ -25,6 +44,18 @@ import { avisar } from "@/components/Dialogos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 
 type Aba = "hoje" | "clientes" | "leads";
+
+// Ícone e cor de cada classe (padrão visual: ícone em quadradinho, sem emoji).
+const VISUAL: Record<Classe, { icone: LucideIcon; cor: CorVisual }> = {
+  agendada: { icone: CalendarCheck, cor: "rosa" },
+  nova: { icone: Sprout, cor: "verde" },
+  ativa: { icone: CircleCheck, cor: "teal" },
+  em_risco: { icone: AlertTriangle, cor: "ambar" },
+  sumida: { icone: Moon, cor: "cinza" },
+  quente: { icone: Flame, cor: "vermelho" },
+  morna: { icone: Sun, cor: "ambar" },
+  fria: { icone: Snowflake, cor: "azul" },
+};
 const CHAVE_PULOS = "harmonize-relacionamento-pulos";
 
 const CLASSES_CLIENTE: Classe[] = ["em_risco", "nova", "ativa", "agendada", "sumida"];
@@ -34,7 +65,10 @@ function Selo({ classe }: { classe: Classe }) {
   const c = ROTULO_CLASSE[classe];
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${c.cor}`}>
-      <span aria-hidden>{c.emoji}</span>
+      {(() => {
+        const I = VISUAL[classe].icone;
+        return <I size={12} strokeWidth={2.4} />;
+      })()}
       {c.rotulo}
     </span>
   );
@@ -45,7 +79,7 @@ function SeloValor({ p }: { p: PessoaClassificada }) {
   if (!v) return null;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${v.cor}`}>
-      <span aria-hidden>{v.emoji}</span>
+      {p.valor === "vip" ? <Gem size={12} strokeWidth={2.4} /> : <Star size={12} strokeWidth={2.4} />}
       {v.rotulo}
     </span>
   );
@@ -207,26 +241,27 @@ export default function RelacionamentoClient({
 
       {aba === "hoje" && (
         <>
-          <section className="rounded-3xl bg-brand-gradient p-4 text-white shadow-glow-teal">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">Conversas de hoje</p>
-            <div className="mt-1 flex items-end justify-between gap-3">
-              <p className="text-2xl font-extrabold leading-none">
-                {feitos.size} <span className="text-base font-semibold text-white/80">de {totalHoje}</span>
+          <section className="cartao p-4">
+            <OndaMarca />
+            <p className="relative text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Conversas de hoje</p>
+            <div className="relative mt-1 flex items-end justify-between gap-3">
+              <p className="text-3xl font-extrabold leading-none text-slate-900">
+                {feitos.size} <span className="text-base font-semibold text-slate-400">de {totalHoje}</span>
               </p>
-              <p className="text-right text-[11.5px] leading-snug text-white/85">
+              <p className="text-right text-[11.5px] font-semibold leading-snug text-teal-700">
                 {restantes > 0 ? `+${restantes} esperando os próximos dias` : "Ninguém esquecido"}
               </p>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/25">
-              <div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${totalHoje ? (feitos.size / totalHoje) * 100 : 100}%` }} />
+            <div className="relative mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-400 transition-all duration-500" style={{ width: `${totalHoje ? (feitos.size / totalHoje) * 100 : 100}%` }} />
             </div>
-            <p className="mt-2 text-[11.5px] text-white/85">
+            <p className="relative mt-2 text-[12px] leading-snug text-slate-500">
               No máximo {LIMITE_DIARIO} por dia, quem vale mais e está há mais tempo sem conversa primeiro. Mandou mensagem, a pessoa sai da lista e volta só no tempo certo.
             </p>
           </section>
 
           {filaVisivel.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-3xl bg-white p-6 text-center ring-1 ring-neutral-200/80">
+            <div className="flex flex-col items-center gap-2 cartao p-6 text-center">
               <Sparkles className="text-brand-teal" />
               <p className="text-sm font-bold text-neutral-900">{feitos.size ? "Fila de hoje concluída 🎉" : "Ninguém para chamar hoje"}</p>
               <p className="text-xs text-neutral-500">Amanhã a lista se monta de novo, sozinha.</p>
@@ -234,11 +269,9 @@ export default function RelacionamentoClient({
           ) : (
             <ul className="space-y-2.5">
               {filaVisivel.map((p) => (
-                <li key={p.id} className="rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
+                <li key={p.id} className="cartao p-4">
                   <div className="flex items-start gap-3">
-                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-lg">
-                      {ROTULO_CLASSE[p.classe].emoji}
-                    </span>
+                    <IconeChip icone={VISUAL[p.classe].icone} cor={VISUAL[p.classe].cor} tamanho="lg" />
                     <div className="min-w-0 flex-1">
                       <Link href={`/clientes/${p.id}`} className="block truncate text-[15px] font-bold text-neutral-900">
                         {nomeCurto(p)}
@@ -309,7 +342,7 @@ export default function RelacionamentoClient({
                 onClick={() => setFiltro("vip")}
                 className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${filtro === "vip" ? "bg-neutral-900 text-white" : "bg-white text-neutral-600 ring-1 ring-neutral-200"}`}
               >
-                💎 VIP · {vips}
+                VIP · {vips}
               </button>
             )}
             {(aba === "clientes" ? CLASSES_CLIENTE : CLASSES_LEAD).map((c) => {
@@ -322,7 +355,7 @@ export default function RelacionamentoClient({
                   onClick={() => setFiltro(c)}
                   className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${filtro === c ? "bg-neutral-900 text-white" : "bg-white text-neutral-600 ring-1 ring-neutral-200"}`}
                 >
-                  {ROTULO_CLASSE[c].emoji} {ROTULO_CLASSE[c].rotulo} · {n}
+                  {ROTULO_CLASSE[c].rotulo} · {n}
                 </button>
               );
             })}
@@ -339,7 +372,7 @@ export default function RelacionamentoClient({
             />
           </label>
 
-          <ul className="overflow-hidden rounded-3xl bg-white ring-1 ring-neutral-200/80">
+          <ul className="cartao">
             {listaCarteira.length === 0 && <li className="p-6 text-center text-sm text-neutral-400">Ninguém aqui.</li>}
             {listaCarteira.slice(0, 200).map((p) => (
               <li key={p.id} className="border-b border-neutral-100 last:border-0">

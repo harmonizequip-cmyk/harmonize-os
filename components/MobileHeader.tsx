@@ -24,7 +24,7 @@ export default function MobileHeader() {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-white/50 bg-white/75 px-4 py-2 backdrop-blur-xl md:hidden">
+    <header className="flex items-center justify-between bg-white/75 px-4 py-2.5 backdrop-blur-xl md:hidden">
       <div className="w-fit">
         <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-8 w-auto" />
         <img

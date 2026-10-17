@@ -6,13 +6,41 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, ChevronRight, PartyPopper } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  CreditCard,
+  FileSignature,
+  MessageCircle,
+  PartyPopper,
+  Phone,
+  ReceiptText,
+  UserPlus,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 
 export type NivelAviso = "urgente" | "atencao" | "info";
 
+// Ícone e cor de cada tipo de aviso (padrão visual aprovado: ícone num
+// quadradinho de cor clara, no lugar de emoji).
+const ICONES: Record<string, { icone: LucideIcon; cor: CorVisual }> = {
+  taxa: { icone: CreditCard, cor: "ambar" },
+  disparos: { icone: ReceiptText, cor: "roxo" },
+  confirmacao: { icone: Phone, cor: "azul" },
+  tarefas: { icone: ClipboardCheck, cor: "verde" },
+  conversa: { icone: MessageCircle, cor: "teal" },
+  equipamento: { icone: Wrench, cor: "cinza" },
+  cadastro: { icone: UserPlus, cor: "rosa" },
+  acesso: { icone: FileSignature, cor: "rosa" },
+};
+
 export interface AvisoDash {
   id: string;
-  emoji: string;
+  /** Chave de ICONES. */
+  icone: keyof typeof ICONES | string;
   texto: string;
   detalhe?: string;
   href: string;
@@ -34,10 +62,8 @@ export default function PrecisaDeVoce({ avisos }: { avisos: AvisoDash[] }) {
 
   if (lista.length === 0) {
     return (
-      <div className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-neutral-200/80">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-          <PartyPopper size={19} />
-        </span>
+      <div className="cartao flex items-center gap-3 p-4">
+        <IconeChip icone={PartyPopper} cor="verde" />
         <div>
           <p className="text-sm font-bold text-neutral-900">Nada pendente agora</p>
           <p className="text-xs text-neutral-500">Sem cobrança atrasada, confirmação ou tarefa vencida.</p>
@@ -47,28 +73,28 @@ export default function PrecisaDeVoce({ avisos }: { avisos: AvisoDash[] }) {
   }
 
   return (
-    <section className="rounded-3xl bg-white p-2 ring-1 ring-neutral-200/80">
-      <div className="flex items-center justify-between px-2.5 pb-1 pt-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-          Precisa de você <span className="text-neutral-400">· {lista.length}</span>
+    <section className="cartao px-3 pb-1 pt-1">
+      <div className="flex items-center justify-between px-2 pb-1 pt-3">
+        <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-slate-600">
+          Precisa de você <span className="text-slate-400">· {lista.length}</span>
         </p>
         {urgentes > 0 && (
-          <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600">
             {urgentes} {urgentes === 1 ? "urgente" : "urgentes"}
           </span>
         )}
       </div>
-      <ul>
+      <ul className="divide-y divide-slate-100">
         {visiveis.map((a) => (
           <li key={a.id}>
-            <Link href={a.href} className="flex items-center gap-3 rounded-2xl px-2.5 py-2.5 active:bg-neutral-50">
-              <span className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-neutral-50 text-lg">
-                {a.emoji}
-                <span className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${PONTO[a.nivel]}`} />
+            <Link href={a.href} className="flex items-center gap-3 px-2 py-3 active:bg-neutral-50">
+              <span className="relative flex-shrink-0">
+                <IconeChip icone={(ICONES[a.icone] ?? ICONES.conversa).icone} cor={(ICONES[a.icone] ?? ICONES.conversa).cor} tamanho="lg" />
+                <span className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full ring-2 ring-white ${PONTO[a.nivel]}`} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[13.5px] font-semibold leading-snug text-neutral-900">{a.texto}</span>
-                {a.detalhe && <span className="block truncate text-[11.5px] text-neutral-500">{a.detalhe}</span>}
+                <span className="block text-[14.5px] font-semibold leading-snug text-slate-900">{a.texto}</span>
+                {a.detalhe && <span className="mt-0.5 block truncate text-[12.5px] text-neutral-500">{a.detalhe}</span>}
               </span>
               <ChevronRight size={16} className="flex-shrink-0 text-neutral-300" />
             </Link>

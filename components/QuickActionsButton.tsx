@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ehEspacoPessoal } from "@/lib/espaco";
-import { Plus, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, ClipboardList, ListChecks, type LucideIcon, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
+import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 import { createClient } from "@/lib/supabase/client";
 import NovaTarefaModal from "@/app/(app)/funil/NovaTarefaModal";
 import NovoLeadModal from "@/app/(app)/funil/NovoLeadModal";
@@ -52,6 +53,20 @@ type ActionKey =
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
 // sem aquele acesso não ver a opção aqui também.
+// Ícone e cor de cada atalho (padrão visual: ícone em quadradinho, sem emoji).
+const VISUAL_ACAO: Record<ActionKey, { icone: LucideIcon; cor: CorVisual }> = {
+  receber: { icone: Banknote, cor: "verde" },
+  locacao: { icone: CalendarPlus, cor: "teal" },
+  locacao_disparos: { icone: Target, cor: "teal" },
+  evento: { icone: CalendarDays, cor: "azul" },
+  planejador: { icone: ClipboardList, cor: "roxo" },
+  lancamento: { icone: Wallet, cor: "ambar" },
+  despesa_voz: { icone: Mic, cor: "ambar" },
+  lead: { icone: UserPlus, cor: "rosa" },
+  tarefa: { icone: ListChecks, cor: "verde" },
+  tabela: { icone: Tag, cor: "roxo" },
+};
+
 // Em grupos e em blocos de duas colunas, como o Menu (pedido do dono,
 // 17/10/2026). Receber pagamento, o mais usado, vem em destaque no topo.
 const GRUPOS_ACAO = ["Agenda", "Dinheiro", "Clientes"] as const;
@@ -187,9 +202,14 @@ export default function QuickActionsButton({
                   <button
                     key={a.key}
                     onClick={() => handlePick(a.key)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-brand-gradient px-4 py-3 text-left text-white shadow-glow-teal active:scale-[0.99]"
+                    className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-400 px-4 py-3 text-left text-white shadow-glow-teal active:scale-[0.99]"
                   >
-                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-xl">{a.emoji}</span>
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
+                      {(() => {
+                        const I = VISUAL_ACAO[a.key].icone;
+                        return <I size={20} />;
+                      })()}
+                    </span>
                     <span className="min-w-0">
                       <span className="block text-[15px] font-bold leading-tight">{a.label}</span>
                       <span className="block text-xs text-white/85">{a.dica}</span>
@@ -207,9 +227,9 @@ export default function QuickActionsButton({
                         <button
                           key={a.key}
                           onClick={() => handlePick(a.key)}
-                          className="flex items-center gap-2 rounded-2xl bg-white px-2.5 py-2.5 text-left ring-1 ring-neutral-200 transition active:bg-neutral-50"
+                          className="flex items-center gap-2 rounded-2xl bg-white px-2.5 py-2.5 text-left shadow-[0_8px_20px_-16px_rgb(15_23_42/0.25)] ring-1 ring-slate-200/70 transition active:bg-neutral-50"
                         >
-                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-base">{a.emoji}</span>
+                          <IconeChip icone={VISUAL_ACAO[a.key].icone} cor={VISUAL_ACAO[a.key].cor} tamanho="sm" />
                           <span className="min-w-0">
                             <span className="block text-[13.5px] font-semibold leading-tight text-neutral-800">{a.label}</span>
                             <span className="block truncate text-[11px] leading-tight text-neutral-500">{a.dica}</span>

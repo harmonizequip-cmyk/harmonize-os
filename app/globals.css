@@ -16,11 +16,47 @@ body {
 
 /* Fundo com manchas suaves de gradiente nas cores da marca, atrás de tudo */
 .bg-brand-mesh {
-  background-image:
-    radial-gradient(500px circle at 8% 8%, rgba(61, 191, 184, 0.12), transparent 60%),
-    radial-gradient(450px circle at 92% 15%, rgba(232, 120, 154, 0.09), transparent 60%),
-    radial-gradient(600px circle at 25% 95%, rgba(184, 160, 208, 0.11), transparent 60%),
-    radial-gradient(450px circle at 95% 90%, rgba(126, 200, 227, 0.11), transparent 60%);
+  background-image: none;
+}
+
+/* ============================================================
+   PADRÃO VISUAL (aprovado pelo dono em 17/10/2026, a partir do Dashboard)
+   Fundo cinza-claro frio, cartões brancos com borda bem leve e sombra
+   suave, cantos redondos. As telas antigas usam o cartão "de vidro"
+   (bg-white/70 + border-white/60 + backdrop-blur): estas regras levam todas
+   elas ao mesmo padrão sem mexer em cada arquivo. Tela nova usa a classe
+   .cartao ou as peças de components/ui/Visual.tsx.
+   ============================================================ */
+body {
+  background-color: #f4f6f9;
+}
+.cartao {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.75rem;
+  background-color: #fff;
+  border: 1px solid rgb(226 232 240 / 0.7);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03), 0 12px 32px -18px rgb(15 23 42 / 0.18);
+}
+.bg-white\/70,
+.bg-white\/80 {
+  background-color: #fff;
+}
+.border-white\/60 {
+  border-color: rgb(226 232 240 / 0.7);
+}
+.backdrop-blur-xl.bg-white\/70 {
+  backdrop-filter: none;
+}
+.shadow-sm {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03), 0 12px 32px -18px rgb(15 23 42 / 0.18);
+}
+/* Cartões novos (ring-1 ring-neutral-200/80): mesma sombra suave. */
+.ring-neutral-200\/80 {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03), 0 12px 32px -18px rgb(15 23 42 / 0.18), 0 0 0 1px rgb(226 232 240 / 0.7) !important;
+}
+h1 {
+  letter-spacing: -0.02em;
 }
 
 /* ============================================================
@@ -31,17 +67,18 @@ body {
    Trocado no botão do menu (components/ThemeToggle.tsx).
    ============================================================ */
 :root {
-  --n-50: 250 250 250;
-  --n-100: 245 245 245;
-  --n-200: 229 229 229;
-  --n-300: 212 212 212;
-  --n-400: 163 163 163;
-  --n-500: 115 115 115;
-  --n-600: 82 82 82;
-  --n-700: 64 64 64;
-  --n-800: 38 38 38;
-  --n-900: 23 23 23;
-  --n-950: 10 10 10;
+  /* Cinzas frios (ardósia), como no padrão aprovado. */
+  --n-50: 248 250 252;
+  --n-100: 241 245 249;
+  --n-200: 226 232 240;
+  --n-300: 203 213 225;
+  --n-400: 148 163 184;
+  --n-500: 100 116 139;
+  --n-600: 71 85 105;
+  --n-700: 51 65 85;
+  --n-800: 30 41 59;
+  --n-900: 15 23 42;
+  --n-950: 2 6 23;
 }
 
 .tema-aurora {

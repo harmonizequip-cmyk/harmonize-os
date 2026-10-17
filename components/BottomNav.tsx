@@ -50,6 +50,13 @@ const PESSOAL_ITEMS = [
 // por assunto (pedido do dono, 17/10/2026), em duas colunas para caber numa
 // tela só, sem rolar.
 const GRUPOS = ["Atendimento", "Dinheiro", "Inteligência", "Sistema"] as const;
+// Cor do quadradinho do ícone por grupo (padrão visual aprovado).
+const COR_GRUPO: Record<(typeof GRUPOS)[number], string> = {
+  Atendimento: "bg-teal-50 text-teal-600",
+  Dinheiro: "bg-amber-50 text-amber-600",
+  Inteligência: "bg-violet-50 text-violet-600",
+  Sistema: "bg-slate-100 text-slate-500",
+};
 const MORE_ITEMS: { href: string; label: string; icon: typeof Users; module: string; grupo: (typeof GRUPOS)[number] }[] = [
   { href: "/relacionamento", label: "Relacionamento", icon: HeartHandshake, module: "clientes", grupo: "Atendimento" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes", grupo: "Atendimento" },
@@ -92,7 +99,7 @@ export default function BottomNav({
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-white/50 bg-white/75 py-2 backdrop-blur-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-10 flex justify-around border-t border-neutral-200/60 bg-white/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_-16px_rgb(15_23_42/0.2)] backdrop-blur-xl md:hidden">
         {mainItems.map((item) => {
           // "Início" do Pessoal (/pessoal) só acende na própria página.
           const active = item.href === "/pessoal" ? pathname === "/pessoal" : pathname.startsWith(item.href);
@@ -101,19 +108,19 @@ export default function BottomNav({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center rounded-xl px-3 py-1 text-[10px] transition ${
-                active ? "text-neutral-900" : "text-neutral-500"
+              className={`flex flex-col items-center rounded-xl px-2 py-0.5 text-[11px] transition ${
+                active ? "text-teal-600" : "text-neutral-500"
               }`}
             >
               <span
-                className={`flex h-7 w-9 items-center justify-center rounded-full transition ${
-                  active ? "bg-neutral-900" : ""
+                className={`flex h-8 w-12 items-center justify-center rounded-2xl transition ${
+                  active ? "bg-teal-50" : ""
                 }`}
               >
                 <Icon
-                  size={17}
-                  strokeWidth={1.75}
-                  className={active ? "text-white" : ""}
+                  size={19}
+                  strokeWidth={1.9}
+                  className={active ? "text-teal-600" : ""}
                 />
               </span>
               <span className="mt-0.5 font-medium">{item.label}</span>
@@ -123,16 +130,16 @@ export default function BottomNav({
 
         {!pessoal && <button
           onClick={() => setMenuOpen(true)}
-          className={`flex flex-col items-center rounded-xl px-3 py-1 text-[10px] transition ${
-            isInMore ? "text-neutral-900" : "text-neutral-500"
+          className={`flex flex-col items-center rounded-xl px-2 py-0.5 text-[11px] transition ${
+            isInMore ? "text-teal-600" : "text-neutral-500"
           }`}
         >
           <span
-            className={`flex h-7 w-9 items-center justify-center rounded-full transition ${
-              isInMore ? "bg-neutral-900" : ""
+            className={`flex h-8 w-12 items-center justify-center rounded-2xl transition ${
+              isInMore ? "bg-teal-50" : ""
             }`}
           >
-            <Menu size={17} strokeWidth={1.75} className={isInMore ? "text-white" : ""} />
+            <Menu size={19} strokeWidth={1.9} className={isInMore ? "text-teal-600" : ""} />
           </span>
           <span className="mt-0.5 font-medium">Menu</span>
         </button>}
@@ -176,11 +183,11 @@ export default function BottomNav({
                             onClick={() => setMenuOpen(false)}
                             className={`flex items-center gap-2 rounded-2xl px-2.5 py-2.5 text-[13.5px] font-medium ring-1 transition ${
                               active
-                                ? "bg-brand-teal/10 text-brand-teal-dark ring-brand-teal/40"
-                                : "bg-white text-neutral-700 ring-neutral-200 active:bg-neutral-50"
+                                ? "bg-teal-50/60 text-teal-700 ring-teal-300/60"
+                                : "bg-white text-slate-700 ring-slate-200/70 shadow-[0_8px_20px_-16px_rgb(15_23_42/0.25)] active:bg-neutral-50"
                             }`}
                           >
-                            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${active ? "bg-brand-teal/15" : "bg-neutral-100"}`}>
+                            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${COR_GRUPO[item.grupo]}`}>
                               <Icon size={17} strokeWidth={1.75} />
                             </span>
                             <span className="min-w-0 leading-tight">{item.label}</span>

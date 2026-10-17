@@ -92,6 +92,11 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Não usar `confirm`/`alert`/`prompt` do navegador: usar `confirmar`, `avisar` e `pedirTexto` de `components/Dialogos.tsx` (montado em `app/layout.tsx`). `perigo: true` e rótulo próprio ("Apagar") quando apaga ou cancela.
 - O "+" (`QuickActionsButton`) segue o Menu: Receber pagamento em destaque e grupos Agenda, Dinheiro e Clientes em duas colunas. A barra lateral do computador usa os mesmos grupos do Menu.
 
+## Padrão visual (aprovado pelo dono em 17/10/2026)
+
+- Modelo: o Dashboard (imagem enviada pelo dono). Fundo cinza-claro frio (#f4f6f9, cinzas ardósia em `--n-*`), cartões brancos com borda bem leve, sombra suave e cantos bem redondos (classe `.cartao` em `app/globals.css`), ícones lucide em quadradinho de cor clara (`IconeChip`), selos com ícone (`Pilula`), onda da marca no canto dos destaques (`OndaMarca`), tudo em `components/ui/Visual.tsx`. Sem emoji como ícone em tela nova.
+- As telas antigas com cartão de vidro (`bg-white/70` + `border-white/60` + `backdrop-blur`) e `shadow-sm` caem no mesmo padrão pelo `globals.css`, sem mexer em cada arquivo. Barra de baixo branca com o item ativo em turquesa claro.
+
 ## Temas (Clássico e Aurora)
 
 - O tema escuro foi retirado a pedido do dono (14/10/2026); não usar classes `dark:`. O Suave também saiu (o dono não gostou). No lugar há o tema Aurora: botão de paleta no topo/menu (`components/ThemeToggle.tsx`), guardado em `localStorage` `harmonize-tema` = `aurora` e aplicado pela classe `tema-aurora` no `<html>` (script em `app/layout.tsx`). Os cinzas `neutral-*` do Tailwind saem de variáveis (`--n-50`…`--n-950`, em `app/globals.css`): o Aurora usa cinzas frios, brilho da marca no topo, cartões brancos com sombra e a barra de baixo flutuante com item ativo em degradê. Ajustes ficam só no `globals.css`.

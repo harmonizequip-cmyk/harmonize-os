@@ -24,6 +24,7 @@ import {
   Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { OndaMarca } from "@/components/ui/Visual";
 import { formatCurrency } from "@/lib/format";
 import type { AppSettings } from "@/lib/settings";
 import { avisosSuportados } from "@/lib/push";
@@ -94,13 +95,13 @@ function Anel({ feitos, total }: { feitos: number; total: number }) {
   const tudo = feitos === total;
   return (
     <svg width="60" height="60" viewBox="0 0 60 60" className="flex-shrink-0">
-      <circle cx="30" cy="30" r={r} fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="6" />
+      <circle cx="30" cy="30" r={r} fill="none" stroke="#e2e8f0" strokeWidth="6" />
       <circle
         cx="30"
         cy="30"
         r={r}
         fill="none"
-        stroke="white"
+        stroke="#14b8a6"
         strokeWidth="6"
         strokeLinecap="round"
         strokeDasharray={c}
@@ -108,7 +109,7 @@ function Anel({ feitos, total }: { feitos: number; total: number }) {
         transform="rotate(-90 30 30)"
         style={{ transition: "stroke-dashoffset .8s ease" }}
       />
-      <text x="30" y="35" textAnchor="middle" fontSize="15" fontWeight="800" fill="white">
+      <text x="30" y="35" textAnchor="middle" fontSize="15" fontWeight="800" fill="#0f172a">
         {tudo ? "✓" : `${feitos}/${total}`}
       </text>
     </svg>
@@ -153,28 +154,29 @@ function Checkup({ saude, testMode }: { saude: Saude; testMode: boolean }) {
   const pendentes = itens.filter((i) => i.ok === false);
 
   return (
-    <section className="overflow-hidden rounded-3xl bg-brand-gradient p-4 text-white shadow-glow-teal">
-      <div className="flex items-center gap-3">
+    <section className="cartao p-4">
+      <OndaMarca />
+      <div className="relative flex items-center gap-3">
         <Anel feitos={feitos} total={itens.length} />
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">Check-up do app</p>
-          <p className="text-lg font-extrabold leading-tight">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Check-up do app</p>
+          <p className="text-lg font-extrabold leading-tight text-slate-900">
             {pendentes.length === 0 ? "Tudo em ordem" : `${pendentes.length} ${pendentes.length === 1 ? "ponto pede" : "pontos pedem"} atenção`}
           </p>
         </div>
       </div>
-      <ul className="mt-3 space-y-1.5">
+      <ul className="relative mt-3 space-y-1.5">
         {itens.map((i) => (
           <li key={i.id}>
             <Link
               href={i.href}
               className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-[13px] font-medium ${
-                i.ok === false ? "bg-white text-neutral-800" : "bg-white/15 text-white"
+                i.ok === false ? "bg-amber-50 text-slate-800" : "bg-slate-50 text-slate-600"
               }`}
             >
               <span
                 className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  i.ok === null ? "bg-white/30" : i.ok ? "bg-white text-brand-teal-dark" : "bg-amber-400 text-white"
+                  i.ok === null ? "bg-slate-200" : i.ok ? "bg-teal-500 text-white" : "bg-amber-400 text-white"
                 }`}
               >
                 {i.ok === null ? "" : i.ok ? "✓" : "!"}
@@ -324,7 +326,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
     <div className="space-y-5 pb-4">
       <h1 className="text-xl font-semibold text-neutral-900">Configurações</h1>
 
-      <Link href="/configuracoes?secao=conta" className="flex items-center gap-3 rounded-3xl bg-white p-3 ring-1 ring-neutral-200/80 active:bg-neutral-50">
+      <Link href="/configuracoes?secao=conta" className="cartao flex items-center gap-3 p-3 active:bg-neutral-50">
         <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-gradient text-base font-extrabold text-white">
           {inicial}
         </span>
@@ -347,7 +349,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
                 <Link
                   key={b.id}
                   href={b.href ?? `/configuracoes?secao=${b.id}`}
-                  className="flex min-h-[92px] flex-col justify-between rounded-2xl bg-white p-3 ring-1 ring-neutral-200 transition active:scale-[0.98] active:bg-neutral-50"
+                  className="cartao flex min-h-[96px] flex-col justify-between !rounded-3xl p-3 transition active:scale-[0.98] active:bg-neutral-50"
                 >
                   <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${b.cor}`}>
                     <Icone size={18} strokeWidth={1.9} />
