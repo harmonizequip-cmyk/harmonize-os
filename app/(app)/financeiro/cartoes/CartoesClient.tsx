@@ -17,6 +17,7 @@ import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { Atalho } from "@/components/Atalhos";
 import { linkLancamento } from "@/lib/atalhos";
 import { confirmar } from "@/components/Dialogos";
+import ImportarFaturaModal from "@/components/ImportarFaturaModal";
 
 export interface Cartao {
   id: string;
@@ -71,10 +72,12 @@ export default function CartoesClient({
   cartoes: todosCartoes,
   faturas,
   escopo,
+  categorias = [],
 }: {
   cartoes: Cartao[];
   faturas: Fatura[];
   escopo: "harmonize" | "pessoal";
+  categorias?: { id: string; name: string }[];
 }) {
   // Cada espaço mostra só os próprios cartões.
   const cartoes = todosCartoes.filter((c) => c.scope === escopo);
@@ -92,6 +95,7 @@ export default function CartoesClient({
   const [compras, setCompras] = useState<Compra[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [importando, setImportando] = useState(false);
 
   const [pagando, setPagando] = useState(false);
   const [valorPagar, setValorPagar] = useState("");
@@ -198,16 +202,27 @@ export default function CartoesClient({
           </h1>
         </div>
         {!somenteLeitura && (
-          <button
-            type="button"
-            onClick={() => {
-              setErro(null);
-              setEditando({ scope: escopo, ativo: true });
-            }}
-            className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700"
-          >
-            + Cartão
-          </button>
+          <div className="flex gap-2">
+            {ativos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setImportando(true)}
+                className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700"
+              >
+                Importar fatura
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setErro(null);
+                setEditando({ scope: escopo, ativo: true });
+              }}
+              className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700"
+            >
+              + Cartão
+            </button>
+          </div>
         )}
       </div>
 
@@ -432,6 +447,19 @@ export default function CartoesClient({
       )}
 
       {erro && <p className="text-xs text-red-600">{erro}</p>}
+
+      {importando && (
+        <ImportarFaturaModal
+          cartoes={ativos}
+          cartaoInicial={selecionado}
+          categorias={categorias}
+          onClose={() => setImportando(false)}
+          onFeito={() => {
+            setImportando(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       <p className="text-[11px] text-neutral-400">
         Para lançar uma compra: Novo lançamento, saída, forma de pagamento Crédito, escolha o cartão e as parcelas.
