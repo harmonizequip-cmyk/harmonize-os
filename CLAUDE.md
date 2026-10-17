@@ -79,6 +79,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
 - Atalhos do ícone (manifest `shortcuts`, no máximo 5): Receber, Nova reserva, Hoje e Dias livres (`/agenda?acao=datas`, imagem de datas). Usam `?acao=`. Pendências saiu a pedido do dono (12/10/2026).
 
+## Menu do celular
+
+- O "Mais" da barra de baixo (`components/BottomNav.tsx`, título "Menu") é organizado em grupos com blocos em duas colunas: Atendimento (Clientes, Tarefas, Planejador, Contratos), Dinheiro (Locações, Pendências, Cartões, Empréstimos), Inteligência (Assistente, Cérebro, Relatórios) e Sistema (Equipamentos, Movimentações, Configurações). Tudo cabe numa tela; item novo entra no grupo certo (`grupo` em `MORE_ITEMS`).
+
 ## Temas (Clássico e Aurora)
 
 - O tema escuro foi retirado a pedido do dono (14/10/2026); não usar classes `dark:`. O Suave também saiu (o dono não gostou). No lugar há o tema Aurora: botão de paleta no topo/menu (`components/ThemeToggle.tsx`), guardado em `localStorage` `harmonize-tema` = `aurora` e aplicado pela classe `tema-aurora` no `<html>` (script em `app/layout.tsx`). Os cinzas `neutral-*` do Tailwind saem de variáveis (`--n-50`…`--n-950`, em `app/globals.css`): o Aurora usa cinzas frios, brilho da marca no topo, cartões brancos com sombra e a barra de baixo flutuante com item ativo em degradê. Ajustes ficam só no `globals.css`.

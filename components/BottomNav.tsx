@@ -45,29 +45,25 @@ const PESSOAL_ITEMS = [
   { href: "/pessoal/relatorios", label: "Relatórios", icon: BarChart3, module: "pessoal" },
 ];
 
-// Tudo que não é atalho do dia a dia fica atrás do botão de menu:
-// Clientes, Tarefas (visão completa, pendentes + concluídas — o Funil só
-// mostra as pendentes), Equipamentos (cujos números principais já aparecem
-// resumidos no Dashboard), Relatórios e Configurações.
-const MORE_ITEMS = [
-  { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard" },
-  { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard" },
-  { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda" },
-  { href: "/clientes", label: "Clientes", icon: Users, module: "clientes" },
-  { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes" },
-  // Histórico de locações realizadas: os FATOS. Fica ao lado de
-  // Equipamentos porque a pergunta é a mesma família, "quanto rodamos".
-  { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro" },
-  // Quem está devendo e quanto (o total também aparece no Dashboard).
-  { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro" },
-  { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro" },
-  { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro" },
-  // Controle dos contratos de locação já emitidos (leva X).
-  { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda" },
-  { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos" },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
-  { href: "/movimentacoes", label: "Movimentações", icon: History, module: "configuracoes" },
-  { href: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes" },
+// Tudo que não é atalho do dia a dia fica atrás do botão de menu, em grupos
+// por assunto (pedido do dono, 17/10/2026), em duas colunas para caber numa
+// tela só, sem rolar.
+const GRUPOS = ["Atendimento", "Dinheiro", "Inteligência", "Sistema"] as const;
+const MORE_ITEMS: { href: string; label: string; icon: typeof Users; module: string; grupo: (typeof GRUPOS)[number] }[] = [
+  { href: "/clientes", label: "Clientes", icon: Users, module: "clientes", grupo: "Atendimento" },
+  { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes", grupo: "Atendimento" },
+  { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda", grupo: "Atendimento" },
+  { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda", grupo: "Atendimento" },
+  { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/financeiro/emprestimos", label: "Empréstimos", icon: Landmark, module: "financeiro", grupo: "Dinheiro" },
+  { href: "/assistente", label: "Assistente", icon: Sparkles, module: "dashboard", grupo: "Inteligência" },
+  { href: "/insights", label: "Cérebro", icon: Brain, module: "dashboard", grupo: "Inteligência" },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios", grupo: "Inteligência" },
+  { href: "/equipamentos", label: "Equipamentos", icon: Package, module: "equipamentos", grupo: "Sistema" },
+  { href: "/movimentacoes", label: "Movimentações", icon: History, module: "configuracoes", grupo: "Sistema" },
+  { href: "/configuracoes", label: "Configurações", icon: Settings, module: "configuracoes", grupo: "Sistema" },
 ];
 
 export default function BottomNav({
@@ -151,7 +147,7 @@ export default function BottomNav({
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-300" />
             <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-neutral-700">Mais opções</p>
+              <p className="text-base font-bold text-neutral-900">Menu</p>
               <button
                 onClick={() => setMenuOpen(false)}
                 aria-label="Fechar menu"
@@ -160,24 +156,37 @@ export default function BottomNav({
                 <X size={16} strokeWidth={1.75} />
               </button>
             </div>
-            <div className="space-y-1">
-              {moreItems.map((item) => {
-                const Icon = item.icon;
-                const active = pathname.startsWith(item.href);
+            <div className="space-y-3">
+              {GRUPOS.map((g) => {
+                const itens = moreItems.filter((item) => item.grupo === g);
+                if (!itens.length) return null;
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
-                      active
-                        ? "bg-brand-teal/10 text-brand-teal"
-                        : "text-neutral-700 hover:bg-neutral-100"
-                    }`}
-                  >
-                    <Icon size={18} strokeWidth={1.75} />
-                    {item.label}
-                  </Link>
+                  <section key={g}>
+                    <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400">{g}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {itens.map((item) => {
+                        const Icon = item.icon;
+                        const active = pathname.startsWith(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setMenuOpen(false)}
+                            className={`flex items-center gap-2 rounded-2xl px-2.5 py-2.5 text-[13.5px] font-medium ring-1 transition ${
+                              active
+                                ? "bg-brand-teal/10 text-brand-teal-dark ring-brand-teal/40"
+                                : "bg-white text-neutral-700 ring-neutral-200 active:bg-neutral-50"
+                            }`}
+                          >
+                            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${active ? "bg-brand-teal/15" : "bg-neutral-100"}`}>
+                              <Icon size={17} strokeWidth={1.75} />
+                            </span>
+                            <span className="min-w-0 leading-tight">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </section>
                 );
               })}
               {moreItems.length === 0 && (
