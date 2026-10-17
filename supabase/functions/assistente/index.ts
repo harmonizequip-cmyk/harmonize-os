@@ -273,7 +273,6 @@ const FERRAMENTAS = [
   },
 ];
 
-// Áreas fixas do Planejador HIPRO (lib/planejador.ts AREAS_FIXAS; arcomandibular = Terço médio).
 // Assistente do Pessoal: só consulta, memória, planilha e orçamento.
 const FERRAMENTAS_PESSOAL = [
   ...FERRAMENTAS.filter((f) => ["consultar_banco", "guardar_memoria", "esquecer_memoria", "gerar_planilha"].includes(f.name)),
@@ -292,6 +291,7 @@ const FERRAMENTAS_PESSOAL = [
   },
 ];
 
+// Áreas fixas do Planejador HIPRO (lib/planejador.ts AREAS_FIXAS; arcomandibular = Terço médio).
 const PROF_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 const PROF_PAP = [...PROF_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
 // Papada pelo adipômetro (espelha profundidadesPapada/dividirDisparos de lib/planejamento.ts).
