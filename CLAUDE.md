@@ -118,6 +118,11 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Cadência (dias sem conversa para voltar à lista): Nova 10, Ativa 21, Em risco 14, Sumida 30, Quente 3, Morna 7, Fria 30. Último contato = tarefa concluída, agenda enviada ou pedido de confirmação. Conversar fecha as tarefas de recontato/contato pendentes da pessoa ou grava uma tarefa concluída (o recontato automático conta daí).
 - Aparece também no Dashboard ("N pessoas para chamar hoje") e na ficha do cliente (`components/RelacaoFicha.tsx`).
 
+## Isenção da taxa de reserva (17/10/2026)
+
+- Por cliente: `clients.isento_taxa` (migration `2026-10-17-cliente-isento-taxa.sql`, aplicada), para quem não é parceiro mas nunca pagou a taxa (clientes antigas). Caixinha "Isentar taxa de reserva" ao lado de "Parceiro" (`components/CaixaIsencaoTaxa.tsx`) na ficha, no cartão do lead e nos cadastros novos; selo "Isenta de taxa" na ficha e "Sem taxa" no funil. Marcar tira a taxa pendente e as tarefas de cobrança das reservas dela; reserva nova (`definir_taxa_ao_criar_evento`, `create_rental`) ou passada para ela nasce `nao_aplica`. Taxa já paga não muda. Ninguém é marcado automaticamente.
+- Por reserva: botão "Isentar taxa" dentro do `TaxaRecebidaBotao` (Agenda, janela da reserva, Pendências, Tarefas, fila, Receber pagamento, Agenda de hoje, ficha) e na finalização da locação; usa `definir_taxa_agendamento(..., 'nao_aplica')`, só com a taxa pendente. Voltar a cobrar: "Cobrar taxa" no agendamento da ficha.
+
 ## Gráficos do Dashboard
 
 - `components/DashboardCharts.tsx` (SVG próprio, sem recharts), contas em `lib/grafico-fluxo.ts`: resultado do período com anel de margem, resultado acumulado (área) e entradas/saídas por dia em barras para cima e para baixo (mês a mês acima de 62 dias), com toque mostrando o dia; e "Para onde foi / De onde veio" por categoria. Recebe os mesmos lançamentos dos quadros (sem empréstimo e sem pagamento de fatura). Paleta validada para daltonismo: #1F9E97 (entradas), #D9577E (saídas).

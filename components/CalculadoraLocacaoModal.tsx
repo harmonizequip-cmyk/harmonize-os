@@ -560,6 +560,14 @@ export default function CalculadoraLocacaoModal({
     }
   }, [isMentoria, shots, pricingConfig]);
 
+  // Linhas de pagamento (forma/valor/conta pix). Declarado antes do cálculo da
+  // mentoria porque a forma da primeira linha decide à vista ou parcelado; do
+  // contrário a mentoria travava ao abrir (usava a forma antes de existir).
+  const [pagamentos, setPagamentos] = useState<PagamentoTela[]>([
+    { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() },
+  ]);
+  const primeiraFormaPagamento = pagamentos[0]?.forma ?? "";
+
   const mentoriaCalc = useMemo(() => {
     if (!isMentoria || patientCountNumber <= 0) return null;
     try {
@@ -572,7 +580,7 @@ export default function CalculadoraLocacaoModal({
       throw e;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMentoria, patientCountNumber, mentoriaPricingResolved]);
+  }, [isMentoria, patientCountNumber, mentoriaPricingResolved, primeiraFormaPagamento]);
 
   // ------------------------------------------------------------
   // Custo por disparo negociado manualmente (não existe em mentoria)
@@ -680,10 +688,6 @@ export default function CalculadoraLocacaoModal({
   // Pagamento: lista de linhas (forma/valor/conta pix). 0 = a receber,
   // 1 = integral, 2+ = parcial.
   // ------------------------------------------------------------
-  const [pagamentos, setPagamentos] = useState<PagamentoTela[]>([
-    { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() },
-  ]);
-  const primeiraFormaPagamento = pagamentos[0]?.forma ?? "";
 
   function updatePagamento(id: string, patch: Partial<PagamentoTela>) {
     setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));

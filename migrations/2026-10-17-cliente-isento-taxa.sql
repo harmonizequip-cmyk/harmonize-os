@@ -1,5 +1,5 @@
 -- ============================================================
--- STATUS: PENDENTE (ainda não rodada no Supabase; só roda com o aval do dono).
+-- STATUS: APLICADA no Supabase (projeto vidnlzbxaxjlmzncqhxw) em 17/10/2026, pelo dono, e conferida por consulta de leitura (coluna 1, gatilho 1, create_rental 1, reserva nova 1, clientes isentos 0).
 -- Cliente isento de taxa de reserva, mesmo sem ser parceiro (pedido do dono,
 -- 17/10/2026: clientes antigos que nunca pagaram a taxa e funcionava assim).
 --   1. clients.isento_taxa (padrão false). Parceiro continua como está.
