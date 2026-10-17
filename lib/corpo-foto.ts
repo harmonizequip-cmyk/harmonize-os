@@ -91,17 +91,47 @@ export function vistaDaRegiao(id?: string | null): Vista {
 const elipseSvg = ([cx, cy, rx, ry, rot]: Elipse, attrs: string) =>
   `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"${rot ? ` transform="rotate(${rot} ${cx} ${cy})"` : ""} ${attrs}/>`;
 
-/** SVG de uma vista com as regiões marcadas (para <img> e impressão). */
-export function svgCorpoFoto(destacar: string[], vista: Vista = "frente"): string {
+/** Quadrado do recorte centrado nas elipses da região (com folga), dentro da foto. */
+export function recorteDaRegiao(id: string | null | undefined, vista: Vista): { x: number; y: number; lado: number } {
+  const elipses = (id && REGIOES_FOTO[id]?.[vista]) || [];
+  if (!elipses.length) return { x: 0, y: (FOTO_ALTURA - FOTO_LARGURA) / 2 - 40, lado: FOTO_LARGURA };
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const [cx, cy, rx, ry] of elipses) {
+    x0 = Math.min(x0, cx - rx);
+    x1 = Math.max(x1, cx + rx);
+    y0 = Math.min(y0, cy - ry);
+    y1 = Math.max(y1, cy + ry);
+  }
+  const lado = Math.min(FOTO_LARGURA, Math.max(42, Math.max(x1 - x0, y1 - y0) * 1.5));
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const x = Math.min(Math.max(cx - lado / 2, 0), FOTO_LARGURA - lado);
+  const y = Math.min(Math.max(cy - lado / 2, 0), FOTO_ALTURA - lado);
+  return { x: +x.toFixed(1), y: +y.toFixed(1), lado: +lado.toFixed(1) };
+}
+
+/** SVG de uma vista com as regiões marcadas (para <img> e impressão). `recortar`: quadrado centrado na região. */
+export function svgCorpoFoto(destacar: string[], vista: Vista = "frente", recortar = false): string {
   const foto = FOTOS[vista];
   const marcas = destacar
     .flatMap((id) => REGIOES_FOTO[id]?.[vista] ?? [])
     .map((e) => elipseSvg(e, 'fill="#3DBFB8" fill-opacity="0.5" stroke="#1F8F88" stroke-width="0.9"'))
     .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${FOTO_LARGURA} ${FOTO_ALTURA}" width="${FOTO_LARGURA * 3}" height="${FOTO_ALTURA * 3}"><defs><clipPath id="q"><rect width="${FOTO_LARGURA}" height="${FOTO_ALTURA}" rx="5"/></clipPath></defs><g clip-path="url(#q)"><rect width="${FOTO_LARGURA}" height="${FOTO_ALTURA}" fill="#fff"/><image href="${foto}" xlink:href="${foto}" x="0" y="0" width="${FOTO_LARGURA}" height="${FOTO_ALTURA}"/>${marcas}</g></svg>`;
+  const r = recortar ? recorteDaRegiao(destacar[0], vista) : null;
+  const vb = r ? `${r.x} ${r.y} ${r.lado} ${r.lado}` : `0 0 ${FOTO_LARGURA} ${FOTO_ALTURA}`;
+  const [w, h] = r ? [240, 240] : [FOTO_LARGURA * 3, FOTO_ALTURA * 3];
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${vb}" width="${w}" height="${h}"><rect x="0" y="0" width="${FOTO_LARGURA}" height="${FOTO_ALTURA}" fill="#fff"/><image href="${foto}" xlink:href="${foto}" x="0" y="0" width="${FOTO_LARGURA}" height="${FOTO_ALTURA}"/>${marcas}</svg>`;
 }
 
-/** Imagem de uma área corporal: a foto (frente ou costas) com a região marcada. */
+/** Miniatura de uma área corporal: a foto (frente ou costas) recortada e centrada na região marcada. */
 export function urlImagemCorporal(parte?: string | null): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgCorpoFoto(parte ? [parte] : [], vistaDaRegiao(parte)))}`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgCorpoFoto(parte ? [parte] : [], vistaDaRegiao(parte), true))}`;
+}
+
+/** Corpo inteiro com a região marcada (imagem ampliada). */
+export function urlCorpoInteiro(parte?: string | null): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgCorpoFoto(parte ? [parte] : [], vistaDaRegiao(parte), false))}`;
 }

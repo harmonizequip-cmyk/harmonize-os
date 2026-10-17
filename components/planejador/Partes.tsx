@@ -10,6 +10,7 @@ import { Check, ChevronDown, Minus, Plus, Trash2, X } from "lucide-react";
 import BonecoCorporal from "@/components/BonecoCorporal";
 import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
 import { imagemDaArea } from "@/lib/planejador-impressao";
+import { urlCorpoInteiro } from "@/lib/corpo-foto";
 import { MOVIMENTO_DA_AREA, OPTS_PAP, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
 
 export const fmt = (n: number) => n.toLocaleString("pt-BR");
@@ -229,7 +230,7 @@ export function FolhaModelo({ area, onFechar }: { area: Area | null; onFechar: (
       {area && (
         <div className="space-y-3 pb-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imagemDaArea(area)} alt={`Movimento: ${area.nome}`} className={area.regiao === "corporal" ? "mx-auto max-h-[55vh] w-auto rounded-3xl object-contain shadow-sm" : "mx-auto aspect-square w-full max-w-[260px] rounded-3xl object-cover shadow-sm"} />
+          <img src={area.regiao === "corporal" ? urlCorpoInteiro(area.parte) : imagemDaArea(area)} alt={`Movimento: ${area.nome}`} className={area.regiao === "corporal" ? "mx-auto max-h-[55vh] w-auto rounded-3xl object-contain shadow-sm" : "mx-auto aspect-square w-full max-w-[260px] rounded-3xl object-cover shadow-sm"} />
           {MOVIMENTO_DA_AREA[area.id] && (
             <p className="rounded-2xl bg-brand-teal/10 px-4 py-3 text-sm text-neutral-800">
               <b className="text-brand-teal-dark">Movimento: </b>
