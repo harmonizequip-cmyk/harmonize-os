@@ -366,7 +366,7 @@ function cortar(ctx: CanvasRenderingContext2D, texto: string, larguraMax: number
   return `${t}…`;
 }
 
-export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLCanvasElement> {
+async function desenharRecibo(dados: DadosImagemCalculo): Promise<HTMLCanvasElement> {
   const ehMentoria = dados.modo === "mentoria";
   const linhas = linhasRecibo(dados).filter((l) => l.tipo !== "total");
   const credito = ehMentoria ? 0 : disparosQueViramCredito(dados);
@@ -552,4 +552,308 @@ export async function drawCalculoImage(dados: DadosImagemCalculo): Promise<HTMLC
   saida.height = Math.round(alturaFinal * ESCALA);
   (saida.getContext("2d") as CanvasRenderingContext2D).drawImage(canvas, 0, 0, canvas.width, saida.height, 0, 0, saida.width, saida.height);
   return saida;
+}
+
+function pilulasDestaque(dados: DadosImagemCalculo): string[] {
+  const ehMentoria = dados.modo === "mentoria";
+  const credito = ehMentoria ? 0 : disparosQueViramCredito(dados);
+  const faixa = dados.faixaTitulo.replace(" APLICADA", "");
+  const out = [
+    ehMentoria
+      ? `${inteiro(dados.disparos)} paciente(s)`
+      : `${inteiro((dados.creditoUsado ?? 0) > 0 ? dados.disparosRealizados ?? dados.disparos : dados.disparos)} disparos`,
+    ehMentoria ? `${dados.faixaChip} por paciente` : `${faixa.charAt(0)}${faixa.slice(1).toLowerCase()} · ${dados.faixaChip}`,
+  ];
+  if (credito > 0) out.push(`+${inteiro(credito)} de crédito`);
+  return out;
+}
+
+function novoCanvas(largura: number, altura: number) {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(largura * ESCALA);
+  canvas.height = Math.round(altura * ESCALA);
+  const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+  ctx.scale(ESCALA, ESCALA);
+  ctx.textBaseline = "alphabetic";
+  return { canvas, ctx };
+}
+
+function recortar(canvas: HTMLCanvasElement, largura: number, altura: number): HTMLCanvasElement {
+  const saida = document.createElement("canvas");
+  saida.width = Math.round(largura * ESCALA);
+  saida.height = Math.round(altura * ESCALA);
+  (saida.getContext("2d") as CanvasRenderingContext2D).drawImage(canvas, 0, 0, saida.width, saida.height, 0, 0, saida.width, saida.height);
+  return saida;
+}
+
+/** Modelo B: fundo escuro elegante, total em degradê, recibo em linhas claras. */
+async function desenharEscuro(dados: DadosImagemCalculo): Promise<HTMLCanvasElement> {
+  const ehMentoria = dados.modo === "mentoria";
+  const linhas = linhasRecibo(dados).filter((l) => l.tipo !== "total");
+  const credito = ehMentoria ? 0 : disparosQueViramCredito(dados);
+  const W = 440;
+  const util = W - 36;
+  const altL = (l: LinhaRecibo) => (l.tipo === "secao" ? 28 : l.detalhe ? 38 : 28);
+  const altura = 300 + linhas.reduce((s, l) => s + altL(l), 0) + (credito ? 80 : 0) + 70;
+  const { canvas, ctx } = novoCanvas(W, altura);
+  const fundo = ctx.createLinearGradient(0, 0, 0, altura);
+  fundo.addColorStop(0, "#0E2A2D");
+  fundo.addColorStop(1, "#14202B");
+  ctx.fillStyle = fundo;
+  ctx.fillRect(0, 0, W, altura);
+  ctx.save();
+  ctx.fillStyle = "rgba(61,191,184,0.16)";
+  ctx.beginPath();
+  ctx.arc(W - 40, 40, 150, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(184,160,208,0.12)";
+  ctx.beginPath();
+  ctx.arc(30, 250, 120, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  let y = 34;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#7FD6D0";
+  ctx.font = `800 10.5px ${FONTE}`;
+  ctx.fillText(ehMentoria ? "HARMONIZE  ·  CÁLCULO DA MENTORIA" : "HARMONIZE  ·  CÁLCULO DOS DISPAROS", 18, y);
+  if (dados.dataEvento) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `600 11px ${FONTE}`;
+    ctx.fillText(formatarData(dados.dataEvento), W - 18, y);
+    ctx.textAlign = "left";
+  }
+  y += 28;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 20px ${FONTE}`;
+  ctx.fillText(cortar(ctx, (dados.cliente ?? "Cliente").toUpperCase(), util), 18, y);
+  y += 46;
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = `700 11px ${FONTE}`;
+  ctx.fillText("T O T A L   A   P A G A R", 18, y);
+  y += 54;
+  const texto = reais(dados.total);
+  ctx.font = `900 48px ${FONTE}`;
+  const lt = ctx.measureText(texto).width;
+  const g = ctx.createLinearGradient(18, 0, 18 + lt, 0);
+  g.addColorStop(0, "#5FE0D6");
+  g.addColorStop(0.6, "#9AD7F0");
+  g.addColorStop(1, "#CDB6F0");
+  ctx.fillStyle = g;
+  ctx.fillText(texto, 16, y);
+  y += 22;
+  let px = 18;
+  ctx.font = `700 12px ${FONTE}`;
+  for (const t of pilulasDestaque(dados)) {
+    const w = ctx.measureText(t).width + 22;
+    if (px + w > W - 18) break;
+    roundedRectPath(ctx, px, y, w, 26, 13);
+    ctx.strokeStyle = "rgba(127,214,208,0.6)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#CFF3F0";
+    ctx.fillText(t, px + 11, y + 17.5);
+    px += w + 8;
+  }
+  y += 50;
+
+  const alturaRecibo = linhas.reduce((s, l) => s + altL(l), 0) + 24;
+  roundedRectPath(ctx, 18, y, util, alturaRecibo, 18);
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.stroke();
+  let ry = y + 10;
+  const xi = 34;
+  const xf = W - 34;
+  for (const l of linhas) {
+    if (l.tipo === "secao") {
+      ctx.fillStyle = "#7FD6D0";
+      ctx.font = `800 10px ${FONTE}`;
+      ctx.textAlign = "left";
+      ctx.fillText(l.rotulo.toUpperCase(), xi, ry + 20);
+      ry += 28;
+      continue;
+    }
+    const base = l.detalhe ? ry + 17 : ry + 19;
+    if (l.tipo === "subtotal") {
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.beginPath();
+      ctx.moveTo(xi, ry + 1);
+      ctx.lineTo(xf, ry + 1);
+      ctx.stroke();
+    }
+    const corV = l.tom === "credito" || l.tom === "menos" ? "#F49AC1" : l.tom === "mais" ? "#F3CF7A" : l.tipo === "subtotal" ? "#7FE3DA" : "#FFFFFF";
+    ctx.textAlign = "right";
+    ctx.font = l.tipo === "subtotal" ? `800 14.5px ${FONTE}` : `700 13px ${FONTE}`;
+    ctx.fillStyle = corV;
+    const v = l.valor ?? "";
+    ctx.fillText(v, xf, base);
+    const lv = ctx.measureText(v).width;
+    ctx.textAlign = "left";
+    ctx.font = l.tipo === "subtotal" ? `700 13px ${FONTE}` : `500 12.5px ${FONTE}`;
+    ctx.fillStyle = l.tom === "credito" ? "#F49AC1" : "rgba(255,255,255,0.85)";
+    ctx.fillText(cortar(ctx, l.rotulo, xf - xi - lv - 12), xi, base);
+    if (l.detalhe) {
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.font = `500 10.5px ${FONTE}`;
+      ctx.fillText(l.detalhe, xi, base + 14);
+    }
+    ry += altL(l);
+  }
+  y += alturaRecibo;
+  if (credito > 0) {
+    y += 12;
+    roundedRectPath(ctx, 18, y, util, 64, 16);
+    ctx.fillStyle = "rgba(244,154,193,0.12)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(244,154,193,0.45)";
+    ctx.stroke();
+    ctx.fillStyle = "#F49AC1";
+    ctx.font = `800 10px ${FONTE}`;
+    ctx.fillText("CRÉDITO PARA O PRÓXIMO ATENDIMENTO", 34, y + 22);
+    ctx.font = `800 18px ${FONTE}`;
+    ctx.fillText(`${inteiro(credito)} disparos`, 34, y + 45);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `500 10.5px ${FONTE}`;
+    ctx.textAlign = "right";
+    ctx.fillText("pagos hoje, para usar depois", W - 34, y + 45);
+    ctx.textAlign = "left";
+    y += 64;
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = `500 10px ${FONTE}`;
+  ctx.textAlign = "center";
+  ctx.fillText("Harmonize  ·  conferência do cálculo, sujeita a confirmação", W / 2, y + 30);
+  return recortar(canvas, W, Math.ceil(y + 44));
+}
+
+/** Modelo C: quadrado (aparece inteiro na conversa), total à esquerda e conta à direita. */
+async function desenharQuadrado(dados: DadosImagemCalculo): Promise<HTMLCanvasElement> {
+  const ehMentoria = dados.modo === "mentoria";
+  const credito = ehMentoria ? 0 : disparosQueViramCredito(dados);
+  const linhas = linhasRecibo(dados).filter((l) => l.tipo !== "total" && l.tipo !== "secao");
+  const W = 440;
+  const H = 440;
+  const { canvas, ctx } = novoCanvas(W, H);
+  ctx.fillStyle = "#F3F8F8";
+  ctx.fillRect(0, 0, W, H);
+  // coluna da esquerda em degradê
+  const colW = 156;
+  const g = ctx.createLinearGradient(0, 0, colW, H);
+  g.addColorStop(0, "#2FB3AC");
+  g.addColorStop(0.6, "#6FBFDC");
+  g.addColorStop(1, "#A995CF");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, colW, H);
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.beginPath();
+  ctx.arc(colW - 10, 30, 90, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.font = `800 9.5px ${FONTE}`;
+  ctx.fillText("HARMONIZE", 18, 30);
+  ctx.font = `600 9.5px ${FONTE}`;
+  ctx.fillText(ehMentoria ? "Cálculo da mentoria" : "Cálculo dos disparos", 18, 44);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 15px ${FONTE}`;
+  const nome = (dados.cliente ?? "Cliente").toUpperCase();
+  const partes = nome.split(" ");
+  let l1 = "";
+  let l2 = "";
+  for (const p of partes) {
+    if (ctx.measureText(`${l1} ${p}`.trim()).width <= colW - 32 && !l2) l1 = `${l1} ${p}`.trim();
+    else l2 = `${l2} ${p}`.trim();
+  }
+  ctx.fillText(l1, 18, 84);
+  if (l2) ctx.fillText(cortar(ctx, l2, colW - 32), 18, 103);
+  if (dados.dataEvento) {
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = `600 11px ${FONTE}`;
+    ctx.fillText(formatarData(dados.dataEvento), 18, l2 ? 122 : 103);
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = `800 9.5px ${FONTE}`;
+  ctx.fillText("TOTAL A PAGAR", 18, 232);
+  ctx.fillStyle = "#FFFFFF";
+  let tam = 30;
+  const texto = reais(dados.total);
+  do {
+    ctx.font = `900 ${tam}px ${FONTE}`;
+    tam -= 1;
+  } while (ctx.measureText(texto).width > colW - 30 && tam > 16);
+  ctx.fillText(texto, 18, 266);
+  let py = 290;
+  ctx.font = `700 10.5px ${FONTE}`;
+  for (const t of pilulasDestaque(dados)) {
+    const w = Math.min(ctx.measureText(t).width + 18, colW - 32);
+    roundedRectPath(ctx, 18, py, w, 22, 11);
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(cortar(ctx, t, w - 18), 27, py + 15);
+    py += 28;
+  }
+
+  // coluna da direita: a conta
+  const xi = colW + 18;
+  const xf = W - 16;
+  let y = 34;
+  ctx.fillStyle = "#1F8F88";
+  ctx.font = `800 9.5px ${FONTE}`;
+  ctx.fillText("COMO CHEGAMOS NO VALOR", xi, y);
+  y += 12;
+  const espaco = Math.min(30, Math.max(22, (H - 70 - y - (credito ? 60 : 0)) / Math.max(1, linhas.length)));
+  for (const l of linhas) {
+    const corV = l.tom === "credito" || l.tom === "menos" ? "#D65A8A" : l.tom === "mais" ? "#A87808" : l.tipo === "subtotal" ? "#1F8F88" : "#17202A";
+    if (l.tipo === "subtotal") {
+      ctx.strokeStyle = "#E3EAEC";
+      ctx.beginPath();
+      ctx.moveTo(xi, y + 4);
+      ctx.lineTo(xf, y + 4);
+      ctx.stroke();
+    }
+    const base = y + espaco - 6;
+    ctx.textAlign = "right";
+    ctx.font = l.tipo === "subtotal" ? `800 12.5px ${FONTE}` : `700 11.5px ${FONTE}`;
+    ctx.fillStyle = corV;
+    const v = l.valor ?? "";
+    ctx.fillText(v, xf, base);
+    const lv = ctx.measureText(v).width;
+    ctx.textAlign = "left";
+    ctx.font = l.tipo === "subtotal" ? `700 11.5px ${FONTE}` : `500 11px ${FONTE}`;
+    ctx.fillStyle = l.tom === "credito" ? "#D65A8A" : "#3A4552";
+    const rot = l.rotulo.replace(" · vira crédito", "").replace(" disparos)", ")").replace(" (crédito)", "").replace(" já paga", " paga");
+    ctx.fillText(cortar(ctx, rot, xf - xi - lv - 8), xi, base);
+    y += espaco;
+  }
+  if (credito > 0) {
+    const cy = H - 96;
+    roundedRectPath(ctx, xi, cy, xf - xi, 52, 14);
+    ctx.fillStyle = "#FDF0F5";
+    ctx.fill();
+    ctx.strokeStyle = "#F4C6D8";
+    ctx.stroke();
+    ctx.fillStyle = "#D65A8A";
+    ctx.font = `800 9px ${FONTE}`;
+    ctx.fillText("CRÉDITO PARA A PRÓXIMA", xi + 12, cy + 19);
+    ctx.font = `800 15px ${FONTE}`;
+    ctx.fillText(`${inteiro(credito)} disparos`, xi + 12, cy + 39);
+  }
+  ctx.fillStyle = "#8A939D";
+  ctx.font = `500 9px ${FONTE}`;
+  ctx.textAlign = "right";
+  ctx.fillText("conferência do cálculo, sujeita a confirmação", xf, H - 18);
+  return canvas;
+}
+
+export type ModeloImagemCalculo = "recibo" | "escuro" | "quadrado";
+
+export async function drawCalculoImage(dados: DadosImagemCalculo, modelo: ModeloImagemCalculo = "recibo"): Promise<HTMLCanvasElement> {
+  if (modelo === "escuro") return desenharEscuro(dados);
+  if (modelo === "quadrado") return desenharQuadrado(dados);
+  return desenharRecibo(dados);
 }
