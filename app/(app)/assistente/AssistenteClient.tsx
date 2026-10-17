@@ -28,6 +28,16 @@ import { confirmar } from "@/components/Dialogos";
 
 const CHAVE_VOZ = "harmonize-assistente-voz";
 
+const SUGESTOES_PESSOAL = [
+  "Para onde foi meu dinheiro neste mês?",
+  "Como o mês deve fechar no ritmo de hoje?",
+  "Onde estou gastando mais do que o normal?",
+  "Quanto sobrou por mês nos últimos 6 meses?",
+  "Tem alguma assinatura ou gasto repetido que eu esqueci?",
+  "Quanto as faturas e contas fixas vão pesar nos próximos dias?",
+  "Monte um orçamento para mim com base nos meus gastos",
+];
+
 const SUGESTOES = [
   "Quem está me devendo e há quanto tempo?",
   "Como está o faturamento deste mês comparado ao mês passado?",
@@ -179,7 +189,10 @@ async function mensagemDeErro(error: unknown): Promise<string> {
   return "Não consegui falar com o assistente. Confira a internet e tente de novo.";
 }
 
-export default function AssistenteClient() {
+export default function AssistenteClient({ escopo = "harmonize" }: { escopo?: "harmonize" | "pessoal" }) {
+  const pessoal = escopo === "pessoal";
+  const caminho = pessoal ? "/pessoal/assistente" : "/assistente";
+  const sugestoes = pessoal ? SUGESTOES_PESSOAL : SUGESTOES;
   const supabase = createClient();
   const somenteLeitura = useSomenteLeitura();
   const [bolhas, setBolhas] = useState<Bolha[]>([]);
@@ -233,7 +246,7 @@ export default function AssistenteClient() {
     if (compartilhado) {
       setTexto(`Recebi esta mensagem no WhatsApp:\n"${compartilhado.slice(0, 2000)}"\n\nMe ajude a responder.`);
     }
-    if (idCliente || compartilhado || pergunta) window.history.replaceState(null, "", "/assistente");
+    if (idCliente || compartilhado || pergunta) window.history.replaceState(null, "", caminho);
     return () => {
       pararEscuta.current?.();
       pararDeFalar();
@@ -335,7 +348,7 @@ export default function AssistenteClient() {
     setBolhas((b) => [...b, { papel: "eu", texto: p }]);
     setPensando(true);
     const { data, error } = await supabase.functions.invoke("assistente", {
-      body: { mensagem: p, conversa_id: conversaRef.current, cliente_id: clienteRef.current },
+      body: { mensagem: p, conversa_id: conversaRef.current, cliente_id: pessoal ? null : clienteRef.current, escopo },
     });
     setPensando(false);
     if (error || !data?.resposta) {
@@ -391,11 +404,13 @@ export default function AssistenteClient() {
       supabase
         .from("assistente_conversas")
         .select("id, titulo, updated_at, client_id, clients(name, display_name, treatment)")
+        .eq("escopo", escopo)
         .order("updated_at", { ascending: false })
         .limit(40),
       supabase
         .from("assistente_memoria")
         .select("id, texto, client_id, clients(name, display_name, treatment)")
+        .eq("escopo", escopo)
         .order("created_at", { ascending: true }),
     ]);
     setConversas((c as Conversa[]) ?? []);
@@ -434,7 +449,7 @@ export default function AssistenteClient() {
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-neutral-900">
-            <Sparkles size={20} className="text-brand-teal" /> Assistente
+            <Sparkles size={20} className="text-brand-teal" /> {pessoal ? "Assistente pessoal" : "Assistente"}
           </h1>
           {gastoMes !== null && (
             <p className="text-[11px] text-neutral-400">Gasto estimado este mês: US$ {gastoMes.toFixed(2)}</p>
@@ -459,7 +474,7 @@ export default function AssistenteClient() {
         </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-2">
+      <div className={`mb-3 flex items-center gap-2 ${pessoal ? "hidden" : ""}`}>
         {cliente ? (
           <div className="flex items-center gap-1 rounded-full border border-brand-teal/30 bg-brand-teal/10 py-1 pl-3 pr-1 text-xs font-medium text-brand-teal-dark">
             <UserRound size={13} />
@@ -488,11 +503,12 @@ export default function AssistenteClient() {
         {bolhas.length === 0 && !pensando && (
           <div className="rounded-2xl border border-neutral-200 bg-white p-4">
             <p className="text-sm text-neutral-700">
-              Pergunte qualquer coisa sobre a Harmonize: agenda, clientes, quem deve, faturamento, tarefas, equipamentos. Pode
-              escrever ou tocar no microfone e falar.
+              {pessoal
+                ? "Pergunte sobre o seu dinheiro: gastos, cartões, contas fixas, quanto sobra por mês, e peça um orçamento por categoria. Pode escrever ou tocar no microfone e falar."
+                : "Pergunte qualquer coisa sobre a Harmonize: agenda, clientes, quem deve, faturamento, tarefas, equipamentos. Pode escrever ou tocar no microfone e falar."}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {SUGESTOES.map((s) => (
+              {sugestoes.map((s) => (
                 <button
                   key={s}
                   onClick={() => enviar(s)}
@@ -502,7 +518,7 @@ export default function AssistenteClient() {
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-[11px] text-neutral-400">
+            <p className={`mt-3 text-[11px] text-neutral-400 ${pessoal ? "hidden" : ""}`}>
               Para responder um cliente: cole a mensagem dele (ou compartilhe do WhatsApp para o Harmonize) e diga de quem é. Ele
               confere agenda, preços e histórico e deixa a resposta pronta para abrir no WhatsApp. Por enquanto ele não altera nada no
               app. Se ele entender algo errado, corrija: ele guarda o que você ensinar, inclusive sobre cada cliente.

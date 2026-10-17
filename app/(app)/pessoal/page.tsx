@@ -6,13 +6,14 @@ import { fetchSettings } from "@/lib/settings";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { contaNoResultado, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
-import { avisosPessoais, comparacaoPorCategoria, mesComDesvio, resumoDoMes, type FaturaPessoal } from "@/lib/pessoal-controle";
+import { avisosPessoais, comparacaoPorCategoria, mesComDesvio, resumoDoMes, usoDosOrcamentos, type FaturaPessoal } from "@/lib/pessoal-controle";
 import { visualDaCategoria } from "@/lib/pessoal-icones";
 import NovoLancamentoPessoalBotao from "@/components/NovoLancamentoPessoalBotao";
 import PrecisaDeVoce from "@/components/dashboard/PrecisaDeVoce";
 import HeroPessoal from "@/components/pessoal/HeroPessoal";
 import RosquinhaGastos from "@/components/pessoal/RosquinhaGastos";
 import FaturasCartoes from "@/components/pessoal/FaturasCartoes";
+import OrcamentosCard from "@/components/pessoal/OrcamentosCard";
 
 function oneOf<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
@@ -27,7 +28,7 @@ export default async function PessoalInicioPage() {
   const supabase = createClient();
   const hoje = hojeLocal();
   const desde = `${mesComDesvio(hoje, -3)}-01`;
-  const [settings, { data: todos }, { data: histRaw }, { data: faturasRaw }, { data: cartoesRaw }, { data: catsRaw }, { data: clientes }] =
+  const [settings, { data: todos }, { data: histRaw }, { data: faturasRaw }, { data: cartoesRaw }, { data: catsRaw }, { data: clientes }, { data: orcRaw }] =
     await Promise.all([
       fetchSettings(supabase),
       supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).limit(20000),
@@ -43,6 +44,7 @@ export default async function PessoalInicioPage() {
       supabase.from("cartoes").select("id, nome"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").eq("type", "saida").order("name"),
       supabase.from("clients").select("id, name").order("name"),
+      supabase.from("orcamentos_pessoais").select("categoria, limite"),
     ]);
 
   // Compra no cartão só sai da conta quando a fatura é paga.
@@ -75,7 +77,9 @@ export default async function PessoalInicioPage() {
   const ultimoLancamento = historico.length
     ? historico.reduce((m, l) => (l.created_at > m ? l.created_at : m), historico[0].created_at).slice(0, 10)
     : null;
-  const avisos = avisosPessoais({ linhas, hoje, saldo, faturas, totalFixas, ultimoLancamento }).map((a) => ({
+  const orcamentos = ((orcRaw ?? []) as any[]).map((o) => ({ categoria: o.categoria as string, limite: Number(o.limite) }));
+  const usosOrcamento = usoDosOrcamentos(orcamentos, linhas, hoje);
+  const avisos = avisosPessoais({ linhas, hoje, saldo, faturas, totalFixas, ultimoLancamento, orcamentos }).map((a) => ({
     id: a.id,
     icone: a.icone,
     texto: a.texto,
@@ -124,6 +128,8 @@ export default async function PessoalInicioPage() {
       />
 
       <FaturasCartoes faturas={faturas.slice(0, 6)} hoje={hoje} />
+
+      <OrcamentosCard usos={usosOrcamento} />
 
       <section className="cartao p-4">
         <div className="mb-3 flex items-center justify-between">

@@ -23,6 +23,7 @@ import {
   UserPlus,
   Wrench,
   type LucideIcon,
+  Target,
 } from "lucide-react";
 import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 
@@ -45,6 +46,7 @@ const ICONES: Record<string, { icone: LucideIcon; cor: CorVisual }> = {
   saldo: { icone: Wallet, cor: "vermelho" },
   lancar: { icone: PenLine, cor: "azul" },
   projecao: { icone: LineChart, cor: "ambar" },
+  orcamento: { icone: Target, cor: "ambar" },
 };
 
 export interface AvisoDash {

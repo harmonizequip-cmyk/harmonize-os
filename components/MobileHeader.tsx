@@ -43,7 +43,7 @@ export default function MobileHeader() {
       <div className="flex items-center gap-1">
         {!somenteLeitura && (
           <Link
-            href="/assistente"
+            href={pessoal ? "/pessoal/assistente" : "/assistente"}
             aria-label="Assistente"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-teal-dark transition hover:bg-neutral-100"
           >

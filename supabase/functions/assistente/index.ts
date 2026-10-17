@@ -19,7 +19,7 @@
 // Segredo: ANTHROPIC_API_KEY (Edge Functions > Secrets no painel do Supabase).
 // Opcionais: ASSISTENTE_MODELO, ASSISTENTE_LIMITE_MENSAL_USD.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { CONHECIMENTO, INSIGHTS } from "./conhecimento.ts";
+import { CONHECIMENTO, CONHECIMENTO_PESSOAL, INSIGHTS } from "./conhecimento.ts";
 
 const SITE = "https://harmonize-os.vercel.app";
 const CORS = {
@@ -274,6 +274,24 @@ const FERRAMENTAS = [
 ];
 
 // Áreas fixas do Planejador HIPRO (lib/planejador.ts AREAS_FIXAS; arcomandibular = Terço médio).
+// Assistente do Pessoal: só consulta, memória, planilha e orçamento.
+const FERRAMENTAS_PESSOAL = [
+  ...FERRAMENTAS.filter((f) => ["consultar_banco", "guardar_memoria", "esquecer_memoria", "gerar_planilha"].includes(f.name)),
+  {
+    name: "definir_orcamento",
+    description:
+      "Define o limite mensal de gasto de uma categoria pessoal (nome exato de categories, scope pessoal, tipo saida). limite 0 remove o orçamento daquela categoria.",
+    input_schema: {
+      type: "object",
+      properties: {
+        categoria: { type: "string", description: "Nome da categoria, igual ao cadastro." },
+        limite: { type: "number", description: "Limite por mês em reais; 0 remove." },
+      },
+      required: ["categoria", "limite"],
+    },
+  },
+];
+
 const PROF_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 const PROF_PAP = [...PROF_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
 // Papada pelo adipômetro (espelha profundidadesPapada/dividirDisparos de lib/planejamento.ts).
@@ -461,12 +479,14 @@ type PlanejamentoIA = {
   estado: Record<string, unknown>;
 };
 type Estado = {
+  escopo: "harmonize" | "pessoal";
   clienteId: string | null;
   whatsapp: Whats[];
   planilhas: Planilha[];
   agendas: Agenda[];
   insights: number;
   planejamentos: PlanejamentoIA[];
+  orcamentos: number;
   escolhas: { marcadas: string[]; saldo: number | null; queixa: string | null; paciente: string | null }[];
 };
 
@@ -494,9 +514,11 @@ async function executarFerramenta(
     if (nome === "guardar_memoria") {
       const texto = String(entrada.texto ?? "").trim().slice(0, 500);
       if (!texto) return { texto: "Texto vazio.", erro: true };
-      const clientId = entrada.client_id ? String(entrada.client_id) : null;
+      const clientId = estado.escopo === "pessoal" ? null : entrada.client_id ? String(entrada.client_id) : null;
       if (clientId && !UUID.test(clientId)) return { texto: "client_id inválido.", erro: true };
-      const { error } = await supabase.from("assistente_memoria").insert({ texto, user_id: userId, client_id: clientId });
+      const { error } = await supabase
+        .from("assistente_memoria")
+        .insert({ texto, user_id: userId, client_id: clientId, escopo: estado.escopo });
       if (error) return { texto: `Não guardei: ${error.message}`, erro: true };
       return { texto: clientId ? "Guardado na memória da cliente." : "Guardado.", erro: false };
     }
@@ -766,6 +788,24 @@ async function executarFerramenta(
       // O telefone fica no resultado para a tela remontar o botão ao reabrir a conversa.
       return { texto: JSON.stringify({ ok: true, nome: nomeCliente, telefone: c.whatsapp }), erro: false };
     }
+    if (nome === "definir_orcamento") {
+      if (estado.escopo !== "pessoal") return { texto: "Orçamento só existe no Pessoal.", erro: true };
+      const categoria = String(entrada.categoria ?? "").trim();
+      const limite = Math.max(0, Number(entrada.limite) || 0);
+      if (!categoria) return { texto: "Faltou a categoria.", erro: true };
+      const { data: cat } = await supabase
+        .from("categories")
+        .select("name")
+        .eq("scope", "pessoal")
+        .eq("type", "saida")
+        .ilike("name", categoria)
+        .maybeSingle();
+      if (!cat) return { texto: `Categoria "${categoria}" não existe entre os gastos pessoais. Confira o nome em categories.`, erro: true };
+      const { error } = await supabase.rpc("salvar_orcamento_pessoal", { p_categoria: cat.name, p_limite: limite });
+      if (error) return { texto: `Não consegui: ${error.message}`, erro: true };
+      estado.orcamentos += 1;
+      return { texto: limite > 0 ? `Orçamento de ${cat.name} definido em ${limite}.` : `Orçamento de ${cat.name} removido.`, erro: false };
+    }
     if (nome === "esquecer_memoria") {
       const { error } = await supabase.from("assistente_memoria").delete().eq("id", String(entrada.id ?? ""));
       if (error) return { texto: `Não apaguei: ${error.message}`, erro: true };
@@ -801,13 +841,19 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!perfil?.active || perfil.somente_leitura || perfil.cliente_id) return json({ erro: "Seu acesso não inclui o assistente." }, 403);
 
-  let corpo: { mensagem?: string; conversa_id?: string | null; cliente_id?: string | null; modo?: string; foco?: string };
+  let corpo: { mensagem?: string; conversa_id?: string | null; cliente_id?: string | null; modo?: string; foco?: string; escopo?: string };
   try {
     corpo = await req.json();
   } catch {
     return json({ erro: "Pedido inválido." }, 400);
   }
-  const modoInsights = corpo.modo === "insights";
+  const pessoal = corpo.escopo === "pessoal";
+  if (pessoal) {
+    const { data: temAcesso } = await supabase.rpc("has_module_permission", { module: "pessoal" });
+    if (!temAcesso) return json({ erro: "Seu acesso não inclui o Pessoal." }, 403);
+  }
+  const escopo: "harmonize" | "pessoal" = pessoal ? "pessoal" : "harmonize";
+  const modoInsights = !pessoal && corpo.modo === "insights";
   const pergunta = modoInsights
     ? `Gere uma nova rodada de insights para a Harmonize. ${FOCOS[String(corpo.foco)] ?? "Olhe tudo, de forma ampla."}`
     : String(corpo.mensagem ?? "").trim().slice(0, 4000);
@@ -830,12 +876,13 @@ Deno.serve(async (req) => {
   // Conversa: continua a anterior ou começa uma nova.
   let conversaId = modoInsights ? null : corpo.conversa_id || null;
   let historico: Mensagem[] = [];
-  const estado: Estado = { clienteId: corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0, planejamentos: [], escolhas: [] };
+  const estado: Estado = { escopo, orcamentos: 0, clienteId: !pessoal && corpo.cliente_id && UUID.test(corpo.cliente_id) ? corpo.cliente_id : null, whatsapp: [], planilhas: [], agendas: [], insights: 0, planejamentos: [], escolhas: [] };
   if (conversaId) {
     const { data: conv } = await supabase
       .from("assistente_conversas")
       .select("mensagens, client_id")
       .eq("id", conversaId)
+      .eq("escopo", escopo)
       .maybeSingle();
     if (conv) {
       historico = semRaciocinio((conv.mensagens as Mensagem[]) ?? []);
@@ -847,12 +894,13 @@ Deno.serve(async (req) => {
   const { data: memorias } = await supabase
     .from("assistente_memoria")
     .select("id, texto")
+    .eq("escopo", escopo)
     .is("client_id", null)
     .order("created_at", { ascending: true })
     .limit(100);
 
   let blocoCliente = "";
-  if (estado.clienteId) {
+  if (estado.clienteId && !pessoal) {
     const [{ data: c }, { data: memCliente }] = await Promise.all([
       supabase
         .from("clients")
@@ -879,12 +927,21 @@ Deno.serve(async (req) => {
     }
   }
 
+  let blocoOrcamento = "";
+  if (pessoal) {
+    const { data: orc } = await supabase.from("orcamentos_pessoais").select("categoria, limite").order("categoria");
+    blocoOrcamento = orc?.length
+      ? `\nOrçamentos mensais definidos: ${orc.map((o) => `${o.categoria} R$ ${o.limite}`).join("; ")}.`
+      : "\nNenhum orçamento mensal definido ainda.";
+  }
+
   const contexto =
     `Agora: ${hojeSaoPaulo()} (horário de Brasília). Quem pergunta: ${perfil.name}.\n` +
     (memorias?.length
       ? `Memórias gerais (o que ele já te ensinou; siga sempre):\n${memorias.map((m) => `- [${m.id}] ${m.texto}`).join("\n")}`
       : "Memórias gerais: nenhuma ainda.") +
-    blocoCliente;
+    blocoCliente +
+    blocoOrcamento;
 
   const mensagens: Mensagem[] = [...historico, { role: "user", content: pergunta }];
   const enviar = () => recortarHistorico(mensagens);
@@ -902,11 +959,11 @@ Deno.serve(async (req) => {
         model: MODELO,
         max_tokens: 8000,
         system: [
-          { type: "text", text: CONHECIMENTO, cache_control: { type: "ephemeral" } },
+          { type: "text", text: pessoal ? CONHECIMENTO_PESSOAL : CONHECIMENTO, cache_control: { type: "ephemeral" } },
           ...(modoInsights ? [{ type: "text", text: INSIGHTS }] : []),
           { type: "text", text: contexto },
         ],
-        tools: modoInsights ? FERRAMENTAS_INSIGHTS : FERRAMENTAS,
+        tools: modoInsights ? FERRAMENTAS_INSIGHTS : pessoal ? FERRAMENTAS_PESSOAL : FERRAMENTAS,
         // Na última rodada, sem ferramentas: responde com o que já tem.
         ...(ultimaRodada ? { tool_choice: { type: "none" } } : {}),
         messages: comCacheNoFim(enviar()),
@@ -971,7 +1028,7 @@ Deno.serve(async (req) => {
     const titulo = pergunta.length > 60 ? pergunta.slice(0, 57) + "..." : pergunta;
     const { data: nova } = await supabase
       .from("assistente_conversas")
-      .insert({ user_id: userId, client_id: estado.clienteId, titulo, mensagens: semRaciocinio(mensagens) })
+      .insert({ user_id: userId, client_id: estado.clienteId, escopo, titulo, mensagens: semRaciocinio(mensagens) })
       .select("id")
       .single();
     conversaId = nova?.id ?? null;
@@ -997,6 +1054,7 @@ Deno.serve(async (req) => {
     planilhas: estado.planilhas,
     agendas: estado.agendas,
     insights_criados: estado.insights,
+    orcamentos_alterados: estado.orcamentos,
     planejamentos: estado.planejamentos,
     escolhas_areas: estado.escolhas,
     gasto_mes_usd: Math.round((gastoAntes + custo) * 100) / 100,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisosPessoais, comparacaoPorCategoria, diasDoMes, mesComDesvio, resumoDoMes } from "./pessoal-controle";
+import { avisosPessoais, comparacaoPorCategoria, diasDoMes, mesComDesvio, resumoDoMes, usoDosOrcamentos } from "./pessoal-controle";
 import type { LinhaFinanceira } from "./relatorio-financeiro";
 
 const HOJE = "2026-10-15";
@@ -86,5 +86,30 @@ describe("avisos", () => {
 
   it("sem nada fora do normal, não avisa", () => {
     expect(avisosPessoais(base)).toEqual([]);
+  });
+});
+
+describe("orçamento por categoria", () => {
+  const linhas = [s("2026-10-03", 450, "Restaurantes"), s("2026-10-09", 300, "Mercado"), s("2026-09-09", 900, "Mercado")];
+  const orcs = [
+    { categoria: "restaurantes", limite: 500 },
+    { categoria: "Mercado", limite: 2000 },
+  ];
+
+  it("soma só o mês e ignora maiúscula e acento", () => {
+    const [a, b] = usoDosOrcamentos(orcs, linhas, HOJE);
+    expect(a.categoria).toBe("restaurantes");
+    expect(a.gasto).toBe(450);
+    expect(a.pct).toBeCloseTo(0.9, 5);
+    expect(b.gasto).toBe(300);
+  });
+
+  it("avisa a partir de 80% e é urgente quando estoura", () => {
+    const base = { linhas, hoje: HOJE, saldo: 1000, faturas: [], totalFixas: 0, ultimoLancamento: "2026-10-14" };
+    const a = avisosPessoais({ ...base, orcamentos: orcs });
+    expect(a.find((x) => x.id === "orcamento-restaurantes")?.nivel).toBe("atencao");
+    expect(a.some((x) => x.id === "orcamento-Mercado")).toBe(false);
+    const b = avisosPessoais({ ...base, orcamentos: [{ categoria: "Restaurantes", limite: 400 }] });
+    expect(b.find((x) => x.id === "orcamento-Restaurantes")?.nivel).toBe("urgente");
   });
 });

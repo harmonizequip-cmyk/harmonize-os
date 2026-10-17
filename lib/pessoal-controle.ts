@@ -104,11 +104,44 @@ export interface FaturaPessoal {
 
 export interface AvisoPessoal {
   id: string;
-  icone: "fatura" | "alta" | "saldo" | "lancar" | "projecao";
+  icone: "fatura" | "alta" | "saldo" | "lancar" | "projecao" | "orcamento";
   texto: string;
   detalhe?: string;
   href: string;
   nivel: "urgente" | "atencao" | "info";
+}
+
+export interface OrcamentoPessoal {
+  categoria: string;
+  limite: number;
+}
+
+export interface UsoOrcamento {
+  categoria: string;
+  limite: number;
+  gasto: number;
+  /** gasto / limite (1 = 100%). */
+  pct: number;
+}
+
+const chave = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+
+/** Quanto de cada orçamento mensal já foi usado neste mês, o mais estourado primeiro. */
+export function usoDosOrcamentos(orcamentos: OrcamentoPessoal[], linhas: LinhaFinanceira[], hoje: string): UsoOrcamento[] {
+  const mes = hoje.slice(0, 7);
+  const gasto = new Map<string, number>();
+  for (const l of linhas) {
+    if (l.type !== "saida" || !contaNoResultado(l) || l.date.slice(0, 7) !== mes) continue;
+    const k = chave(l.categoria ?? "Sem categoria");
+    gasto.set(k, (gasto.get(k) ?? 0) + Number(l.amount));
+  }
+  return orcamentos
+    .filter((o) => o.limite > 0)
+    .map((o) => {
+      const g = r2(gasto.get(chave(o.categoria)) ?? 0);
+      return { categoria: o.categoria, limite: o.limite, gasto: g, pct: g / o.limite };
+    })
+    .sort((a, b) => b.pct - a.pct);
 }
 
 function diasEntre(de: string, ate: string): number {
@@ -124,6 +157,7 @@ export function avisosPessoais({
   faturas,
   totalFixas,
   ultimoLancamento,
+  orcamentos = [],
 }: {
   linhas: LinhaFinanceira[];
   hoje: string;
@@ -132,6 +166,7 @@ export function avisosPessoais({
   totalFixas: number;
   /** Data (AAAA-MM-DD) do último lançamento feito, de qualquer mês; null se nunca. */
   ultimoLancamento: string | null;
+  orcamentos?: OrcamentoPessoal[];
 }): AvisoPessoal[] {
   const avisos: AvisoPessoal[] = [];
   const resumo = resumoDoMes(linhas, hoje);
@@ -216,6 +251,20 @@ export function avisosPessoais({
         });
       }
     }
+  }
+
+  // Orçamento por categoria: passou de 80% do limite avisa; passou de 100% é urgente.
+  for (const u of usoDosOrcamentos(orcamentos, linhas, hoje)) {
+    if (u.pct < 0.8) continue;
+    const estourou = u.pct >= 1;
+    avisos.push({
+      id: `orcamento-${u.categoria}`,
+      icone: "orcamento",
+      texto: estourou ? `${u.categoria} passou do orçamento do mês` : `${u.categoria} já usou ${Math.round(u.pct * 100)}% do orçamento`,
+      detalhe: `${formatCurrency(u.gasto)} de ${formatCurrency(u.limite)}`,
+      href: "/pessoal/relatorios",
+      nivel: estourou ? "urgente" : "atencao",
+    });
   }
 
   // Hábito: sem lançar há dias, o controle deixa de refletir a realidade.

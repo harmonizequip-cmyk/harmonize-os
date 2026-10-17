@@ -39,6 +39,7 @@ const PESSOAL_ITEMS = [
   { href: "/pessoal/lancamentos", label: "Lançamentos", icon: Wallet, module: "pessoal" },
   { href: "/pessoal/cartoes", label: "Cartões", icon: CreditCard, module: "pessoal" },
   { href: "/pessoal/relatorios", label: "Relatórios", icon: BarChart3, module: "pessoal" },
+  { href: "/pessoal/assistente", label: "Assistente", icon: Sparkles, module: "pessoal" },
 ];
 
 // Mesma organização do Menu do celular (BottomNav): o dia a dia no topo e os
