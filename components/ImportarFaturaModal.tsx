@@ -60,6 +60,8 @@ export default function ImportarFaturaModal({
   const [categoriaPorNome, setCategoriaPorNome] = useState<Record<string, string>>({});
   // chave -> fatura em que a linha já está lançada neste cartão.
   const [jaLancadas, setJaLancadas] = useState<Map<string, string>>(new Map());
+  // Só libera a prévia e o botão depois de conferir o que já está lançado (senão parece duplicado).
+  const [conferido, setConferido] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -95,15 +97,30 @@ export default function ImportarFaturaModal({
   useEffect(() => {
     if (!cartaoId || !fatura) return;
     let vivo = true;
-    supabase
-      .from("transactions")
-      .select("importacao_chave, fatura_ref")
-      .eq("cartao_id", cartaoId)
-      .not("importacao_chave", "is", null)
-      .limit(20000)
-      .then(({ data }) => {
-        if (vivo) setJaLancadas(new Map(((data ?? []) as { importacao_chave: string; fatura_ref: string | null }[]).map((r) => [r.importacao_chave, r.fatura_ref ?? ""])));
-      });
+    setConferido(false);
+    (async () => {
+      // O Supabase devolve no máximo 1000 linhas por vez: busca em páginas.
+      const mapa = new Map<string, string>();
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("importacao_chave, fatura_ref")
+          .eq("cartao_id", cartaoId)
+          .not("importacao_chave", "is", null)
+          .order("id")
+          .range(de, de + 999);
+        if (!vivo) return;
+        if (error) {
+          setErro(`Não consegui conferir o que já foi lançado: ${error.message}`);
+          return;
+        }
+        const linhas = (data ?? []) as { importacao_chave: string; fatura_ref: string | null }[];
+        for (const r of linhas) mapa.set(r.importacao_chave, r.fatura_ref ?? "");
+        if (linhas.length < 1000) break;
+      }
+      setJaLancadas(mapa);
+      setConferido(true);
+    })();
     return () => {
       vivo = false;
     };
@@ -150,16 +167,28 @@ export default function ImportarFaturaModal({
   const total = compras.reduce((s, i) => s + i.valor, 0);
   const totalPagamentos = pagamentos.reduce((s, i) => s + i.valor, 0);
 
+  // Por estabelecimento: quantas compras diferentes, o que cai nesta fatura e o que fica para os próximos meses.
   const grupos = useMemo(() => {
-    const mapa = new Map<string, { nome: string; qtd: number; total: number }>();
+    const mapa = new Map<string, { nome: string; compras: Set<string>; agora: number; qtdAgora: number; depois: number; qtdDepois: number; total: number }>();
     for (const i of compras) {
-      const g = mapa.get(i.nome) ?? { nome: i.nome, qtd: 0, total: 0 };
-      g.qtd += 1;
+      const g = mapa.get(i.nome) ?? { nome: i.nome, compras: new Set<string>(), agora: 0, qtdAgora: 0, depois: 0, qtdDepois: 0, total: 0 };
+      g.compras.add(i.parcela_num ? i.grupo : i.chave);
+      if (i.fatura_ref === plano?.faturaRef) {
+        g.agora += i.valor;
+        g.qtdAgora += 1;
+      } else {
+        g.depois += i.valor;
+        g.qtdDepois += 1;
+      }
       g.total += i.valor;
       mapa.set(i.nome, g);
     }
     return Array.from(mapa.values()).sort((a, b) => b.total - a.total);
-  }, [compras]);
+  }, [compras, plano]);
+
+  const nestaFatura = compras.filter((i) => i.fatura_ref === plano?.faturaRef);
+  const totalNesta = nestaFatura.reduce((s, i) => s + i.valor, 0);
+  const totalDepois = total - totalNesta;
 
   const porFatura = useMemo(() => {
     const mapa = new Map<string, number>();
@@ -246,7 +275,9 @@ export default function ImportarFaturaModal({
 
           {erro && <p className="text-xs text-red-600">{erro}</p>}
 
-          {fatura && plano && cartao && (
+          {fatura && !conferido && !erro && <p className="text-xs text-neutral-500">Conferindo o que já foi lançado...</p>}
+
+          {fatura && plano && cartao && conferido && (
             <>
               <div className="space-y-2">
                 <p className="text-xs font-medium text-neutral-700">Esta fatura</p>
@@ -328,28 +359,43 @@ export default function ImportarFaturaModal({
                 <>
                   <div>
                     <p className="text-sm font-semibold text-neutral-900">
-                      {compras.length} compra{compras.length === 1 ? "" : "s"}, {formatCurrency(total)}
+                      {compras.length} lançamento{compras.length === 1 ? "" : "s"} novo{compras.length === 1 ? "" : "s"}, {formatCurrency(total)}
                     </p>
+                    <p className="text-xs text-neutral-700">
+                      Nesta fatura ({rotuloFatura(plano.faturaRef)}): {nestaFatura.length}, {formatCurrency(totalNesta)}
+                    </p>
+                    {compras.length > nestaFatura.length && (
+                      <p className="text-xs text-neutral-700">
+                        Parcelas dos próximos meses: {compras.length - nestaFatura.length}, {formatCurrency(totalDepois)}
+                      </p>
+                    )}
                     {antecipadas > 0 && (
                       <p className="text-[11px] text-neutral-500">
                         {antecipadas} parcela{antecipadas === 1 ? "" : "s"} antecipada{antecipadas === 1 ? "" : "s"}: já estavam em faturas futuras e passam para esta.
                       </p>
                     )}
-                    {repetidos > 0 && <p className="text-[11px] text-neutral-500">{repetidos} já lançada{repetidos === 1 ? "" : "s"} antes e ficam de fora.</p>}
+                    {repetidos > 0 && (
+                      <p className="text-[11px] text-neutral-500">
+                        {repetidos} já {repetidos === 1 ? "estava lançada" : "estavam lançadas"} por uma importação anterior e {repetidos === 1 ? "fica" : "ficam"} de fora (não duplica).
+                      </p>
+                    )}
                     <p className="mt-1 text-[11px] text-neutral-500">
                       Por fatura: {porFatura.map(([r, v]) => `${rotuloFatura(r)} ${formatCurrency(v)}`).join(" · ")}
                     </p>
                   </div>
 
                   <div>
-                    <p className="mb-1 text-xs font-medium text-neutral-700">Categoria de cada estabelecimento</p>
+                    <p className="text-xs font-medium text-neutral-700">Categoria de cada estabelecimento</p>
+                    <p className="mb-1 text-[11px] text-neutral-500">Compras na mesma loja ficam juntas numa linha.</p>
                     <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
                       {grupos.map((g) => (
                         <li key={g.nome} className="flex items-center gap-2 px-3 py-2">
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs font-medium text-neutral-800">{g.nome}</span>
                             <span className="block text-[11px] text-neutral-500">
-                              {g.qtd}x · {formatCurrency(g.total)}
+                              {g.compras.size} compra{g.compras.size === 1 ? "" : "s"}
+                              {g.qtdAgora > 0 && ` · nesta fatura ${formatCurrency(g.agora)}`}
+                              {g.qtdDepois > 0 && ` · próximos meses ${formatCurrency(g.depois)} (${g.qtdDepois} parcela${g.qtdDepois === 1 ? "" : "s"})`}
                             </span>
                           </span>
                           <select
@@ -380,7 +426,7 @@ export default function ImportarFaturaModal({
           </button>
           <button
             type="button"
-            disabled={salvando || novos.length === 0}
+            disabled={salvando || !conferido || novos.length === 0}
             onClick={importar}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >

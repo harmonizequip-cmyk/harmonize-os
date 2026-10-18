@@ -32,17 +32,25 @@ export default function DesfazerImportacaoModal({
   const [apagando, setApagando] = useState(false);
 
   async function carregar() {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("created_at, amount, fatura_ref, cartao_mov")
-      .eq("cartao_id", cartaoId)
-      .not("importacao_chave", "is", null)
-      .limit(20000);
-    if (error) {
-      setErro(error.message);
-      return;
+    // O Supabase devolve no máximo 1000 linhas por vez: busca em páginas.
+    const todas: LinhaImportada[] = [];
+    for (let de = 0; ; de += 1000) {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("created_at, amount, fatura_ref, cartao_mov")
+        .eq("cartao_id", cartaoId)
+        .not("importacao_chave", "is", null)
+        .order("id")
+        .range(de, de + 999);
+      if (error) {
+        setErro(error.message);
+        return;
+      }
+      const linhas = (data ?? []) as LinhaImportada[];
+      todas.push(...linhas);
+      if (linhas.length < 1000) break;
     }
-    setSessoes(agruparImportacoes(((data ?? []) as LinhaImportada[]).map((l) => ({ ...l, amount: Number(l.amount) }))));
+    setSessoes(agruparImportacoes(todas.map((l) => ({ ...l, amount: Number(l.amount) }))));
   }
 
   useEffect(() => {
