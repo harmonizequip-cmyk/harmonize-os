@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { resolverPeriodo, hojeLocal } from "@/lib/period";
+import { buscarTodas } from "@/lib/buscar-todas";
 import LocacoesClient from "./LocacoesClient";
 
 // Histórico de locações realizadas (item 4 da auditoria, segunda metade).
@@ -9,6 +10,8 @@ import LocacoesClient from "./LocacoesClient";
 // justamente o que o pedido proibiu, porque servem a perguntas diferentes:
 // uma responde "o que houve com este registro", a outra "quanto rodamos
 // neste mês".
+// Teto do que a tela mostra. A consulta vem em páginas (o Supabase devolve no máximo
+// 1000 linhas por vez); passou disso, a tela avisa que os totais estão incompletos.
 const TETO = 2000;
 const LOTE = 100;
 
@@ -36,52 +39,62 @@ export default async function LocacoesPage(
   // ver também o que foi cancelado no período. O que a view faz por
   // dentro, esta tela faz à vista: cancelada aparece marcada e fica fora
   // dos totais.
-  let consulta = supabase
-    .from("rentals")
-    .select(
-      "id, event_date, event_date_end, shots, calculated_value, payment_method, status, pago, pago_em, rescheduled, client_id, equipment_id, clients(name), equipments(name)"
-    )
-    .eq("is_test", false)
-    .gte("event_date", periodo.inicio)
-    .lte("event_date", periodo.fim);
+  // Montada de novo a cada página: o construtor do Supabase acumula ordem e filtros.
+  const montarConsulta = () => {
+    let consulta = supabase
+      .from("rentals")
+      .select(
+        "id, event_date, event_date_end, shots, calculated_value, payment_method, status, pago, pago_em, rescheduled, client_id, equipment_id, clients(name), equipments(name)"
+      )
+      .eq("is_test", false)
+      .gte("event_date", periodo.inicio)
+      .lte("event_date", periodo.fim);
 
-  if (searchParams.equipamento) consulta = consulta.eq("equipment_id", searchParams.equipamento);
-  if (searchParams.pagamento) consulta = consulta.eq("payment_method", searchParams.pagamento);
-  if (searchParams.cliente) consulta = consulta.eq("client_id", searchParams.cliente);
+    if (searchParams.equipamento) consulta = consulta.eq("equipment_id", searchParams.equipamento);
+    if (searchParams.pagamento) consulta = consulta.eq("payment_method", searchParams.pagamento);
+    if (searchParams.cliente) consulta = consulta.eq("client_id", searchParams.cliente);
 
-  // Situação junta os dois eixos que o banco guarda separados: o status
-  // da locação e a marca de pagamento. Quem usa pensa em "a receber",
-  // não em "realizada e pago igual a falso".
-  switch (searchParams.situacao) {
-    case "a_receber":
-      // Mesmo critério da tela de Pendências: locação não cancelada e não
-      // paga que já aconteceu, esteja o status como "realizada" ou ainda
-      // como "confirmada" (reserva do dia que ninguém finalizou).
-      consulta = consulta.neq("status", "cancelada").eq("pago", false).lt("event_date", hojeLocal());
-      break;
-    case "pagas":
-      consulta = consulta.eq("pago", true);
-      break;
-    case "realizadas":
-      // Realizada = já aconteceu e não foi cancelada. O status "realizada"
-      // do banco quase nunca é marcado à mão, então não serve de filtro.
-      consulta = consulta.neq("status", "cancelada").lt("event_date", hojeLocal());
-      break;
-    case "canceladas":
-      consulta = consulta.eq("status", "cancelada");
-      break;
-  }
+    // Situação junta os dois eixos que o banco guarda separados: o status
+    // da locação e a marca de pagamento. Quem usa pensa em "a receber",
+    // não em "realizada e pago igual a falso".
+    switch (searchParams.situacao) {
+      case "a_receber":
+        // Mesmo critério da tela de Pendências: locação não cancelada e não
+        // paga que já aconteceu, esteja o status como "realizada" ou ainda
+        // como "confirmada" (reserva do dia que ninguém finalizou).
+        consulta = consulta.neq("status", "cancelada").eq("pago", false).lt("event_date", hojeLocal());
+        break;
+      case "pagas":
+        consulta = consulta.eq("pago", true);
+        break;
+      case "realizadas":
+        // Realizada = já aconteceu e não foi cancelada. O status "realizada"
+        // do banco quase nunca é marcado à mão, então não serve de filtro.
+        consulta = consulta.neq("status", "cancelada").lt("event_date", hojeLocal());
+        break;
+      case "canceladas":
+        consulta = consulta.eq("status", "cancelada");
+        break;
+    }
+    return consulta;
+  };
 
-  const [{ data: rentals, error: erroLocacoes }, { data: clients }, { data: equipments }] = await Promise.all([
-    consulta.order("event_date", { ascending: false }).limit(TETO),
-    supabase.from("clients").select("id, name").eq("is_test", false).order("name"),
+  // buscarTodas lança erro se uma página falhar: lista que não carregou nunca pode
+  // aparecer como "sem locações".
+  const [todas, clients, { data: equipments, error: erroEquipamentos }] = await Promise.all([
+    buscarTodas<any>((de, ate) =>
+      montarConsulta().order("event_date", { ascending: false }).order("id").range(de, ate)
+    ),
+    buscarTodas<any>((de, ate) =>
+      supabase.from("clients").select("id, name").eq("is_test", false).order("name").order("id").range(de, ate)
+    ),
     supabase.from("equipments").select("id, name").order("code"),
   ]);
+  if (erroEquipamentos) throw new Error(`Não consegui carregar os equipamentos: ${erroEquipamentos.message}`);
+  const atingiuTeto = todas.length > TETO;
+  const rentals = todas.slice(0, TETO);
 
-  // Lista que não carregou nunca pode aparecer como "sem locações".
-  if (erroLocacoes) throw new Error(`Não consegui carregar as locações: ${erroLocacoes.message}`);
-
-  const normalizadas = (rentals ?? []).map((r: any) => ({
+  const normalizadas = rentals.map((r: any) => ({
     ...r,
     clients: Array.isArray(r.clients) ? (r.clients[0] ?? null) : (r.clients ?? null),
     equipments: Array.isArray(r.equipments) ? (r.equipments[0] ?? null) : (r.equipments ?? null),
@@ -90,37 +103,52 @@ export default async function LocacoesPage(
   // Saldo de cada locação (valor menos pagamentos e taxa de reserva paga),
   // da mesma view que a tela de Pendências usa. Assim os dois totais de
   // "a receber" sempre batem. Em lotes para a URL da consulta não estourar.
+  // Os três complementos (saldo, lucro, atendimento) correm em paralelo, cada um em lotes.
+  const lotes: string[][] = [];
+  for (let i = 0; i < normalizadas.length; i += LOTE) lotes.push(normalizadas.slice(i, i + LOTE).map((r: any) => r.id));
+
   const saldos = new Map<string, number>();
-  for (let i = 0; i < normalizadas.length; i += LOTE) {
-    const ids = normalizadas.slice(i, i + LOTE).map((r: any) => r.id);
-    const { data: situacoes } = await supabase
-      .from("rentals_situacao_pagamento")
-      .select("rental_id, saldo")
-      .in("rental_id", ids);
-    for (const s of situacoes ?? []) saldos.set(s.rental_id, Number(s.saldo));
-  }
-  // Despesas e lucro de cada locação (view rentals_lucro: valor cobrado menos
-  // as saídas ligadas à locação). A view já ignora cancelada e teste.
   const lucros = new Map<string, { despesas: number; lucro: number }>();
-  for (let i = 0; i < normalizadas.length; i += LOTE) {
-    const ids = normalizadas.slice(i, i + LOTE).map((r: any) => r.id);
-    const { data: linhasLucro, error: erroLucro } = await supabase
-      .from("rentals_lucro")
-      .select("rental_id, total_despesas, lucro_liquido")
-      .in("rental_id", ids);
-    if (erroLucro) throw new Error(`Não consegui carregar o lucro das locações: ${erroLucro.message}`);
-    for (const l of linhasLucro ?? []) {
-      lucros.set(l.rental_id, { despesas: Number(l.total_despesas), lucro: Number(l.lucro_liquido) });
-    }
-  }
-  // Atendimento da Agenda de cada locação (calendar_events.rental_id), para o
-  // atalho abrir o evento direto. Sem ele, o atalho cai no dia.
   const eventos = new Map<string, string>();
-  for (let i = 0; i < normalizadas.length; i += LOTE) {
-    const ids = normalizadas.slice(i, i + LOTE).map((r: any) => r.id);
-    const { data: evs } = await supabase.from("calendar_events").select("id, rental_id").in("rental_id", ids);
-    for (const e of evs ?? []) if (e.rental_id && !eventos.has(e.rental_id)) eventos.set(e.rental_id, e.id);
-  }
+  await Promise.all([
+    (async () => {
+      for (const ids of lotes) {
+        const { data: situacoes, error: erroSaldo } = await supabase
+          .from("rentals_situacao_pagamento")
+          .select("rental_id, saldo")
+          .in("rental_id", ids);
+        // Sem o saldo, a tela cairia no valor cheio e o "a receber" sairia errado.
+        if (erroSaldo) throw new Error(`Não consegui carregar o saldo das locações: ${erroSaldo.message}`);
+        for (const s of situacoes ?? []) saldos.set(s.rental_id, Number(s.saldo));
+      }
+    })(),
+    // Despesas e lucro de cada locação (view rentals_lucro: valor cobrado menos
+    // as saídas ligadas à locação). A view já ignora cancelada e teste.
+    (async () => {
+      for (const ids of lotes) {
+        const { data: linhasLucro, error: erroLucro } = await supabase
+          .from("rentals_lucro")
+          .select("rental_id, total_despesas, lucro_liquido")
+          .in("rental_id", ids);
+        if (erroLucro) throw new Error(`Não consegui carregar o lucro das locações: ${erroLucro.message}`);
+        for (const l of linhasLucro ?? []) {
+          lucros.set(l.rental_id, { despesas: Number(l.total_despesas), lucro: Number(l.lucro_liquido) });
+        }
+      }
+    })(),
+    // Atendimento da Agenda de cada locação (calendar_events.rental_id), para o
+    // atalho abrir o evento direto. Sem ele, o atalho cai no dia.
+    (async () => {
+      for (const ids of lotes) {
+        const { data: evs, error: erroEventos } = await supabase
+          .from("calendar_events")
+          .select("id, rental_id")
+          .in("rental_id", ids);
+        if (erroEventos) throw new Error(`Não consegui carregar os atendimentos das locações: ${erroEventos.message}`);
+        for (const e of evs ?? []) if (e.rental_id && !eventos.has(e.rental_id)) eventos.set(e.rental_id, e.id);
+      }
+    })(),
+  ]);
   const hoje = hojeLocal();
   for (const r of normalizadas as any[]) {
     r.event_id = eventos.get(r.id) ?? null;
@@ -150,7 +178,7 @@ export default async function LocacoesPage(
       clients={clients ?? []}
       equipments={equipments ?? []}
       periodo={periodo}
-      atingiuTeto={normalizadas.length >= TETO}
+      atingiuTeto={atingiuTeto}
     />
   );
 }

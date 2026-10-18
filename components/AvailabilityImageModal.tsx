@@ -97,6 +97,9 @@ export default function AvailabilityImageModal({
   const [cityByDate, setCityByDate] = useState<Map<string, string>>(new Map());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  // Falha ao ler a agenda: sem isso todo dia sairia livre e a imagem iria errada para a cliente.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
+  const [tentativa, setTentativa] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [canvasFile, setCanvasFile] = useState<File | null>(null);
@@ -165,6 +168,7 @@ export default function AvailabilityImageModal({
       setPreviewUrl(null);
       setCanvasFile(null);
       setShareNote(null);
+      setErroCarga(null);
 
       const start = toDateKey(startOfMonth(currentMonth));
       const end = toDateKey(endOfMonth(currentMonth));
@@ -172,7 +176,7 @@ export default function AvailabilityImageModal({
       // o "dia seguinte" de um evento que caiu bem no último dia do mês.
       const paddedStart = toDateKey(subDays(startOfMonth(currentMonth), 1));
       const paddedEnd = toDateKey(addDays(endOfMonth(currentMonth), 1));
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("calendar_events")
         .select("date_start, date_end, clients(city)")
         .in("event_type", ["hipro_1", "hipro_2"])
@@ -180,6 +184,11 @@ export default function AvailabilityImageModal({
         .gte("date_end", paddedStart)
         .lte("date_start", paddedEnd);
       if (cancelled) return;
+      if (error) {
+        setErroCarga(`Não consegui ler a agenda do mês (${error.message}). Confira a internet e tente de novo.`);
+        setLoading(false);
+        return;
+      }
 
       const rows = (data ?? []).flatMap((e: any) =>
         diasDoPeriodo(e.date_start as string, (e.date_end ?? e.date_start) as string).map((d) => ({
@@ -191,12 +200,17 @@ export default function AvailabilityImageModal({
       const busy = new Set(rows.filter((r) => r.date >= start && r.date <= end).map((r) => r.date));
       // Dia com algum HIPRO bloqueado (manutenção, recesso) também não entra
       // como livre: a regra é os dois livres.
-      const { data: bloqueios } = await supabase
+      const { data: bloqueios, error: erroBloqueios } = await supabase
         .from("bloqueios_equipamento")
         .select("data_inicio, data_fim")
         .lte("data_inicio", end)
         .gte("data_fim", start);
       if (cancelled) return;
+      if (erroBloqueios) {
+        setErroCarga(`Não consegui ler os bloqueios da agenda (${erroBloqueios.message}). Confira a internet e tente de novo.`);
+        setLoading(false);
+        return;
+      }
       for (const b of bloqueios ?? []) {
         for (const d of diasDoPeriodo(b.data_inicio as string, b.data_fim as string, 400)) {
           if (d >= start && d <= end) busy.add(d);
@@ -217,7 +231,7 @@ export default function AvailabilityImageModal({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthKey]);
+  }, [monthKey, tentativa]);
 
   function toggleDay(key: string) {
     setSelectedDays((prev) => {
@@ -229,6 +243,7 @@ export default function AvailabilityImageModal({
   }
 
   async function handleGenerate() {
+    if (erroCarga) return;
     setGenerating(true);
     setShareNote(null);
     const canvas = await drawAvailabilityImage({ daysInMonth, selectedDays, busyDates, today });
@@ -349,6 +364,17 @@ export default function AvailabilityImageModal({
 
         {loading ? (
           <p className="py-8 text-center text-sm text-neutral-400">Carregando agenda do mês...</p>
+        ) : erroCarga ? (
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <p>{erroCarga}</p>
+            <button
+              type="button"
+              onClick={() => setTentativa((t) => t + 1)}
+              className="mt-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700"
+            >
+              Tentar de novo
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
             {daysInMonth.map((day) => {
@@ -393,13 +419,13 @@ export default function AvailabilityImageModal({
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={loading || generating}
+          disabled={loading || generating || !!erroCarga}
           className="mt-4 w-full rounded-xl bg-brand-gradient py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
         >
           {generating ? "Gerando..." : "Gerar imagem"}
         </button>
 
-        {previewUrl && (
+        {previewUrl && !erroCarga && (
           <div className="mt-4 space-y-3">
             <img
               src={previewUrl}

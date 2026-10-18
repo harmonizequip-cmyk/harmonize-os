@@ -81,8 +81,9 @@ const FORMAS = [
   { value: "outros", label: "Outros" },
 ];
 
+// Ação de dinheiro (marcar pago, confirmar pagamento): alvo de toque de ~40px no celular.
 const BOTAO_PRIMARIO =
-  "rounded-lg bg-brand-teal px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60";
+  "rounded-lg bg-brand-teal px-3 py-2.5 text-sm font-medium text-white disabled:opacity-60";
 const BOTAO_AZUL =
   "rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60";
 const BOTAO_NEUTRO =
@@ -616,13 +617,18 @@ export default function AgendamentosDoCliente({
                         <button
                           type="button"
                           disabled={trabalhando}
-                          onClick={() =>
-                            executar(
-                              "desfazer_pagamento_locacao",
-                              { p_rental_id: a.rental_id },
-                              a.event_id
-                            )
-                          }
+                          onClick={async () => {
+                            // Apaga todos os pagamentos da locação, não só o último.
+                            const ok = await confirmar({
+                              titulo: "Desfazer o pagamento?",
+                              texto:
+                                "Todos os pagamentos desta locação serão apagados e o valor volta para \"a receber\".",
+                              confirmar: "Desfazer",
+                              perigo: true,
+                            });
+                            if (!ok) return;
+                            executar("desfazer_pagamento_locacao", { p_rental_id: a.rental_id }, a.event_id);
+                          }}
                           className={BOTAO_NEUTRO}
                         >
                           Desfazer pagamento

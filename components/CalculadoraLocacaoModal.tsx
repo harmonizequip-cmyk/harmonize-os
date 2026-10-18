@@ -96,6 +96,7 @@ export interface ClientWithExtras {
   name: string;
   whatsapp?: string | null;
   parceiro?: boolean | null;
+  isento_taxa?: boolean | null;
 }
 
 interface PendingReservation {
@@ -205,6 +206,26 @@ export default function CalculadoraLocacaoModal({
   const activeClientWhatsapp =
     mode.kind === "finalize" ? mode.reservation.clientWhatsapp : mode.clientId ? mode.clientWhatsapp : pickedClient?.whatsapp ?? null;
   const activeClientParceiro = mode.kind === "finalize" ? false : mode.clientId ? !!mode.clientParceiro : !!pickedClient?.parceiro;
+  // Cliente isenta da taxa (clients.isento_taxa) também não paga, como o parceiro. Nem toda tela
+  // manda esse campo na lista, então confere no cadastro (mesma regra de definir_taxa_ao_criar_evento).
+  const [activeClientIsenta, setActiveClientIsenta] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setActiveClientIsenta(mode.kind === "create" && !mode.clientId ? !!pickedClient?.isento_taxa : false);
+    if (mode.kind !== "create" || !activeClientId) return;
+    supabase
+      .from("clients")
+      .select("parceiro, isento_taxa")
+      .eq("id", activeClientId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data) setActiveClientIsenta(!!data.parceiro || !!data.isento_taxa);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, mode.kind]);
 
   // ------------------------------------------------------------
   // Equipamento e data
@@ -650,9 +671,10 @@ export default function CalculadoraLocacaoModal({
   const [isentando, setIsentando] = useState(false);
   const feePending = mode.kind === "finalize" && mode.reservation.taxaStatus === "pendente" && !taxaIsentada;
   // Em modo "create", a taxa nasce pendente sozinha (gatilho do banco)
-  // quando a data é futura e o cliente não é parceiro — mesma conta de
+  // quando a data é futura e o cliente não é parceiro nem isento — mesma conta de
   // definir_taxa_ao_criar_evento. Só decide se a opção aparece na tela.
-  const feeWouldApplyOnCreate = mode.kind === "create" && !activeClientParceiro && eventDate > hojeLocal();
+  const feeWouldApplyOnCreate =
+    mode.kind === "create" && !activeClientParceiro && !activeClientIsenta && eventDate > hojeLocal();
   const [chargeFeeNow, setChargeFeeNow] = useState(false);
   async function isentarTaxaDestaReserva() {
     if (mode.kind !== "finalize") return;
@@ -684,6 +706,28 @@ export default function CalculadoraLocacaoModal({
     ? "cobrar_agora"
     : "nao_aplica";
 
+  // Taxa já paga: o crédito é o valor que a cliente pagou (calendar_events.taxa_valor), não o
+  // preço atual de Configurações, que pode ter mudado depois do pagamento.
+  const [taxaPagaValor, setTaxaPagaValor] = useState<number | null>(null);
+  const reservaIdFinalizar = mode.kind === "finalize" ? mode.reservation.id : null;
+  useEffect(() => {
+    let active = true;
+    if (!feeIsPaid || !reservaIdFinalizar) return;
+    supabase
+      .from("calendar_events")
+      .select("taxa_valor")
+      .eq("id", reservaIdFinalizar)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data?.taxa_valor != null) setTaxaPagaValor(Number(data.taxa_valor));
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feeIsPaid, reservaIdFinalizar]);
+  const feeDoResumo = reservationFeeStatus === "ja_paga" && taxaPagaValor != null ? taxaPagaValor : fee;
+
   // ------------------------------------------------------------
   // Pagamento: lista de linhas (forma/valor/conta pix). 0 = a receber,
   // 1 = integral, 2+ = parcial.
@@ -714,9 +758,9 @@ export default function CalculadoraLocacaoModal({
       kmIda: kmIdaNumber,
       itens,
       reservationFeeStatus,
-      reservationFee: fee,
+      reservationFee: feeDoResumo,
     });
-  }, [isMentoria, mentoriaCalc, pricing, tudoNoCredito, shots, custoManualPorDisparo, kmIdaNumber, itens, reservationFeeStatus, fee]);
+  }, [isMentoria, mentoriaCalc, pricing, tudoNoCredito, shots, custoManualPorDisparo, kmIdaNumber, itens, reservationFeeStatus, feeDoResumo]);
 
   function preencherValorTotal(id: string) {
     if (!resumo) return;
@@ -732,6 +776,9 @@ export default function CalculadoraLocacaoModal({
     [pagamentos]
   );
   const saldoAposPagamentos = resumo ? Math.round((resumo.totalAPagarAgora - somaPagamentos) * 100) / 100 : 0;
+  // Dinheiro (pix, cartão, espécie) acima do total: o banco recusaria as últimas linhas depois de
+  // criar a locação (meio registrada). Permuta acima do total vira crédito e pode.
+  const dinheiroExcedeTotal = !!resumo && somaDinheiro - resumo.totalAPagarAgora > 0.009;
   // Permuta abate o que sobra depois do dinheiro; o que passar vira crédito em R$.
   const divisaoPermuta = useMemo(() => {
     const mapa: Record<string, { abate: number; credito: number }> = {};
@@ -790,7 +837,7 @@ export default function CalculadoraLocacaoModal({
         kmIda: kmIdaNumber,
         itens,
         reservationFeeStatus,
-        reservationFee: fee,
+        reservationFee: feeDoResumo,
         initialCount: initialNumber,
         finalCount: finalNumber,
         patientCount: patientCountNumber,
@@ -818,7 +865,7 @@ export default function CalculadoraLocacaoModal({
     kmIdaNumber,
     itens,
     reservationFeeStatus,
-    fee,
+    feeDoResumo,
     initialNumber,
     finalNumber,
     patientCountNumber,
@@ -956,6 +1003,11 @@ export default function CalculadoraLocacaoModal({
           return;
         }
       }
+    }
+
+    if (dinheiroExcedeTotal) {
+      setError("Os pagamentos passam do total. Ajuste os valores antes de salvar.");
+      return;
     }
 
     setSaving(true);
@@ -1193,7 +1245,7 @@ export default function CalculadoraLocacaoModal({
           kmIda: kmIdaNumber,
           itens,
           reservationFeeStatus,
-          reservationFee: fee,
+          reservationFee: feeDoResumo,
           initialCount: initialNumber,
           finalCount: finalNumber,
           patientCount: patientCountNumber,
@@ -1389,7 +1441,7 @@ export default function CalculadoraLocacaoModal({
   // TELA DE FORMULÁRIO
   // ============================================================
   const disparosValidos = !isMentoria && todasContagensPreenchidas && totalDisparos > 0 && (!!pricing || tudoNoCredito);
-  const podeSalvar = isMentoria ? !!mentoriaCalc : disparosValidos;
+  const podeSalvar = (isMentoria ? !!mentoriaCalc : disparosValidos) && !dinheiroExcedeTotal;
 
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
@@ -1466,7 +1518,7 @@ export default function CalculadoraLocacaoModal({
 
         {feeIsPaid && (
           <div className="mb-4 rounded-xl border border-brand-teal/30 bg-brand-teal/10 p-3 text-xs text-brand-teal">
-            💳 A taxa de reserva desta data ({formatCurrency(fee)}) já foi paga. Ela entra como crédito no total abaixo.
+            💳 A taxa de reserva desta data ({formatCurrency(feeDoResumo)}) já foi paga. Ela entra como crédito no total abaixo.
           </div>
         )}
         {feePending && (
@@ -1476,7 +1528,7 @@ export default function CalculadoraLocacaoModal({
               type="button"
               disabled={isentando}
               onClick={isentarTaxaDestaReserva}
-              className="mt-2 block rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 disabled:opacity-60"
+              className="mt-2 block rounded-lg border border-amber-400 bg-white px-3 py-2.5 text-sm font-semibold text-amber-800 disabled:opacity-60"
             >
               {isentando ? "Salvando..." : "Isentar taxa desta reserva"}
             </button>
@@ -2063,7 +2115,7 @@ export default function CalculadoraLocacaoModal({
               {pagamentos.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-neutral-300 p-3 text-center text-xs text-neutral-500">
                   Esta locação fica em aberto — nada será registrado como pago agora.
-                  <button type="button" onClick={addPagamento} className="mt-2 block w-full rounded-lg border border-brand-teal py-1.5 font-medium text-brand-teal">
+                  <button type="button" onClick={addPagamento} className="mt-2 block w-full rounded-lg border border-brand-teal py-2.5 text-sm font-medium text-brand-teal">
                     + Adicionar um pagamento
                   </button>
                 </div>
@@ -2235,6 +2287,11 @@ export default function CalculadoraLocacaoModal({
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {dinheiroExcedeTotal && !error && resumo && (
+          <p className="mt-3 text-sm text-red-600">
+            Os pagamentos passam do total em {formatCurrency(Math.round((somaDinheiro - resumo.totalAPagarAgora) * 100) / 100)}. Ajuste os valores para salvar.
+          </p>
+        )}
 
         <div className="mt-4 flex gap-2">
           <button onClick={onClose} className="flex-1 rounded-xl border border-neutral-300 py-2.5 text-sm font-medium text-neutral-600">

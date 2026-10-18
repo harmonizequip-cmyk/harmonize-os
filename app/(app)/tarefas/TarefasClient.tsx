@@ -110,20 +110,22 @@ export default function TarefasClient({
     [concluidas, term]
   );
 
-  async function registerContactAttempt(taskId: string, responded: boolean) {
+  // As ações devolvem se gravou: a fila só passa para a próxima (e conta como feita) quando deu certo.
+  async function registerContactAttempt(taskId: string, responded: boolean): Promise<boolean> {
     setTaskBusyId(taskId);
-    setPendentes((prev) => prev.filter((t) => t.id !== taskId));
     const { error } = await supabase.rpc("register_contact_attempt", { p_task_id: taskId, p_responded: responded });
     setTaskBusyId(null);
     if (error) {
       avisar(error.message || "Não foi possível registrar o contato. A tarefa continua na lista.", "erro");
+      return false;
     }
+    setPendentes((prev) => prev.filter((t) => t.id !== taskId));
     router.refresh();
+    return true;
   }
 
-  async function completeManualTask(taskId: string) {
+  async function completeManualTask(taskId: string): Promise<boolean> {
     setTaskBusyId(taskId);
-    setPendentes((prev) => prev.filter((t) => t.id !== taskId));
     const { error } = await supabase
       .from("tasks")
       .update({ status: "concluida", completed_at: new Date().toISOString() })
@@ -131,15 +133,22 @@ export default function TarefasClient({
     setTaskBusyId(null);
     if (error) {
       avisar(error.message || "Não foi possível concluir a tarefa. Ela continua na lista.", "erro");
+      return false;
     }
-    router.refresh();
-  }
-
-  async function adiarPara(taskId: string, data: string) {
-    const { error } = await supabase.from("tasks").update({ due_date: data }).eq("id", taskId);
-    if (error) avisar(error.message || "Não foi possível adiar. A tarefa continua na fila.", "erro");
     setPendentes((prev) => prev.filter((t) => t.id !== taskId));
     router.refresh();
+    return true;
+  }
+
+  async function adiarPara(taskId: string, data: string): Promise<boolean> {
+    const { error } = await supabase.from("tasks").update({ due_date: data }).eq("id", taskId);
+    if (error) {
+      avisar(error.message || "Não foi possível adiar. A tarefa continua na fila.", "erro");
+      return false;
+    }
+    setPendentes((prev) => prev.filter((t) => t.id !== taskId));
+    router.refresh();
+    return true;
   }
 
   async function adiarTarefa(taskId: string) {
