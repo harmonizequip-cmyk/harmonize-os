@@ -145,10 +145,10 @@ View clientes_lucro: client_id, cliente, locacoes, faturado, recebido, despesas,
 Locação cancelada não tem despesa.
 
 ## Financeiro (caixa)
-transactions: id, type (entrada, saida), category_id (categories.id), description, amount (sempre positivo), payment_method (pix, dinheiro, debito, credito, transferencia, outros), date, notes, scope (harmonize ou pessoal), client_id, rental_id, calendar_event_id, conta_no_lucro, cartao_id, cartao_mov (compra, pagamento), fatura_ref ('AAAA-MM'), parcela_num, parcelas_total, vinculo_id, is_test.
+transactions: id, type (entrada, saida), category_id (categories.id), description, amount (sempre positivo), payment_method (pix, dinheiro, debito, credito, transferencia, outros), date, data_compra, notes, scope (harmonize ou pessoal), client_id, rental_id, calendar_event_id, conta_no_lucro, cartao_id, cartao_mov (compra, pagamento), fatura_ref ('AAAA-MM'), parcela_num, parcelas_total, vinculo_id, is_test.
 categories: id, name, type, scope.
 Para somar use transactions_contabilizaveis (sem teste e sem itens de locação cancelada).
-Regras das somas de Entradas/Saídas/Resultado: só scope = 'harmonize' (a não ser que ele pergunte do pessoal); ficam fora o pagamento de fatura (cartao_mov = 'pagamento', categoria 'Pagamento de fatura') e os empréstimos (categorias 'Empréstimo concedido' e 'Devolução de empréstimo'). Compra no cartão conta como gasto no mês da parcela.
+Regras das somas de Entradas/Saídas/Resultado: só scope = 'harmonize' (a não ser que ele pergunte do pessoal); ficam fora o pagamento de fatura (cartao_mov = 'pagamento', categoria 'Pagamento de fatura') e os empréstimos (categorias 'Empréstimo concedido' e 'Devolução de empréstimo'). Compra no cartão conta como gasto no mês em que a fatura vence: em compra de cartão, date é o vencimento da fatura e data_compra é o dia da compra (use data_compra só para dizer quando comprou).
 "Retiradas" (saída da Harmonize) vira entrada "Retirada da Harmonize" no pessoal.
 Contas fixas: settings.despesas_fixas (lista JSON com nome, valor, tipo harmonize/pessoal).
 cartoes: id, nome, scope, dia_fechamento, dia_vencimento, limite. View faturas_cartao: cartao_id, nome, scope, fatura_ref, vencimento, fechamento, total_compras, total_pago.
@@ -227,8 +227,8 @@ export const CONHECIMENTO_PESSOAL = `Você é o assistente financeiro pessoal do
 - Planilha: gerar_planilha, com o mesmo cuidado de sempre (SQL pronto e ordenado, tipos certos, total nas somas, grafico de ranking quando fizer sentido).
 
 # Dados (sempre scope = 'pessoal')
-transactions: id, type (entrada, saida), category_id (categories.id), description, amount (positivo), payment_method (pix, dinheiro, debito, credito, transferencia, permuta, outros), date, notes, scope, cartao_id, cartao_mov (compra, pagamento), fatura_ref ('AAAA-MM'), parcela_num, parcelas_total, vinculo_id, is_test.
-Para somar use transactions_contabilizaveis (sem teste), sempre com scope = 'pessoal'. Para gastos, saidas fora do pagamento de fatura (cartao_mov = 'pagamento' ou categoria 'Pagamento de fatura') e fora de empréstimos ('Empréstimo concedido', 'Devolução de empréstimo'). Compra no cartão conta como gasto no mês da parcela (a data da parcela), mas não sai do saldo até a fatura ser paga.
+transactions: id, type (entrada, saida), category_id (categories.id), description, amount (positivo), payment_method (pix, dinheiro, debito, credito, transferencia, permuta, outros), date, data_compra, notes, scope, cartao_id, cartao_mov (compra, pagamento), fatura_ref ('AAAA-MM'), parcela_num, parcelas_total, vinculo_id, is_test.
+Para somar use transactions_contabilizaveis (sem teste), sempre com scope = 'pessoal'. Para gastos, saidas fora do pagamento de fatura (cartao_mov = 'pagamento' ou categoria 'Pagamento de fatura') e fora de empréstimos ('Empréstimo concedido', 'Devolução de empréstimo'). Compra no cartão conta como gasto no mês em que a fatura vence (date = vencimento da fatura; data_compra = dia da compra), mas não sai do saldo até a fatura ser paga.
 categories: id, name, type, scope (use scope = 'pessoal').
 Saldo da conta pessoal: entradas menos saídas de scope = 'pessoal', ignorando compra de cartão ainda não paga (cartao_mov = 'compra') e payment_method = 'permuta'.
 "Retirada da Harmonize" (entrada) é o dinheiro que ele tira da empresa e que cai aqui sozinho.

@@ -11,6 +11,8 @@ export interface LinhaFinanceira {
   date: string;
   categoria: string | null;
   cartao_mov?: CartaoMov;
+  /** Compra no cartão: dia da compra (a data acima é o vencimento da fatura, quando o gasto conta). */
+  data_compra?: string | null;
   /** Só para o detalhe por categoria (lançamento de origem). */
   id?: string;
   description?: string;
@@ -67,7 +69,7 @@ export function lancamentosPorCategoria(linhas: LinhaFinanceira[], tipo: "entrad
     const nome = l.categoria ?? "Sem categoria";
     (mapa[nome] ??= []).push({
       id: l.id,
-      date: l.date,
+      date: l.data_compra ?? l.date,
       description: l.description?.trim() || "Sem descrição",
       amount: Number(l.amount),
       parcela: l.parcela ?? null,

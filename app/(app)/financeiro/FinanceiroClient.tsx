@@ -16,6 +16,7 @@ import { foraDoResultadoPorCartao, rotuloFatura } from "@/lib/cartao";
 import EditarLancamentoModal from "./EditarLancamentoModal";
 import { LinkCliente } from "@/components/Atalhos";
 import { linkEvento, linkLocacao } from "@/lib/atalhos";
+import { agruparPorFatura, linkFatura } from "@/lib/lancamentos-fatura";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -49,6 +50,11 @@ interface TransactionRow {
   // marcado, porque um número que não bate com o relatório sem
   // explicação visível é pior do que o número estar errado.
   is_test?: boolean;
+  // Compra no cartão: date é o vencimento da fatura (quando conta) e data_compra o dia da compra.
+  cartao_mov?: "compra" | "pagamento" | null;
+  cartao_id?: string | null;
+  fatura_ref?: string | null;
+  data_compra?: string | null;
 }
 
 interface CategoryRow {
@@ -105,6 +111,7 @@ export default function FinanceiroClient({
   initialTransactions,
   categories,
   clients,
+  nomesCartoes = {},
   periodo,
   atingiuTeto,
   escopo = "harmonize",
@@ -113,6 +120,7 @@ export default function FinanceiroClient({
   initialTransactions: TransactionRow[];
   categories: CategoryRow[];
   clients: ClientOption[];
+  nomesCartoes?: Record<string, string>;
   periodo: Periodo;
   atingiuTeto: boolean;
   escopo?: "harmonize" | "pessoal";
@@ -153,11 +161,15 @@ export default function FinanceiroClient({
     return { entradas, saidas, resultado: entradas - saidas, emprestado, devolvido, faturasPagas };
   }, [initialTransactions]);
 
+  // As compras do cartão aparecem numa linha por fatura, que abre a tela Cartões.
+  const linhas = useMemo(() => agruparPorFatura(initialTransactions), [initialTransactions]);
+
   function baixarCsv() {
     exportarTabela(
       initialTransactions,
       [
         { titulo: "Data", valor: (t) => formatDate(t.date), tipo: "data" },
+        { titulo: "Data da compra (cartão)", valor: (t) => (t.data_compra ? formatDate(t.data_compra) : ""), tipo: "data" },
         { titulo: "Tipo", valor: (t) => (t.type === "entrada" ? "Entrada" : "Saída") },
         { titulo: "Categoria", valor: (t) => t.categories?.name ?? "" },
         { titulo: "Descrição", valor: (t) => t.description },
@@ -225,7 +237,7 @@ export default function FinanceiroClient({
     createClient()
       .from("transactions")
       .select(
-        "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
+        "id, type, description, amount, payment_method, date, data_compra, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
       )
       .eq("id", id)
       .maybeSingle()
@@ -401,7 +413,33 @@ export default function FinanceiroClient({
 
       {/* Celular: lista de cartões empilhados */}
       <div className="space-y-2 sm:hidden">
-        {initialTransactions.map((t) => (
+        {linhas.map((linha) => {
+          if (linha.tipo === "fatura") {
+            return (
+              <Link
+                key={linha.chave}
+                href={linkFatura(escopo, linha.cartao_id, linha.fatura_ref)}
+                className="block rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900">Fatura {nomesCartoes[linha.cartao_id] ?? "do cartão"}</p>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      {rotuloFatura(linha.fatura_ref)} · vence {formatDate(linha.itens[0].date)} · {linha.itens.length}{" "}
+                      {linha.itens.length === 1 ? "compra" : "compras"}
+                    </p>
+                  </div>
+                  <span className="whitespace-nowrap rounded-full bg-brand-pink/10 px-2 py-0.5 text-xs font-medium text-brand-pink">Saída</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-neutral-500">Crédito · ver as compras →</span>
+                  <span className="font-medium text-brand-pink">{formatCurrency(linha.total)}</span>
+                </div>
+              </Link>
+            );
+          }
+          const t = linha.item;
+          return (
           <div
             key={t.id}
             onClick={() => abrirLancamento(t)}
@@ -446,7 +484,8 @@ export default function FinanceiroClient({
               </span>
             </div>
           </div>
-        ))}
+          );
+        })}
         {initialTransactions.length === 0 && (
           <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
             Nenhum lançamento em {periodo.rotulo}.
@@ -468,7 +507,32 @@ export default function FinanceiroClient({
             </tr>
           </thead>
           <tbody>
-            {initialTransactions.map((t) => (
+            {linhas.map((linha) => {
+              if (linha.tipo === "fatura") {
+                return (
+                  <tr
+                    key={linha.chave}
+                    onClick={() => router.push(linkFatura(escopo, linha.cartao_id, linha.fatura_ref))}
+                    className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                  >
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{formatDate(linha.itens[0].date)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className="rounded-full bg-brand-pink/10 px-2 py-0.5 text-xs font-medium text-brand-pink">Saída</span>
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600">Cartão</td>
+                    <td className="px-4 py-3 text-neutral-900">
+                      Fatura {nomesCartoes[linha.cartao_id] ?? "do cartão"} {rotuloFatura(linha.fatura_ref)}
+                      <span className="ml-1 text-xs font-normal text-neutral-400">
+                        · {linha.itens.length} {linha.itens.length === 1 ? "compra" : "compras"} · ver as compras →
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-brand-pink">{formatCurrency(linha.total)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-600">Crédito</td>
+                  </tr>
+                );
+              }
+              const t = linha.item;
+              return (
               <tr
                 key={t.id}
                 onClick={() => abrirLancamento(t)}
@@ -511,7 +575,8 @@ export default function FinanceiroClient({
                   {PAYMENT_LABELS[t.payment_method] ?? t.payment_method}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {initialTransactions.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">

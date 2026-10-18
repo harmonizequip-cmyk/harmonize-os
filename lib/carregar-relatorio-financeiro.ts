@@ -3,6 +3,7 @@ import { hojeLocal, type Periodo } from "@/lib/period";
 import { resumirEmprestimos, type MovimentoEmprestimo } from "@/lib/emprestimos";
 import { porCategoria, evolucaoMensal, lancamentosPorCategoria, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
 import type { FaturaRelatorio } from "@/components/RelatorioFinanceiro";
+import { buscarTodas } from "@/lib/buscar-todas";
 
 function oneOf<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
@@ -16,13 +17,16 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
   const inicio12 = `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}-01`;
   const desde = periodo.inicio < inicio12 ? periodo.inicio : inicio12;
   const [{ data: linhasRaw }, { data: faturasRaw }, { data: cartoesRaw }, emprestimosRes] = await Promise.all([
-    supabase
-      .from("transactions_contabilizaveis")
-      .select("id, type, amount, date, description, parcela_num, parcelas_total, cartao_mov, categories(name)")
-      .eq("scope", escopo)
-      .gte("date", desde)
-      .lte("date", periodo.fim > hoje ? periodo.fim : hoje)
-      .limit(20000),
+    buscarTodas((de, ate) =>
+      supabase
+        .from("transactions_contabilizaveis")
+        .select("id, type, amount, date, data_compra, description, parcela_num, parcelas_total, cartao_mov, categories(name)")
+        .eq("scope", escopo)
+        .gte("date", desde)
+        .lte("date", periodo.fim > hoje ? periodo.fim : hoje)
+        .order("id")
+        .range(de, ate)
+    ).then((data) => ({ data })),
     supabase.from("faturas_cartao").select("cartao_id, fatura_ref, vencimento, total_compras, total_pago").eq("scope", escopo).order("fatura_ref"),
     supabase.from("cartoes").select("id, nome"),
     escopo === "harmonize"
@@ -36,6 +40,7 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
     type: l.type,
     amount: Number(l.amount),
     date: l.date,
+    data_compra: l.data_compra ?? null,
     cartao_mov: l.cartao_mov,
     categoria: oneOf<{ name: string }>(l.categories)?.name ?? null,
   }));

@@ -1,4 +1,5 @@
-// Cartão de crédito. A compra conta como gasto no mês de cada parcela, mas não
+// Cartão de crédito. A compra conta como gasto no mês em que a fatura dela vence
+// (transactions.date = vencimento; data_compra = dia da compra), mas não
 // tira dinheiro da conta; o pagamento da fatura tira o dinheiro e não conta
 // como gasto (as compras já contaram). Assim nada é somado duas vezes.
 

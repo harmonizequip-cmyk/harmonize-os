@@ -7,7 +7,7 @@ import ClientPicker from "@/components/ClientPicker";
 import { createClient } from "@/lib/supabase/client";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import { PIX_CONTAS } from "@/lib/rental-calculator";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 import { confirmar } from "@/components/Dialogos";
@@ -43,6 +43,9 @@ interface TransactionToEdit {
   client_id: string | null;
   rental_id?: string | null;
   calendar_event_id?: string | null;
+  // Compra no cartão: date é o vencimento da fatura; aqui se edita o dia da compra.
+  cartao_mov?: "compra" | "pagamento" | null;
+  data_compra?: string | null;
 }
 
 // Pagamento de locação (linha de rental_payments ligada a este lançamento).
@@ -88,7 +91,9 @@ export default function EditarLancamentoModal({
   const vinculoFixo = transaction.type === "entrada" && !!transaction.rental_id;
   const podeEscolherLocacao = !vinculoFixo && type === "saida" && !!clientId;
   const [paymentMethod, setPaymentMethod] = useState(transaction.payment_method);
-  const [date, setDate] = useState(transaction.date);
+  // Na compra do cartão o campo é o dia da compra; o banco põe a data no vencimento da fatura.
+  const compraCartao = transaction.cartao_mov === "compra";
+  const [date, setDate] = useState(compraCartao ? (transaction.data_compra ?? transaction.date) : transaction.date);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
@@ -451,13 +456,16 @@ export default function EditarLancamentoModal({
             />
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Data</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">{compraCartao ? "Data da compra" : "Data"}</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
+            {compraCartao && (
+              <p className="mt-1 text-[11px] text-neutral-500">Conta no mês em que a fatura vence ({formatDate(transaction.date)}).</p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600">Forma de pagamento</label>

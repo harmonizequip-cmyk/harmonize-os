@@ -1,8 +1,8 @@
 "use client";
 
 // Cartões de crédito: fatura atual de cada cartão, compras da fatura,
-// pagar a fatura e cadastrar/editar cartão. A compra conta como gasto no mês
-// da parcela; o pagamento da fatura tira o dinheiro e fica fora do resultado.
+// pagar a fatura e cadastrar/editar cartão. A compra conta como gasto no mês em
+// que a fatura vence; o pagamento da fatura tira o dinheiro e fica fora do resultado.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -44,6 +44,8 @@ interface Compra {
   description: string;
   amount: number;
   date: string;
+  /** Dia da compra (date é o vencimento da fatura). */
+  data_compra: string | null;
   cartao_mov: "compra" | "pagamento";
   compra_grupo: string | null;
   categoria: string | null;
@@ -99,6 +101,23 @@ export default function CartoesClient({
   const [importando, setImportando] = useState(false);
   const [desfazendo, setDesfazendo] = useState(false);
 
+  // ?cartao=<id>&fatura=AAAA-MM (linha da fatura em Lançamentos): abre direto naquela fatura.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get("cartao");
+    const alvo = url.searchParams.get("fatura");
+    const c = cartoes.find((x) => x.id === id);
+    if (!c) return;
+    setSelecionado(c.id);
+    if (alvo && /^\d{4}-\d{2}$/.test(alvo)) {
+      const atual = faturaDaCompra(hoje, c.dia_fechamento, c.dia_vencimento);
+      const meses = (r: string) => Number(r.slice(0, 4)) * 12 + Number(r.slice(5, 7));
+      setDeslocamento(meses(alvo) - meses(atual));
+    }
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [pagando, setPagando] = useState(false);
   const [valorPagar, setValorPagar] = useState("");
   const [dataPagar, setDataPagar] = useState(hoje);
@@ -112,10 +131,11 @@ export default function CartoesClient({
     setCarregando(true);
     supabase
       .from("transactions")
-      .select("id, description, amount, date, cartao_mov, compra_grupo, categories(name)")
+      .select("id, description, amount, date, data_compra, cartao_mov, compra_grupo, categories(name)")
       .eq("cartao_id", selecionado)
       .eq("fatura_ref", ref)
       .eq("is_test", false)
+      .order("data_compra", { nullsFirst: false })
       .order("date")
       .then(({ data }) => {
         setCompras(
@@ -229,7 +249,7 @@ export default function CartoesClient({
       </div>
 
       <p className="text-xs text-neutral-500">
-        A compra conta como gasto no mês de cada parcela, mas só sai da conta quando você paga a fatura. O pagamento da fatura fica
+        A compra conta como gasto no mês em que a fatura vence, mas só sai da conta quando você paga a fatura. O pagamento da fatura fica
         fora do resultado, para não contar duas vezes.
       </p>
 
@@ -404,7 +424,7 @@ export default function CartoesClient({
                     <span className="min-w-0">
                       <span className="block truncate text-neutral-800">{c.description}</span>
                       <span className="text-[11px] text-neutral-400">
-                        {formatDate(c.date)}
+                        {formatDate(c.data_compra ?? c.date)}
                         {c.categoria ? ` · ${c.categoria}` : ""}
                       </span>
                     </span>

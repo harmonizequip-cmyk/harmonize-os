@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import { foraDoSaldo } from "@/lib/cartao";
+import { buscarTodas } from "@/lib/buscar-todas";
 import FinanceiroClient from "../../financeiro/FinanceiroClient";
 import { carregarLancamentos, type FiltrosFinanceiro } from "../../financeiro/carregar-lancamentos";
 
@@ -13,7 +14,7 @@ export default async function PessoalPage(props: { searchParams: Promise<Filtros
   const [d, settings, { data: todos }] = await Promise.all([
     carregarLancamentos(supabase, searchParams, "pessoal"),
     fetchSettings(supabase),
-    supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).limit(20000),
+    buscarTodas((de, ate) => supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).order("id").range(de, ate)).then((data) => ({ data })),
   ]);
   // Compra no cartão só sai da conta quando a fatura é paga.
   const saldo = (todos ?? []).filter((t: any) => !foraDoSaldo(t)).reduce((s, t: any) => s + (t.type === "entrada" ? 1 : -1) * Number(t.amount), 0);
@@ -23,6 +24,7 @@ export default async function PessoalPage(props: { searchParams: Promise<Filtros
       initialTransactions={d.transactions}
       categories={d.categories}
       clients={d.clients}
+      nomesCartoes={d.nomesCartoes}
       periodo={d.periodo}
       atingiuTeto={d.atingiuTeto}
       escopo="pessoal"

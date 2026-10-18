@@ -130,3 +130,14 @@ describe("lançamentos por categoria", () => {
     expect(Object.keys(r)).not.toContain("Pagamento de fatura");
   });
 });
+
+describe("fatura do cartão no vencimento", () => {
+  it("a fatura entra cheia na projeção, sem ser esticada pelo ritmo do mês", () => {
+    const cartao: LinhaFinanceira = { type: "saida", amount: 3000, date: "2026-10-02", categoria: "Mercado", cartao_mov: "compra" };
+    const r = resumoDoMes([cartao, s("2026-10-10", 150), e("2026-10-01", 5000)], HOJE);
+    // 3000 da fatura + 150 em 15 dias projetados para 31 (310).
+    expect(r.projecaoSaidas).toBe(3310);
+    const c = comparacaoPorCategoria([cartao, s("2026-10-10", 150)], HOJE);
+    expect(c[0]).toMatchObject({ categoria: "Mercado", atual: 3150, cartao: 3000 });
+  });
+});

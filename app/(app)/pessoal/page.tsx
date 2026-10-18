@@ -2,12 +2,14 @@ import Link from "next/link";
 import { BarChart3, CreditCard, ListOrdered, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { foraDoSaldo } from "@/lib/cartao";
+import { buscarTodas } from "@/lib/buscar-todas";
 import { fetchSettings } from "@/lib/settings";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { contaNoResultado, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
 import { avisosPessoais, comparacaoPorCategoria, mesComDesvio, resumoDoMes, usoDosOrcamentos, type FaturaPessoal } from "@/lib/pessoal-controle";
 import { visualDaCategoria } from "@/lib/pessoal-icones";
+import { agruparPorFatura, linkFatura } from "@/lib/lancamentos-fatura";
 import NovoLancamentoPessoalBotao from "@/components/NovoLancamentoPessoalBotao";
 import PrecisaDeVoce from "@/components/dashboard/PrecisaDeVoce";
 import HeroPessoal from "@/components/pessoal/HeroPessoal";
@@ -31,10 +33,10 @@ export default async function PessoalInicioPage() {
   const [settings, { data: todos }, { data: histRaw }, { data: faturasRaw }, { data: cartoesRaw }, { data: catsRaw }, { data: clientes }, { data: orcRaw }] =
     await Promise.all([
       fetchSettings(supabase),
-      supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).limit(20000),
+      buscarTodas((de, ate) => supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).order("id").range(de, ate)).then((data) => ({ data })),
       supabase
         .from("transactions_contabilizaveis")
-        .select("id, type, amount, date, description, cartao_mov, created_at, categories(name)")
+        .select("id, type, amount, date, description, cartao_mov, cartao_id, fatura_ref, created_at, categories(name)")
         .eq("scope", "pessoal")
         .gte("date", desde)
         .order("date", { ascending: false })
@@ -60,6 +62,8 @@ export default async function PessoalInicioPage() {
     amount: Number(t.amount),
     date: t.date as string,
     cartao_mov: t.cartao_mov,
+    cartao_id: (t.cartao_id ?? null) as string | null,
+    fatura_ref: (t.fatura_ref ?? null) as string | null,
     categoria: oneOf<{ name: string }>(t.categories)?.name ?? null,
   }));
   const linhas: LinhaFinanceira[] = historico;
@@ -89,7 +93,8 @@ export default async function PessoalInicioPage() {
   }));
 
   const rotuloMes = new Date(`${hoje}T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", timeZone: "UTC" });
-  const doMes = historico.filter((l) => l.date.slice(0, 7) === hoje.slice(0, 7));
+  // Compras do cartão do mês numa linha por fatura (abre a fatura em Cartões).
+  const doMes = agruparPorFatura(historico.filter((l) => l.date.slice(0, 7) === hoje.slice(0, 7)));
   const gastoDoMes = categorias.reduce((s, c) => s + c.atual, 0);
 
   return (
@@ -185,7 +190,26 @@ export default async function PessoalInicioPage() {
           </p>
         ) : (
           <ul className="relative space-y-3 pl-1">
-            {doMes.slice(0, 7).map((l) => {
+            {doMes.slice(0, 7).map((linha) => {
+              if (linha.tipo === "fatura") {
+                return (
+                  <li key={linha.chave}>
+                    <Link href={linkFatura("pessoal", linha.cartao_id, linha.fatura_ref)} className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-fuchsia-100 text-fuchsia-600">
+                        <CreditCard size={18} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">Fatura {nomeCartao.get(linha.cartao_id) ?? "do cartão"}</span>
+                        <span className="block text-[11.5px] text-slate-500">
+                          vence {formatDate(linha.itens[0].date)} · {linha.itens.length} {linha.itens.length === 1 ? "compra" : "compras"}
+                        </span>
+                      </span>
+                      <span className="text-sm font-extrabold tabular-nums text-slate-900">-{formatCurrency(linha.total)}</span>
+                    </Link>
+                  </li>
+                );
+              }
+              const l = linha.item;
               const v = visualDaCategoria(l.categoria);
               const Icone = v.icone;
               return (

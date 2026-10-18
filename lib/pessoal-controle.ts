@@ -2,8 +2,10 @@
 // CONTROLE PESSOAL (17/10/2026): as contas por trás da tela Pessoal > Início.
 // Funções puras (testadas): resumo do mês com projeção, comparação por
 // categoria com a média dos 3 meses anteriores e os avisos de "Precisa de
-// você" do Pessoal. Compra no cartão conta no mês da parcela; empréstimo e
-// pagamento de fatura ficam fora (mesma regra de lib/relatorio-financeiro).
+// você" do Pessoal. Compra no cartão conta no mês em que a fatura vence (todas no
+// dia do vencimento), por isso entra na projeção pelo valor cheio, sem ser esticada
+// pelo ritmo do mês; empréstimo e pagamento de fatura ficam fora (mesma regra de
+// lib/relatorio-financeiro).
 // ============================================================
 
 import { contaNoResultado, type LinhaFinanceira } from "./relatorio-financeiro";
@@ -51,8 +53,10 @@ export function resumoDoMes(linhas: LinhaFinanceira[], hoje: string): ResumoMesP
   const doMes = linhas.filter((l) => l.date.slice(0, 7) === mes);
   const entradas = doMes.filter((l) => l.type === "entrada" && contaNoResultado(l)).reduce((s, l) => s + Number(l.amount), 0);
   const saidas = somaSaidas(doMes, () => true);
+  // A fatura do cartão já é o valor do mês: só o resto segue o ritmo dos dias.
+  const cartao = somaSaidas(doMes, (l) => l.cartao_mov === "compra");
   const passadoAteHoje = somaSaidas(linhas, (l) => l.date.slice(0, 7) === passado && Number(l.date.slice(8, 10)) <= dia);
-  const projecao = dia >= 1 ? (saidas / dia) * total : saidas;
+  const projecao = dia >= 1 ? cartao + ((saidas - cartao) / dia) * total : saidas;
   return {
     entradas: r2(entradas),
     saidas: r2(saidas),
@@ -73,6 +77,8 @@ export interface ComparacaoCategoria {
   media: number;
   /** (atual - média) / média; null quando não há média. */
   variacao: number | null;
+  /** Parte do atual que veio da fatura do cartão (já é o valor do mês, não se projeta). */
+  cartao: number;
 }
 
 /** Gasto por categoria no mês contra a média dos 3 meses anteriores, maior gasto primeiro. */
@@ -80,18 +86,21 @@ export function comparacaoPorCategoria(linhas: LinhaFinanceira[], hoje: string):
   const mes = hoje.slice(0, 7);
   const anteriores = new Set([mesComDesvio(hoje, -1), mesComDesvio(hoje, -2), mesComDesvio(hoje, -3)]);
   const atual = new Map<string, number>();
+  const doCartao = new Map<string, number>();
   const passado = new Map<string, number>();
   for (const l of linhas) {
     if (l.type !== "saida" || !contaNoResultado(l)) continue;
     const nome = l.categoria ?? "Sem categoria";
     const m = l.date.slice(0, 7);
-    if (m === mes) atual.set(nome, (atual.get(nome) ?? 0) + Number(l.amount));
-    else if (anteriores.has(m)) passado.set(nome, (passado.get(nome) ?? 0) + Number(l.amount));
+    if (m === mes) {
+      atual.set(nome, (atual.get(nome) ?? 0) + Number(l.amount));
+      if (l.cartao_mov === "compra") doCartao.set(nome, (doCartao.get(nome) ?? 0) + Number(l.amount));
+    } else if (anteriores.has(m)) passado.set(nome, (passado.get(nome) ?? 0) + Number(l.amount));
   }
   return Array.from(atual.entries())
     .map(([categoria, v]) => {
       const media = (passado.get(categoria) ?? 0) / 3;
-      return { categoria, atual: r2(v), media: r2(media), variacao: media > 0 ? (v - media) / media : null };
+      return { categoria, atual: r2(v), media: r2(media), variacao: media > 0 ? (v - media) / media : null, cartao: r2(doCartao.get(categoria) ?? 0) };
     })
     .sort((a, b) => b.atual - a.atual);
 }
@@ -238,7 +247,7 @@ export function avisosPessoais({
     const projetar = resumo.diasNoMes / resumo.dia;
     for (const c of comparacaoPorCategoria(linhas, hoje)) {
       if (c.variacao === null || c.media < 50) continue;
-      const projetado = c.atual * projetar;
+      const projetado = c.cartao + (c.atual - c.cartao) * projetar;
       if (projetado > c.media * 1.3 && projetado - c.media >= 100 && c.atual > c.media * 0.5) {
         const pct = Math.round((projetado / c.media - 1) * 100);
         avisos.push({

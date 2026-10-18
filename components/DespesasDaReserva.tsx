@@ -37,7 +37,8 @@ function paraDespesa(t: any): Despesa {
     id: t.id,
     description: t.description,
     amount: Number(t.amount),
-    date: t.date,
+    // Compra no cartão: mostra o dia da compra (date é o vencimento da fatura).
+    date: t.data_compra ?? t.date,
     categoria: cat?.name ?? null,
     cliente: cli?.name ?? null,
     pessoal: t.scope === "pessoal" ? (t.conta_no_lucro ? "custo" : "meu") : null,
@@ -77,7 +78,7 @@ export default function DespesasDaReserva({
   const [erro, setErro] = useState<string | null>(null);
 
   async function carregar() {
-    const campos = "id, description, amount, date, scope, conta_no_lucro, categories(name), clients(name)";
+    const campos = "id, description, amount, date, data_compra, scope, conta_no_lucro, categories(name), clients(name)";
     let consultaAvulsas = supabase
       .from("transactions")
       .select(campos)
@@ -87,9 +88,11 @@ export default function DespesasDaReserva({
       .is("rental_id", null)
       .is("calendar_event_id", null)
       .gte("date", somarDias(dataEvento, -JANELA_AVULSAS))
-      .lte("date", somarDias(dataEvento, JANELA_AVULSAS))
+      // Compra no cartão tem a data no vencimento da fatura (até uns 40 dias depois da compra):
+      // a janela vai mais longe e o filtro pelo dia da compra é feito abaixo.
+      .lte("date", somarDias(dataEvento, JANELA_AVULSAS + 45))
       .order("date", { ascending: false })
-      .limit(50);
+      .limit(100);
     // Só despesa deste cliente ou sem cliente nenhum: despesa de outro
     // cliente não é candidata.
     consultaAvulsas = clientId
@@ -108,7 +111,9 @@ export default function DespesasDaReserva({
       supabase.from("categories").select("id, name").eq("type", "saida").eq("scope", "pessoal").order("name"),
     ]);
     setDespesas((daReserva.data ?? []).map(paraDespesa));
-    setAvulsas((soltas.data ?? []).map(paraDespesa));
+    const de = somarDias(dataEvento, -JANELA_AVULSAS);
+    const ate = somarDias(dataEvento, JANELA_AVULSAS);
+    setAvulsas((soltas.data ?? []).map(paraDespesa).filter((d) => d.date >= de && d.date <= ate).slice(0, 50));
     setCategorias(cats.data ?? []);
     setCategoriasPessoais(catsPessoais.data ?? []);
     setCarregando(false);

@@ -36,7 +36,7 @@ export async function carregarLancamentos(
   let consulta = supabase
     .from("transactions_contabilizaveis")
     .select(
-      "id, type, description, amount, payment_method, date, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
+      "id, type, description, amount, payment_method, date, data_compra, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
     )
     .eq("scope", escopo)
     .gte("date", periodo.inicio)
@@ -57,12 +57,14 @@ export async function carregarLancamentos(
     consulta = consulta.ilike("description", `%${termo}%`);
   }
 
-  const [{ data: transactions, error: erroLancamentos }, { data: categories }, { data: clients }] = await Promise.all([
+  const [{ data: transactions, error: erroLancamentos }, { data: categories }, { data: clients }, { data: cartoes }] = await Promise.all([
     consulta.order("date", { ascending: false }).order("created_at", { ascending: false }).limit(TETO),
     escopo === "harmonize"
       ? supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name")
       : supabase.from("categories").select("id, name, type, scope").or("scope.eq.pessoal,and(scope.eq.harmonize,type.eq.saida)").order("name"),
     supabase.from("clients").select("id, name, city, whatsapp").order("name"),
+    // Nome do cartão para a linha da fatura (as compras do cartão aparecem agrupadas).
+    supabase.from("cartoes").select("id, nome"),
   ]);
   // Lista que não carregou nunca pode aparecer como "sem lançamentos".
   if (erroLancamentos) throw new Error(`Não consegui carregar os lançamentos: ${erroLancamentos.message}`);
@@ -110,6 +112,7 @@ export async function carregarLancamentos(
     transactions: normalizedTransactions,
     categories: categories ?? [],
     clients: clients ?? [],
+    nomesCartoes: Object.fromEntries(((cartoes ?? []) as { id: string; nome: string }[]).map((c) => [c.id, c.nome])) as Record<string, string>,
     periodo,
     atingiuTeto: normalizedTransactions.length >= TETO,
   };

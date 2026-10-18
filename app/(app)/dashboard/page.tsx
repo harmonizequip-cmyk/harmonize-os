@@ -16,6 +16,7 @@ import { preverCaixa, type ReservaFutura, type LocacaoPassada } from "@/lib/prev
 import { calcularMetaDoMes } from "@/lib/meta-mes";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
 import { foraDoResultadoPorCartao, foraDoSaldo } from "@/lib/cartao";
+import { buscarTodas } from "@/lib/buscar-todas";
 import { diasDoPeriodo } from "@/lib/period";
 import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
@@ -69,10 +70,14 @@ export default async function DashboardPage(
     .lte("date", toStr);
 
   // Todos os lançamentos históricos, para o Saldo acumulado (não depende do filtro de período)
-  const { data: allTimeTransactions } = await supabase
-    .from("transactions_contabilizaveis")
-    .select("type, amount, cartao_mov, payment_method")
-    .eq("scope", "harmonize");
+  const allTimeTransactions = await buscarTodas((de, ate) =>
+    supabase
+      .from("transactions_contabilizaveis")
+      .select("type, amount, cartao_mov, payment_method")
+      .eq("scope", "harmonize")
+      .order("id")
+      .range(de, ate)
+  );
 
   // Contagem de locações do período, sem cancelada nem teste (as canceladas
   // têm card próprio). Serve ao card "Locações" e de divisor do ticket médio.

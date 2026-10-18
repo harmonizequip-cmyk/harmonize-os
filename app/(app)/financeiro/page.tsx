@@ -11,6 +11,7 @@ export default async function FinanceiroPage(props: { searchParams: Promise<Filt
       initialTransactions={d.transactions}
       categories={d.categories}
       clients={d.clients}
+      nomesCartoes={d.nomesCartoes}
       periodo={d.periodo}
       atingiuTeto={d.atingiuTeto}
     />
