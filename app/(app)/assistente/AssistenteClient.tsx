@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { mensagemDeErro } from "./mensagem-erro";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { falar, pararDeFalar, podeFalar } from "@/lib/falar";
@@ -176,19 +177,6 @@ function Texto({ texto }: { texto: string }) {
   );
 }
 
-async function mensagemDeErro(error: unknown): Promise<string> {
-  const ctx = (error as { context?: Response })?.context;
-  if (ctx && typeof ctx.json === "function") {
-    try {
-      const corpo = await ctx.json();
-      if (corpo?.erro) return corpo.erro;
-    } catch {
-      // segue para a mensagem genérica
-    }
-  }
-  return "Não consegui falar com o assistente. Confira a internet e tente de novo.";
-}
-
 export default function AssistenteClient({ escopo = "harmonize" }: { escopo?: "harmonize" | "pessoal" }) {
   const pessoal = escopo === "pessoal";
   const caminho = pessoal ? "/pessoal/assistente" : "/assistente";
@@ -199,6 +187,7 @@ export default function AssistenteClient({ escopo = "harmonize" }: { escopo?: "h
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
+  const ocupadoRef = useRef(false);
   const [erro, setErro] = useState<string | null>(null);
   const [vozLigada, setVozLigada] = useState(true);
   const [ouvindo, setOuvindo] = useState(false);
@@ -342,15 +331,26 @@ export default function AssistenteClient({ escopo = "harmonize" }: { escopo?: "h
 
   async function enviar(pergunta: string, porVoz = false) {
     const p = pergunta.trim();
-    if (!p || pensando) return;
+    // Trava por ref: o estado `pensando` ainda é o antigo num toque duplo ou
+    // quando a voz devolve o resultado logo depois do toque.
+    if (!p || ocupadoRef.current) return;
+    ocupadoRef.current = true;
     setTexto("");
     setErro(null);
     setBolhas((b) => [...b, { papel: "eu", texto: p }]);
     setPensando(true);
-    const { data, error } = await supabase.functions.invoke("assistente", {
-      body: { mensagem: p, conversa_id: conversaRef.current, cliente_id: pessoal ? null : clienteRef.current, escopo },
-    });
-    setPensando(false);
+    let data: any = null;
+    let error: unknown = null;
+    try {
+      ({ data, error } = await supabase.functions.invoke("assistente", {
+        body: { mensagem: p, conversa_id: conversaRef.current, cliente_id: pessoal ? null : clienteRef.current, escopo },
+      }));
+    } catch (e) {
+      error = e;
+    } finally {
+      ocupadoRef.current = false;
+      setPensando(false);
+    }
     if (error || !data?.resposta) {
       setErro(error ? await mensagemDeErro(error) : "O assistente não respondeu. Tente de novo.");
       return;

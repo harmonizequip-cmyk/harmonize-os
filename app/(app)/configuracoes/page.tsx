@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
 import ConfiguracoesHub from "./ConfiguracoesHub";
@@ -19,8 +20,11 @@ export default async function ConfiguracoesPage(props: { searchParams: Promise<{
 
   const user = auth.user;
   const { data: perfil } = user
-    ? await supabase.from("profiles").select("name").eq("id", user.id).single()
+    ? await supabase.from("profiles").select("name, somente_leitura").eq("id", user.id).single()
     : { data: null };
+  // Acesso só de visualização vê tudo menos Configurações (o menu já esconde;
+  // aqui fecha também quem digita o endereço).
+  if (perfil?.somente_leitura) redirect("/dashboard");
 
   const secao = sp.acao === "backup" ? "backup" : ehSecao(sp.secao) ? sp.secao : null;
 

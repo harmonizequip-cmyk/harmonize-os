@@ -150,12 +150,18 @@ export default function RelacionamentoClient({
     const agora = new Date().toISOString();
     // Fecha as tarefas de conversa que estavam esperando por ela; sem nenhuma,
     // grava o contato como tarefa concluída (o recontato automático conta daí).
-    const { data: abertas } = await supabase
+    const { data: abertas, error: erroBusca } = await supabase
       .from("tasks")
       .select("id")
       .eq("client_id", p.id)
       .eq("status", "pendente")
       .in("type", ["recontato", "contato_inicial", "followup"]);
+    // Sem saber das pendentes, gravar uma nova deixaria as antigas abertas.
+    if (erroBusca) {
+      setOcupado(null);
+      avisar("Não consegui conferir as tarefas dela. Confira a internet e tente de novo.", "erro");
+      return false;
+    }
     let erro = null;
     if (abertas && abertas.length > 0) {
       ({ error: erro } = await supabase

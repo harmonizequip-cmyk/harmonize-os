@@ -31,16 +31,25 @@ const MESES: Record<string, number> = {
   agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 };
 
-// getUTCDay: 0 = domingo.
+// getUTCDay: 0 = domingo. "passada"/"última" depois ou antes força o passado.
+const ANTES_DIA = "(?:no |na |nesse |nessa |proximo |proxima |ultimo |ultima )?";
+const DEPOIS_DIA = "(?: passad[oa])?";
 const DIAS_DA_SEMANA: [RegExp, number][] = [
-  [/\b(?:no |na |nesse |nessa |proximo |proxima )?domingo\b/, 0],
-  [/\b(?:na |nessa |proxima )?segunda(?:-feira| feira)?\b/, 1],
-  [/\b(?:na |nessa |proxima )?terca(?:-feira| feira)?\b/, 2],
-  [/\b(?:na |nessa |proxima )?quarta(?:-feira| feira)?\b/, 3],
-  [/\b(?:na |nessa |proxima )?quinta(?:-feira| feira)?\b/, 4],
-  [/\b(?:na |nessa |proxima )?sexta(?:-feira| feira)?\b/, 5],
-  [/\b(?:no |nesse |proximo )?sabado\b/, 6],
+  [new RegExp(`\\b${ANTES_DIA}domingo${DEPOIS_DIA}\\b`), 0],
+  [new RegExp(`\\b${ANTES_DIA}segunda(?:-feira| feira)?${DEPOIS_DIA}\\b`), 1],
+  [new RegExp(`\\b${ANTES_DIA}terca(?:-feira| feira)?${DEPOIS_DIA}\\b`), 2],
+  [new RegExp(`\\b${ANTES_DIA}quarta(?:-feira| feira)?${DEPOIS_DIA}\\b`), 3],
+  [new RegExp(`\\b${ANTES_DIA}quinta(?:-feira| feira)?${DEPOIS_DIA}\\b`), 4],
+  [new RegExp(`\\b${ANTES_DIA}sexta(?:-feira| feira)?${DEPOIS_DIA}\\b`), 5],
+  [new RegExp(`\\b${ANTES_DIA}sabado${DEPOIS_DIA}\\b`), 6],
 ];
+
+/**
+ * Para que lado resolver a data que não diz o ano/mês: tarefa olha para a
+ * frente ("sexta" = a próxima), despesa olha para trás ("sexta" = a última,
+ * "dia 15" dito no dia 18 = este mês), porque gasto se anota depois.
+ */
+export type DirecaoData = "futuro" | "passado";
 
 function diaDaSemana(iso: string): number {
   return new Date(`${iso}T12:00:00Z`).getUTCDay();
@@ -53,11 +62,21 @@ function dataValida(ano: number, mes: number, dia: number): string | null {
 }
 
 /** Procura a data na frase (já sem acento). Volta a data e o trecho achado. */
-function acharData(t: string, hoje: string): { data: string; trecho: [number, number] } | null {
+function acharData(t: string, hoje: string, direcao: DirecaoData = "futuro"): { data: string; trecho: [number, number] } | null {
   const [ano, mes] = hoje.split("-").map(Number);
+  const passado = direcao === "passado";
+  // Dia e mês sem ano: este ano, ou o seguinte (futuro) / o anterior (passado).
+  const comAno = (mm: number, dia: number): string | null => {
+    const d = dataValida(ano, mm, dia);
+    if (!d) return null;
+    if (passado) return d > hoje ? dataValida(ano - 1, mm, dia) : d;
+    return d < hoje ? dataValida(ano + 1, mm, dia) : d;
+  };
   const tentativas: { re: RegExp; calc: (m: RegExpMatchArray) => string | null }[] = [
     { re: /\b(?:para |pra )?depois de amanha\b/, calc: () => somarDias(hoje, 2) },
     { re: /\b(?:para |pra )?amanha\b/, calc: () => somarDias(hoje, 1) },
+    { re: /\b(?:de |foi )?(?:anteontem|antes de ontem)\b/, calc: () => somarDias(hoje, -2) },
+    { re: /\b(?:de |foi )?ontem\b/, calc: () => somarDias(hoje, -1) },
     { re: /\b(?:para |pra )?hoje\b/, calc: () => hoje },
     {
       re: /\b(?:daqui a|daqui|em) (\d+|[a-z]+) dias?\b/,
@@ -66,28 +85,35 @@ function acharData(t: string, hoje: string): { data: string; trecho: [number, nu
         return n ? somarDias(hoje, n) : null;
       },
     },
+    {
+      re: /\b(?:ha|faz) (\d+|[a-z]+) dias?(?: atras)?\b/,
+      calc: (m) => {
+        const n = /^\d+$/.test(m[1]) ? Number(m[1]) : NUMEROS[m[1]];
+        return n ? somarDias(hoje, -n) : null;
+      },
+    },
+    { re: /\b(?:na )?semana passada\b/, calc: () => somarDias(hoje, -7) },
     { re: /\b(?:na |para a |pra )?(?:semana que vem|proxima semana)\b/, calc: () => somarDias(hoje, 7) },
     {
       re: /\b(?:no |para o |pra )?dia (\d{1,2})(?:\/| de )(\d{1,2}|[a-z]+)\b/,
       calc: (m) => {
         const mm = /^\d+$/.test(m[2]) ? Number(m[2]) : MESES[m[2]];
-        if (!mm) return null;
-        const d = dataValida(ano, mm, Number(m[1]));
-        return d && d < hoje ? dataValida(ano + 1, mm, Number(m[1])) : d;
+        return mm ? comAno(mm, Number(m[1])) : null;
       },
     },
     {
       re: /\b(\d{1,2})\/(\d{1,2})\b/,
-      calc: (m) => {
-        const d = dataValida(ano, Number(m[2]), Number(m[1]));
-        return d && d < hoje ? dataValida(ano + 1, Number(m[2]), Number(m[1])) : d;
-      },
+      calc: (m) => comAno(Number(m[2]), Number(m[1])),
     },
     {
       re: /\b(?:no |para o |pra )?dia (\d{1,2})\b/,
       calc: (m) => {
         const dia = Number(m[1]);
         const d = dataValida(ano, mes, dia);
+        if (passado) {
+          if (d && d <= hoje) return d;
+          return mes === 1 ? dataValida(ano - 1, 12, dia) : dataValida(ano, mes - 1, dia);
+        }
         if (d && d >= hoje) return d;
         return mes === 12 ? dataValida(ano + 1, 1, dia) : dataValida(ano, mes + 1, dia);
       },
@@ -103,9 +129,16 @@ function acharData(t: string, hoje: string): { data: string; trecho: [number, nu
   for (const [re, alvo] of DIAS_DA_SEMANA) {
     const m = t.match(re);
     if (m && m.index !== undefined) {
+      const trecho: [number, number] = [m.index, m.index + m[0].length];
+      if (passado || /passad|ultim/.test(m[0])) {
+        // A última (ou hoje): "sexta" dito numa sexta é hoje; "sexta passada", a anterior.
+        let volta = (diaDaSemana(hoje) - alvo + 7) % 7;
+        if (volta === 0 && /passad|ultim/.test(m[0])) volta = 7;
+        return { data: somarDias(hoje, -volta), trecho };
+      }
       // Sempre o próximo: "sexta" dito numa sexta é a da semana que vem.
       const falta = ((alvo - diaDaSemana(hoje) + 7) % 7) || 7;
-      return { data: somarDias(hoje, falta), trecho: [m.index, m.index + m[0].length] };
+      return { data: somarDias(hoje, falta), trecho };
     }
   }
   return null;
@@ -222,7 +255,8 @@ export function interpretarDespesa(
 
   // Data primeiro, para "dia 15" não virar valor.
   let data = hoje;
-  const achada = mesmoTamanho ? acharData(comp, hoje) : null;
+  // Despesa olha para trás: "sexta" é a última, "dia 15" é o mais recente.
+  const achada = mesmoTamanho ? acharData(comp, hoje, "passado") : null;
   if (achada) {
     data = achada.data;
     [texto, comp] = tirarTrecho(texto, comp, achada.trecho[0], achada.trecho[1]);

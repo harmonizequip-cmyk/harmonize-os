@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Minus, Plus, Trash2, X } from "lucide-react";
 import BonecoCorporal from "@/components/BonecoCorporal";
+import { confirmar } from "@/components/Dialogos";
 import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
 import { imagemDaArea } from "@/lib/planejador-impressao";
 import { urlCorpoInteiro } from "@/lib/corpo-foto";
@@ -82,6 +83,19 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
   const max = maximoDaLinha(area.id);
   // Lados iguais: mexeu no direito e o esquerdo estava igual, ele acompanha.
   const mudarDireito = (v: number) => onMudar({ ...linha, dispD: v, dispE: (linha.dispE ?? 0) === (linha.dispD ?? 0) ? v : linha.dispE });
+  // Linha com disparos: pergunta antes, para um toque errado não apagar o que foi digitado.
+  const remover = async () => {
+    if (sub > 0) {
+      const ok = await confirmar({
+        titulo: `Remover a profundidade ${linha.prof.replace(".", ",")} mm?`,
+        texto: `Os ${fmt(sub)} disparos desta linha saem do planejamento.`,
+        confirmar: "Remover",
+        perigo: true,
+      });
+      if (!ok) return;
+    }
+    onRemover();
+  };
   const colunas = area.bilateral ? (corporal ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2") : corporal ? "grid-cols-2" : "grid-cols-1";
   return (
     <div className={`rounded-2xl p-2.5 ring-1 transition ${linha.feito ? "bg-emerald-50/70 ring-emerald-200" : "bg-neutral-50 ring-neutral-200/70"}`}>
@@ -89,11 +103,13 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
         <button
           type="button"
           onClick={() => onMudar({ ...linha, feito: !linha.feito })}
-          className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ring-1 transition ${linha.feito ? "bg-emerald-500 text-white ring-emerald-500" : "bg-white text-transparent ring-neutral-300"}`}
+          className="-my-1.5 -ml-1.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
           aria-label={linha.feito ? "Desmarcar feito" : "Marcar como feito"}
           title="Feito no atendimento"
         >
-          <Check size={15} strokeWidth={3} />
+          <span className={`flex h-7 w-7 items-center justify-center rounded-full ring-1 transition ${linha.feito ? "bg-emerald-500 text-white ring-emerald-500" : "bg-white text-transparent ring-neutral-300"}`}>
+            <Check size={15} strokeWidth={3} />
+          </span>
         </button>
         <span className="relative">
           <select
@@ -113,7 +129,7 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
         <span className="ml-auto text-xs tabular-nums text-neutral-500">
           = <b className="text-neutral-800">{fmt(sub)}</b>
         </span>
-        <button type="button" onClick={onRemover} disabled={!podeRemover} className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 hover:text-rose-600 disabled:opacity-25" aria-label="Remover profundidade">
+        <button type="button" onClick={remover} disabled={!podeRemover} className="-my-1.5 -mr-1.5 ml-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-rose-600 active:bg-rose-50 disabled:opacity-25" aria-label="Remover profundidade">
           <Trash2 size={14} />
         </button>
       </div>

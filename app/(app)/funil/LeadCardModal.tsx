@@ -161,11 +161,25 @@ export default function LeadCardModal({
     const toAdd = selectedTagIds.filter((id) => !originalIds.includes(id));
     const toRemove = originalIds.filter((id) => !selectedTagIds.includes(id));
 
+    // Erro aqui mantém a janela aberta: fechar daria a impressão de que as tags
+    // foram salvas. Upsert ignora a que já entrou, para "Salvar" de novo funcionar.
     if (toAdd.length > 0) {
-      await supabase.from("client_tags").insert(toAdd.map((tag_id) => ({ client_id: lead.id, tag_id })));
+      const { error: erroAdd } = await supabase
+        .from("client_tags")
+        .upsert(toAdd.map((tag_id) => ({ client_id: lead.id, tag_id })), { onConflict: "client_id,tag_id", ignoreDuplicates: true });
+      if (erroAdd) {
+        setSaving(false);
+        setError("Os dados foram salvos, mas não consegui gravar as tags. Toque em Salvar de novo.");
+        return;
+      }
     }
     if (toRemove.length > 0) {
-      await supabase.from("client_tags").delete().eq("client_id", lead.id).in("tag_id", toRemove);
+      const { error: erroRemove } = await supabase.from("client_tags").delete().eq("client_id", lead.id).in("tag_id", toRemove);
+      if (erroRemove) {
+        setSaving(false);
+        setError("Os dados foram salvos, mas não consegui tirar as tags. Toque em Salvar de novo.");
+        return;
+      }
     }
 
     setSaving(false);
