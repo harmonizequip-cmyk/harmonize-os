@@ -68,6 +68,19 @@ export default function ImportarFaturaModal({
     [fatura, cartao, modo, faturaRef, pagamentosDesde]
   );
 
+  // A data de corte dos pagamentos fica guardada por cartão: nas próximas importações vale a primeira
+  // escolhida, para não perder pagamento feito no meio do mês (os repetidos são pulados).
+  const chaveCorte = `harmonize-import-corte-${cartaoId}`;
+  useEffect(() => {
+    try {
+      const guardada = localStorage.getItem(chaveCorte);
+      if (guardada) setPagamentosDesde(guardada);
+    } catch {
+      // sem armazenamento: fica a data de hoje
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartaoId]);
+
   // Fatura de referência padrão: a data no nome do arquivo (Nubank_2026-10-02 = vence em outubro);
   // sem ela, o primeiro vencimento depois do fechamento.
   useEffect(() => {
@@ -185,6 +198,11 @@ export default function ImportarFaturaModal({
       movidos += Number((data as { movidos?: number }).movidos ?? 0);
     }
     setSalvando(false);
+    try {
+      if (pagamentosDesde && !localStorage.getItem(chaveCorte)) localStorage.setItem(chaveCorte, pagamentosDesde);
+    } catch {
+      // sem armazenamento
+    }
     avisar(
       `${inseridos} lançamento${inseridos === 1 ? "" : "s"} entraram no cartão ${cartao.nome}` +
         `${movidos ? `, ${movidos} parcela${movidos === 1 ? "" : "s"} antecipada${movidos === 1 ? "" : "s"} passaram para esta fatura` : ""}` +
