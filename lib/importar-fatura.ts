@@ -401,3 +401,56 @@ export function sugerirCategoria(nome: string, categorias: { id: string; name: s
   }
   return "";
 }
+
+export interface LinhaImportada {
+  created_at: string;
+  amount: number;
+  fatura_ref: string | null;
+  cartao_mov: "compra" | "pagamento" | null;
+}
+
+export interface SessaoImportacao {
+  /** Janela (com 1 s de folga) para desfazer só esta importação. */
+  desde: string;
+  ate: string;
+  inicio: string;
+  lancamentos: number;
+  total: number;
+  pagamentos: number;
+  faturaDe: string;
+  faturaAte: string;
+}
+
+/**
+ * Agrupa as linhas importadas em importações: cada tela "Importar" grava em lotes de poucos
+ * segundos, então lotes a menos de `lacunaMin` minutos um do outro são a mesma importação.
+ * Do mais recente ao mais antigo.
+ */
+export function agruparImportacoes(linhas: LinhaImportada[], lacunaMin = 10): SessaoImportacao[] {
+  const ordenadas = [...linhas].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const sessoes: LinhaImportada[][] = [];
+  for (const l of ordenadas) {
+    const atual = sessoes[sessoes.length - 1];
+    const ultimo = atual?.[atual.length - 1];
+    if (atual && ultimo && new Date(l.created_at).getTime() - new Date(ultimo.created_at).getTime() <= lacunaMin * 60000) atual.push(l);
+    else sessoes.push([l]);
+  }
+  return sessoes
+    .map((ls) => {
+      const compras = ls.filter((l) => l.cartao_mov !== "pagamento");
+      const refs = compras.map((l) => l.fatura_ref ?? "").filter(Boolean).sort();
+      const t0 = new Date(ls[0].created_at).getTime();
+      const t1 = new Date(ls[ls.length - 1].created_at).getTime();
+      return {
+        desde: new Date(t0 - 1000).toISOString(),
+        ate: new Date(t1 + 1000).toISOString(),
+        inicio: ls[0].created_at,
+        lancamentos: compras.length,
+        total: r2(compras.reduce((s, l) => s + Number(l.amount), 0)),
+        pagamentos: ls.length - compras.length,
+        faturaDe: refs[0] ?? "",
+        faturaAte: refs[refs.length - 1] ?? "",
+      };
+    })
+    .reverse();
+}

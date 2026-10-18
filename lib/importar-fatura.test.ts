@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lerCsv, lerFatura, lerOfx, planejarImportacao, refDaFatura, refDoNomeDoArquivo, somarMesesData, sugerirCategoria } from "./importar-fatura";
+import { agruparImportacoes, lerCsv, lerFatura, lerOfx, planejarImportacao, refDaFatura, refDoNomeDoArquivo, somarMesesData, sugerirCategoria } from "./importar-fatura";
 
 const bloco = (tipo: string, data: string, valor: string, fitid: string, memo: string) =>
   `<STMTTRN>\n<TRNTYPE>${tipo}</TRNTYPE>\n<DTPOSTED>${data}000000[-3:BRT]</DTPOSTED>\n<TRNAMT>${valor}</TRNAMT>\n<FITID>${fitid}</FITID>\n<MEMO>${memo}</MEMO>\n</STMTTRN>\n`;
@@ -245,5 +245,27 @@ describe("pagamentos feitos no banco", () => {
   it("sem data de corte, nenhum pagamento é registrado", () => {
     const p = planejarImportacao(f, { diaVencimento: 2, modo: "aberta", pagamentosDesde: null });
     expect(p.pagamentosARegistrar.qtd).toBe(0);
+  });
+});
+
+describe("agrupar importações", () => {
+  const l = (t: string, amount: number, ref: string, mov: "compra" | "pagamento" = "compra") => ({ created_at: t, amount, fatura_ref: ref, cartao_mov: mov });
+
+  it("lotes próximos são uma importação; mais de 10 minutos separa", () => {
+    const s = agruparImportacoes([
+      l("2026-10-17T22:13:44.100Z", 10, "2026-11"),
+      l("2026-10-17T22:13:44.100Z", 20, "2026-12"),
+      l("2026-10-17T22:16:21.500Z", 5, "2026-11", "pagamento"),
+      l("2026-10-18T10:00:00.000Z", 7, "2027-01"),
+    ]);
+    expect(s).toHaveLength(2);
+    expect(s[0]).toMatchObject({ lancamentos: 1, total: 7, pagamentos: 0, faturaDe: "2027-01" });
+    expect(s[1]).toMatchObject({ lancamentos: 2, total: 30, pagamentos: 1, faturaDe: "2026-11", faturaAte: "2026-12" });
+  });
+
+  it("a janela leva 1 segundo de folga dos dois lados", () => {
+    const [s] = agruparImportacoes([l("2026-10-17T22:13:44.100Z", 10, "2026-11")]);
+    expect(s.desde).toBe("2026-10-17T22:13:43.100Z");
+    expect(s.ate).toBe("2026-10-17T22:13:45.100Z");
   });
 });

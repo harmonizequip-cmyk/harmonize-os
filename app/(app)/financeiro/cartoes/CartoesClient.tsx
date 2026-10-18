@@ -18,6 +18,7 @@ import { Atalho } from "@/components/Atalhos";
 import { linkLancamento } from "@/lib/atalhos";
 import { confirmar } from "@/components/Dialogos";
 import ImportarFaturaModal from "@/components/ImportarFaturaModal";
+import DesfazerImportacaoModal from "@/components/DesfazerImportacaoModal";
 
 export interface Cartao {
   id: string;
@@ -96,6 +97,7 @@ export default function CartoesClient({
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [importando, setImportando] = useState(false);
+  const [desfazendo, setDesfazendo] = useState(false);
 
   const [pagando, setPagando] = useState(false);
   const [valorPagar, setValorPagar] = useState("");
@@ -443,10 +445,27 @@ export default function CartoesClient({
               Editar cartão
             </button>
           )}
+          {!somenteLeitura && (
+            <button type="button" onClick={() => setDesfazendo(true)} className="ml-4 mt-3 text-[11px] text-neutral-500 underline">
+              Desfazer importação
+            </button>
+          )}
         </div>
       )}
 
       {erro && <p className="text-xs text-red-600">{erro}</p>}
+
+      {desfazendo && cartao && (
+        <DesfazerImportacaoModal
+          cartaoId={cartao.id}
+          cartaoNome={cartao.nome}
+          onClose={() => setDesfazendo(false)}
+          onFeito={() => {
+            setDesfazendo(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {importando && (
         <ImportarFaturaModal
