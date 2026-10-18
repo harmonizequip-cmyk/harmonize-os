@@ -52,6 +52,14 @@ describe("interpretarFala", () => {
     expect(interpretarFala("confirmar endereço da Fernanda Maia", CLIENTES, HOJE).clienteId).toBe("2");
   });
 
+  it("tarefa continua olhando para a frente", () => {
+    const c = "2026-10-18";
+    expect(interpretarFala("cobrar taxa dia 15", CLIENTES, c).data).toBe("2026-11-15");
+    expect(interpretarFala("mandar contrato sexta", CLIENTES, c).data).toBe("2026-10-23");
+    expect(interpretarFala("renovar 15/10", CLIENTES, c).data).toBe("2027-10-15");
+    expect(interpretarFala("ligar para quem veio ontem", CLIENTES, c).data).toBe("2026-10-17");
+  });
+
   it("acento no cadastro ou na fala não atrapalha", () => {
     expect(interpretarFala("enviar recibo thaysa araujo", CLIENTES, HOJE).clienteId).toBe("4");
   });
@@ -85,9 +93,32 @@ describe("interpretarDespesa", () => {
     expect(r).toMatchObject({ valor: "280,50", forma: "dinheiro", categoriaId: "c3", clienteId: "1" });
   });
 
-  it("dia do mês não vira valor", () => {
+  it("dia do mês não vira valor (e, na despesa, é o mais recente que já passou)", () => {
     const r = interpretarDespesa("estacionamento 20 reais dia 15", ctx);
-    expect(r).toMatchObject({ valor: "20,00", data: "2026-10-15", categoriaId: "c4" });
+    expect(r).toMatchObject({ valor: "20,00", data: "2026-09-15", categoriaId: "c4" });
+  });
+
+  it("ontem e anteontem, tirados da descrição", () => {
+    const r = interpretarDespesa("gasolina 150 reais no pix ontem", ctx);
+    expect(r).toMatchObject({ valor: "150,00", forma: "pix", categoriaId: "c1", data: "2026-10-07", descricao: "Gasolina" });
+    const a = interpretarDespesa("almoço 40 reais anteontem", ctx);
+    expect(a).toMatchObject({ data: "2026-10-06", descricao: "Almoço" });
+  });
+
+  it("dia da semana na despesa é o último (ou hoje)", () => {
+    // HOJE é quinta, 08/10.
+    expect(interpretarDespesa("hotel 300 reais sexta", ctx).data).toBe("2026-10-02");
+    expect(interpretarDespesa("hotel 300 reais na segunda", ctx).data).toBe("2026-10-05");
+    expect(interpretarDespesa("almoço 30 reais quinta", ctx).data).toBe(HOJE);
+    expect(interpretarDespesa("almoço 30 reais quinta passada", ctx).data).toBe("2026-10-01");
+  });
+
+  it("dia do mês dito no dia 18 fica no mesmo mês; dd/mm não vai para o ano que vem", () => {
+    const c = { ...ctx, hoje: "2026-10-18" };
+    expect(interpretarDespesa("estacionamento 20 reais dia 15", c).data).toBe("2026-10-15");
+    expect(interpretarDespesa("estacionamento 20 reais 15/10", c).data).toBe("2026-10-15");
+    expect(interpretarDespesa("estacionamento 20 reais dia 25", c).data).toBe("2026-09-25");
+    expect(interpretarDespesa("hotel 200 reais 20/12", c).data).toBe("2025-12-20");
   });
 
   it("milhar com ponto", () => {

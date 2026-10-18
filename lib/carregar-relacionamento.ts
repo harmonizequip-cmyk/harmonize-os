@@ -1,8 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buscarPendencias } from "./pendencias";
+import { buscarTodas } from "./buscar-todas";
 import { classificarTodas, type PessoaBase, type PessoaClassificada } from "./relacionamento";
 
-const LOTE = 1000;
+// Busca todas as páginas e troca a mensagem de erro genérica por uma que diz o que faltou.
+async function carregar(
+  oque: string,
+  consulta: (de: number, ate: number) => PromiseLike<{ data: any[] | null; error: { message: string } | null }>
+): Promise<any[]> {
+  try {
+    return await buscarTodas<any>(consulta);
+  } catch (e) {
+    throw new Error(`Não consegui carregar ${oque} do Relacionamento: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
 
 function dataLocal(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -23,36 +34,55 @@ function maior(a: string | null | undefined, b: string | null | undefined): stri
  * tarefas pendentes e quem deve.
  */
 export async function carregarRelacionamento(supabase: SupabaseClient, hoje: string): Promise<PessoaClassificada[]> {
-  const [clientesRes, locacoesRes, reservasRes, tarefasRes, enviosRes, confirmacoesRes] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("id, name, display_name, treatment, whatsapp, city, stage, is_client, parceiro, created_at")
-      .eq("is_test", false)
-      .neq("stage", "desqualificado")
-      .limit(LOTE * 5),
-    supabase.from("rentals_contabilizaveis").select("client_id, event_date, calculated_value").limit(LOTE * 10),
-    supabase
-      .from("calendar_events")
-      .select("client_id, date_start")
-      .eq("is_test", false)
-      .neq("status", "cancelada")
-      .not("client_id", "is", null)
-      .gte("date_end", hoje)
-      .order("date_start", { ascending: true })
-      .limit(LOTE),
-    supabase.from("tasks").select("client_id, status, completed_at").eq("is_test", false).not("client_id", "is", null).limit(LOTE * 10),
-    supabase.from("agenda_envios").select("client_id, enviado_em").limit(LOTE * 5),
-    supabase
-      .from("calendar_events")
-      .select("client_id, confirmation_message_sent_at")
-      .not("confirmation_message_sent_at", "is", null)
-      .not("client_id", "is", null)
-      .limit(LOTE * 5),
+  // Tudo em páginas (o Supabase corta em 1000 linhas) e com ordem fixa. Qualquer
+  // erro derruba a carga: sem locações ou contatos todo mundo viraria "Sumida"/"Fria".
+  const [clientes, locacoesRows, reservasRows, tarefasRows, enviosRows, confirmacoesRows] = await Promise.all([
+    carregar("os clientes", (de, ate) =>
+      supabase
+        .from("clients")
+        .select("id, name, display_name, treatment, whatsapp, city, stage, is_client, parceiro, created_at")
+        .eq("is_test", false)
+        .neq("stage", "desqualificado")
+        .order("id")
+        .range(de, ate)
+    ),
+    carregar("as locações", (de, ate) =>
+      supabase.from("rentals_contabilizaveis").select("id, client_id, event_date, calculated_value").order("id").range(de, ate)
+    ),
+    carregar("as próximas reservas", (de, ate) =>
+      supabase
+        .from("calendar_events")
+        .select("id, client_id, date_start")
+        .eq("is_test", false)
+        .neq("status", "cancelada")
+        .not("client_id", "is", null)
+        .gte("date_end", hoje)
+        .order("id")
+        .range(de, ate)
+    ),
+    carregar("as tarefas", (de, ate) =>
+      supabase
+        .from("tasks")
+        .select("id, client_id, status, completed_at")
+        .eq("is_test", false)
+        .not("client_id", "is", null)
+        .order("id")
+        .range(de, ate)
+    ),
+    carregar("os envios da agenda", (de, ate) => supabase.from("agenda_envios").select("id, client_id, enviado_em").order("id").range(de, ate)),
+    carregar("os pedidos de confirmação", (de, ate) =>
+      supabase
+        .from("calendar_events")
+        .select("id, client_id, confirmation_message_sent_at")
+        .not("confirmation_message_sent_at", "is", null)
+        .not("client_id", "is", null)
+        .order("id")
+        .range(de, ate)
+    ),
   ]);
-  if (clientesRes.error) throw new Error(`Não consegui carregar os clientes: ${clientesRes.error.message}`);
 
   const locacoes = new Map<string, { data: string; valor: number }[]>();
-  for (const r of (locacoesRes.data ?? []) as any[]) {
+  for (const r of locacoesRows) {
     if (!r.client_id) continue;
     const l = locacoes.get(r.client_id) ?? [];
     l.push({ data: r.event_date, valor: Number(r.calculated_value ?? 0) });
@@ -60,16 +90,21 @@ export async function carregarRelacionamento(supabase: SupabaseClient, hoje: str
   }
 
   const proxima = new Map<string, string>();
-  for (const e of (reservasRes.data ?? []) as any[]) if (!proxima.has(e.client_id)) proxima.set(e.client_id, e.date_start < hoje ? hoje : e.date_start);
+  // A mais cedo de cada pessoa (a consulta vem por id, não por data).
+  for (const e of reservasRows) {
+    const d = e.date_start < hoje ? hoje : e.date_start;
+    const atual = proxima.get(e.client_id);
+    if (!atual || d < atual) proxima.set(e.client_id, d);
+  }
 
   const contato = new Map<string, string>();
   const pendentes = new Map<string, number>();
-  for (const t of (tarefasRes.data ?? []) as any[]) {
+  for (const t of tarefasRows) {
     if (t.status === "concluida") contato.set(t.client_id, maior(contato.get(t.client_id), dataLocal(t.completed_at)) as string);
     else pendentes.set(t.client_id, (pendentes.get(t.client_id) ?? 0) + 1);
   }
-  for (const e of (enviosRes.data ?? []) as any[]) contato.set(e.client_id, maior(contato.get(e.client_id), dataLocal(e.enviado_em)) as string);
-  for (const e of (confirmacoesRes.data ?? []) as any[])
+  for (const e of enviosRows) contato.set(e.client_id, maior(contato.get(e.client_id), dataLocal(e.enviado_em)) as string);
+  for (const e of confirmacoesRows)
     contato.set(e.client_id, maior(contato.get(e.client_id), dataLocal(e.confirmation_message_sent_at)) as string);
 
   let deve = new Map<string, number>();
@@ -80,7 +115,7 @@ export async function carregarRelacionamento(supabase: SupabaseClient, hoje: str
     // Sem o "deve" a classificação segue; é só um selo.
   }
 
-  const pessoas: PessoaBase[] = ((clientesRes.data ?? []) as any[]).map((c) => ({
+  const pessoas: PessoaBase[] = clientes.map((c) => ({
     id: c.id,
     nome: c.name,
     treatment: c.treatment,

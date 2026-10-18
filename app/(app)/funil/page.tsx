@@ -5,17 +5,24 @@ import { etapaDoCliente } from "@/lib/funil-clientes";
 import { taxaVencida } from "@/lib/taxa";
 import FunilClient from "./FunilClient";
 
+function falhou(oque: string, erro: { message: string } | null) {
+  if (erro) throw new Error(`Não consegui carregar ${oque} do Funil: ${erro.message}`);
+}
+
 export default async function FunilPage() {
   const supabase = createClient();
 
-  const { data: clients } = await supabase
+  const { data: clients, error: erroClients } = await supabase
     .from("clients")
     .select(
       "id, name, city, address, whatsapp, stage, is_client, data_evento, origem, indicado_por, notes, parceiro, isento_taxa, treatment, display_name, client_tags(tags(id, name, color))"
     )
     .order("created_at", { ascending: true }); // sem tarefa nem data, o mais antigo primeiro
+  // Funil vazio por erro pareceria "sem leads": melhor a tela de erro.
+  falhou("os leads", erroClients);
 
-  const { data: allTags } = await supabase.from("tags").select("id, name, color").order("name");
+  const { data: allTags, error: erroTags } = await supabase.from("tags").select("id, name, color").order("name");
+  falhou("as tags", erroTags);
 
   // Rotina automática de recontato (clientes sem reserva): gera a tarefa
   // pendente de cada um antes de listar as tarefas. Se falhar, a tela
@@ -24,11 +31,12 @@ export default async function FunilPage() {
   // Tarefas da agenda: confirmação, pós-locação e cobrança da taxa.
   await supabase.rpc("gerar_tarefas_agenda");
 
-  const { data: tasks } = await supabase
+  const { data: tasks, error: erroTasks } = await supabase
     .from("tasks")
     .select("id, client_id, type, follow_up_number, title, due_date, clients(name)")
     .eq("status", "pendente")
     .order("due_date", { ascending: true });
+  falhou("as tarefas", erroTasks);
 
   const initialTasks = (tasks ?? []).map((t: any) => ({
     id: t.id,
@@ -46,13 +54,14 @@ export default async function FunilPage() {
   // Data de hoje no calendário de Brasília. Com o toISOString() que estava
   // aqui antes, às 21h o "próximo evento" do card já pulava o dia seguinte.
   const todayStr = hojeLocal();
-  const { data: upcomingEvents } = await supabase
+  const { data: upcomingEvents, error: erroEventos } = await supabase
     .from("calendar_events")
     .select("id, client_id, date_start, confirmed, confirmation_message_sent_at, equipment_id, taxa_status, is_mentoria, created_at")
     .neq("status", "cancelada")
     .not("client_id", "is", null)
     .gte("date_start", todayStr)
     .order("date_start", { ascending: true });
+  falhou("os agendamentos", erroEventos);
 
   // id e confirmation_message_sent_at entraram junto com a leva F, para o
   // Funil poder usar exatamente o mesmo fluxo de "pedir confirmação no
@@ -76,9 +85,10 @@ export default async function FunilPage() {
   // A taxa não mora mais no cliente, e sim em cada agendamento: quem
   // reserva cinco datas deve cinco taxas. A view clientes_taxas é quem
   // resume isso, para esta tela e as outras lerem a mesma conta.
-  const { data: taxas } = await supabase
+  const { data: taxas, error: erroTaxas } = await supabase
     .from("clientes_taxas")
     .select("client_id, taxas_pendentes, taxas_pagas, valor_pendente, proxima_pendente");
+  falhou("as taxas de reserva", erroTaxas);
 
   const taxaPorCliente = new Map<string, any>();
   for (const t of taxas ?? []) taxaPorCliente.set(t.client_id, t);
@@ -87,7 +97,8 @@ export default async function FunilPage() {
   // Cliente): calculada aqui, não gravada. Só conta reserva de equipamento
   // que não seja mentoria, igual à regra da taxa de reserva.
   const settings = await fetchSettings(supabase);
-  const { data: ultimas } = await supabase.from("clientes_ultima_locacao").select("client_id, ultima_locacao");
+  const { data: ultimas, error: erroUltimas } = await supabase.from("clientes_ultima_locacao").select("client_id, ultima_locacao");
+  falhou("as últimas locações", erroUltimas);
   const ultimaPorCliente = new Map<string, string>();
   for (const u of ultimas ?? []) ultimaPorCliente.set(u.client_id, u.ultima_locacao);
 

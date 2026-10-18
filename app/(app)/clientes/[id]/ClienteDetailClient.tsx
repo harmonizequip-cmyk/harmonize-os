@@ -17,6 +17,8 @@ import EditarLocacaoModal from "./EditarLocacaoModal";
 import ReservarHiproModal from "../../agenda/ReservarHiproModal";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
+import { confirmar, avisar } from "@/components/Dialogos";
+import { createClient } from "@/lib/supabase/client";
 import HistoricoClienteSection from "./HistoricoClienteSection";
 import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
 import CreditosClienteCard from "@/components/CreditosClienteCard";
@@ -103,6 +105,43 @@ function temSaldo(r: RentalRow): boolean {
   return r.status !== "cancelada" && !r.pago && Number(r.saldo ?? 0) > 0.009;
 }
 
+// Volta a cobrar a taxa de uma reserva isentada ("Isentar taxa" avisa que é
+// por aqui). Mesma chamada do "Cobrar taxa" de AgendamentosDoCliente.
+function CobrarTaxaBotao({ eventId, onFeito, className }: { eventId: string; onFeito: () => void; className?: string }) {
+  const [trabalhando, setTrabalhando] = useState(false);
+  async function cobrar() {
+    const ok = await confirmar({
+      titulo: "Voltar a cobrar a taxa de reserva?",
+      texto: "A taxa volta a ficar pendente nesta reserva.",
+      confirmar: "Cobrar taxa",
+    });
+    if (!ok) return;
+    setTrabalhando(true);
+    const { error } = await createClient().rpc("definir_taxa_agendamento", {
+      p_event_id: eventId,
+      p_status: "pendente",
+      p_payment_method: "pix",
+    });
+    setTrabalhando(false);
+    if (error) {
+      avisar(error.message || "Não consegui voltar a cobrar a taxa.", "erro");
+      return;
+    }
+    avisar("Taxa de reserva voltou a ser cobrada.");
+    onFeito();
+  }
+  return (
+    <button
+      type="button"
+      disabled={trabalhando}
+      onClick={cobrar}
+      className={`inline-flex min-h-[40px] items-center justify-center rounded-lg border border-neutral-200 px-3 text-xs font-medium text-neutral-600 hover:border-brand-teal hover:text-brand-teal disabled:opacity-50 ${className ?? ""}`}
+    >
+      {trabalhando ? "Salvando..." : "Cobrar taxa"}
+    </button>
+  );
+}
+
 function formatPeriodo(r: { event_date: string; event_date_end?: string | null }): string {
   if (r.event_date_end && r.event_date_end !== r.event_date) {
     return `${formatDate(r.event_date)} a ${formatDate(r.event_date_end)}`;
@@ -177,16 +216,24 @@ export default function ClienteDetailClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const totalLocacoes = rentals.length;
+  // Mesma régua do faturado: locação cancelada não conta.
+  const totalLocacoes = billableCount;
   // Faturado e ticket médio saem da contagem contabilizável, não do
   // tamanho da lista do histórico. Locação cancelada continua aparecendo
   // na tabela abaixo, mas não entra em nenhum dos dois números.
   const totalFaturado = billableTotal;
   const ticketMedio = billableCount > 0 ? billableTotal / billableCount : 0;
-  const ultimaLocacao = rentals[0]?.event_date;
   // Realizada = já aconteceu e não foi cancelada. O status "realizada" do
   // banco quase nunca é marcado à mão, então a tela deriva pela data.
   const hojeStr = hojeLocal();
+  // A lista vem em ordem crescente: a última é a mais recente não cancelada
+  // que já começou (reserva futura não é "última locação").
+  const ultimaLocacao = rentals
+    .filter((r) => r.status !== "cancelada" && r.event_date <= hojeStr)
+    .reduce<string | undefined>((ult, r) => (!ult || r.event_date > ult ? r.event_date : ult), undefined);
+  // "Cobrar taxa" só onde faz sentido: reserva futura isentada, cliente que paga taxa.
+  const podeCobrarTaxa = (pr: PreReservaRow) =>
+    !somenteLeitura && pr.taxa_status === "nao_aplica" && !client.parceiro && !client.isento_taxa && pr.event_date >= hojeStr;
   const situacaoDe = (r: RentalRow): string =>
     r.status === "cancelada"
       ? "cancelada"
@@ -412,6 +459,9 @@ export default function ClienteDetailClient({
                     <TaxaRecebidaBotao eventId={pr.id} />
                   </div>
                 )}
+                {podeCobrarTaxa(pr) && (
+                  <CobrarTaxaBotao eventId={pr.id} onFeito={() => router.refresh()} className="mt-2 w-full" />
+                )}
                 <button
                   type="button"
                   onClick={() => setContratoOrigem({ kind: "reserva", reserva: pr })}
@@ -454,6 +504,9 @@ export default function ClienteDetailClient({
                         <div className="mb-2 min-w-[12rem] text-left">
                           <TaxaRecebidaBotao eventId={pr.id} />
                         </div>
+                      )}
+                      {podeCobrarTaxa(pr) && (
+                        <CobrarTaxaBotao eventId={pr.id} onFeito={() => router.refresh()} className="mb-2 mr-2" />
                       )}
                       <button
                         type="button"

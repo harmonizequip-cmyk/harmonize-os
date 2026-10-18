@@ -9,10 +9,12 @@ import { resumoCredito, temCredito } from "@/lib/creditos";
 
 export default async function CreditosEmAbertoPage() {
   const supabase = createClient();
-  const { data: saldos } = await supabase
+  const { data: saldos, error: erroSaldos } = await supabase
     .from("creditos_saldo")
     .select("client_id, disparos_disponiveis, disparos_aguardando, valor_disponivel, atualizado_em")
     .or("disparos_disponiveis.gt.0,disparos_aguardando.gt.0,valor_disponivel.gt.0");
+  // Lista vazia por erro pareceria "ninguém tem crédito": melhor a tela de erro.
+  if (erroSaldos) throw new Error(`Não consegui carregar os créditos: ${erroSaldos.message}`);
 
   const linhas = (saldos ?? [])
     .map((s: any) => ({
@@ -25,9 +27,10 @@ export default async function CreditosEmAbertoPage() {
     .filter((s) => temCredito(s));
 
   const ids = linhas.map((l) => l.client_id);
-  const { data: clientes } = ids.length
+  const { data: clientes, error: erroClientes } = ids.length
     ? await supabase.from("clients").select("id, name, display_name, treatment").in("id", ids)
-    : { data: [] as any[] };
+    : { data: [] as any[], error: null };
+  if (erroClientes) throw new Error(`Não consegui carregar as clientes dos créditos: ${erroClientes.message}`);
   const nomePorId = new Map(
     (clientes ?? []).map((c: any) => [
       c.id as string,

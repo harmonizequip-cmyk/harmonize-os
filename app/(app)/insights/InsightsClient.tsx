@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { mensagemDeErro } from "../assistente/mensagem-erro";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { CATEGORIAS_INSIGHT, categoriaInfo, ordenarInsights, perguntaParaAprofundar, type Insight } from "@/lib/insights";
 import { Archive, Brain, Check, ChevronDown, ChevronUp, Copy, Sparkles, ThumbsDown, ThumbsUp, Undo2 } from "lucide-react";
@@ -16,19 +17,6 @@ const FRASES_ESPERA = [
   "Separando o que mais mexe no caixa...",
   "Escrevendo os próximos passos...",
 ];
-
-async function mensagemDeErro(error: unknown): Promise<string> {
-  const ctx = (error as { context?: Response })?.context;
-  if (ctx && typeof ctx.json === "function") {
-    try {
-      const corpo = await ctx.json();
-      if (corpo?.erro) return corpo.erro;
-    } catch {
-      // segue para a mensagem genérica
-    }
-  }
-  return "Não consegui gerar agora. Confira a internet e tente de novo.";
-}
 
 function CartaoInsight({
   insight,
@@ -218,7 +206,7 @@ export default function InsightsClient() {
     });
     setGerando(false);
     if (error) {
-      setErro(await mensagemDeErro(error));
+      setErro(await mensagemDeErro(error, "Não consegui gerar agora. Confira a internet e tente de novo."));
       return;
     }
     const n = Number(data?.insights_criados ?? 0);

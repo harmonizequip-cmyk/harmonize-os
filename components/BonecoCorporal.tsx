@@ -32,7 +32,22 @@ export default function BonecoCorporal({
             <g
               key={r.id}
               onClick={tocavel ? () => onAlternar!(r.id) : undefined}
-              className={tocavel ? "cursor-pointer" : ""}
+              // Teclado e leitor de tela: cada região é um botão de liga/desliga.
+              role={tocavel ? "button" : undefined}
+              tabIndex={tocavel ? 0 : undefined}
+              aria-label={tocavel ? r.nome : undefined}
+              aria-pressed={tocavel ? on : undefined}
+              onKeyDown={
+                tocavel
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onAlternar!(r.id);
+                      }
+                    }
+                  : undefined
+              }
+              className={tocavel ? "cursor-pointer outline-none focus-visible:stroke-brand-teal-dark" : ""}
               fill="#3DBFB8"
               fillOpacity={on ? 0.5 : 0.08}
               stroke={on ? "#1F8F88" : "#ffffff"}

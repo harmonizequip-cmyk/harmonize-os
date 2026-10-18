@@ -105,6 +105,7 @@ export default function EditorPlanejamento({
   const idRef = useRef(id);
   const planoRef = useRef(plano);
   const sujo = useRef(false);
+  const emAndamento = useRef<Promise<void> | null>(null);
   const ligacao = useRef({ cliente, evento });
   idRef.current = id;
   planoRef.current = plano;
@@ -138,12 +139,14 @@ export default function EditorPlanejamento({
     setTimeout(() => setAviso((a) => (a === t ? null : a)), 2600);
   }, []);
 
-  const salvar = useCallback(async () => {
-    if (!sujo.current || somenteLeitura) return;
+  // Uma ida ao banco. Devolve true quando gravou (o laço de `salvar` repete se
+  // ficou sujo enquanto isso), false quando não há o que gravar ou deu erro.
+  const salvarUmaVez = useCallback(async (): Promise<boolean> => {
+    if (!sujo.current || somenteLeitura) return false;
     const p = planoRef.current;
     const total = totalDistribuido(p);
     const est = paraEstado(p);
-    if (!idRef.current && !temConteudo(est, total)) return;
+    if (!idRef.current && !temConteudo(est, total)) return false;
     sujo.current = false;
     setStatus("salvando");
     const { data, error } = await supabase.rpc("salvar_planejamento", {
@@ -156,7 +159,7 @@ export default function EditorPlanejamento({
     if (error) {
       sujo.current = true;
       setStatus("erro");
-      return;
+      return false;
     }
     if (!idRef.current && data) {
       idRef.current = data as string;
@@ -164,7 +167,27 @@ export default function EditorPlanejamento({
       window.history.replaceState(null, "", `${base}/${data}`);
     }
     setStatus("salvo");
+    return true;
   }, [supabase, somenteLeitura, base]);
+
+  // Salvamentos em fila, um de cada vez: enquanto o primeiro de um plano novo
+  // roda, o id ainda não existe e um segundo em paralelo criaria outro registro.
+  // Quem chama durante um salvamento espera o mesmo; se mudou algo nesse meio
+  // tempo, ele grava de novo com o estado mais recente ao terminar.
+  const salvar = useCallback((): Promise<void> => {
+    if (emAndamento.current) return emAndamento.current;
+    const rodada = (async () => {
+      try {
+        while (sujo.current && (await salvarUmaVez())) {
+          // repete enquanto houver mudança nova
+        }
+      } finally {
+        emAndamento.current = null;
+      }
+    })();
+    emAndamento.current = rodada;
+    return rodada;
+  }, [salvarUmaVez]);
 
   const agendar = useCallback(() => {
     sujo.current = true;
@@ -307,8 +330,10 @@ export default function EditorPlanejamento({
     window.location.href = `${destino}${destino.includes("?") ? "&" : "?"}ia=1`;
   }
 
-  function excluir() {
+  async function excluir() {
     setMenu(false);
+    // Primeiro salvamento ainda rodando: espera, senão o registro nasce depois de "apagado".
+    if (emAndamento.current) await emAndamento.current;
     if (!idRef.current) {
       sujo.current = false;
       router.push(base);
@@ -320,6 +345,7 @@ export default function EditorPlanejamento({
   async function apagarDeVez(): Promise<string | null> {
     if (timer.current) clearTimeout(timer.current);
     sujo.current = false;
+    if (emAndamento.current) await emAndamento.current;
     const { error } = await supabase.rpc("excluir_planejamento", { p_id: idRef.current });
     if (error) return error.message || "Não consegui apagar. Confira a internet.";
     router.push(base);

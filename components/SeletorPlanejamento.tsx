@@ -16,10 +16,12 @@ import {
   type PlanejamentoMontado,
 } from "@/lib/planejamento";
 import { Check, ClipboardList, Plus, Sparkles, X } from "lucide-react";
+import { valorParaNumero } from "@/lib/valor";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("pt-BR");
 const mm = (p: number) => p.toFixed(1).replace(".", ",");
-const num = (s: string) => Number(String(s).replace(",", ".")) || 0;
+// "1.500" é milhar (1500), "4,5" e "4.5" são decimais: mesma leitura dos campos de valor.
+const num = (s: string) => valorParaNumero(String(s)) || 0;
 
 type Corporal = {
   chave: string;

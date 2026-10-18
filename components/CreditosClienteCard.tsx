@@ -59,10 +59,12 @@ export default function CreditosClienteCard({ clientId }: { clientId: string }) 
   const [data, setData] = useState(hojeLocal());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Falha ao ler não pode parecer "sem crédito".
+  const [erroCarga, setErroCarga] = useState(false);
 
   const carregar = useCallback(async () => {
     const supabase = createClient();
-    const [{ data: s }, { data: m }] = await Promise.all([
+    const [{ data: s, error: erroS }, { data: m, error: erroM }] = await Promise.all([
       supabase
         .from("creditos_saldo")
         .select("client_id, disparos_disponiveis, disparos_aguardando, valor_disponivel")
@@ -76,6 +78,12 @@ export default function CreditosClienteCard({ clientId }: { clientId: string }) 
         .order("created_at", { ascending: false })
         .limit(100),
     ]);
+    if (erroS || erroM) {
+      setErroCarga(true);
+      setCarregado(true);
+      return;
+    }
+    setErroCarga(false);
     setSaldo(
       s
         ? {
@@ -151,6 +159,18 @@ export default function CreditosClienteCard({ clientId }: { clientId: string }) 
   }
 
   if (!carregado) return null;
+  if (erroCarga)
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+        <p className="text-sm text-rose-700">Não consegui carregar o crédito. Confira a internet.</p>
+        <button
+          onClick={() => carregar()}
+          className="flex-shrink-0 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700"
+        >
+          Tentar de novo
+        </button>
+      </div>
+    );
   const vazio = !temCredito(saldo) && movs.length === 0;
 
   return (
