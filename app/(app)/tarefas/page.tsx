@@ -32,7 +32,7 @@ export default async function TarefasPage() {
   // Tarefas da agenda: confirmação, pós-locação e cobrança da taxa.
   await supabase.rpc("gerar_tarefas_agenda");
 
-  const [{ data: pendentes }, { data: concluidas }] = await Promise.all([
+  const [{ data: pendentes, error: erroPendentes }, { data: concluidas, error: erroConcluidas }] = await Promise.all([
     supabase
       .from("tasks")
       .select("id, client_id, type, follow_up_number, title, due_date, completed_at, event_id, clients(name, whatsapp, treatment, display_name)")
@@ -47,6 +47,9 @@ export default async function TarefasPage() {
       .order("completed_at", { ascending: false })
       .limit(50),
   ]);
+  // Lista vazia por falha de rede pareceria "nada para fazer": melhor a tela de erro.
+  if (erroPendentes) throw new Error(`Não consegui carregar as tarefas pendentes: ${erroPendentes.message}`);
+  if (erroConcluidas) throw new Error(`Não consegui carregar as tarefas concluídas: ${erroConcluidas.message}`);
 
   // Data e situação da taxa da reserva de cada tarefa que veio de uma
   // reserva (cobrança de taxa, confirmação, pós-locação), para a tarefa
@@ -54,7 +57,8 @@ export default async function TarefasPage() {
   const idsEventos = Array.from(new Set((pendentes ?? []).map((t: any) => t.event_id).filter(Boolean))) as string[];
   const eventos = new Map<string, { date_start: string; taxa_status: string | null }>();
   if (idsEventos.length > 0) {
-    const { data: evs } = await supabase.from("calendar_events").select("id, date_start, taxa_status").in("id", idsEventos);
+    const { data: evs, error: erroEventos } = await supabase.from("calendar_events").select("id, date_start, taxa_status").in("id", idsEventos);
+    if (erroEventos) throw new Error(`Não consegui carregar as reservas das tarefas: ${erroEventos.message}`);
     for (const e of evs ?? []) eventos.set((e as any).id, { date_start: (e as any).date_start, taxa_status: (e as any).taxa_status });
   }
   const { reservationFee } = await fetchSettings(supabase);

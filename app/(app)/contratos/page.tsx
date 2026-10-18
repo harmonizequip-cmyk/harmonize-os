@@ -10,12 +10,13 @@ const TETO = 1000;
 export default async function ContratosPage() {
   const supabase = createClient();
 
-  const { data: contratos } = await supabase
+  const { data: contratos, error } = await supabase
     .from("contratos_emitidos")
     .select("id, gerado_em, dados, client_id, rental_id, reservation_id, clients(name)")
     .eq("is_test", false)
     .order("gerado_em", { ascending: false })
     .limit(TETO);
+  if (error) throw new Error(`Não consegui carregar os contratos: ${error.message}`);
 
   const normalizados = (contratos ?? []).map((c: any) => ({
     ...c,

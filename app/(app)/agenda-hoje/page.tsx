@@ -19,7 +19,7 @@ export default async function AgendaHojePage() {
   const hojeStr = hojeLocal();
 
   // Locações já finalizadas (com disparos/valor lançados) a partir de hoje.
-  const { data: rentals } = await supabase
+  const { data: rentals, error: erroRentals } = await supabase
     .from("rentals")
     .select("id, client_id, event_date, event_date_end, pago, clients(name), equipments(name)")
     .eq("is_test", false)
@@ -27,11 +27,12 @@ export default async function AgendaHojePage() {
     .gte("event_date", hojeStr)
     .order("event_date", { ascending: true })
     .limit(50);
+  if (erroRentals) throw new Error(`Não consegui carregar as locações: ${erroRentals.message}`);
 
   // Pré-reservas ("Agendar sem disparos") que ainda não viraram locação —
   // ficam em calendar_events, não em rentals, e são justamente os
   // "próximos agendamentos" que ainda não têm disparos contados.
-  const { data: preReservas } = await supabase
+  const { data: preReservas, error: erroReservas } = await supabase
     .from("calendar_events")
     .select("id, client_id, date_start, date_end, taxa_status, clients(name), equipments(name)")
     .eq("is_test", false)
@@ -40,12 +41,15 @@ export default async function AgendaHojePage() {
     .gte("date_start", hojeStr)
     .order("date_start", { ascending: true })
     .limit(50);
+  if (erroReservas) throw new Error(`Não consegui carregar as reservas: ${erroReservas.message}`);
 
   // Saldo em aberto das locações listadas, para oferecer o recebimento aqui.
   const idsLocacoes = (rentals ?? []).map((r: any) => r.id);
-  const { data: situacoes } = idsLocacoes.length
+  const { data: situacoes, error: erroSituacoes } = idsLocacoes.length
     ? await supabase.from("rentals_situacao_pagamento").select("rental_id, saldo").in("rental_id", idsLocacoes)
-    : { data: [] as any[] };
+    : { data: [] as any[], error: null };
+  // Sem o saldo, a locação apareceria sem "Receber": melhor a tela de erro.
+  if (erroSituacoes) throw new Error(`Não consegui carregar os saldos das locações: ${erroSituacoes.message}`);
   const saldoPorLocacao = new Map<string, number>((situacoes ?? []).map((x: any) => [x.rental_id, Number(x.saldo)]));
 
   const listaRentals = (rentals ?? []).map((r: any) => ({

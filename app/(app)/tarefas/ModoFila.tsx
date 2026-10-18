@@ -35,9 +35,9 @@ export default function ModoFila({
 }: {
   tarefas: TarefaRow[];
   valorTaxa?: number;
-  onFeito: (id: string) => Promise<void>;
-  onRespondeu: (id: string, respondeu: boolean) => Promise<void>;
-  onAdiar: (id: string, data: string) => Promise<void>;
+  onFeito: (id: string) => Promise<boolean>;
+  onRespondeu: (id: string, respondeu: boolean) => Promise<boolean>;
+  onAdiar: (id: string, data: string) => Promise<boolean>;
   onFechar: () => void;
 }) {
   // Fotografia da fila ao abrir: concluir uma tarefa não reordena o resto.
@@ -49,11 +49,13 @@ export default function ModoFila({
 
   const t = fila[pos];
 
-  async function seguir(acao?: () => Promise<void>, contaFeita = true) {
+  // Se a ação não gravou (o aviso de erro já apareceu), fica no mesmo cartão para tentar de novo.
+  async function seguir(acao?: () => Promise<boolean>, contaFeita = true) {
     if (acao) {
       setOcupado(true);
-      await acao();
+      const ok = await acao().catch(() => false);
       setOcupado(false);
+      if (!ok) return;
       if (contaFeita) setFeitas((n) => n + 1);
     }
     setMandou(false);
@@ -148,7 +150,7 @@ export default function ModoFila({
           mensagem && <p className="text-xs text-amber-700">Sem WhatsApp no cadastro.</p>
         )}
         {taxaPendente && (
-          <TaxaRecebidaBotao eventId={t.event_id as string} valor={valorTaxa} onDone={() => seguir(async () => onFeito(t.id))} />
+          <TaxaRecebidaBotao eventId={t.event_id as string} valor={valorTaxa} onDone={() => seguir(() => onFeito(t.id))} />
         )}
       </div>
 
