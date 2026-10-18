@@ -9,6 +9,7 @@ import { X, FileUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { rotuloFatura } from "@/lib/cartao";
+import { hojeLocal } from "@/lib/period";
 import { avisar } from "@/components/Dialogos";
 import {
   decodificarArquivo,
@@ -54,6 +55,8 @@ export default function ImportarFaturaModal({
   const [nomeArquivo, setNomeArquivo] = useState("");
   const [modo, setModo] = useState<"paga" | "aberta">("paga");
   const [faturaRef, setFaturaRef] = useState("");
+  // Pagamentos feitos no banco só entram a partir desta data (vazio = não registrar nenhum).
+  const [pagamentosDesde, setPagamentosDesde] = useState(hojeLocal());
   const [categoriaPorNome, setCategoriaPorNome] = useState<Record<string, string>>({});
   // chave -> fatura em que a linha já está lançada neste cartão.
   const [jaLancadas, setJaLancadas] = useState<Map<string, string>>(new Map());
@@ -61,8 +64,8 @@ export default function ImportarFaturaModal({
   const [salvando, setSalvando] = useState(false);
 
   const plano = useMemo(
-    () => (fatura && cartao ? planejarImportacao(fatura, { diaVencimento: cartao.dia_vencimento, modo, faturaRef: faturaRef || undefined }) : null),
-    [fatura, cartao, modo, faturaRef]
+    () => (fatura && cartao ? planejarImportacao(fatura, { diaVencimento: cartao.dia_vencimento, modo, faturaRef: faturaRef || undefined, pagamentosDesde: pagamentosDesde || null }) : null),
+    [fatura, cartao, modo, faturaRef, pagamentosDesde]
   );
 
   // Fatura de referência padrão: a data no nome do arquivo (Nubank_2026-10-02 = vence em outubro);
@@ -129,24 +132,27 @@ export default function ImportarFaturaModal({
   );
   const antecipadas = novos.filter((i) => jaLancadas.has(i.chave)).length;
   const repetidos = plano ? plano.itens.length - novos.length : 0;
-  const total = novos.reduce((s, i) => s + i.valor, 0);
+  const compras = novos.filter((i) => i.tipo !== "pagamento");
+  const pagamentos = novos.filter((i) => i.tipo === "pagamento");
+  const total = compras.reduce((s, i) => s + i.valor, 0);
+  const totalPagamentos = pagamentos.reduce((s, i) => s + i.valor, 0);
 
   const grupos = useMemo(() => {
     const mapa = new Map<string, { nome: string; qtd: number; total: number }>();
-    for (const i of novos) {
+    for (const i of compras) {
       const g = mapa.get(i.nome) ?? { nome: i.nome, qtd: 0, total: 0 };
       g.qtd += 1;
       g.total += i.valor;
       mapa.set(i.nome, g);
     }
     return Array.from(mapa.values()).sort((a, b) => b.total - a.total);
-  }, [novos]);
+  }, [compras]);
 
   const porFatura = useMemo(() => {
     const mapa = new Map<string, number>();
-    for (const i of novos) mapa.set(i.fatura_ref, (mapa.get(i.fatura_ref) ?? 0) + i.valor);
+    for (const i of compras) mapa.set(i.fatura_ref, (mapa.get(i.fatura_ref) ?? 0) + i.valor);
     return Array.from(mapa.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [novos]);
+  }, [compras]);
 
   async function importar() {
     if (!cartao || novos.length === 0) return;
@@ -165,7 +171,8 @@ export default function ImportarFaturaModal({
         fatura_ref: x.fatura_ref,
         parcela_num: x.parcela_num,
         parcelas_total: x.parcelas_total,
-        category_id: categoriaPorNome[x.nome] || null,
+        tipo: x.tipo ?? "compra",
+        category_id: x.tipo === "pagamento" ? null : categoriaPorNome[x.nome] || null,
       }));
       const { data, error } = await supabase.rpc("importar_compras_cartao", { p_cartao_id: cartao.id, p_itens: lote });
       if (error) {
@@ -256,7 +263,7 @@ export default function ImportarFaturaModal({
                 </p>
                 {plano.pagamentos.qtd > 0 && (
                   <p className="mt-1 text-neutral-500">
-                    Não entram como compra: {plano.pagamentos.qtd} pagamento{plano.pagamentos.qtd === 1 ? "" : "s"} ({formatCurrency(plano.pagamentos.total)}), que você registra em Pagar fatura.
+                    O arquivo tem {plano.pagamentos.qtd} pagamento{plano.pagamentos.qtd === 1 ? "" : "s"} ({formatCurrency(plano.pagamentos.total)}). Eles não são compras: veja abaixo quais serão registrados.
                   </p>
                 )}
                 {plano.creditos.qtd > 0 && modo === "paga" && (
@@ -282,6 +289,19 @@ export default function ImportarFaturaModal({
                 )}
               </div>
 
+              <label className="block text-xs text-neutral-600">
+                Registrar os pagamentos feitos a partir de
+                <input type="date" className={`${campo} mt-1`} value={pagamentosDesde} onChange={(e) => setPagamentosDesde(e.target.value)} />
+                <span className="mt-1 block text-[11px] text-neutral-500">
+                  Os pagamentos antigos já estão no saldo que você informou. Apague a data para não registrar nenhum.
+                </span>
+              </label>
+              {pagamentos.length > 0 && (
+                <p className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
+                  {pagamentos.length} pagamento{pagamentos.length === 1 ? "" : "s"} de fatura, {formatCurrency(totalPagamentos)}, saem do seu saldo.
+                </p>
+              )}
+
               {novos.length === 0 ? (
                 <p className="text-xs text-neutral-600">
                   {repetidos > 0 ? "Tudo deste arquivo já foi lançado antes." : "Nada para lançar com essa escolha."}
@@ -290,7 +310,7 @@ export default function ImportarFaturaModal({
                 <>
                   <div>
                     <p className="text-sm font-semibold text-neutral-900">
-                      {novos.length} lançamento{novos.length === 1 ? "" : "s"}, {formatCurrency(total)}
+                      {compras.length} compra{compras.length === 1 ? "" : "s"}, {formatCurrency(total)}
                     </p>
                     {antecipadas > 0 && (
                       <p className="text-[11px] text-neutral-500">

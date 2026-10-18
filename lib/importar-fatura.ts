@@ -45,6 +45,8 @@ export interface ItemImportacao {
   origem: "fatura" | "futura";
   /** Quanto de desconto ou estorno do banco já foi tirado do valor desta linha. */
   abatido?: number;
+  /** "pagamento" = pagamento de fatura feito no banco (sai do saldo). Sem valor = compra. */
+  tipo?: "compra" | "pagamento";
 }
 
 export interface Abatimento {
@@ -59,6 +61,8 @@ export interface PlanoImportacao {
   itens: ItemImportacao[];
   faturaRef: string;
   pagamentos: { qtd: number; total: number };
+  /** Pagamentos que vão ser registrados (a partir da data de corte). */
+  pagamentosARegistrar: { qtd: number; total: number };
   creditos: { qtd: number; total: number };
   /** Descontos e estornos do banco abatidos das compras a que se referem. */
   abatimentos: Abatimento[];
@@ -226,7 +230,10 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * - modo "paga": só as parcelas que ainda faltam (a fatura em si já foi paga).
  * Pagamentos e descontos do banco não viram compra (vêm só no resumo).
  */
-export function planejarImportacao(fatura: FaturaLida, opcoes: { diaVencimento: number; modo: "aberta" | "paga"; faturaRef?: string }): PlanoImportacao {
+export function planejarImportacao(
+  fatura: FaturaLida,
+  opcoes: { diaVencimento: number; modo: "aberta" | "paga"; faturaRef?: string; pagamentosDesde?: string | null }
+): PlanoImportacao {
   const fim = fatura.fim ?? fatura.linhas.reduce((m, l) => (l.data > m ? l.data : m), fatura.linhas[0].data);
   const faturaRef = opcoes.faturaRef ?? refDaFatura(fim, opcoes.diaVencimento);
   const itens: ItemImportacao[] = [];
@@ -293,11 +300,43 @@ export function planejarImportacao(fatura: FaturaLida, opcoes: { diaVencimento: 
 
   const abatimentos = opcoes.modo === "aberta" ? abaterCreditos(fatura, itens) : [];
 
+  // Pagamentos feitos no banco a partir da data de corte (os antigos já estão no saldo informado).
+  // Pagamento até o vencimento da fatura anterior paga aquela; depois dele, esta.
+  const pagamentosARegistrar = { qtd: 0, total: 0 };
+  if (opcoes.pagamentosDesde) {
+    const anterior = somarMesesRef(faturaRef, -1);
+    const [ya, ma] = anterior.split("-").map(Number);
+    const diaAnterior = Math.min(opcoes.diaVencimento, new Date(Date.UTC(ya, ma, 0)).getUTCDate());
+    const vencAnterior = `${anterior}-${String(diaAnterior).padStart(2, "0")}`;
+    const vistas = new Map<string, number>();
+    for (const l of fatura.linhas) {
+      if (l.tipo !== "pagamento" || l.data < opcoes.pagamentosDesde) continue;
+      const base = fatura.formato === "ofx" ? `${l.fitid}|pag|${l.valor.toFixed(2)}` : `csv|pag|${l.data}|${l.valor.toFixed(2)}`;
+      const vez = (vistas.get(base) ?? 0) + 1;
+      vistas.set(base, vez);
+      itens.push({
+        chave: vez > 1 ? `${base}#${vez}` : base,
+        grupo: "pagamento",
+        data: l.data,
+        valor: l.valor,
+        descricao: "Pagamento de fatura",
+        nome: "Pagamento de fatura",
+        fatura_ref: l.data > vencAnterior ? faturaRef : anterior,
+        parcela_num: null,
+        parcelas_total: null,
+        origem: "fatura",
+        tipo: "pagamento",
+      });
+      pagamentosARegistrar.qtd += 1;
+      pagamentosARegistrar.total = r2(pagamentosARegistrar.total + l.valor);
+    }
+  }
+
   const soma = (tipo: TipoLinha) => {
     const ls = fatura.linhas.filter((l) => l.tipo === tipo);
     return { qtd: ls.length, total: r2(ls.reduce((s, l) => s + l.valor, 0)) };
   };
-  return { itens, faturaRef, pagamentos: soma("pagamento"), creditos: soma("credito"), abatimentos };
+  return { itens, faturaRef, pagamentos: soma("pagamento"), pagamentosARegistrar, creditos: soma("credito"), abatimentos };
 }
 
 const semPrefixoDeCredito = (memo: string) =>
@@ -311,7 +350,7 @@ const semPrefixoDeCredito = (memo: string) =>
  */
 function abaterCreditos(fatura: FaturaLida, itens: ItemImportacao[]): Abatimento[] {
   const resultado: Abatimento[] = [];
-  const doArquivo = itens.filter((i) => i.origem === "fatura");
+  const doArquivo = itens.filter((i) => i.origem === "fatura" && i.tipo !== "pagamento");
   for (const c of fatura.linhas) {
     if (c.tipo !== "credito") continue;
     const alvoNome = semAcento(semPrefixoDeCredito(c.memo));

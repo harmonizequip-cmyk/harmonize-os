@@ -221,3 +221,29 @@ describe("descontos e estornos do banco", () => {
     expect(p.itens.find((i) => i.nome === "Lavagem")!.valor).toBe(125.83);
   });
 });
+
+describe("pagamentos feitos no banco", () => {
+  const f = lerOfx(OFX); // um pagamento de R$ 1.000 em 19/09/2026
+
+  it("só registra a partir da data de corte", () => {
+    const sem = planejarImportacao(f, { diaVencimento: 2, modo: "aberta", pagamentosDesde: "2026-10-18" });
+    expect(sem.pagamentosARegistrar).toEqual({ qtd: 0, total: 0 });
+    expect(sem.itens.some((i) => i.tipo === "pagamento")).toBe(false);
+    const com = planejarImportacao(f, { diaVencimento: 2, modo: "aberta", pagamentosDesde: "2026-09-01" });
+    expect(com.pagamentosARegistrar).toEqual({ qtd: 1, total: 1000 });
+    expect(com.itens.find((i) => i.tipo === "pagamento")).toMatchObject({ valor: 1000, descricao: "Pagamento de fatura", chave: "g1|pag|1000.00" });
+  });
+
+  it("pagamento até o vencimento anterior paga a fatura anterior; depois, esta", () => {
+    // fatura de outubro (vence dia 2); a anterior venceu em 02/09
+    const csv = lerCsv(["date,title,amount", '2026-09-01,Pagamento recebido,"- 50,00"', '2026-09-02,Pagamento recebido,"- 60,00"', '2026-09-03,Pagamento recebido,"- 70,00"', '2026-09-04,Loja,"10,00"'].join("\n"));
+    const p = planejarImportacao(csv, { diaVencimento: 2, modo: "aberta", faturaRef: "2026-10", pagamentosDesde: "2026-01-01" });
+    const refs = p.itens.filter((i) => i.tipo === "pagamento").map((i) => `${i.data}:${i.fatura_ref}`);
+    expect(refs).toEqual(["2026-09-01:2026-09", "2026-09-02:2026-09", "2026-09-03:2026-10"]);
+  });
+
+  it("sem data de corte, nenhum pagamento é registrado", () => {
+    const p = planejarImportacao(f, { diaVencimento: 2, modo: "aberta", pagamentosDesde: null });
+    expect(p.pagamentosARegistrar.qtd).toBe(0);
+  });
+});

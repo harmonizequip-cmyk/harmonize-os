@@ -8727,6 +8727,8 @@ declare
   v_desc text;
   v_pn int;
   v_pt int;
+  v_pag boolean;
+  v_cat_pag uuid;
 begin
   select * into v_cartao from cartoes where id = p_cartao_id;
   if v_cartao.id is null then
@@ -8736,6 +8738,7 @@ begin
      or (v_cartao.scope = 'pessoal' and not has_module_permission('pessoal')) then
     raise exception 'Sem permissão para lançar neste cartão.';
   end if;
+  select id into v_cat_pag from categories where name = 'Pagamento de fatura' and scope = v_cartao.scope and type = 'saida' limit 1;
   if p_itens is null or jsonb_typeof(p_itens) <> 'array' or jsonb_array_length(p_itens) = 0 then
     raise exception 'Nada para importar.';
   end if;
@@ -8750,6 +8753,12 @@ begin
     v_cat := nullif(v_item->>'category_id', '')::uuid;
     v_pn := nullif(v_item->>'parcela_num', '')::int;
     v_pt := nullif(v_item->>'parcelas_total', '')::int;
+    v_pag := coalesce(v_item->>'tipo', 'compra') = 'pagamento';
+    if v_pag then
+      -- Pagamento de fatura feito no banco: igual ao "Pagar fatura" (sai do saldo, fora do resultado).
+      v_desc := 'Fatura ' || v_cartao.nome || ' ' || substr(coalesce(v_item->>'fatura_ref', ''), 6, 2) || '/' || substr(coalesce(v_item->>'fatura_ref', ''), 1, 4);
+      v_cat := v_cat_pag;
+    end if;
 
     if v_valor is null or v_valor <= 0 then
       raise exception 'Valor inválido na linha %.', coalesce(v_desc, '?');
@@ -8763,7 +8772,7 @@ begin
     if nullif(v_item->>'chave', '') is null or nullif(v_item->>'grupo', '') is null then
       raise exception 'Linha sem chave: %.', v_desc;
     end if;
-    if v_cat is not null and not exists (select 1 from categories c where c.id = v_cat and c.scope = v_cartao.scope) then
+    if not v_pag and v_cat is not null and not exists (select 1 from categories c where c.id = v_cat and c.scope = v_cartao.scope) then
       raise exception 'Categoria que não é deste lado, na linha %.', v_desc;
     end if;
 
@@ -8771,9 +8780,10 @@ begin
       type, category_id, description, amount, payment_method, date, scope, notes, created_by,
       cartao_id, cartao_mov, fatura_ref, parcela_num, parcelas_total, compra_grupo, importacao_chave
     ) values (
-      'saida', v_cat, v_desc, v_valor, 'credito', v_data, v_cartao.scope, 'Importado da fatura', auth.uid(),
-      p_cartao_id, 'compra', v_item->>'fatura_ref', v_pn, v_pt,
-      md5(p_cartao_id::text || '|' || (v_item->>'grupo'))::uuid, v_item->>'chave'
+      'saida', v_cat, v_desc, v_valor, case when v_pag then 'pix'::payment_method_type else 'credito'::payment_method_type end,
+      v_data, v_cartao.scope, 'Importado da fatura', auth.uid(),
+      p_cartao_id, case when v_pag then 'pagamento' else 'compra' end, v_item->>'fatura_ref', v_pn, v_pt,
+      case when v_pag then null else md5(p_cartao_id::text || '|' || (v_item->>'grupo'))::uuid end, v_item->>'chave'
     )
     on conflict (cartao_id, importacao_chave) where importacao_chave is not null do update
       set fatura_ref = excluded.fatura_ref, amount = excluded.amount, date = excluded.date
