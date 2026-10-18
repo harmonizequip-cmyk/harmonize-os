@@ -10,12 +10,9 @@ import { useEffect, useState } from "react";
 import { BellOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { avisosSuportados, garantirInscricao, marcarAvisosDesligados } from "@/lib/push";
+import { hojeLocal } from "@/lib/period";
 
 const CHAVE_ADIADO = "harmonize-faixa-avisos-adiada";
-
-function hojeIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function AvisosDesligadosFaixa() {
   const [mostrar, setMostrar] = useState<"pedir" | "bloqueado" | null>(null);
@@ -27,7 +24,7 @@ export default function AvisosDesligadosFaixa() {
       if (!avisosSuportados()) return;
       try {
         if (localStorage.getItem("harmonize-avisos-desligados") === "1") return;
-        if (localStorage.getItem(CHAVE_ADIADO) === hojeIso()) return;
+        if (localStorage.getItem(CHAVE_ADIADO) === hojeLocal()) return;
       } catch {
         // sem armazenamento: segue mostrando quando precisar
       }
@@ -59,7 +56,7 @@ export default function AvisosDesligadosFaixa() {
 
   function adiar() {
     try {
-      localStorage.setItem(CHAVE_ADIADO, hojeIso());
+      localStorage.setItem(CHAVE_ADIADO, hojeLocal());
     } catch {
       // sem armazenamento: só esconde agora
     }

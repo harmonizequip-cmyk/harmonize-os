@@ -6,14 +6,18 @@ import { ehEspacoPessoal } from "@/lib/espaco";
 import { Banknote, CalendarDays, CalendarPlus, ClipboardList, ListChecks, type LucideIcon, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
 import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 import { createClient } from "@/lib/supabase/client";
-import NovaTarefaModal from "@/app/(app)/funil/NovaTarefaModal";
-import NovoLeadModal from "@/app/(app)/funil/NovoLeadModal";
-import NovoLancamentoModal from "@/app/(app)/financeiro/NovoLancamentoModal";
-import NovoEventoModal from "@/app/(app)/agenda/NovoEventoModal";
-import ReservarHiproModal from "@/app/(app)/agenda/ReservarHiproModal";
-import CalculadoraLocacaoModal from "@/components/CalculadoraLocacaoModal";
-import TabelaPrecosModal from "@/components/TabelaPrecosModal";
-import ReceberPagamentoModal from "@/components/ReceberPagamentoModal";
+import dynamic from "next/dynamic";
+
+// Os modais do "+" só carregam quando abrem: o botão está em todas as telas, e importá-los
+// direto mandava umas 5 mil linhas (a calculadora sozinha tem 2 mil) para cada página.
+const NovaTarefaModal = dynamic(() => import("@/app/(app)/funil/NovaTarefaModal"), { ssr: false });
+const NovoLeadModal = dynamic(() => import("@/app/(app)/funil/NovoLeadModal"), { ssr: false });
+const NovoLancamentoModal = dynamic(() => import("@/app/(app)/financeiro/NovoLancamentoModal"), { ssr: false });
+const NovoEventoModal = dynamic(() => import("@/app/(app)/agenda/NovoEventoModal"), { ssr: false });
+const ReservarHiproModal = dynamic(() => import("@/app/(app)/agenda/ReservarHiproModal"), { ssr: false });
+const CalculadoraLocacaoModal = dynamic(() => import("@/components/CalculadoraLocacaoModal"), { ssr: false });
+const TabelaPrecosModal = dynamic(() => import("@/components/TabelaPrecosModal"), { ssr: false });
+const ReceberPagamentoModal = dynamic(() => import("@/components/ReceberPagamentoModal"), { ssr: false });
 import type { PricingConfig } from "@/lib/rental-pricing";
 
 interface ClientOption {

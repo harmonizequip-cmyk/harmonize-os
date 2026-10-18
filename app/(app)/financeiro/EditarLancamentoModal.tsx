@@ -384,6 +384,8 @@ export default function EditarLancamentoModal({
             <button
               key={t}
               type="button"
+              // Compra no cartão é sempre saída no crédito (a fatura soma só compras).
+              disabled={compraCartao && t !== type}
               onClick={() => setType(t)}
               className={`flex-1 rounded-lg py-2 text-sm font-medium ${
                 type === t
@@ -464,7 +466,7 @@ export default function EditarLancamentoModal({
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
             {compraCartao && (
-              <p className="mt-1 text-[11px] text-neutral-500">Conta no mês em que a fatura vence ({formatDate(transaction.date)}).</p>
+              <p className="mt-1 text-[11px] text-neutral-500">Conta na fatura que vence em {formatDate(transaction.date)}. Mudar a data aqui não troca a fatura; para isso, apague a compra e lance de novo.</p>
             )}
           </div>
           <div>
@@ -472,7 +474,8 @@ export default function EditarLancamentoModal({
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              disabled={compraCartao}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-100"
             >
               {PAYMENT_METHODS.map((p) => (
                 <option key={p.value} value={p.value}>

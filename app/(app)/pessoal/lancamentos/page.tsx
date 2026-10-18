@@ -25,6 +25,7 @@ export default async function PessoalPage(props: { searchParams: Promise<Filtros
       categories={d.categories}
       clients={d.clients}
       nomesCartoes={d.nomesCartoes}
+      filtrado={d.filtrado}
       periodo={d.periodo}
       atingiuTeto={d.atingiuTeto}
       escopo="pessoal"

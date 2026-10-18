@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
+import { hojeLocal, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/period";
 import { LinkCliente } from "@/components/Atalhos";
 
 function formatDate(dateStr: string) {
@@ -30,9 +31,10 @@ export default async function EquipmentDetailPage(
   // Mesmo período em que o usuário estava no Dashboard quando clicou no
   // card, para a lista abrir já filtrada de forma consistente. Sem from/to
   // na URL, cai pro mês atual.
-  const now = new Date();
-  const fromStr = searchParams.from ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const toStr = searchParams.to ?? new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  // Mês no horário de Brasília (o servidor roda em UTC: depois das 21h já seria amanhã).
+  const hoje = hojeLocal();
+  const fromStr = searchParams.from ?? primeiroDiaDoMes(hoje);
+  const toStr = searchParams.to ?? ultimoDiaDoMes(hoje);
 
   const { data: rentals } = await supabase
     .from("rentals_contabilizaveis")

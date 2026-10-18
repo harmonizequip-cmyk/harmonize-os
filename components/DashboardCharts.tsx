@@ -325,8 +325,10 @@ export default function DashboardCharts({
   rotuloPeriodo?: string;
 }) {
   const pontos = useMemo(() => montarFluxo(transactions, inicio, ate), [transactions, inicio, ate]);
-  const entradas = pontos.reduce((s, p) => s + p.entradas, 0);
-  const saidas = pontos.reduce((s, p) => s + p.saidas, 0);
+  // Totais de todo o período (os pontos param em hoje, mas a fatura do cartão pode ter data
+  // mais adiante no mês e conta no mesmo resultado do Financeiro).
+  const entradas = transactions.reduce((s, t) => s + (t.type === "entrada" ? Number(t.amount) || 0 : 0), 0);
+  const saidas = transactions.reduce((s, t) => s + (t.type === "saida" ? Number(t.amount) || 0 : 0), 0);
   const resultado = entradas - saidas;
   const margem = entradas > 0 ? resultado / entradas : 0;
 

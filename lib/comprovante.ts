@@ -45,13 +45,19 @@ export async function enviarComprovante(
   pasta: string,
   arquivo: Blob
 ): Promise<{ ok: boolean }> {
-  const pdf = ehPdf(arquivo);
-  const corpo = pdf ? arquivo : await reduzirFoto(arquivo);
-  const carimbo = new Date().toISOString().replace(/[:.]/g, "-");
-  const { error } = await supabase.storage
-    .from(PASTA_COMPROVANTES)
-    .upload(`${pasta}/${carimbo}.${pdf ? "pdf" : "jpg"}`, corpo, {
-      contentType: pdf ? "application/pdf" : "image/jpeg",
-    });
-  return { ok: !error };
+  // Nunca lança: o pagamento já foi gravado antes e a tela precisa seguir (avisar e recarregar)
+  // mesmo quando a foto não abre (HEIC, arquivo corrompido) ou a rede cai.
+  try {
+    const pdf = ehPdf(arquivo);
+    const corpo = pdf ? arquivo : await reduzirFoto(arquivo);
+    const carimbo = new Date().toISOString().replace(/[:.]/g, "-");
+    const { error } = await supabase.storage
+      .from(PASTA_COMPROVANTES)
+      .upload(`${pasta}/${carimbo}.${pdf ? "pdf" : "jpg"}`, corpo, {
+        contentType: pdf ? "application/pdf" : "image/jpeg",
+      });
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
 }

@@ -6,6 +6,8 @@
 // as maiores primeiro, o resto em "Outras".
 // ============================================================
 
+import { somarDias } from "./period";
+
 export interface LancamentoGrafico {
   type: "entrada" | "saida";
   amount: number | string;
@@ -23,11 +25,6 @@ export interface PontoFluxo {
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
-function somarDia(iso: string, n: number): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * Pontos do período, dia a dia; acima de 62 dias, mês a mês. Dias sem
@@ -41,7 +38,7 @@ export function montarFluxo(lancamentos: LancamentoGrafico[], inicio: string, at
   const chaveDe = (iso: string) => (porMes ? iso.slice(0, 7) : iso);
 
   const chaves: string[] = [];
-  for (let d = inicio; d <= ate; d = somarDia(d, 1)) {
+  for (let d = inicio; d <= ate; d = somarDias(d, 1)) {
     const k = chaveDe(d);
     if (chaves[chaves.length - 1] !== k) chaves.push(k);
   }

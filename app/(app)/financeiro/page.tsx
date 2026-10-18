@@ -12,6 +12,7 @@ export default async function FinanceiroPage(props: { searchParams: Promise<Filt
       categories={d.categories}
       clients={d.clients}
       nomesCartoes={d.nomesCartoes}
+      filtrado={d.filtrado}
       periodo={d.periodo}
       atingiuTeto={d.atingiuTeto}
     />

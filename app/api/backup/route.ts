@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { hojeLocal } from "@/lib/period";
 
 // Backup manual: baixa um arquivo JSON com todas as tabelas do negócio.
-// Só administrador. A leitura passa pelo login de quem pede (RLS), então
+// Só administrador ativo. A leitura passa pelo login de quem pede (RLS), então
 // nada vem a mais do que a pessoa já enxerga. Não inclui chaves de acesso
 // biométrico (webauthn_credentials), que não servem para restaurar dados.
 export const dynamic = "force-dynamic";
@@ -13,6 +14,10 @@ const TABELAS = [
   "equipments",
   "categories",
   "tags",
+  "cartoes",
+  "aplicadores",
+  "aplicador_montagens",
+  "bloqueios_equipamento",
   "clients",
   "client_tags",
   "calendar_events",
@@ -25,6 +30,16 @@ const TABELAS = [
   "tasks",
   "contratos_emitidos",
   "movimentacoes",
+  "creditos_cliente",
+  "locacao_contagens",
+  "reserva_contagens",
+  "planejamentos",
+  "convites_cadastro",
+  "cadastros_recebidos",
+  "agenda_envios",
+  "orcamentos_pessoais",
+  "insights",
+  "assistente_memoria",
 ];
 
 const PAGINA = 1000;
@@ -40,8 +55,8 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
 
-  const { data: perfil } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!perfil?.is_admin) return NextResponse.json({ erro: "Só administrador pode baixar o backup." }, { status: 403 });
+  const { data: perfil } = await supabase.from("profiles").select("is_admin, active").eq("id", user.id).single();
+  if (!perfil?.is_admin || !perfil.active) return NextResponse.json({ erro: "Só administrador pode baixar o backup." }, { status: 403 });
 
   const tabelas: Record<string, unknown[]> = {};
   const contagens: Record<string, number> = {};
@@ -69,7 +84,7 @@ export async function GET() {
     null,
     1
   );
-  const nome = `backup-harmonize-${agora.toISOString().slice(0, 10)}.json`;
+  const nome = `backup-harmonize-${hojeLocal(agora)}.json`;
 
   return new NextResponse(corpo, {
     headers: {

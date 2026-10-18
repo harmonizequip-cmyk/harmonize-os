@@ -27,11 +27,13 @@ export default async function AppLayout({
 
   if (!user) redirect("/login");
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("name, permissions, is_admin, somente_leitura, cliente_id")
-    .eq("id", user.id)
-    .single();
+  // Perfil, faixa do modo teste e configurações de preço saem juntos (antes eram três idas
+  // ao banco em fila, a cada tela).
+  const [{ data: profile, error: profileError }, { data: testModeRow }, settings] = await Promise.all([
+    supabase.from("profiles").select("name, permissions, is_admin, somente_leitura, cliente_id").eq("id", user.id).single(),
+    supabase.from("settings").select("test_mode").eq("id", true).single(),
+    fetchSettings(supabase),
+  ]);
 
   // Login de cliente só tem o Planejador dela (/portal).
   if (profile?.cliente_id) redirect("/portal");
@@ -53,12 +55,10 @@ export default async function AppLayout({
   // aparece em todas as telas, não só em Configurações. O select falha
   // silenciosamente enquanto a migração do modo teste não tiver rodado,
   // e nesse caso simplesmente não há faixa nenhuma.
-  const { data: testModeRow } = await supabase.from("settings").select("test_mode").eq("id", true).single();
   const testMode = !!testModeRow?.test_mode;
 
   // Lançar locação direto pelo "+" (Pedido 1 da auditoria) precisa da
-  // mesma config de preço/taxa que a ficha do cliente já usa.
-  const settings = await fetchSettings(supabase);
+  // mesma config de preço/taxa que a ficha do cliente já usa (settings, acima).
 
   return (
     <SomenteLeituraProvider valor={somenteLeitura}>

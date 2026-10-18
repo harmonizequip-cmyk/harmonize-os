@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DatabaseBackup } from "lucide-react";
+import { hojeLocal } from "@/lib/period";
 
 export const CHAVE_BACKUP = "harmonize-ultimo-backup";
 const CHAVE = CHAVE_BACKUP;
@@ -61,7 +62,7 @@ export default function BackupCard() {
       throw new Error(corpo?.erro ?? "Não consegui gerar o backup.");
     }
     const texto = await resposta.text();
-    const base = `backup-harmonize-${new Date().toISOString().slice(0, 10)}`;
+    const base = `backup-harmonize-${hojeLocal()}`;
     // O Compartilhar do Android costuma recusar .json; .txt passa e o
     // conteúdo é o mesmo (o script de restauração lê qualquer um dos dois).
     const json = new File([texto], `${base}.json`, { type: "application/json" });
@@ -112,7 +113,7 @@ export default function BackupCard() {
         throw new Error(corpo?.erro ?? "Não consegui gerar o backup.");
       }
       const blob = await resposta.blob();
-      const nome = `backup-harmonize-${new Date().toISOString().slice(0, 10)}.json`;
+      const nome = `backup-harmonize-${hojeLocal()}.json`;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

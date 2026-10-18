@@ -112,6 +112,7 @@ export default function FinanceiroClient({
   categories,
   clients,
   nomesCartoes = {},
+  filtrado = false,
   periodo,
   atingiuTeto,
   escopo = "harmonize",
@@ -121,6 +122,8 @@ export default function FinanceiroClient({
   categories: CategoryRow[];
   clients: ClientOption[];
   nomesCartoes?: Record<string, string>;
+  // Busca ou filtro ligado: compras do cartão aparecem uma a uma, não agrupadas por fatura.
+  filtrado?: boolean;
   periodo: Periodo;
   atingiuTeto: boolean;
   escopo?: "harmonize" | "pessoal";
@@ -162,7 +165,10 @@ export default function FinanceiroClient({
   }, [initialTransactions]);
 
   // As compras do cartão aparecem numa linha por fatura, que abre a tela Cartões.
-  const linhas = useMemo(() => agruparPorFatura(initialTransactions), [initialTransactions]);
+  const linhas = useMemo(
+    () => (filtrado ? initialTransactions.map((item) => ({ tipo: "lancamento" as const, item })) : agruparPorFatura(initialTransactions)),
+    [initialTransactions, filtrado]
+  );
 
   function baixarCsv() {
     exportarTabela(
@@ -456,7 +462,7 @@ export default function FinanceiroClient({
                   )}
                 </p>
                 <p className="mt-0.5 text-xs text-neutral-500">
-                  {formatDate(t.date)} · {t.categories?.name ?? "-"}
+                  {formatDate(t.data_compra ?? t.date)} · {t.categories?.name ?? "-"}
                   {t.clients?.name && (
                     <>
                       {" · "}

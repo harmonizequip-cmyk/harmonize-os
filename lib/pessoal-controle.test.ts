@@ -141,3 +141,12 @@ describe("fatura do cartão no vencimento", () => {
     expect(c[0]).toMatchObject({ categoria: "Mercado", atual: 3150, cartao: 3000 });
   });
 });
+
+describe("comparação com o mês passado com fatura no vencimento", () => {
+  it("conta a fatura inteira do mês passado, como conta a deste mês", () => {
+    const fatura = (date: string, amount: number): LinhaFinanceira => ({ type: "saida", amount, date, categoria: "Mercado", cartao_mov: "compra" });
+    // Hoje dia 15; a fatura do mês passado venceu dia 20 (depois do "mesmo dia") e mesmo assim entra.
+    const r = resumoDoMes([fatura("2026-10-02", 1000), fatura("2026-09-20", 900), s("2026-09-10", 100), s("2026-09-25", 500)], HOJE);
+    expect(r.saidasMesPassadoAteHoje).toBe(1000);
+  });
+});

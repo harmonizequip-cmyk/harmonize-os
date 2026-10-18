@@ -113,7 +113,7 @@ export default function EquipamentoCard({
             </p>
             <p className="mt-2 whitespace-nowrap text-base font-extrabold leading-none tabular-nums tracking-tight text-teal-700">{formatCurrency(receitaTotal)}</p>
             {pendenteTotal > 0 && (
-              <p className="mt-1 text-[12.5px] font-bold text-orange-500">Pendente: {formatCurrency(pendenteTotal)}</p>
+              <p className="mt-1 text-[12.5px] font-bold text-orange-500">Em aberto: {formatCurrency(pendenteTotal)}</p>
             )}
           </div>
           <span className="w-px bg-slate-100" />

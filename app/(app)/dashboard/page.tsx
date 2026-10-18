@@ -61,13 +61,19 @@ export default async function DashboardPage(
   // filtro já vem de dentro dela junto com a exclusão de locação
   // cancelada, e por isso o .eq("is_test", false) não aparece; onde lê a
   // tabela crua, o filtro continua explícito na consulta.
-  // Lançamentos do período filtrado, para os cards de Entradas/Saídas/Resultado e os gráficos
-  const { data: transactions } = await supabase
-    .from("transactions_contabilizaveis")
-    .select("id, type, amount, date, category_id, cartao_mov, categories(name)")
-    .eq("scope", "harmonize")
-    .gte("date", fromStr)
-    .lte("date", toStr);
+  // Lançamentos do período filtrado, para os gráficos (resultado, fluxo e categorias).
+  // Em páginas (o Supabase devolve no máximo 1000 linhas) e com erro visível: soma pela
+  // metade seria pior que a tela de erro.
+  const transactions = await buscarTodas((de, ate) =>
+    supabase
+      .from("transactions_contabilizaveis")
+      .select("id, type, amount, date, category_id, cartao_mov, categories(name)")
+      .eq("scope", "harmonize")
+      .gte("date", fromStr)
+      .lte("date", toStr)
+      .order("id")
+      .range(de, ate)
+  );
 
   // Todos os lançamentos históricos, para o Saldo acumulado (não depende do filtro de período)
   const allTimeTransactions = await buscarTodas((de, ate) =>
@@ -303,11 +309,13 @@ export default async function DashboardPage(
   }));
   const fixasMensais = despesasFixas.reduce((s, f) => s + (f.valor > 0 ? f.valor : 0), 0);
   // Faturas de cartão da Harmonize ainda não pagas (vencidas também contam).
-  const { data: faturasRaw } = await supabase
+  const { data: faturasRaw, error: erroFaturas } = await supabase
     .from("faturas_cartao")
     .select("vencimento, total_compras, total_pago")
     .eq("scope", "harmonize")
     .lte("vencimento", fim60);
+  // Sem as faturas a previsão sairia maior do que é.
+  if (erroFaturas) throw new Error(`Não consegui carregar as faturas do cartão: ${erroFaturas.message}`);
   const faturasAbertas = ((faturasRaw ?? []) as any[])
     .map((f) => ({ vencimento: f.vencimento as string, valor: Math.round((Number(f.total_compras) - Number(f.total_pago)) * 100) / 100 }))
     .filter((f) => f.valor > 0.009);
@@ -516,11 +524,6 @@ export default async function DashboardPage(
       categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
     }))
     .filter((t: any) => !ehCategoriaDeEmprestimo(t.categories?.name) && !foraDoResultadoPorCartao(t.cartao_mov));
-  const rows = normalizedRows;
-  const entradas = rows.filter((t) => t.type === "entrada").reduce((sum, t) => sum + Number(t.amount), 0);
-  const saidas = rows.filter((t) => t.type === "saida").reduce((sum, t) => sum + Number(t.amount), 0);
-  const resultado = entradas - saidas;
-
   // Compra no cartão só tira dinheiro quando a fatura é paga.
   const saldoTotal = (allTimeTransactions ?? []).filter((t: any) => !foraDoSaldo(t)).reduce(
     (sum, t) => sum + (t.type === "entrada" ? Number(t.amount) : -Number(t.amount)),
@@ -533,13 +536,6 @@ export default async function DashboardPage(
   // recebimento de locações de outros períodos), o que inflava o número.
   const valorLocacoesPeriodo = (equipmentRentals ?? []).reduce((sum, r) => sum + Number(r.calculated_value), 0);
   const ticketMedio = billableRentalsCount && billableRentalsCount > 0 ? valorLocacoesPeriodo / billableRentalsCount : 0;
-
-  const cards = [
-    { label: "Saldo", value: saldoTotal },
-    { label: "Entradas", value: entradas },
-    { label: "Saídas", value: saidas },
-    { label: "Resultado", value: resultado },
-  ];
 
   const EQUIPMENT_COLORS: Record<string, string> = {
     hipro_1: "bg-brand-teal",
@@ -793,7 +789,7 @@ export default async function DashboardPage(
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-neutral-200">
                       <div className="h-full rounded-full bg-brand-teal" style={{ width: `${Math.min(100, Math.round(eq.ocupacao.pct * 100))}%` }} />
                     </div>
-                    {eq.pendente > 0 && <p className="mt-1 text-[11px] font-semibold text-amber-600">Pendente {formatCurrency(eq.pendente)}</p>}
+                    {eq.pendente > 0 && <p className="mt-1 text-[11px] font-semibold text-amber-600">Em aberto {formatCurrency(eq.pendente)}</p>}
                   </Link>
                 ))}
               </div>

@@ -3,7 +3,7 @@
 // WhatsApp da cliente, no botão de cobrar).
 // Página que abre quando o app é aberto sem sinal (mostra a cópia da agenda
 // guardada no aparelho). Fica guardada desde a instalação.
-const CAIXA_OFFLINE = "harmonize-offline-v1";
+const CAIXA_OFFLINE = "harmonize-offline-v2";
 const PAGINA_OFFLINE = "/sem-internet.html";
 
 self.addEventListener("install", (event) => {
@@ -15,14 +15,32 @@ self.addEventListener("install", (event) => {
       .then(() => self.skipWaiting())
   );
 });
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+// Caixas que este service worker usa; as de versões antigas são apagadas ao ativar.
+const CAIXAS_EM_USO = [CAIXA_OFFLINE, "harmonize-compartilhado"];
+self.addEventListener("activate", (event) =>
+  event.waitUntil(
+    caches
+      .keys()
+      .then((nomes) => Promise.all(nomes.filter((n) => !CAIXAS_EM_USO.includes(n)).map((n) => caches.delete(n))))
+      .catch(() => {})
+      .then(() => self.clients.claim())
+  )
+);
+
+// Sinal fraco: se a tela não responde em 10 s, mostra a agenda guardada em vez de travar.
+function comPrazo(promessa, ms) {
+  return new Promise((ok, falha) => {
+    const t = setTimeout(() => falha(new Error("tempo")), ms);
+    promessa.then((r) => (clearTimeout(t), ok(r)), (e) => (clearTimeout(t), falha(e)));
+  });
+}
 
 // Abrir uma tela sem internet: em vez da tela de erro do Chrome, mostra a
 // agenda guardada. Com internet nada muda (a resposta vem da rede).
 self.addEventListener("fetch", (event) => {
   if (event.request.mode !== "navigate" || event.request.method !== "GET") return;
   event.respondWith(
-    fetch(event.request).catch(async () => {
+    comPrazo(fetch(event.request), 10000).catch(async () => {
       const guardada = await caches.match(PAGINA_OFFLINE);
       return guardada || new Response("Sem internet.", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     })

@@ -5,7 +5,7 @@ import { resolverPeriodo } from "@/lib/period";
 // muito abaixo disso; o teto existe para uma consulta absurda não travar
 // a tela. Quando ele é atingido, a tela avisa em vez de mostrar um total
 // menor do que a realidade calado, que era o risco do limit(200) antigo.
-export const TETO = 2000;
+export const TETO = 3000;
 
 export interface FiltrosFinanceiro {
   period?: string;
@@ -33,32 +33,52 @@ export async function carregarLancamentos(
   // Lê da view transactions_contabilizaveis, não da tabela transactions.
   // A view exclui modo teste e lançamento preso a locação cancelada, que
   // é a mesma regra usada por Dashboard e Relatórios.
-  let consulta = supabase
-    .from("transactions_contabilizaveis")
-    .select(
-      "id, type, description, amount, payment_method, date, data_compra, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
-    )
-    .eq("scope", escopo)
-    .gte("date", periodo.inicio)
-    .lte("date", periodo.fim);
+  // Uma consulta nova por página: o construtor do Supabase acumula ordem e filtros.
+  const montarConsulta = () => {
+    let consulta = supabase
+      .from("transactions_contabilizaveis")
+      .select(
+        "id, type, description, amount, payment_method, date, data_compra, category_id, client_id, rental_id, calendar_event_id, is_test, conta_no_lucro, vinculo_id, cartao_mov, cartao_id, fatura_ref, compra_grupo, categories(name), clients(name)"
+      )
+      .eq("scope", escopo)
+      .gte("date", periodo.inicio)
+      .lte("date", periodo.fim);
 
-  // Cada filtro vira condição na consulta, e não peneira no navegador:
-  // assim a tela nunca baixa o que não vai mostrar, e o total sai da
-  // mesma consulta que a lista.
-  if (searchParams.tipo === "entrada" || searchParams.tipo === "saida") {
-    consulta = consulta.eq("type", searchParams.tipo);
-  }
-  if (searchParams.categoria) consulta = consulta.eq("category_id", searchParams.categoria);
-  if (searchParams.pagamento) consulta = consulta.eq("payment_method", searchParams.pagamento);
-  if (searchParams.cliente) consulta = consulta.eq("client_id", searchParams.cliente);
-  if (searchParams.q?.trim()) {
-    // Escapa % e _ para quem digitar esses caracteres não virar curinga.
-    const termo = searchParams.q.trim().replace(/[%_]/g, "\\$&");
-    consulta = consulta.ilike("description", `%${termo}%`);
-  }
+    // Cada filtro vira condição na consulta, e não peneira no navegador:
+    // assim a tela nunca baixa o que não vai mostrar, e o total sai da
+    // mesma consulta que a lista.
+    if (searchParams.tipo === "entrada" || searchParams.tipo === "saida") {
+      consulta = consulta.eq("type", searchParams.tipo);
+    }
+    if (searchParams.categoria) consulta = consulta.eq("category_id", searchParams.categoria);
+    if (searchParams.pagamento) consulta = consulta.eq("payment_method", searchParams.pagamento);
+    if (searchParams.cliente) consulta = consulta.eq("client_id", searchParams.cliente);
+    if (searchParams.q?.trim()) {
+      // Escapa % e _ para quem digitar esses caracteres não virar curinga.
+      const termo = searchParams.q.trim().replace(/[%_]/g, "\\$&");
+      consulta = consulta.ilike("description", `%${termo}%`);
+    }
+    return consulta;
+  };
+
+  // O Supabase devolve no máximo 1000 linhas por vez: busca em páginas até o teto.
+  const buscarPaginas = async () => {
+    const linhas: any[] = [];
+    for (let de = 0; de < TETO; de += 1000) {
+      const { data, error } = await montarConsulta()
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(de, Math.min(de + 999, TETO - 1));
+      if (error) return { data: null, error };
+      linhas.push(...(data ?? []));
+      if ((data ?? []).length < 1000) break;
+    }
+    return { data: linhas, error: null };
+  };
 
   const [{ data: transactions, error: erroLancamentos }, { data: categories }, { data: clients }, { data: cartoes }] = await Promise.all([
-    consulta.order("date", { ascending: false }).order("created_at", { ascending: false }).limit(TETO),
+    buscarPaginas(),
     escopo === "harmonize"
       ? supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name")
       : supabase.from("categories").select("id, name, type, scope").or("scope.eq.pessoal,and(scope.eq.harmonize,type.eq.saida)").order("name"),
@@ -115,5 +135,8 @@ export async function carregarLancamentos(
     nomesCartoes: Object.fromEntries(((cartoes ?? []) as { id: string; nome: string }[]).map((c) => [c.id, c.nome])) as Record<string, string>,
     periodo,
     atingiuTeto: normalizedTransactions.length >= TETO,
+    // Com busca ou filtro (além de período e tipo), as compras do cartão aparecem uma a uma:
+    // uma linha "Fatura" com só parte das compras confundiria o total.
+    filtrado: Boolean(searchParams.q?.trim() || searchParams.categoria || searchParams.pagamento || searchParams.cliente),
   };
 }

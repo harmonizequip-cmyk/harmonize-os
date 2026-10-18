@@ -5,7 +5,7 @@ import { foraDoSaldo } from "@/lib/cartao";
 import { buscarTodas } from "@/lib/buscar-todas";
 import { fetchSettings } from "@/lib/settings";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { hojeLocal } from "@/lib/period";
+import { hojeLocal, ultimoDiaDoMes } from "@/lib/period";
 import { contaNoResultado, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
 import { avisosPessoais, comparacaoPorCategoria, mesComDesvio, resumoDoMes, usoDosOrcamentos, type FaturaPessoal } from "@/lib/pessoal-controle";
 import { visualDaCategoria } from "@/lib/pessoal-icones";
@@ -34,15 +34,30 @@ export default async function PessoalInicioPage() {
     await Promise.all([
       fetchSettings(supabase),
       buscarTodas((de, ate) => supabase.from("transactions").select("type, amount, cartao_mov, payment_method").eq("scope", "pessoal").eq("is_test", false).order("id").range(de, ate)).then((data) => ({ data })),
+      // Três meses para trás até o fim do mês (parcelas futuras não entram em nenhuma conta daqui),
+      // em páginas: o Supabase devolve no máximo 1000 linhas por vez.
+      buscarTodas((de, ate) =>
+        supabase
+          .from("transactions_contabilizaveis")
+          .select("id, type, amount, date, description, cartao_mov, cartao_id, fatura_ref, created_at, categories(name)")
+          .eq("scope", "pessoal")
+          .gte("date", desde)
+          .lte("date", ultimoDiaDoMes(hoje))
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(de, ate)
+      ).then((data) => ({ data })),
       supabase
-        .from("transactions_contabilizaveis")
-        .select("id, type, amount, date, description, cartao_mov, cartao_id, fatura_ref, created_at, categories(name)")
+        .from("faturas_cartao")
+        .select("cartao_id, fatura_ref, vencimento, total_compras, total_pago")
         .eq("scope", "pessoal")
-        .gte("date", desde)
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(6000),
-      supabase.from("faturas_cartao").select("cartao_id, fatura_ref, vencimento, total_compras, total_pago").eq("scope", "pessoal").order("vencimento"),
+        .order("vencimento")
+        .then((r) => {
+          // Sem as faturas a tela diria "Tudo sob controle" sem saber.
+          if (r.error) throw new Error(`Não consegui carregar as faturas: ${r.error.message}`);
+          return r;
+        }),
       supabase.from("cartoes").select("id, nome"),
       supabase.from("categories").select("id, name, type").eq("scope", "harmonize").eq("type", "saida").order("name"),
       supabase.from("clients").select("id, name").order("name"),
@@ -73,9 +88,12 @@ export default async function PessoalInicioPage() {
   const fixas = settings.despesasFixas.filter((f) => f.tipo === "pessoal");
   const totalFixas = fixas.reduce((s, f) => s + f.valor, 0);
   const nomeCartao = new Map(((cartoesRaw ?? []) as any[]).map((c) => [c.id, c.nome as string]));
+  // Faturas que pesam agora: as vencidas e as que vencem até o fim do mês que vem. As parcelas
+  // dos meses seguintes não entram no número "Faturas" nem no aviso contra o saldo.
+  const limiteFaturas = ultimoDiaDoMes(`${mesComDesvio(hoje, 1)}-01`);
   const faturas: FaturaPessoal[] = ((faturasRaw ?? []) as any[])
     .map((f) => ({ cartao: nomeCartao.get(f.cartao_id) ?? "Cartão", vencimento: f.vencimento as string, falta: Number(f.total_compras) - Number(f.total_pago) }))
-    .filter((f) => f.falta > 0.009);
+    .filter((f) => f.falta > 0.009 && f.vencimento <= limiteFaturas);
   const faturasAbertas = faturas.reduce((s, f) => s + f.falta, 0);
 
   const ultimoLancamento = historico.length

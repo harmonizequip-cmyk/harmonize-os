@@ -55,7 +55,12 @@ export function resumoDoMes(linhas: LinhaFinanceira[], hoje: string): ResumoMesP
   const saidas = somaSaidas(doMes, () => true);
   // A fatura do cartão já é o valor do mês: só o resto segue o ritmo dos dias.
   const cartao = somaSaidas(doMes, (l) => l.cartao_mov === "compra");
-  const passadoAteHoje = somaSaidas(linhas, (l) => l.date.slice(0, 7) === passado && Number(l.date.slice(8, 10)) <= dia);
+  // Mesmo ponto do mês passado: o dia a dia até hoje, mais a fatura inteira (como neste mês,
+  // que conta a fatura toda mesmo antes do vencimento).
+  const passadoAteHoje = somaSaidas(
+    linhas,
+    (l) => l.date.slice(0, 7) === passado && (l.cartao_mov === "compra" || Number(l.date.slice(8, 10)) <= dia)
+  );
   const projecao = dia >= 1 ? cartao + ((saidas - cartao) / dia) * total : saidas;
   return {
     entradas: r2(entradas),
