@@ -762,11 +762,33 @@ export default function CalculadoraLocacaoModal({
     });
   }, [isMentoria, mentoriaCalc, pricing, tudoNoCredito, shots, custoManualPorDisparo, kmIdaNumber, itens, reservationFeeStatus, feeDoResumo]);
 
+  // Deslocamento lançado na reserva: fica cobrado à parte na locação (soma no saldo a receber)
+  // e pode ser recebido junto aqui. Digitar km acima troca pelo cálculo da calculadora.
+  const [deslocReserva, setDeslocReserva] = useState(0);
+  useEffect(() => {
+    let active = true;
+    if (!reservaIdFinalizar) return;
+    supabase
+      .from("calendar_events")
+      .select("valor_deslocamento")
+      .eq("id", reservaIdFinalizar)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setDeslocReserva(Number(data?.valor_deslocamento ?? 0));
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservaIdFinalizar]);
+  const deslocReservaAParte = kmIdaNumber > 0 ? 0 : deslocReserva;
+  const totalCobrar = resumo ? Math.round((resumo.totalAPagarAgora + deslocReservaAParte) * 100) / 100 : 0;
+
   function preencherValorTotal(id: string) {
     if (!resumo) return;
     updatePagamento(id, {
-      valor: resumo.totalAPagarAgora,
-      valorTexto: resumo.totalAPagarAgora > 0 ? String(resumo.totalAPagarAgora).replace(".", ",") : "",
+      valor: totalCobrar,
+      valorTexto: totalCobrar > 0 ? String(totalCobrar).replace(".", ",") : "",
     });
   }
 
@@ -775,14 +797,14 @@ export default function CalculadoraLocacaoModal({
     () => Math.round(pagamentos.reduce((acc, p) => acc + (p.forma === "permuta" ? 0 : p.valor || 0), 0) * 100) / 100,
     [pagamentos]
   );
-  const saldoAposPagamentos = resumo ? Math.round((resumo.totalAPagarAgora - somaPagamentos) * 100) / 100 : 0;
+  const saldoAposPagamentos = resumo ? Math.round((totalCobrar - somaPagamentos) * 100) / 100 : 0;
   // Dinheiro (pix, cartão, espécie) acima do total: o banco recusaria as últimas linhas depois de
   // criar a locação (meio registrada). Permuta acima do total vira crédito e pode.
-  const dinheiroExcedeTotal = !!resumo && somaDinheiro - resumo.totalAPagarAgora > 0.009;
+  const dinheiroExcedeTotal = !!resumo && somaDinheiro - totalCobrar > 0.009;
   // Permuta abate o que sobra depois do dinheiro; o que passar vira crédito em R$.
   const divisaoPermuta = useMemo(() => {
     const mapa: Record<string, { abate: number; credito: number }> = {};
-    let restante = resumo ? Math.max(0, Math.round((resumo.totalAPagarAgora - somaDinheiro) * 100) / 100) : 0;
+    let restante = resumo ? Math.max(0, Math.round((totalCobrar - somaDinheiro) * 100) / 100) : 0;
     let creditoTotal = 0;
     for (const p of pagamentos) {
       if (p.forma !== "permuta" || !(p.valor > 0)) continue;
@@ -2076,8 +2098,18 @@ export default function CalculadoraLocacaoModal({
               <div className="mt-4 rounded-xl bg-neutral-900 p-3 text-sm text-white">
                 <div className="flex items-center justify-between">
                   <span>Total a cobrar do cliente</span>
-                  <span className="text-lg font-semibold">{formatCurrency(resumo.totalAPagarAgora)}</span>
+                  <span className="text-lg font-semibold">{formatCurrency(totalCobrar)}</span>
                 </div>
+                {deslocReservaAParte > 0 && (
+                  <p className="mt-1 text-xs text-white/70">
+                    Inclui {formatCurrency(deslocReservaAParte)} de deslocamento lançado na reserva (entra no caixa quando for pago).
+                  </p>
+                )}
+                {kmIdaNumber > 0 && deslocReserva > 0 && (
+                  <p className="mt-1 text-xs text-white/70">
+                    O deslocamento da reserva ({formatCurrency(deslocReserva)}) foi trocado pelo calculado aqui.
+                  </p>
+                )}
               </div>
 
               {previewWhatsappText && (
@@ -2289,7 +2321,7 @@ export default function CalculadoraLocacaoModal({
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         {dinheiroExcedeTotal && !error && resumo && (
           <p className="mt-3 text-sm text-red-600">
-            Os pagamentos passam do total em {formatCurrency(Math.round((somaDinheiro - resumo.totalAPagarAgora) * 100) / 100)}. Ajuste os valores para salvar.
+            Os pagamentos passam do total em {formatCurrency(Math.round((somaDinheiro - totalCobrar) * 100) / 100)}. Ajuste os valores para salvar.
           </p>
         )}
 

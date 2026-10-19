@@ -139,7 +139,7 @@ Crédito de disparos abate os disparos da próxima locação antes do cálculo d
 Permuta (forma de pagamento 'permuta'): o parceiro paga com produto ou serviço. Da empresa sai em "Outros"; pessoal sai como "Retiradas" e vira gasto no Pessoal. Lançamento com payment_method = 'permuta' não é dinheiro: fica fora do saldo do caixa (mas conta em Entradas/Saídas).
 
 ## Lucro
-View rentals_lucro: rental_id, client_id, cliente, event_date, calculated_value, valor_deslocamento, total_pago, total_despesas, lucro_liquido.
+View rentals_lucro: rental_id, client_id, cliente, event_date, calculated_value, valor_deslocamento, total_pago, total_despesas, lucro_liquido, valor_total. Deslocamento cobrado à parte (deslocamento_incluso_no_valor = false) soma no valor devido (rentals_situacao_pagamento.valor_devido e saldo) e no lucro; ele não vira lançamento próprio, entra no caixa pelo pagamento da locação.
 View clientes_lucro: client_id, cliente, locacoes, faturado, recebido, despesas, lucro_liquido.
 Locação cancelada não tem despesa.
 

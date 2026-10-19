@@ -213,12 +213,11 @@ export default function EditarLocacaoModal({
   const [addingPayment, setAddingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Leva AC: lucro = o que de fato entrou (pagamentos + ajuda de custo lançada
-  // à parte) menos os custos ligados à locação. Ajuda de custo que já está
-  // somada no valor da locação não entra de novo: os pagamentos já a cobrem.
+  // Lucro = o que de fato entrou (pagamentos, que cobrem também o deslocamento
+  // cobrado à parte quando ele é pago) menos os custos ligados à locação.
   const totalRecebido = payments.reduce((acc, p) => acc + Number(p.valor ?? 0), 0) + creditoTaxa;
   const ajudaCustoLancada = rental.deslocamento_incluso_no_valor ? 0 : Number(rental.valor_deslocamento ?? 0);
-  const lucroLiquido = totalRecebido + ajudaCustoLancada - totalDespesas;
+  const lucroLiquido = totalRecebido - totalDespesas;
 
   // Leva AD: custo (gasolina etc.) ligado a esta locação, lançado aqui mesmo.
   const [categoriasSaida, setCategoriasSaida] = useState<{ id: string; name: string }[]>([]);
@@ -887,7 +886,9 @@ export default function EditarLocacaoModal({
               <div className="space-y-0.5 text-neutral-700">
                 <div className="flex justify-between"><span>Recebido da locação{creditoTaxa > 0 ? " (inclui taxa de reserva)" : ""}</span><span>{formatCurrency(totalRecebido)}</span></div>
                 {ajudaCustoLancada > 0 && (
-                  <div className="flex justify-between"><span>Ajuda de custo (deslocamento)</span><span>{formatCurrency(ajudaCustoLancada)}</span></div>
+                  <p className="text-xs text-neutral-500">
+                    O deslocamento cobrado à parte ({formatCurrency(ajudaCustoLancada)}) soma no saldo a receber e entra aqui quando for pago.
+                  </p>
                 )}
                 <div className="flex justify-between"><span>Custos (gasolina etc.)</span><span>− {formatCurrency(totalDespesas)}</span></div>
                 <div className={`flex justify-between border-t border-neutral-200 pt-1 font-semibold ${lucroLiquido >= 0 ? "text-emerald-600" : "text-red-500"}`}>
@@ -962,9 +963,9 @@ export default function EditarLocacaoModal({
               />
             </div>
             <p className="mt-1 text-xs text-neutral-400">
-              Valor que o cliente pagou de ajuda de custo pelo deslocamento, cobrado à parte do valor da locação. Entra
-              no financeiro como entrada "Deslocamento" (mesma forma de pagamento e data da locação), mas não conta no
-              faturamento. Deixe em branco (ou zere) para remover.
+              Ajuda de custo do deslocamento, cobrada à parte do valor da locação. Soma no saldo a receber e entra no
+              caixa quando a cliente pagar (pelo Receber pagamento). Conta no lucro da locação. Deixe em branco (ou
+              zere) para remover.
             </p>
             {valorDeslocamentoNumber > 0 && (
               <label className="mt-2 flex items-start gap-2 text-xs text-neutral-500">
@@ -975,8 +976,7 @@ export default function EditarLocacaoModal({
                   className="mt-0.5"
                 />
                 <span>
-                  Esse valor já está somado no valor da locação (veio da calculadora). Marcado, não lança no
-                  financeiro, para não contar duas vezes.
+                  Esse valor já está somado no valor da locação (veio da calculadora). Marcado, não soma de novo no saldo, para não cobrar duas vezes.
                 </span>
               </label>
             )}

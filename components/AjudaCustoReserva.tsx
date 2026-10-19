@@ -98,8 +98,8 @@ export default function AjudaCustoReserva({ eventId }: { eventId: string }) {
             </button>
           </div>
           <p className="mt-1 text-[11px] text-neutral-400">
-            Valor que o cliente paga pelo deslocamento, à parte da locação. Ao finalizar, segue junto para a locação.
-            O km é só registro.
+            Valor que o cliente paga pelo deslocamento, à parte da locação. Ao finalizar, soma no total a receber e
+            entra no caixa quando for pago. O km é só registro.
           </p>
           {ok && <p className="mt-1 text-xs text-brand-teal">Salvo.</p>}
         </>

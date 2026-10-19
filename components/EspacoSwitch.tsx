@@ -33,12 +33,12 @@ export default function EspacoSwitch() {
       ativo
         ? pessoalBotao
           ? "bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white shadow-[0_8px_18px_-8px_rgb(124_58_237/0.8)]"
-          : "bg-white text-slate-900 shadow-sm"
+          : "bg-gradient-to-r from-teal-600 to-emerald-500 text-white shadow-[0_8px_18px_-8px_rgb(13_148_136/0.8)]"
         : "text-slate-500"
     }`;
   return (
     <div className="mb-4">
-      <div className={`flex rounded-2xl p-1 ${pessoal ? "bg-violet-100/80" : "bg-neutral-200/70"}`}>
+      <div className={`flex rounded-2xl p-1 ${pessoal ? "bg-violet-100/80" : "bg-teal-100/70"}`}>
         <button type="button" onClick={() => ir("harmonize")} className={estilo(!pessoal)}>
           Harmonize
         </button>

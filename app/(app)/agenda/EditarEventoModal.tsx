@@ -1131,9 +1131,7 @@ export default function EditarEventoModal({
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-neutral-400">
-                  Valor que o cliente pagou de ajuda de custo pelo deslocamento, cobrado à parte do valor da locação.
-                  Entra no financeiro como entrada "Deslocamento" (mesma forma de pagamento e data da locação), mas não
-                  conta no faturamento. Deixe em branco (ou zere) para remover.
+                  Ajuda de custo do deslocamento, cobrada à parte do valor da locação. Soma no saldo a receber e entra no caixa quando a cliente pagar (pelo Receber pagamento). Conta no lucro da locação. Deixe em branco (ou zere) para remover.
                 </p>
                 {valorDeslocamentoNumber > 0 && (
                   <label className="mt-2 flex items-start gap-2 text-xs text-neutral-500">
@@ -1144,8 +1142,7 @@ export default function EditarEventoModal({
                       className="mt-0.5"
                     />
                     <span>
-                      Esse valor já está somado no valor da locação (veio da calculadora). Marcado, não lança no
-                      financeiro, para não contar duas vezes.
+                      Esse valor já está somado no valor da locação (veio da calculadora). Marcado, não soma de novo no saldo, para não cobrar duas vezes.
                     </span>
                   </label>
                 )}

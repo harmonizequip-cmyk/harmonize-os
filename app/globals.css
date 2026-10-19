@@ -27,16 +27,18 @@ body {
    elas ao mesmo padrão sem mexer em cada arquivo. Tela nova usa a classe
    .cartao ou as peças de components/ui/Visual.tsx.
    ============================================================ */
+/* Harmonize (19/10/2026, pedido do dono): fundo e sombras puxados para o
+   verde-turquesa da borboleta, como o Pessoal tem o violeta. */
 body {
-  background-color: #f4f6f9;
+  background-color: #eff6f5;
 }
 .cartao {
   position: relative;
   overflow: hidden;
   border-radius: 1.75rem;
   background-color: #fff;
-  border: 1px solid rgb(226 232 240 / 0.7);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03), 0 12px 32px -18px rgb(15 23 42 / 0.18);
+  border: 1px solid rgb(204 236 231 / 0.8);
+  box-shadow: 0 1px 2px rgb(13 94 87 / 0.04), 0 12px 32px -18px rgb(13 94 87 / 0.24);
 }
 .bg-white\/70,
 .bg-white\/80 {
