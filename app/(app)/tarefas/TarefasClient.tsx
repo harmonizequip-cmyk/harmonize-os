@@ -13,6 +13,8 @@ import { linkEvento } from "@/lib/atalhos";
 
 import { hojeLocal } from "@/lib/period";
 import { confirmar, avisar } from "@/components/Dialogos";
+import HeroTela from "@/components/ui/HeroTela";
+import { AlarmClock, CheckCircle2 } from "lucide-react";
 export interface TarefaRow {
   id: string;
   client_id: string | null;
@@ -192,7 +194,17 @@ export default function TarefasClient({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-neutral-900">Tarefas</h1>
+      <HeroTela
+        etiqueta="Tarefas"
+        rotulo="Para hoje e atrasadas"
+        valor={filaDeHoje.length}
+        apoio={`${pendentes.length} ${pendentes.length === 1 ? "tarefa pendente" : "tarefas pendentes"} no total`}
+        tom={filaDeHoje.some((t) => t.due_date < todayStr) ? "alerta" : "ok"}
+        chips={[
+          { texto: `${filaDeHoje.filter((t) => t.due_date < todayStr).length} atrasadas`, icone: AlarmClock, tom: filaDeHoje.some((t) => t.due_date < todayStr) ? "ruim" : "neutro" },
+          { texto: `${concluidas.length} concluídas`, icone: CheckCircle2, tom: "bom" },
+        ]}
+      />
 
       {filaDeHoje.length > 0 && (
         <button

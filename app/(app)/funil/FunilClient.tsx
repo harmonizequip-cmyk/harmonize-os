@@ -31,6 +31,8 @@ import {
 import { hojeLocal } from "@/lib/period";
 import { CLIENT_STAGES, type ClientStageKey } from "@/lib/funil-clientes";
 import { avisar } from "@/components/Dialogos";
+import HeroTela from "@/components/ui/HeroTela";
+import { CalendarClock, MessageCircle, Sparkles } from "lucide-react";
 export const STAGES = [
   { key: "lead", label: "Novo contato", dot: "bg-neutral-400" },
   { key: "contato", label: "Tentativa de contato", dot: "bg-brand-blue" },
@@ -458,7 +460,17 @@ export default function FunilClient({
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900">Funil de vendas</h1>
+      <HeroTela
+        etiqueta="Funil de vendas"
+        rotulo="Leads em andamento"
+        valor={leads.filter((l) => !l.is_client && l.stage !== "desqualificado").length}
+        apoio={`${totalClientes} ${totalClientes === 1 ? "cliente" : "clientes"} no funil de clientes`}
+        chips={[
+          { texto: `${leads.filter((l) => !l.is_client && l.stage === "em_contato").length} em contato`, icone: MessageCircle },
+          { texto: `${leads.filter((l) => !l.is_client && l.stage === "qualificado").length} com interesse`, icone: Sparkles },
+          { texto: `${leads.filter((l) => !l.is_client && l.stage === "agendado").length} agendando`, icone: CalendarClock, tom: "bom" },
+        ]}
+      />
 
       <div className="flex gap-1 rounded-xl bg-neutral-100 p-1 sm:w-fit">
         {(

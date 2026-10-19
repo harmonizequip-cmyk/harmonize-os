@@ -3,6 +3,8 @@
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import { useMemo } from "react";
 import Link from "next/link";
+import { Wallet, Zap } from "lucide-react";
+import HeroTela from "@/components/ui/HeroTela";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
@@ -176,19 +178,31 @@ export default function LocacoesClient({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-neutral-900">
-          Locações realizadas
-        </h1>
-        <p className="mt-0.5 text-xs text-neutral-500">
-          O que aconteceu e quanto valeu. Para ver quem confirmou, cancelou ou apagou cada registro,
-          o histórico de ações fica em{" "}
-          <Link href="/movimentacoes" className="text-brand-teal underline underline-offset-2">
-            Movimentações
-          </Link>
-          .
-        </p>
-      </div>
+      <HeroTela
+        etiqueta={`Locações realizadas · ${periodo.rotulo}`}
+        rotulo="Recebido"
+        valor={formatCurrency(totais.recebido)}
+        apoio={`Lucro ${formatCurrency(totais.lucro)}`}
+        anel={{
+          fracao: totais.recebido + totais.aReceber > 0 ? totais.recebido / (totais.recebido + totais.aReceber) : 0,
+          texto:
+            totais.recebido + totais.aReceber > 0 ? `${Math.round((totais.recebido / (totais.recebido + totais.aReceber)) * 100)}%` : "-",
+          legenda: "recebido",
+        }}
+        tom={totais.aReceber > 0 ? "alerta" : "ok"}
+        chips={[
+          { texto: `A receber ${formatCurrency(totais.aReceber)}`, icone: Wallet, tom: totais.aReceber > 0 ? "ruim" : "bom" },
+          { texto: `${totais.disparos.toLocaleString("pt-BR")} disparos`, icone: Zap },
+          ...(totais.cancelado > 0 ? [{ texto: `Cancelado ${formatCurrency(totais.cancelado)}` }] : []),
+        ]}
+      />
+      <p className="px-1 text-xs text-neutral-500">
+        Para ver quem confirmou, cancelou ou apagou cada registro, o histórico de ações fica em{" "}
+        <Link href="/movimentacoes" className="text-brand-teal underline underline-offset-2">
+          Movimentações
+        </Link>
+        .
+      </p>
 
       <FiltroBarra
         periodoPadrao="mes"
@@ -243,39 +257,6 @@ export default function LocacoesClient({
           incompletos. Escolha um período menor.
         </div>
       )}
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Recebido</p>
-          <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
-            {formatCurrency(totais.recebido)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber</p>
-          <p className="mt-0.5 text-sm font-semibold text-amber-600 sm:text-base">
-            {formatCurrency(totais.aReceber)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Lucro</p>
-          <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
-            {formatCurrency(totais.lucro)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Disparos</p>
-          <p className="mt-0.5 text-sm font-semibold text-neutral-700 sm:text-base">
-            {totais.disparos.toLocaleString("pt-BR")}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Cancelado</p>
-          <p className="mt-0.5 text-sm font-semibold text-neutral-400 sm:text-base">
-            {formatCurrency(totais.cancelado)}
-          </p>
-        </div>
-      </div>
 
       {/* Celular */}
       <div className="space-y-2 sm:hidden">

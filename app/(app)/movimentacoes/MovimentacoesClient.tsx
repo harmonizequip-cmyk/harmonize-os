@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+import HeroTela from "@/components/ui/HeroTela";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
 import { exportarTabela } from "@/lib/exportar-planilha";
@@ -48,18 +50,20 @@ export default function MovimentacoesClient({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-neutral-900">Movimentações</h1>
-        <p className="mt-0.5 text-sm text-neutral-500">
-          Tudo que foi criado, editado, confirmado, reagendado, cancelado ou excluído, com data, hora e autor.
-          Este histórico não pode ser editado nem apagado por ninguém. Para ver o que aconteceu e
-          quanto valeu, o histórico de{" "}
-          <Link href="/locacoes" className="text-brand-teal underline underline-offset-2">
-            Locações
-          </Link>{" "}
-          é a tela ao lado.
-        </p>
-      </div>
+      <HeroTela
+        etiqueta={`Movimentações · ${periodo.rotulo}`}
+        rotulo="Registros no período"
+        valor={filtradas.length.toLocaleString("pt-BR")}
+        apoio="Tudo que foi criado, editado, confirmado, reagendado, cancelado ou excluído, com data, hora e autor. Ninguém edita nem apaga este histórico."
+        chips={[{ texto: "Só leitura", icone: ShieldCheck }]}
+      />
+      <p className="px-1 text-xs text-neutral-500">
+        Para ver o que aconteceu e quanto valeu, o histórico de{" "}
+        <Link href="/locacoes" className="text-brand-teal underline underline-offset-2">
+          Locações
+        </Link>{" "}
+        é a tela ao lado.
+      </p>
 
       <FiltroBarra
         periodoPadrao="mes"

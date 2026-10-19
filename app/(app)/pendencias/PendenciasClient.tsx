@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { Clock, Users, Wallet } from "lucide-react";
+import HeroTela from "@/components/ui/HeroTela";
 import { buildWhatsAppLink, formatCurrency, formatDate } from "@/lib/format";
 import { buildCobrancaMessage, buildCobrancaTaxaMessage } from "@/lib/cobranca";
 import { exportarTabela } from "@/lib/exportar-planilha";
@@ -73,23 +75,29 @@ export default function PendenciasClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Pendências de pagamento</h1>
-          <p className="text-xs text-neutral-500">
-            Locações que já aconteceram e ainda têm saldo a receber, já descontando taxa de reserva paga e
-            pagamentos parciais.
-          </p>
-        </div>
+      <HeroTela
+        etiqueta="Pendências de pagamento"
+        rotulo="Total a receber"
+        valor={formatCurrency(pendencias.total)}
+        apoio="Locações que já aconteceram, já descontando taxa de reserva paga e pagamentos parciais"
+        tom={pendencias.maiorAtraso >= 15 ? "ruim" : pendencias.total > 0 ? "alerta" : "ok"}
+        chips={[
+          { texto: `${pendencias.clientes.length} ${pendencias.clientes.length === 1 ? "cliente devendo" : "clientes devendo"}`, icone: Users },
+          { texto: `${pendencias.locacoes.length} ${pendencias.locacoes.length === 1 ? "locação" : "locações"} em aberto`, icone: Wallet },
+          ...(pendencias.maiorAtraso > 0
+            ? [{ texto: `Maior atraso ${pendencias.maiorAtraso} ${pendencias.maiorAtraso === 1 ? "dia" : "dias"}`, icone: Clock, tom: (pendencias.maiorAtraso >= 15 ? "ruim" : "neutro") as "ruim" | "neutro" }]
+            : []),
+        ]}
+      >
         <button
           type="button"
           onClick={baixarCsv}
           disabled={pendencias.locacoes.length === 0}
-          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:opacity-50"
+          className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
         >
           Exportar planilha
         </button>
-      </div>
+      </HeroTela>
 
       {semDisparos.length > 0 && (
         <div id="sem-disparos" className="scroll-mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
@@ -203,33 +211,6 @@ export default function PendenciasClient({
           })}
         </div>
       )}
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className={`${card} col-span-2 sm:col-span-1`}>
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Total a receber</p>
-          <p className="mt-0.5 text-lg font-semibold text-amber-600">
-            {formatCurrency(pendencias.total)}
-          </p>
-        </div>
-        <div className={card}>
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Clientes devendo</p>
-          <p className="mt-0.5 text-lg font-semibold text-neutral-800">
-            {pendencias.clientes.length}
-          </p>
-        </div>
-        <div className={card}>
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Locações em aberto</p>
-          <p className="mt-0.5 text-lg font-semibold text-neutral-800">
-            {pendencias.locacoes.length}
-          </p>
-        </div>
-        <div className={card}>
-          <p className="text-[11px] uppercase tracking-wide text-neutral-400">Maior atraso</p>
-          <p className="mt-0.5 text-lg font-semibold text-neutral-800">
-            {pendencias.maiorAtraso} {pendencias.maiorAtraso === 1 ? "dia" : "dias"}
-          </p>
-        </div>
-      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <input

@@ -238,16 +238,33 @@ export default function InsightsClient() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 pb-28">
-      <div className="rounded-2xl bg-brand-gradient p-5 text-white shadow-sm">
-        <div className="flex items-center gap-2">
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#05302d] via-[#0b6b63] to-[#1fae9f] p-5 text-white shadow-[0_24px_50px_-24px_rgb(13_110_100/0.9)]">
+        <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-emerald-300/25 blur-2xl" />
+        <span aria-hidden className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-sky-300/20 blur-2xl" />
+        <div className="relative flex items-center gap-2">
           <Brain size={22} />
           <h1 className="text-xl font-bold">Cérebro</h1>
         </div>
-        <p className="mt-1 text-sm text-white/90">
+        <p className="relative mt-3 text-[13px] font-medium text-teal-100">Insights novos</p>
+        <p className="relative whitespace-nowrap text-[1.75rem] font-black leading-tight tabular-nums">{insights === null ? "..." : totalNovos}</p>
+        {insights !== null && totalNovos > 0 && (
+          <div className="relative mt-2 flex flex-wrap gap-2">
+            {[3, 2, 1].map((n) => {
+              const qtd = insights.filter((i) => i.status === "novo" && Math.max(1, Math.min(3, i.impacto)) === n).length;
+              if (!qtd) return null;
+              return (
+                <span key={n} className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold backdrop-blur">
+                  {"🔥".repeat(n)} {qtd} {n === 3 ? "de alto impacto" : n === 2 ? "de impacto médio" : "de impacto menor"}
+                </span>
+              );
+            })}
+          </div>
+        )}
+        <p className="relative mt-3 text-sm text-white/90">
           Ideias para a Harmonize crescer, tiradas dos seus números e do que funciona no mercado. Cada uma vem com o próximo passo.
         </p>
         {!somenteLeitura && (
-          <div className="mt-4 space-y-2">
+          <div className="relative mt-4 space-y-2">
             <select
               value={foco}
               onChange={(e) => setFoco(e.target.value)}

@@ -26,9 +26,11 @@ import {
   Sparkles,
   Sprout,
   Sun,
+  Users,
   type LucideIcon,
 } from "lucide-react";
-import { IconeChip, OndaMarca, type CorVisual } from "@/components/ui/Visual";
+import { IconeChip, type CorVisual } from "@/components/ui/Visual";
+import HeroTela from "@/components/ui/HeroTela";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatCurrency } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
@@ -221,10 +223,21 @@ export default function RelacionamentoClient({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-neutral-900">Relacionamento</h1>
-        <p className="text-sm text-neutral-500">Quem chamar hoje e como está cada cliente e lead.</p>
-      </div>
+      <HeroTela
+        etiqueta="Relacionamento"
+        rotulo="Conversas de hoje"
+        valor={
+          <>
+            {feitos.size} <span className="text-base font-semibold text-teal-100">de {totalHoje}</span>
+          </>
+        }
+        apoio={restantes > 0 ? `+${restantes} esperando os próximos dias` : "Ninguém esquecido"}
+        anel={{ fracao: totalHoje ? feitos.size / totalHoje : 1, texto: `${totalHoje ? Math.round((feitos.size / totalHoje) * 100) : 100}%`, legenda: "feito" }}
+        chips={[
+          { texto: `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"}`, icone: Users },
+          { texto: `${leads.length} ${leads.length === 1 ? "lead" : "leads"}`, icone: Sparkles },
+        ]}
+      />
 
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-neutral-100 p-1">
         {(
@@ -247,24 +260,9 @@ export default function RelacionamentoClient({
 
       {aba === "hoje" && (
         <>
-          <section className="cartao p-4">
-            <OndaMarca />
-            <p className="relative text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Conversas de hoje</p>
-            <div className="relative mt-1 flex items-end justify-between gap-3">
-              <p className="text-3xl font-extrabold leading-none text-slate-900">
-                {feitos.size} <span className="text-base font-semibold text-slate-400">de {totalHoje}</span>
-              </p>
-              <p className="text-right text-[11.5px] font-semibold leading-snug text-teal-700">
-                {restantes > 0 ? `+${restantes} esperando os próximos dias` : "Ninguém esquecido"}
-              </p>
-            </div>
-            <div className="relative mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-400 transition-all duration-500" style={{ width: `${totalHoje ? (feitos.size / totalHoje) * 100 : 100}%` }} />
-            </div>
-            <p className="relative mt-2 text-[12px] leading-snug text-slate-500">
-              No máximo {LIMITE_DIARIO} por dia, quem vale mais e está há mais tempo sem conversa primeiro. Mandou mensagem, a pessoa sai da lista e volta só no tempo certo.
-            </p>
-          </section>
+          <p className="px-1 text-[12px] leading-snug text-slate-500">
+            No máximo {LIMITE_DIARIO} por dia, quem vale mais e está há mais tempo sem conversa primeiro. Mandou mensagem, a pessoa sai da lista e volta só no tempo certo.
+          </p>
 
           {filaVisivel.length === 0 ? (
             <div className="flex flex-col items-center gap-2 cartao p-6 text-center">

@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import Link from "next/link";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
+import HeroTela from "@/components/ui/HeroTela";
+import { CalendarClock, Wallet } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -84,9 +86,29 @@ export default async function AgendaHojePage() {
     a.data_inicio.localeCompare(b.data_inicio)
   );
 
+  const totalAReceber = listaRentals.reduce((acc, r) => acc + (r.saldo > 0 ? r.saldo : 0), 0);
+
   return (
     <div className="min-h-screen bg-neutral-50 p-4">
-      <h1 className="mb-4 text-lg font-semibold text-neutral-900">Próximos agendamentos</h1>
+      <div className="mb-4">
+        <HeroTela
+          etiqueta="Próximos agendamentos"
+          rotulo="Atendimentos pela frente"
+          valor={lista.length}
+          apoio={
+            lista.length === 0
+              ? "Nenhum agendamento futuro"
+              : `${listaRentals.length} ${listaRentals.length === 1 ? "locação" : "locações"} · ${listaPreReservas.length} ${listaPreReservas.length === 1 ? "reserva" : "reservas"}`
+          }
+          chips={[
+            ...(lista.filter((l) => l.data_inicio === hojeStr).length > 0
+              ? [{ texto: `${lista.filter((l) => l.data_inicio === hojeStr).length} hoje`, icone: CalendarClock, tom: "bom" as const }]
+              : []),
+            ...(totalAReceber > 0 ? [{ texto: `${formatCurrency(totalAReceber)} a receber`, icone: Wallet, tom: "ruim" as const }] : []),
+          ]}
+        />
+      </div>
+      <h1 className="sr-only">Próximos agendamentos</h1>
 
       {lista.length === 0 && (
         <p className="text-sm text-neutral-400">Nenhum agendamento futuro.</p>

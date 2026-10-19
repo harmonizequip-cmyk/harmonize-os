@@ -6,6 +6,8 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { ContratoDados } from "@/lib/contrato-pdf";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLocacao } from "@/lib/atalhos";
+import HeroTela from "@/components/ui/HeroTela";
+import { FileClock, FileText } from "lucide-react";
 
 interface ContratoRow {
   id: string;
@@ -79,8 +81,17 @@ export default function ContratosClient({
 
   return (
     <div className="space-y-4">
+      <HeroTela
+        etiqueta="Contratos"
+        rotulo={contratos.length === 1 ? "Contrato gerado" : "Contratos gerados"}
+        valor={`${contratos.length}${atingiuTeto ? "+" : ""}`}
+        apoio="Cada registro guarda os dados do contrato para baixar de novo"
+        chips={[
+          { texto: `${contratos.filter((c) => c.dados.locacao.calculated_value != null).length} com valor`, icone: FileText },
+          { texto: `${contratos.filter((c) => c.dados.locacao.calculated_value == null).length} a apurar`, icone: FileClock, tom: contratos.some((c) => c.dados.locacao.calculated_value == null) ? "ruim" : "neutro" },
+        ]}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Contratos</h1>
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}

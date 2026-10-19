@@ -12,6 +12,8 @@ import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { formatCurrency, formatDate, buildMapsLink, buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 import { avisar } from "@/components/Dialogos";
+import HeroTela from "@/components/ui/HeroTela";
+import { CalendarClock, Users, Wallet } from "lucide-react";
 
 const ETAPAS: Record<string, string> = {
   lead: "Lead",
@@ -106,8 +108,18 @@ export default function ClientesClient({
 
   return (
     <div className="space-y-4">
+      <HeroTela
+        etiqueta={`Clientes · ${periodo.rotulo}`}
+        rotulo={filtered.length === 1 ? "Cliente na lista" : "Clientes na lista"}
+        valor={filtered.length}
+        apoio={`${filtered.filter((c) => c.stats.count > 0).length} com locação no histórico`}
+        chips={[
+          { texto: `${filtered.filter((c) => c.nextEvent).length} com agendamento`, icone: CalendarClock },
+          { texto: `${filtered.filter((c) => c.taxasPendentes > 0).length} com taxa pendente`, icone: Wallet, tom: filtered.some((c) => c.taxasPendentes > 0) ? "ruim" : "neutro" },
+          { texto: `${filtered.filter((c) => c.stats.count === 0).length} nunca alugaram`, icone: Users },
+        ]}
+      />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Clientes</h1>
         <div className="flex flex-wrap gap-2">
         <LinkCadastroBotao className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-60" />
         <Link

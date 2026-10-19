@@ -33,6 +33,8 @@ import EditarEventoModal from "./EditarEventoModal";
 import ReservarHiproModal from "./ReservarHiproModal";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import { avisar } from "@/components/Dialogos";
+import HeroTela from "@/components/ui/HeroTela";
+import { CalendarCheck, Clock3 } from "lucide-react";
 
 // `hex` é a mesma cor de `dot`, só que em valor puro — necessário porque o
 // indicador do dia no calendário (abaixo) usa conic-gradient via style
@@ -609,8 +611,26 @@ export default function AgendaClient({
 
   return (
     <div className="space-y-4">
+      <HeroTela
+        etiqueta={`Agenda · ${format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}`}
+        rotulo={filtroAtivo ? "Atendimentos (filtrado)" : "Atendimentos no mês"}
+        valor={resumoMes.total}
+        apoio={
+          resumoMes.total === 0
+            ? "Nada marcado neste mês"
+            : resumoMes.porTipo
+                .slice(0, 3)
+                .map((t) => `${t.label} ${t.qtd}`)
+                .join(" · ")
+        }
+        chips={[
+          needsConfirmation.length > 0
+            ? { texto: `${needsConfirmation.length} sem confirmação nos próximos 7 dias`, icone: Clock3, tom: "ruim" }
+            : { texto: "Próximos 7 dias confirmados", icone: CalendarCheck, tom: "bom" },
+        ]}
+      />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Agenda</h1>
+        <h1 className="sr-only">Agenda</h1>
         <div className="flex gap-2 self-start sm:self-auto">
           <Link
             href="/agenda-hoje"

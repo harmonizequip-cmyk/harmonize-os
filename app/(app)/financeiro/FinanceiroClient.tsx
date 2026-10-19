@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import HeroTela from "@/components/ui/HeroTela";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -263,8 +265,26 @@ export default function FinanceiroClient({
 
   return (
     <div className="space-y-4">
+      {!pessoal && (
+        <HeroTela
+          etiqueta={`Financeiro · ${periodo.rotulo}`}
+          rotulo={totais.resultado >= 0 ? "Sobrou" : "Faltou"}
+          valor={formatCurrency(Math.abs(totais.resultado))}
+          apoio="Do que está filtrado abaixo, não do caixa inteiro"
+          anel={{
+            fracao: totais.entradas > 0 ? totais.saidas / totais.entradas : 0,
+            texto: totais.entradas > 0 ? `${Math.round((totais.saidas / totais.entradas) * 100)}%` : "-",
+            legenda: "gasto",
+          }}
+          tom={totais.entradas > 0 && totais.saidas > totais.entradas ? "ruim" : totais.entradas > 0 && totais.saidas / totais.entradas > 0.85 ? "alerta" : "ok"}
+          chips={[
+            { texto: `Entrou ${formatCurrency(totais.entradas)}`, icone: ArrowUpRight, tom: "bom" },
+            { texto: `Saiu ${formatCurrency(totais.saidas)}`, icone: ArrowDownRight },
+          ]}
+        />
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">{pessoal ? "Financeiro pessoal" : "Financeiro"}</h1>
+        {pessoal ? <h1 className="text-xl font-semibold text-neutral-900">Financeiro pessoal</h1> : <span />}
         <div className="flex gap-2">
           <Link
             href={pessoal ? "/pessoal/cartoes" : "/financeiro/cartoes"}
@@ -381,7 +401,7 @@ export default function FinanceiroClient({
       {/* Os totais são do que está filtrado, não do mês inteiro nem de
           sempre. Dizer isso na tela evita ler "Resultado" como o caixa
           da empresa quando há um filtro de categoria ligado. */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className={pessoal ? "grid grid-cols-3 gap-2" : "hidden"}>
         <div className="rounded-2xl border border-white/60 bg-white/70 p-3 backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Entradas</p>
           <p className="mt-0.5 text-sm font-semibold text-brand-teal sm:text-base">
