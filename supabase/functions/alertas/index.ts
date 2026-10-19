@@ -267,7 +267,8 @@ async function montarSemana(hoje: string): Promise<Aviso> {
   if (ids.length) {
     const { data: locs } = await admin.from("rentals_contabilizaveis").select("id, event_date, event_date_end").in("id", ids);
     const saldo = new Map((situacoes ?? []).map((x: any) => [x.rental_id, Number(x.saldo)]));
-    for (const r of locs ?? []) if ((r.event_date_end ?? r.event_date) <= hoje) aReceber += saldo.get(r.id) ?? 0;
+    // Vencido = último dia antes de hoje (mesma regra do resumo das 7h30 e de Pendências).
+    for (const r of locs ?? []) if ((r.event_date_end ?? r.event_date) < hoje) aReceber += saldo.get(r.id) ?? 0;
   }
 
   // Contas fixas do negócio (Configurações) contra a sobra das locações do
@@ -539,7 +540,17 @@ Deno.serve(async (req) => {
 
   if (!avisos.length) return json({ enviados: 0, motivo: "nada para avisar" });
 
-  let consulta = admin.from("push_inscricoes").select("id, endpoint, p256dh, auth");
+  // Só aparelhos de quem usa a Harmonize (ativo, sem ser login de cliente nem só visualização):
+  // os avisos trazem nomes de clientes, dívidas e links de cobrança.
+  const { data: internos } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("active", true)
+    .eq("somente_leitura", false)
+    .is("cliente_id", null);
+  const idsInternos = (internos ?? []).map((p: any) => p.id as string);
+  if (!idsInternos.length) return json({ enviados: 0, motivo: "nenhum usuário ativo" });
+  let consulta = admin.from("push_inscricoes").select("id, endpoint, p256dh, auth").in("user_id", idsInternos);
   if (somenteUsuario) consulta = consulta.eq("user_id", somenteUsuario);
   const { data: inscricoes } = await consulta;
 

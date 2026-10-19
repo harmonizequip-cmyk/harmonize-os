@@ -130,7 +130,6 @@ Ligar equipamento: rentals.equipment_id = equipments.id.
 rental_payments: rental_id, forma, valor, data, pix_conta (eder, harmonize, laser_dream), notes.
 View rentals_situacao_pagamento: rental_id, calculated_value, credito_taxa (taxa de reserva paga, abate do valor), total_pago, saldo, situacao (aberto, parcial, pago).
 Pendência (quem deve): locação não cancelada, is_test = false, pago = false, último dia (coalesce(event_date_end, event_date)) antes de hoje e saldo > 0. Dias de atraso = hoje_local() - último dia.
-View locacoes_a_receber: id, client_id, cliente, event_date, calculated_value, credito_taxa, valor_a_receber.
 Taxa de reserva: calendar_events.taxa_status/taxa_valor. Parceiro não paga taxa. View clientes_taxas: client_id, taxas_pendentes, taxas_pagas, valor_pendente, valor_pago, proxima_pendente.
 
 ## Créditos da cliente e permuta

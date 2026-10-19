@@ -305,7 +305,7 @@ function profundidadesPapada(adip: number, quantidade: number): number[] {
   const escolhidas = new Set<number>([4.5, max]);
   for (let i = 1; i < n - 1; i++) {
     const alvo = 4.5 + ((max - 4.5) * i) / (n - 1);
-    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo))[0];
+    const livre = cands.filter((p) => !escolhidas.has(p)).sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo) || b - a)[0];
     if (livre !== undefined) escolhidas.add(livre);
   }
   return Array.from(escolhidas).sort((a, b) => b - a);
@@ -980,6 +980,21 @@ Deno.serve(async (req) => {
           : /credit|billing|balance/i.test(txt)
           ? "Acabou o crédito da conta da IA (console da Anthropic)."
           : "A IA não respondeu. Tente de novo.";
+      // Rodadas anteriores desta pergunta já gastaram: registra, senão a trava do mês não as vê.
+      if (uso.entrada + uso.saida > 0) {
+        const [pe, ps, pcl, pce] = PRECOS[MODELO] ?? PRECOS["claude-sonnet-5-5"];
+        const gasto = (uso.entrada * pe + uso.saida * ps + uso.cacheLeitura * pcl + uso.cacheEscrita * pce) / 1_000_000;
+        await supabase.from("assistente_uso").insert({
+          user_id: userId,
+          conversa_id: conversaId,
+          modelo: MODELO,
+          tokens_entrada: uso.entrada,
+          tokens_saida: uso.saida,
+          tokens_cache_leitura: uso.cacheLeitura,
+          tokens_cache_escrita: uso.cacheEscrita,
+          custo_usd: Math.round(gasto * 100000) / 100000,
+        });
+      }
       return json({ erro: msg }, 502);
     }
     const dados = await r.json();
