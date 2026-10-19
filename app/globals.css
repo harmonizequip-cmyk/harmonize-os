@@ -85,6 +85,11 @@ h1 {
 .espaco-pessoal .border-brand-teal\/30,
 .espaco-pessoal .border-brand-teal\/40 { border-color: #a78bfa; }
 .espaco-pessoal .accent-brand-teal { accent-color: #6d4af6; }
+/* Chave Harmonize | Pessoal presa no topo: fundo da cor da página para o conteúdo não aparecer atrás. */
+.barra-espaco { background-color: rgb(239 246 245 / 0.92); }
+.espaco-pessoal .barra-espaco { background-color: rgb(244 241 251 / 0.92); }
+.tema-aurora .barra-espaco { background-color: rgb(243 246 250 / 0.92); }
+.tema-aurora.espaco-pessoal .barra-espaco { background-color: rgb(244 241 251 / 0.92); }
 .espaco-pessoal .cartao {
   border-color: rgb(221 214 254 / 0.7);
   box-shadow: 0 1px 2px rgb(76 29 149 / 0.04), 0 12px 32px -18px rgb(76 29 149 / 0.28);

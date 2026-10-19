@@ -37,7 +37,9 @@ export default function EspacoSwitch() {
         : "text-slate-500"
     }`;
   return (
-    <div className="mb-4">
+    // Fica preso no topo ao rolar (pedido do dono, 19/10/2026): dá para trocar de espaço a qualquer hora.
+    // z-10 de propósito: as janelas (z-20 em diante) continuam por cima.
+    <div className="barra-espaco sticky top-0 z-10 -mx-4 mb-3 px-4 py-2 backdrop-blur-md md:-mx-8 md:px-8">
       <div className={`flex rounded-2xl p-1 ${pessoal ? "bg-violet-100/80" : "bg-teal-100/70"}`}>
         <button type="button" onClick={() => ir("harmonize")} className={estilo(!pessoal)}>
           Harmonize

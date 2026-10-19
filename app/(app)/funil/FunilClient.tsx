@@ -494,7 +494,7 @@ export default function FunilClient({
         ))}
       </div>
 
-      <div className="sticky top-0 z-20 -mx-4 space-y-2 bg-neutral-50 px-4 pb-2 pt-2 md:static md:mx-0 md:space-y-4 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
+      <div className="sticky top-14 z-20 -mx-4 space-y-2 bg-neutral-50 px-4 pb-2 pt-2 md:static md:mx-0 md:space-y-4 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
         {pendingConfirmationLeads.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-lg md:shadow-none">
             <button
