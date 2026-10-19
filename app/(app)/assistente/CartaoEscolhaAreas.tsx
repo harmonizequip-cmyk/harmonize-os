@@ -25,6 +25,7 @@ export default function CartaoEscolhaAreas({
         queixaInicial={escolha.queixa}
         paciente={escolha.paciente}
         textoAplicar="Abrir no planejador"
+        comSessoes
         onAplicar={(m) => {
           try {
             sessionStorage.setItem(CHAVE_PLANO_IA, JSON.stringify(m.estado));

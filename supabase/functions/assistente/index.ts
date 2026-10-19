@@ -49,7 +49,7 @@ type Mensagem = { role: "user" | "assistant"; content: string | Bloco[] };
 
 // Áreas do seletor (lib/planejamento.ts CATALOGO_AREAS + lib/boneco-corporal.ts CATALOGO_CORPORAL).
 const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
-const AREAS_SELETOR = ["pescoco", "papada", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
 
 const FERRAMENTAS = [
   {
@@ -180,7 +180,10 @@ const FERRAMENTAS = [
         calendar_event_id: { type: "string", description: "Atendimento da agenda, quando houver." },
         paciente: { type: "string", description: "Nome do paciente (vazio se não souber)." },
         queixa: { type: "string", description: "Queixa principal." },
-        saldo_total: { type: "integer", description: "Saldo total de disparos." },
+        saldo_total: { type: "integer", description: "Saldo total de disparos (sem sessões: o que será distribuído)." },
+        sessoes_total: { type: "integer", description: "Quantas sessões o paciente vai fazer (1 a 12). Pergunte sempre." },
+        saldo_pacote: { type: "integer", description: "Disparos do pacote inteiro (todas as sessões), ex.: 16000." },
+        disparos_sessao: { type: "integer", description: "Disparos desta sessão, ex.: 10000. Distribua só isso; o resto do pacote fica para a próxima." },
         procedimento: { type: "string", description: "Ex.: HIPRO Full Face." },
         observacoes: { type: "string", description: "Observações clínicas / explicação da distribuição." },
         areas: {
@@ -189,7 +192,7 @@ const FERRAMENTAS = [
           items: {
             type: "object",
             properties: {
-              id: { type: "string", enum: ["pescoco", "papada", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"] },
+              id: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"] },
               linhas: {
                 type: "array",
                 items: {
@@ -198,7 +201,7 @@ const FERRAMENTAS = [
                     prof: { type: "string", description: "Profundidade em mm, ex.: 4.5" },
                     direito: { type: "integer", description: "Bilateral: disparos do lado direito." },
                     esquerdo: { type: "integer", description: "Bilateral: disparos do lado esquerdo." },
-                    disparos: { type: "integer", description: "Área única (papada): disparos." },
+                    disparos: { type: "integer", description: "Área única (papada, submandibular): disparos." },
                   },
                   required: ["prof"],
                 },
@@ -323,6 +326,7 @@ function dividirDisparos(total: number, partes: number): number[] {
 const MAXIMO_POR_LINHA: Record<string, number | null> = {
   pescoco: 1200,
   papada: 2400,
+  submandibular: 1200,
   jowls: null,
   arcomandibular: 1200,
   temporal: 1200,
@@ -332,7 +336,8 @@ const MAXIMO_POR_LINHA: Record<string, number | null> = {
 };
 const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs: string[] }> = {
   pescoco: { nome: "Pescoço", bilateral: true, profs: PROF_STD },
-  papada: { nome: "Submandibular e Papada", bilateral: false, profs: PROF_PAP },
+  papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
+  submandibular: { nome: "Submandibular", bilateral: false, profs: PROF_STD },
   jowls: { nome: "Jowls", bilateral: true, profs: PROF_STD },
   arcomandibular: { nome: "Terço médio", bilateral: true, profs: PROF_STD },
   temporal: { nome: "Temporal e Arco Zigomático", bilateral: true, profs: PROF_STD },
@@ -342,9 +347,9 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
 };
 
 // Nome do procedimento pelas áreas (espelha nomeProcedimento de lib/planejamento.ts):
-// todas as áreas grandes do rosto = Full Face; "Submandibular e Papada" e pescoço somam no nome.
+// todas as áreas grandes do rosto = Full Face; papada, submandibular e pescoço somam no nome (ordem do CATALOGO_AREAS).
 const ROSTO_GRANDES = ["frontal", "temporal", "arcomandibular", "jowls"];
-const FORA_DO_ROSTO: [string, string][] = [["papada", "Submandibular e Papada"], ["pescoco", "Pescoço"]];
+const FORA_DO_ROSTO: [string, string][] = [["papada", "Papada"], ["submandibular", "Submandibular"], ["pescoco", "Pescoço"]];
 const ID_POR_NOME: Record<string, string> = { "terco medio": "arcomandibular", mento: "mento", olhos: "olhos" };
 function nomeDoProcedimento(ids: Set<string>, nomes: string[]): string {
   if (ROSTO_GRANDES.every((id) => ids.has(id))) return ["Full Face", ...FORA_DO_ROSTO.filter(([id]) => ids.has(id)).map(([, n]) => n)].join(" + ");
@@ -557,6 +562,10 @@ async function executarFerramenta(
     }
     if (nome === "preparar_planejamento") {
       const saldo = Math.max(0, Math.round(Number(entrada.saldo_total) || 0));
+      const sessoesTotal = Math.min(12, Math.max(1, Math.round(Number(entrada.sessoes_total) || 1)));
+      const saldoPacote = Math.max(0, Math.round(Number(entrada.saldo_pacote) || 0));
+      const disparosSessao = Math.max(0, Math.round(Number(entrada.disparos_sessao) || 0));
+      const pacote = saldoPacote || saldo;
       const areas = (Array.isArray(entrada.areas) ? entrada.areas : []) as { id?: string; linhas?: Record<string, unknown>[] }[];
       const DATA: Record<string, unknown[]> = {};
       const resumo: { area: string; total: number }[] = [];
@@ -649,7 +658,8 @@ async function executarFerramenta(
       }
       if (problemas.length) return { texto: `Corrija e chame de novo: ${problemas.join("; ")}.`, erro: true };
       if (!total) return { texto: "Nenhum disparo distribuído.", erro: true };
-      if (saldo && total > saldo) return { texto: `Distribuiu ${total} disparos, acima do saldo de ${saldo}. Ajuste.`, erro: true };
+      if (disparosSessao && total > disparosSessao) return { texto: `Distribuiu ${total} disparos, acima dos ${disparosSessao} desta sessão. Ajuste.`, erro: true };
+      if (pacote && total > pacote) return { texto: `Distribuiu ${total} disparos, acima do saldo de ${pacote}. Ajuste.`, erro: true };
       let clienteNome: string | null = null;
       const clientId = entrada.client_id && UUID.test(String(entrada.client_id)) ? String(entrada.client_id) : null;
       if (clientId) {
@@ -677,18 +687,21 @@ async function executarFerramenta(
         queixa: txt(entrada.queixa, 300),
         profissional: clienteNome ?? "",
         procNome: procedimento,
-        saldoTotal: String(saldo || total),
+        saldoTotal: String(pacote || total),
         obs: txt(entrada.observacoes),
         DATA,
         customAreas,
         customSeq: customAreas.length,
+        sessoesTotal,
+        sessaoAtual: 1,
+        sessoesAnteriores: [],
       };
       const plano: PlanejamentoIA = {
         client_id: clientId,
         calendar_event_id: eventId,
         cliente_nome: clienteNome,
         paciente: txt(entrada.paciente, 120),
-        saldo: saldo || total,
+        saldo: (sessoesTotal > 1 && disparosSessao) || pacote || total,
         total,
         resumo,
         estado: estadoPlano,

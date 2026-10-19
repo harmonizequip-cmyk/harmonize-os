@@ -72,6 +72,8 @@ export default function SeletorPlanejamento({
   queixaInicial,
   paciente,
   textoAplicar,
+  rotuloSaldo = "Saldo de disparos",
+  comSessoes = false,
   onAplicar,
   onPedirIA,
 }: {
@@ -80,13 +82,21 @@ export default function SeletorPlanejamento({
   queixaInicial?: string | null;
   paciente?: string | null;
   textoAplicar: string;
+  /** Rótulo do campo de disparos (no editor com várias sessões: "Disparos nesta sessão"). */
+  rotuloSaldo?: string;
+  /** Pergunta quantas sessões e o pacote (usado no cartão do assistente; o editor já tem isso no plano). */
+  comSessoes?: boolean;
   /** Devolva false para continuar editando (ex.: cancelou a confirmação). */
   onAplicar: (m: PlanejamentoMontado) => boolean | void | Promise<boolean | void>;
   onPedirIA?: (texto: string) => void;
 }) {
   const [sel, setSel] = useState<Set<string>>(() => new Set(marcadas.filter((m) => !IDS_CORPORAIS.has(m))));
   const [corporais, setCorporais] = useState<Corporal[]>(() => marcadas.filter((m) => IDS_CORPORAIS.has(m)).map(novaCorporal));
-  const [saldo, setSaldo] = useState(saldoInicial ? String(saldoInicial) : "");
+  // Com sessões: saldoInicial é o pacote; o campo de disparos vira "nesta sessão".
+  const [sessoes, setSessoes] = useState(1);
+  const [pacote, setPacote] = useState(comSessoes && saldoInicial ? String(saldoInicial) : "");
+  const [saldo, setSaldo] = useState(!comSessoes && saldoInicial ? String(saldoInicial) : "");
+  const varias = comSessoes && sessoes > 1;
   const [queixa, setQueixa] = useState(queixaInicial ?? "");
   const [adipPapada, setAdipPapada] = useState("");
   const [nProfPapada, setNProfPapada] = useState("3");
@@ -97,7 +107,7 @@ export default function SeletorPlanejamento({
   const papadaIncompleta = temPapada && (!num(adipPapada) || !num(dispPapada));
   const corporalIncompleta = corporais.some((c) => !c.nome.trim() || (c.tipo === "gordura" && !num(c.adipometro)));
 
-  const montado = useMemo(
+  const montadoBase = useMemo(
     () =>
       montarPlanejamento({
         areas: Array.from(sel),
@@ -109,6 +119,22 @@ export default function SeletorPlanejamento({
       }),
     [sel, saldo, temPapada, papadaIncompleta, adipPapada, nProfPapada, dispPapada, corporais, queixa, paciente]
   );
+  // Com sessões, o saldo do plano é o do pacote inteiro; esta sessão usa só o que foi distribuído.
+  const montado = useMemo<PlanejamentoMontado>(() => {
+    if (!comSessoes) return montadoBase;
+    const pacoteN = Math.max(num(pacote), montadoBase.total);
+    return {
+      ...montadoBase,
+      estado: {
+        ...montadoBase.estado,
+        sessoesTotal: sessoes,
+        sessaoAtual: 1,
+        sessoesAnteriores: [],
+        ...(varias && pacoteN > 0 ? { saldoTotal: String(pacoteN) } : {}),
+      },
+    };
+  }, [comSessoes, montadoBase, pacote, sessoes, varias]);
+  const restaProxima = varias ? Math.max(0, num(pacote) - montadoBase.total) : 0;
   const nada = sel.size === 0 && corporais.length === 0;
   const previaPapada = useMemo(() => {
     if (!temPapada || !num(adipPapada)) return null;
@@ -143,7 +169,11 @@ export default function SeletorPlanejamento({
       rosto.length ? `Áreas do rosto: ${rosto.join(", ")}.` : "",
       corpo.length ? `Corporal: ${corpo.join("; ")}.` : "",
       `Procedimento: ${montado.estado.procNome || "-"}.`,
-      num(saldo) ? `Saldo: ${fmt(num(saldo))} disparos.` : "",
+      varias
+        ? `Sessões: ${sessoes} (pacote de ${fmt(num(pacote))} disparos, nesta sessão ${fmt(num(saldo))}).`
+        : num(saldo)
+        ? `Saldo: ${fmt(num(saldo))} disparos.`
+        : "",
       queixa.trim() ? `Queixa principal: ${queixa.trim()}.` : "",
       temPapada && !papadaIncompleta ? `Papada: adipômetro ${adipPapada} mm, ${nProfPapada} profundidades, ${fmt(num(dispPapada))} disparos.` : "",
       paciente ? `Paciente: ${paciente}.` : "",
@@ -200,7 +230,7 @@ export default function SeletorPlanejamento({
         )}
       </div>
       {grupo("face", "Rosto (queixo até a testa)")}
-      {grupo("fora", "Papada e pescoço")}
+      {grupo("fora", "Papada, submandibular e pescoço")}
 
       {temPapada && (
         <div className="space-y-2 rounded-lg border border-brand-teal/30 bg-white p-2.5">
@@ -340,8 +370,45 @@ export default function SeletorPlanejamento({
         );
       })}
 
+      {comSessoes && (
+        <div className="space-y-2 rounded-lg border border-brand-teal/30 bg-white p-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Quantas sessões o paciente vai fazer?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={feito}
+                onClick={() => setSessoes(n)}
+                className={`h-9 w-9 rounded-lg border text-sm font-bold ${sessoes === n ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-200 bg-white text-neutral-600"}`}
+              >
+                {n}
+              </button>
+            ))}
+            <select
+              value={sessoes > 4 ? sessoes : ""}
+              onChange={(e) => e.target.value && setSessoes(Number(e.target.value))}
+              disabled={feito}
+              className={`h-9 rounded-lg border px-2 text-sm ${sessoes > 4 ? "border-brand-teal bg-brand-teal/10 font-bold text-brand-teal-dark" : "border-neutral-200 text-neutral-500"}`}
+            >
+              <option value="">Mais</option>
+              {[5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                <option key={n} value={n}>
+                  {n} sessões
+                </option>
+              ))}
+            </select>
+          </div>
+          {varias && (
+            <label className="block text-[11px] text-neutral-500">
+              Disparos do pacote (todas as sessões)
+              <input value={pacote} onChange={(e) => setPacote(e.target.value.replace(/\D/g, ""))} disabled={feito} inputMode="numeric" placeholder="16000" className={campo} />
+            </label>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
-        <input value={saldo} onChange={(e) => setSaldo(e.target.value.replace(/\D/g, ""))} disabled={feito} inputMode="numeric" placeholder="Saldo de disparos" className="rounded-lg border border-neutral-300 px-2.5 py-2 text-sm" />
+        <input value={saldo} onChange={(e) => setSaldo(e.target.value.replace(/\D/g, ""))} disabled={feito} inputMode="numeric" placeholder={varias ? "Disparos nesta sessão" : rotuloSaldo} className="rounded-lg border border-neutral-300 px-2.5 py-2 text-sm" />
         <input value={queixa} onChange={(e) => setQueixa(e.target.value)} disabled={feito} placeholder="Queixa principal" className="rounded-lg border border-neutral-300 px-2.5 py-2 text-sm" />
       </div>
 
@@ -364,6 +431,12 @@ export default function SeletorPlanejamento({
               {num(saldo) ? ` de ${fmt(num(saldo))}` : ""}
             </span>
           </div>
+          {varias && num(pacote) > 0 && (
+            <div className="flex justify-between text-xs font-semibold text-brand-teal-dark">
+              <span>Sessão 1 de {sessoes}: restam para a próxima</span>
+              <span className="font-mono">{fmt(restaProxima)}</span>
+            </div>
+          )}
           {montado.avisos.map((a) => (
             <p key={a} className="text-[11px] text-amber-700">
               {a}

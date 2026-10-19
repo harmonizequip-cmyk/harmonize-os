@@ -96,7 +96,8 @@ export const CATALOGO_AREAS: AreaCatalogo[] = [
   { id: "perioral_inf", nome: "Perioral Inferior", grupo: "face", pequena: true },
   { id: "mento", nome: "Mento", grupo: "face", pequena: true },
   { id: "jowls", nome: "Jowls", grupo: "face" },
-  { id: "papada", nome: "Submandibular e Papada", grupo: "fora" },
+  { id: "papada", nome: "Papada", grupo: "fora" },
+  { id: "submandibular", nome: "Submandibular", grupo: "fora" },
   { id: "pescoco", nome: "Pescoço", grupo: "fora" },
 ];
 
@@ -156,10 +157,11 @@ export function dividirDisparos(total: number, partes: number): number[] {
 
 // ─── Montagem pelas regras (o seletor monta sozinho; a IA só ajusta) ───
 
-/** Máximo por lado em cada profundidade (tabela do fabricante + regra do dono). */
+/** Máximo em cada profundidade (por lado; Submandibular e Papada são campo único). */
 export const MAXIMO_LINHA: Record<string, number> = {
   pescoco: 1200,
   jowls: 1200,
+  submandibular: 1200,
   arcomandibular: 1200,
   temporal: 1200,
   frontal: 500,
@@ -176,8 +178,8 @@ export function profundidadesRosto(id: string): number[] {
   return [4.5, 3, 1.5];
 }
 
-const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"]);
-const AREA_UNICA = new Set(["papada", "mento"]);
+const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"]);
+const AREA_UNICA = new Set(["papada", "submandibular", "mento"]);
 const NOME_EXTRA: Record<string, string> = { olhos: "Pálpebras inferiores e lateral dos olhos", mento: "Mento" };
 
 export const PROFUNDIDADES_GORDURA = [6, 7, 8, 9, 10, 11, 12, 13];
@@ -265,7 +267,7 @@ export function montarPlanejamento(e: EscolhaPlanejamento): PlanejamentoMontado 
     const partes = dividirDisparos(e.papada.disparos, profs.length);
     DATA.papada = profs.map((p, i) => ({ prof: fx(p), disp: partes[i] }));
     const t = partes.reduce((a, b) => a + b, 0);
-    resumo.push({ area: "Submandibular e Papada", total: t });
+    resumo.push({ area: "Papada", total: t });
     usado += t;
     if (profs.length < e.papada.profundidades) avisos.push(`Papada: com ${e.papada.adipometro} mm só cabem ${profs.length} profundidade(s).`);
   } else if (sel.has("papada")) {

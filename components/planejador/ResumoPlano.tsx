@@ -36,9 +36,13 @@ export default function ResumoPlano({ plano, onIrParaArea }: { plano: Plano; onI
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {numero("Saldo", fmt(s.saldo))}
-        {numero("Distribuído", fmt(s.total), "text-brand-teal-dark")}
-        {numero("Restante", fmt(s.resta), s.resta < 0 ? "text-rose-600" : "")}
+        {numero(plano.sessoesTotal > 1 ? "Pacote" : "Saldo", fmt(s.saldo))}
+        {numero(plano.sessoesTotal > 1 ? `Nesta sessão (${plano.sessaoAtual}/${plano.sessoesTotal})` : "Distribuído", fmt(s.total), "text-brand-teal-dark")}
+        {numero(
+          plano.sessoesTotal > 1 && plano.sessaoAtual < plano.sessoesTotal ? `Fica para a sessão ${plano.sessaoAtual + 1}` : "Restante",
+          fmt(plano.sessoesTotal > 1 && plano.sessaoAtual < plano.sessoesTotal ? s.paraProximas : s.resta),
+          s.resta < 0 ? "text-rose-600" : ""
+        )}
         {numero("Áreas", String(areas.length))}
       </div>
 

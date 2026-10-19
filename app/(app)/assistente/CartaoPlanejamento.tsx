@@ -12,6 +12,10 @@ const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 export default function CartaoPlanejamento({ plano }: { plano: PlanejamentoIA }) {
   const router = useRouter();
   const passou = plano.saldo > 0 && plano.total > plano.saldo;
+  // Várias sessões: o saldo do plano é o do pacote; o que não foi distribuído fica para a próxima.
+  const sessoes = Math.max(1, Number(plano.estado?.sessoesTotal) || 1);
+  const pacote = Number(plano.estado?.saldoTotal) || 0;
+  const restam = Math.max(0, pacote - plano.total);
 
   function abrir() {
     try {
@@ -34,6 +38,11 @@ export default function CartaoPlanejamento({ plano }: { plano: PlanejamentoIA })
           {fmt(plano.total)} / {fmt(plano.saldo)}
         </p>
       </div>
+      {sessoes > 1 && (
+        <p className="mt-1 text-xs font-semibold text-brand-teal-dark">
+          Sessão 1 de {sessoes}, restam {fmt(restam)} para a próxima
+        </p>
+      )}
       <div className="mt-2 space-y-1">
         {plano.resumo.map((r) => (
           <div key={r.area} className="flex items-center gap-2 text-xs text-neutral-700">

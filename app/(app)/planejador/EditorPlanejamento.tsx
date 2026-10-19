@@ -9,18 +9,23 @@ import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { CHAVE_PLANO_IA, linkCliente, linkEvento, linkNovoPlanejamento } from "@/lib/atalhos";
 import { temConteudo, type EstadoPlanejador, type PlanejamentoMontado } from "@/lib/planejamento";
 import {
+  MAX_SESSOES,
   PERFIS,
   alertas,
   areasPreenchidas,
+  fecharSessao,
   linhaVazia,
   mascaraReais,
   normalizarPlano,
   paraEstado,
+  reabrirSessaoAnterior,
   situacaoSaldo,
   textoResumo,
   todasAreas,
   totalArea,
+  totalDaSessao,
   totalDistribuido,
+  usadoEmAnteriores,
   type Area,
   type Linha,
   type Plano,
@@ -40,6 +45,7 @@ import {
   FileText,
   ListChecks,
   Loader2,
+  Minus,
   MoreHorizontal,
   Plus,
   Share2,
@@ -95,6 +101,10 @@ export default function EditorPlanejamento({
   const [modelo, setModelo] = useState<Area | null>(null);
   const [novaArea, setNovaArea] = useState(false);
   const [seletor, setSeletor] = useState(false);
+  // Planejamento novo sempre pergunta quantas sessões o paciente vai fazer (planos que já existem, nunca).
+  const [perguntarSessoes, setPerguntarSessoes] = useState(() => !planoId && estado.sessoesTotal === undefined && !somenteLeitura);
+  const [maisSessoes, setMaisSessoes] = useState<number | null>(null);
+  const [stepperSessoes, setStepperSessoes] = useState(false);
   const [menu, setMenu] = useState(false);
   const [confirmarApagar, setConfirmarApagar] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -144,7 +154,7 @@ export default function EditorPlanejamento({
   const salvarUmaVez = useCallback(async (): Promise<boolean> => {
     if (!sujo.current || somenteLeitura) return false;
     const p = planoRef.current;
-    const total = totalDistribuido(p);
+    const total = totalDistribuido(p) + usadoEmAnteriores(p);
     const est = paraEstado(p);
     if (!idRef.current && !temConteudo(est, total)) return false;
     sujo.current = false;
@@ -296,7 +306,9 @@ export default function EditorPlanejamento({
       !(await confirmar({ titulo: "Trocar as áreas e disparos?", texto: "O que está neste planejamento é trocado pelo que foi montado.", confirmar: "Trocar" }))
     )
       return false;
-    const montado = normalizarPlano({ ...paraEstado(plano), DATA: m.estado.DATA, customAreas: m.estado.customAreas, customSeq: m.estado.customSeq, saldoTotal: m.estado.saldoTotal, procNome: m.estado.procNome, ...(m.estado.queixa ? { queixa: m.estado.queixa } : {}) });
+    // Com várias sessões o saldo do pacote não é trocado pelo saldo da sessão que o seletor usou.
+    const saldoPacote = plano.sessoesTotal > 1 ? String(Math.max(Number(plano.saldoTotal) || 0, usadoEmAnteriores(plano) + m.total)) : m.estado.saldoTotal;
+    const montado = normalizarPlano({ ...paraEstado(plano), DATA: m.estado.DATA, customAreas: m.estado.customAreas, customSeq: m.estado.customSeq, saldoTotal: saldoPacote, procNome: m.estado.procNome, ...(m.estado.queixa ? { queixa: m.estado.queixa } : {}) });
     mudar(() => montado);
     setAbertas(new Set(todasAreas(montado).filter((a) => totalArea(montado, a) > 0).map((a) => a.id)));
     setSeletor(false);
@@ -322,7 +334,7 @@ export default function EditorPlanejamento({
     const est = paraEstado(plano);
     const DATA = Object.fromEntries(Object.entries(plano.DATA).map(([k, ls]) => [k, ls.map(({ feito: _f, ...l }) => l)]));
     try {
-      sessionStorage.setItem(CHAVE_PLANO_IA, JSON.stringify({ ...est, paciente: "", dataRetorno: "", obs: "", DATA }));
+      sessionStorage.setItem(CHAVE_PLANO_IA, JSON.stringify({ ...est, paciente: "", dataRetorno: "", obs: "", DATA, sessaoAtual: 1, sessoesAnteriores: [] }));
     } catch {
       return mostrarAviso("Não consegui duplicar neste aparelho.");
     }
@@ -413,14 +425,67 @@ export default function EditorPlanejamento({
     mostrarAviso(ok ? "Abrindo para salvar em PDF…" : "O aparelho bloqueou a janela. Permita pop-ups para o Harmonize.");
   }
 
+  function fichaSessao(n: number) {
+    const nome = plano.paciente || "paciente";
+    const ok = imprimir(htmlFichaPaciente(plano, window.location.origin, new Date(), n), `Ficha da Sessão ${n} - ${nome}`);
+    mostrarAviso(ok ? "Abrindo a ficha para imprimir…" : "O aparelho bloqueou a janela. Permita pop-ups para o Harmonize.");
+  }
+
+  function definirSessoes(n: number) {
+    campo("sessoesTotal", Math.max(plano.sessaoAtual, Math.min(MAX_SESSOES, n)));
+  }
+
+  async function concluirSessao() {
+    const atual = planoRef.current;
+    if (totalDistribuido(atual) <= 0) return mostrarAviso("Distribua os disparos desta sessão antes de concluir.");
+    const sobra = Math.max(0, situacaoSaldo(atual).resta);
+    const ok = await confirmar({
+      titulo: `Concluir a Sessão ${atual.sessaoAtual}?`,
+      texto: `Guarda os ${fmt(totalDistribuido(atual))} disparos distribuídos, abre a Sessão ${atual.sessaoAtual + 1} vazia${atual.dataRetorno ? ` na data do retorno (${formatDate(atual.dataRetorno)})` : ""} e deixa ${fmt(sobra)} disparos de saldo para ela.`,
+      confirmar: "Concluir sessão",
+    });
+    if (!ok) return;
+    const novo = fecharSessao(planoRef.current);
+    if (!novo) return mostrarAviso("Não deu para concluir a sessão.");
+    mudar(() => novo);
+    setAbertas(new Set());
+    setSoPreenchidas(false);
+    irPara("areas");
+    mostrarAviso(`Sessão ${novo.sessaoAtual} aberta.`);
+  }
+
+  async function voltarSessao() {
+    const atual = planoRef.current;
+    if (!atual.sessoesAnteriores.length) return;
+    const anterior = atual.sessoesAnteriores[atual.sessoesAnteriores.length - 1].n;
+    if (
+      totalDistribuido(atual) > 0 &&
+      !(await confirmar({ titulo: `Voltar para a Sessão ${anterior}?`, texto: "O que foi distribuído na sessão aberta agora é descartado.", confirmar: "Voltar", perigo: true }))
+    )
+      return;
+    const novo = reabrirSessaoAnterior(planoRef.current);
+    if (!novo) return;
+    mudar(() => novo);
+    setAbertas(new Set(todasAreas(novo).filter((a) => totalArea(novo, a) > 0).map((a) => a.id)));
+    mostrarAviso(`Voltou para a Sessão ${novo.sessaoAtual}.`);
+  }
+
   const s = situacaoSaldo(plano);
+  const varias = plano.sessoesTotal > 1;
+  const naoUltima = plano.sessaoAtual < plano.sessoesTotal;
   const nAreas = areasPreenchidas(plano);
   const nAlertas = alertas(plano).length;
   const nomeCliente = useMemo(() => clientes.find((c) => c.id === cliente)?.name, [clientes, cliente]);
   const quemAtende = nomeCliente || plano.profissional;
   const areas = todasAreas(plano).filter((a) => !soPreenchidas || totalArea(plano, a) > 0);
   const voltar = portal ? base : cliente ? `/planejador?cliente=${cliente}` : "/planejador";
-  const usado = s.saldo > 0 ? Math.min(100, (s.total / s.saldo) * 100) : s.total > 0 ? 100 : 0;
+  const usado = s.disponivel > 0 ? Math.min(100, (s.total / s.disponivel) * 100) : s.total > 0 ? 100 : 0;
+  // Seletor: com várias sessões sugere dividir o que resta igual entre as sessões que faltam.
+  const saldoSeletor = varias
+    ? s.disponivel > 0
+      ? Math.floor(s.disponivel / (plano.sessoesTotal - plano.sessaoAtual + 1) / 50) * 50 || null
+      : null
+    : Number(plano.saldoTotal) || null;
   const corBarra = s.estado === "estourado" ? "bg-rose-500" : s.estado === "baixo" ? "bg-amber-400" : "bg-brand-gradient";
   const entrada = "w-full rounded-xl bg-white px-3.5 py-3 text-[15px] text-neutral-900 ring-1 ring-neutral-200 outline-none transition placeholder:text-neutral-400 focus:ring-2 focus:ring-brand-teal disabled:bg-neutral-50";
   const rotulo = "mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500";
@@ -482,6 +547,18 @@ export default function EditorPlanejamento({
                   <button onClick={() => (setMenu(false), pdf("paciente"))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50">
                     <UserRound size={16} /> PDF do paciente
                   </button>
+                  {varias && (
+                    <>
+                      <button onClick={() => (setMenu(false), fichaSessao(plano.sessaoAtual))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-semibold text-neutral-800 active:bg-neutral-50">
+                        <FileText size={16} /> Ficha para assinar (Sessão {plano.sessaoAtual})
+                      </button>
+                      {plano.sessoesAnteriores.map((x) => (
+                        <button key={x.n} onClick={() => (setMenu(false), fichaSessao(x.n))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50">
+                          <FileText size={16} /> Ficha da Sessão {x.n}
+                        </button>
+                      ))}
+                    </>
+                  )}
                   {!somenteLeitura && (
                     <button onClick={excluir} className="flex w-full items-center gap-2.5 border-t border-neutral-100 px-4 py-3 text-left text-sm text-rose-600 active:bg-rose-50">
                       <Trash2 size={16} /> Excluir paciente
@@ -498,14 +575,21 @@ export default function EditorPlanejamento({
           <button type="button" onClick={() => s.saldo <= 0 && irPara("paciente")} className="block w-full text-left">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">{s.saldo > 0 ? "Saldo restante" : "Saldo de disparos"}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">
+                  {s.saldo <= 0 ? "Saldo de disparos" : varias && naoUltima ? `Fica para a sessão ${plano.sessaoAtual + 1}` : "Saldo restante"}
+                </p>
                 <p className={`text-[28px] font-black leading-none tabular-nums ${s.estado === "estourado" ? "text-rose-600" : s.estado === "baixo" ? "text-amber-600" : "text-neutral-900"}`}>
                   {s.saldo > 0 ? fmt(s.resta) : <span className="text-base font-bold text-brand-teal-dark">Toque para definir</span>}
                 </p>
+                {varias && s.saldo > 0 && (
+                  <p className="mt-0.5 text-[11px] font-semibold text-neutral-500">
+                    Sessão {plano.sessaoAtual} de {plano.sessoesTotal}
+                  </p>
+                )}
               </div>
               <p className="pb-0.5 text-right text-xs leading-tight text-neutral-500">
                 <b className="tabular-nums text-neutral-800">{fmt(s.total)}</b>
-                {s.saldo > 0 ? <> de {fmt(s.saldo)}</> : " distribuídos"}
+                {s.saldo > 0 ? <> de {fmt(s.disponivel)}</> : " distribuídos"}
                 <br />
                 {nAreas} área{nAreas === 1 ? "" : "s"}
                 {nAlertas > 0 && <span className="ml-1 font-semibold text-amber-600">· {nAlertas} alerta{nAlertas > 1 ? "s" : ""}</span>}
@@ -623,7 +707,87 @@ export default function EditorPlanejamento({
               </div>
 
               <div className={cartao}>
-                <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Saldo de disparos</p>
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Sessões do pacote</p>
+                <p className="mb-3 text-sm font-semibold text-neutral-800">Quantas sessões o paciente vai fazer?</p>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {[1, 2, 3, 4, 5, 6].map((n) => {
+                    const on = plano.sessoesTotal === n;
+                    const bloqueada = n < plano.sessaoAtual;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        disabled={bloqueada || somenteLeitura}
+                        onClick={() => definirSessoes(n)}
+                        className={`rounded-2xl py-2.5 text-center text-sm font-bold ring-1 transition disabled:opacity-40 ${on ? "bg-brand-teal text-white ring-brand-teal shadow-glow-teal" : "bg-white text-neutral-700 ring-neutral-200"}`}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(stepperSessoes || plano.sessoesTotal > 6) && (
+                  <div className="mt-2 flex items-center justify-between rounded-2xl bg-neutral-50 px-3 py-2 ring-1 ring-neutral-200">
+                    <span className="text-sm text-neutral-600">Mais de 6 sessões</span>
+                    <span className="flex items-center gap-3">
+                      <button type="button" disabled={somenteLeitura || plano.sessoesTotal <= plano.sessaoAtual} onClick={() => definirSessoes(plano.sessoesTotal - 1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200 disabled:opacity-40" aria-label="Menos uma sessão">
+                        <Minus size={16} />
+                      </button>
+                      <b className="w-6 text-center text-base tabular-nums">{plano.sessoesTotal}</b>
+                      <button type="button" disabled={somenteLeitura || plano.sessoesTotal >= MAX_SESSOES} onClick={() => definirSessoes(plano.sessoesTotal + 1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200 disabled:opacity-40" aria-label="Mais uma sessão">
+                        <Plus size={16} />
+                      </button>
+                    </span>
+                  </div>
+                )}
+                {!stepperSessoes && plano.sessoesTotal <= 6 && (
+                  <button type="button" onClick={() => setStepperSessoes(true)} className="mt-2 text-xs font-semibold text-brand-teal-dark">
+                    Mais de 6 sessões
+                  </button>
+                )}
+                <p className="mt-3 text-sm text-neutral-600">
+                  Sessão atual: <b className="text-neutral-900">{plano.sessaoAtual} de {plano.sessoesTotal}</b>
+                </p>
+                {varias && plano.sessoesAnteriores.length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {plano.sessoesAnteriores.map((x) => (
+                      <li key={x.n} className="flex items-center justify-between gap-2 rounded-2xl bg-neutral-50 px-3 py-2 text-sm ring-1 ring-neutral-200">
+                        <span className="min-w-0 truncate">
+                          <b>Sessão {x.n}</b> · {x.data ? formatDate(x.data) : "sem data"} · {fmt(totalDaSessao(x))} disparos
+                        </span>
+                        <button type="button" onClick={() => fichaSessao(x.n)} className="flex-shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-brand-teal-dark ring-1 ring-brand-teal/40">
+                          Ficha
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {varias && !somenteLeitura && (
+                  <div className="mt-3 space-y-2">
+                    {naoUltima && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={concluirSessao}
+                          disabled={s.total <= 0}
+                          className="w-full rounded-2xl bg-brand-gradient py-3 text-sm font-bold text-white shadow-glow-teal disabled:opacity-50 disabled:shadow-none"
+                        >
+                          Concluir Sessão {plano.sessaoAtual} e abrir Sessão {plano.sessaoAtual + 1}
+                        </button>
+                        {s.total <= 0 && <p className="text-center text-xs text-neutral-500">Distribua os disparos desta sessão antes de concluir.</p>}
+                      </>
+                    )}
+                    {plano.sessoesAnteriores.length > 0 && (
+                      <button type="button" onClick={voltarSessao} className="w-full rounded-2xl bg-white py-3 text-sm font-bold text-neutral-700 ring-1 ring-neutral-200">
+                        Voltar para a Sessão {plano.sessoesAnteriores[plano.sessoesAnteriores.length - 1].n}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className={cartao}>
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">{varias ? "Saldo de disparos do pacote" : "Saldo de disparos"}</p>
                 <div className="grid grid-cols-4 gap-1.5">
                   {PERFIS.map((pf) => {
                     const on = plano.perfil === pf.valor;
@@ -641,7 +805,7 @@ export default function EditorPlanejamento({
                   })}
                 </div>
                 <label className="mt-3 block">
-                  <span className={rotulo}>Saldo total</span>
+                  <span className={rotulo}>{varias ? "Saldo total do pacote" : "Saldo total"}</span>
                   <input
                     inputMode="numeric"
                     value={plano.saldoTotal === "0" ? "" : fmt(Number(plano.saldoTotal))}
@@ -651,6 +815,24 @@ export default function EditorPlanejamento({
                     className={`${entrada} text-2xl font-black tabular-nums`}
                   />
                 </label>
+                {varias && (
+                  <dl className="mt-3 space-y-1 text-sm">
+                    {s.anteriores > 0 && (
+                      <div className="flex justify-between">
+                        <dt className="text-neutral-600">Já usados nas sessões anteriores</dt>
+                        <dd className="font-bold tabular-nums">{fmt(s.anteriores)}</dd>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-600">Nesta sessão</dt>
+                      <dd className="font-bold tabular-nums">{fmt(s.total)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-600">{naoUltima ? "Fica para as próximas sessões" : "Restante"}</dt>
+                      <dd className={`font-bold tabular-nums ${s.resta < 0 ? "text-rose-600" : "text-brand-teal-dark"}`}>{fmt(naoUltima ? s.paraProximas : s.resta)}</dd>
+                    </div>
+                  </dl>
+                )}
               </div>
 
               <div className={cartao}>
@@ -744,6 +926,21 @@ export default function EditorPlanejamento({
           {aba === "resumo" && (
             <div key="resumo" className="animate-[aparecer_.25s_ease-out]">
               <ResumoPlano plano={plano} onIrParaArea={irParaArea} />
+              {varias && (
+                <div className={`${cartao} mt-4`}>
+                  <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Fichas para assinar</p>
+                  <div className="flex flex-wrap gap-2">
+                    {plano.sessoesAnteriores.map((x) => (
+                      <button key={x.n} type="button" onClick={() => fichaSessao(x.n)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-neutral-700 ring-1 ring-neutral-200">
+                        <FileText size={14} /> Ficha da Sessão {x.n}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => fichaSessao(plano.sessaoAtual)} className="inline-flex items-center gap-1.5 rounded-full bg-brand-teal px-3.5 py-2 text-xs font-bold text-white shadow-glow-teal">
+                      <FileText size={14} /> Ficha para assinar (Sessão {plano.sessaoAtual})
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -794,11 +991,53 @@ export default function EditorPlanejamento({
           onConfirmar={apagarDeVez}
         />
       )}
+      <Folha aberta={perguntarSessoes} onFechar={() => setPerguntarSessoes(false)} titulo="Quantas sessões o paciente vai fazer?">
+        <div className="space-y-4 pb-2">
+          <p className="text-sm text-neutral-600">Ex.: pacote de 16.000 disparos em 2 sessões: faz 10.000 agora e ficam 6.000 para a segunda.</p>
+          {maisSessoes === null ? (
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => (campo("sessoesTotal", n), setPerguntarSessoes(false))}
+                  className={`rounded-2xl py-4 text-lg font-extrabold ring-1 transition active:scale-[0.98] ${plano.sessoesTotal === n ? "bg-brand-teal text-white ring-brand-teal" : "bg-white text-neutral-800 ring-neutral-200"}`}
+                >
+                  {n}
+                  <span className="block text-[10px] font-semibold opacity-70">{n === 1 ? "sessão" : "sessões"}</span>
+                </button>
+              ))}
+              <button type="button" onClick={() => setMaisSessoes(6)} className="rounded-2xl bg-white py-4 text-base font-extrabold text-brand-teal-dark ring-1 ring-brand-teal/40 active:scale-[0.98]">
+                Mais
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-center gap-5">
+                <button type="button" onClick={() => setMaisSessoes((v) => Math.max(6, (v ?? 6) - 1))} className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200" aria-label="Menos uma sessão">
+                  <Minus size={20} />
+                </button>
+                <b className="w-12 text-center text-4xl font-black tabular-nums">{maisSessoes}</b>
+                <button type="button" onClick={() => setMaisSessoes((v) => Math.min(MAX_SESSOES, (v ?? 6) + 1))} className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200" aria-label="Mais uma sessão">
+                  <Plus size={20} />
+                </button>
+              </div>
+              <button type="button" onClick={() => (campo("sessoesTotal", maisSessoes), setPerguntarSessoes(false))} className="w-full rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
+                Usar {maisSessoes} sessões
+              </button>
+              <button type="button" onClick={() => setMaisSessoes(null)} className="w-full text-center text-xs font-semibold text-neutral-500">
+                Voltar
+              </button>
+            </div>
+          )}
+        </div>
+      </Folha>
       <FolhaModelo area={modelo} onFechar={() => setModelo(null)} />
       <FolhaNovaArea aberta={novaArea} onFechar={() => setNovaArea(false)} onCriar={criarArea} />
       <Folha aberta={seletor} onFechar={() => setSeletor(false)} titulo="Montar pelas regras">
         <SeletorPlanejamento
-          saldoInicial={Number(plano.saldoTotal) || null}
+          saldoInicial={saldoSeletor}
+          rotuloSaldo={varias ? "Disparos desta sessão" : undefined}
           queixaInicial={plano.queixa || null}
           paciente={plano.paciente || null}
           textoAplicar="Colocar no planejador"

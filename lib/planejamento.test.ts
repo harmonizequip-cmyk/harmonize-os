@@ -64,11 +64,13 @@ describe("nome do procedimento pela escolha de áreas", () => {
     expect(nomeProcedimento([...rosto, "perioral_sup", "mento"])).toBe("Full Face");
   });
   it("o que é de fora do rosto soma no nome, na ordem", () => {
-    expect(nomeProcedimento([...rosto, "papada"])).toBe("Full Face + Submandibular e Papada");
-    expect(nomeProcedimento([...rosto, "pescoco", "papada"])).toBe("Full Face + Submandibular e Papada + Pescoço");
+    expect(nomeProcedimento([...rosto, "papada"])).toBe("Full Face + Papada");
+    expect(nomeProcedimento([...rosto, "submandibular", "papada"])).toBe("Full Face + Papada + Submandibular");
+    expect(nomeProcedimento([...rosto, "pescoco", "submandibular", "papada"])).toBe("Full Face + Papada + Submandibular + Pescoço");
   });
   it("sem o rosto completo, lista as áreas", () => {
-    expect(nomeProcedimento(["papada", "jowls"])).toBe("Jowls + Submandibular e Papada");
+    expect(nomeProcedimento(["papada", "jowls"])).toBe("Jowls + Papada");
+    expect(nomeProcedimento(["submandibular", "papada", "jowls"])).toBe("Jowls + Papada + Submandibular");
   });
 });
 
@@ -125,11 +127,19 @@ describe("montagem pelas regras", () => {
       papada: { adipometro: 20, profundidades: 3, disparos: 1500 },
       corporais: [{ nome: "Abdômen", tipo: "gordura", adipometro: 30, profundidades: 3, quadrantes: 2, disparosPorProfundidade: 3200 }],
     });
-    expect(m.resumo.find((r) => r.area === "Submandibular e Papada")?.total).toBe(1500);
+    expect(m.resumo.find((r) => r.area === "Papada")?.total).toBe(1500);
     expect(m.resumo.find((r) => r.area.startsWith("Abdômen"))?.total).toBe(3 * 3200 * 2);
     expect(m.resumo.find((r) => r.area === "Jowls")?.total).toBe(7200);
-    expect(m.estado.procNome).toBe("Jowls + Submandibular e Papada + Abdômen");
+    expect(m.estado.procNome).toBe("Jowls + Papada + Abdômen");
     expect((m.estado.customAreas as unknown[]).length).toBe(1);
+  });
+  it("submandibular é área única fixa, até 1.200 por profundidade (não por lado)", () => {
+    const m = montarPlanejamento({ areas: ["submandibular"] });
+    const linhas = (m.estado.DATA as Record<string, { prof: string; disp?: number; dispD?: number }[]>).submandibular;
+    expect(linhas.map((l) => l.prof)).toEqual(["4.5", "3.0", "1.5"]);
+    expect(linhas.every((l) => l.disp === 1200 && l.dispD === undefined)).toBe(true);
+    expect((m.estado.customAreas as unknown[]).length).toBe(0);
+    expect(m.total).toBe(3600);
   });
   it("disparos corporais ficam entre 3.200 e 4.000", () => {
     const m = montarPlanejamento({ areas: [], corporais: [{ nome: "Braço", tipo: "flacidez", profundidades: 2, quadrantes: 1, disparosPorProfundidade: 9999, bilateral: true }] });

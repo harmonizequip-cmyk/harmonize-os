@@ -43,10 +43,11 @@ export interface Area {
   manual?: boolean;
 }
 
-/** Áreas fixas, na ordem do dono (pescoço, papada, jowls, terço médio...). Nasolabial saiu (fica no Jowls) e o Submandibular entrou na Papada (regra do dono, 16/10/2026). */
+/** Áreas fixas, na ordem do dono (pescoço, papada, submandibular, jowls, terço médio...). Nasolabial saiu (fica no Jowls). Papada e Submandibular voltaram a ser áreas separadas, com a mesma foto (regra do dono, 19/10/2026). */
 export const AREAS_FIXAS: Area[] = [
   { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
-  { id: "papada", nome: "Submandibular e Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
+  { id: "papada", nome: "Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
+  { id: "submandibular", nome: "Submandibular", bilateral: false, opts: OPTS_STD, hint: "Área central única, até 1.200 por profundidade. Iniciar da maior profundidade." },
   { id: "jowls", nome: "Jowls", bilateral: true, opts: OPTS_STD },
   { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD },
   { id: "temporal", nome: "Temporal e Arco Zigomático", bilateral: true, opts: OPTS_STD, hint: "Usar óculos/gaze. Não tratar pálpebra." },
@@ -63,6 +64,7 @@ export const MOVIMENTO_DA_AREA: Record<string, string> = {
   jowls: "Dois campos ovais (bigode chinês e jowls), com o movimento de baixo para cima.",
   pescoco: "Da parte de baixo da orelha descendo em curva até embaixo do queixo.",
   papada: "Movimento circular no centro, abaixo do queixo, pegando a região submandibular. Não descer para a tireoide (X).",
+  submandibular: "Movimento circular no centro, abaixo do queixo, pegando a região submandibular. Não descer para a tireoide (X).",
   perioral_sup: "Entre o nariz e o lábio, do centro para os cantos.",
   perioral_inf: "Abaixo do lábio inferior, do centro para os cantos.",
 };
@@ -89,7 +91,22 @@ export interface Plano {
   customAreas: Area[];
   customSeq: number;
   DATA: Record<string, Linha[]>;
+  /** Quantas sessões o paciente vai fazer (o saldo total é o do pacote inteiro). */
+  sessoesTotal: number;
+  /** Sessão que está aberta agora (1 = primeira). */
+  sessaoAtual: number;
+  /** Sessões já fechadas, com o que foi distribuído em cada uma. */
+  sessoesAnteriores: SessaoFechada[];
 }
+
+export interface SessaoFechada {
+  n: number;
+  data: string;
+  DATA: Record<string, Linha[]>;
+  customAreas: Area[];
+}
+
+export const MAX_SESSOES = 12;
 
 const txt = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
 const num = (v: unknown) => {
@@ -135,19 +152,18 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
   const s = (e ?? {}) as Record<string, unknown>;
   let customAreas = (Array.isArray(s.customAreas) ? s.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
   const bruto = (s.DATA && typeof s.DATA === "object" ? s.DATA : {}) as Record<string, unknown>;
-  const DATA: Record<string, Linha[]> = {};
-  for (const a of [...AREAS_FIXAS, ...customAreas]) {
-    const linhas = Array.isArray(bruto[a.id]) ? (bruto[a.id] as unknown[]) : [];
-    DATA[a.id] = linhas.length ? linhas.map((r) => normalizarLinha(a, r)) : [linhaVazia(a)];
-  }
-  // Planos antigos: o Submandibular (D/E) vira linhas da área única "Submandibular e
-  // Papada" (soma dos lados) e a área manual Nasolabial vai para o Jowls.
+  // Submandibular do planejador antigo tinha Direito e Esquerdo (dispD/dispE) e foi somado na papada;
+  // a área nova é campo único (disp). Só o formato antigo é somado na papada.
+  const subAntigo = Array.isArray(bruto.submandibular) && (bruto.submandibular as unknown[]).some((r) => r && typeof r === "object" && ("dispD" in r || "dispE" in r));
+  const DATA = lerDATA(subAntigo ? { ...bruto, submandibular: [] } : bruto, customAreas);
+  // Planos antigos: o Submandibular (D/E) vira linhas da área única "Papada" (soma dos
+  // lados) e a área manual Nasolabial vai para o Jowls.
   const juntar = (destino: string, novas: Linha[]) => {
     if (!novas.length) return;
     const atuais = DATA[destino].filter((l) => (l.disp ?? 0) + (l.dispD ?? 0) + (l.dispE ?? 0) > 0);
     DATA[destino] = [...atuais, ...novas];
   };
-  if (Array.isArray(bruto.submandibular)) {
+  if (subAntigo) {
     const papada = AREAS_FIXAS.find((a) => a.id === "papada")!;
     juntar(
       "papada",
@@ -188,8 +204,36 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
     customAreas,
     customSeq: Math.max(seqSalvo, maiorId),
     DATA,
+    sessoesTotal: Math.min(MAX_SESSOES, Math.max(1, num(s.sessoesTotal) || 1)),
+    sessaoAtual: Math.max(1, num(s.sessaoAtual) || 1),
+    sessoesAnteriores: lerSessoesAnteriores(s.sessoesAnteriores),
   };
 }
+
+/** DATA completo: toda área (fixa e manual) com ao menos uma linha. */
+function lerDATA(bruto: Record<string, unknown>, customAreas: Area[]): Record<string, Linha[]> {
+  const DATA: Record<string, Linha[]> = {};
+  for (const a of [...AREAS_FIXAS, ...customAreas]) {
+    const linhas = Array.isArray(bruto[a.id]) ? (bruto[a.id] as unknown[]) : [];
+    DATA[a.id] = linhas.length ? linhas.map((r) => normalizarLinha(a, r)) : [linhaVazia(a)];
+  }
+  return DATA;
+}
+
+function lerSessoesAnteriores(v: unknown): SessaoFechada[] {
+  if (!Array.isArray(v)) return [];
+  const out: SessaoFechada[] = [];
+  v.forEach((x, i) => {
+    const o = (x ?? {}) as Record<string, unknown>;
+    const custom = (Array.isArray(o.customAreas) ? o.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
+    const bruto = (o.DATA && typeof o.DATA === "object" ? o.DATA : {}) as Record<string, unknown>;
+    out.push({ n: num(o.n) || i + 1, data: txt(o.data), customAreas: custom, DATA: lerDATA(bruto, custom) });
+  });
+  return out.sort((a, b) => a.n - b.n);
+}
+
+const areasCustomParaEstado = (areas: Area[]) =>
+  areas.map(({ id, nome, bilateral, regiao, parte }) => ({ id, nome, bilateral, regiao: regiao ?? "facial", ...(parte ? { parte } : {}) }));
 
 /** Plano → objeto guardado no banco (mesmas chaves do planejador antigo). */
 export function paraEstado(p: Plano): EstadoPlanejador {
@@ -206,9 +250,12 @@ export function paraEstado(p: Plano): EstadoPlanejador {
     obs: p.obs,
     recomendacoes: p.recomendacoes,
     modoResumo: "lista",
-    customAreas: p.customAreas.map(({ id, nome, bilateral, regiao, parte }) => ({ id, nome, bilateral, regiao: regiao ?? "facial", ...(parte ? { parte } : {}) })),
+    customAreas: areasCustomParaEstado(p.customAreas),
     customSeq: p.customSeq,
     DATA: p.DATA as Record<string, unknown[]>,
+    sessoesTotal: p.sessoesTotal,
+    sessaoAtual: p.sessaoAtual,
+    sessoesAnteriores: p.sessoesAnteriores.map((x) => ({ n: x.n, data: x.data, DATA: x.DATA, customAreas: areasCustomParaEstado(x.customAreas) })),
   };
 }
 
@@ -234,13 +281,92 @@ export const saldoDe = (p: Plano) => Number(p.saldoTotal) || 0;
 
 export type EstadoSaldo = "ok" | "baixo" | "estourado" | "sem_saldo";
 
-export function situacaoSaldo(p: Plano): { saldo: number; total: number; resta: number; pct: number; estado: EstadoSaldo } {
+const somaDATA = (areas: Area[], DATA: Record<string, Linha[]>) =>
+  areas.reduce((t, a) => t + (DATA[a.id] ?? []).reduce((s, r) => s + subtotalLinha(a, r), 0), 0);
+
+/** Disparos distribuídos numa sessão já fechada. */
+export function totalDaSessao(x: SessaoFechada): number {
+  return somaDATA([...AREAS_FIXAS, ...x.customAreas], x.DATA);
+}
+
+/** Disparos do pacote já usados nas sessões anteriores a `ate` (padrão: a sessão aberta). */
+export function usadoEmAnteriores(p: Plano, ate = p.sessaoAtual): number {
+  return p.sessoesAnteriores.filter((x) => x.n < ate).reduce((t, x) => t + totalDaSessao(x), 0);
+}
+
+/**
+ * Saldo do pacote. `saldoTotal` é o pacote inteiro (todas as sessões): o que sobra
+ * depois desta sessão (resta) é o crédito para as próximas. Com 1 sessão só, é o
+ * saldo de sempre.
+ */
+export function situacaoSaldo(p: Plano): {
+  saldo: number;
+  total: number;
+  resta: number;
+  pct: number;
+  estado: EstadoSaldo;
+  anteriores: number;
+  disponivel: number;
+  sessao: number;
+  sessoes: number;
+  /** Crédito que fica para as próximas sessões (0 na última). */
+  paraProximas: number;
+} {
   const saldo = saldoDe(p);
   const total = totalDistribuido(p);
-  const resta = saldo - total;
-  const pct = saldo > 0 ? Math.max(0, Math.min(100, (resta / saldo) * 100)) : 0;
-  const estado: EstadoSaldo = saldo <= 0 ? "sem_saldo" : resta < 0 ? "estourado" : pct < 20 && total > 0 ? "baixo" : "ok";
-  return { saldo, total, resta, pct, estado };
+  const anteriores = usadoEmAnteriores(p);
+  const disponivel = saldo - anteriores;
+  const resta = disponivel - total;
+  const pct = disponivel > 0 ? Math.max(0, Math.min(100, (resta / disponivel) * 100)) : 0;
+  const ultima = p.sessaoAtual >= p.sessoesTotal;
+  const estado: EstadoSaldo = saldo <= 0 ? "sem_saldo" : resta < 0 ? "estourado" : ultima && pct < 20 && total > 0 ? "baixo" : "ok";
+  return { saldo, total, resta, pct, estado, anteriores, disponivel, sessao: p.sessaoAtual, sessoes: p.sessoesTotal, paraProximas: ultima ? 0 : Math.max(0, resta) };
+}
+
+/** Plano como estava numa sessão (a aberta ou uma fechada), para imprimir a ficha dela. */
+export function planoDaSessao(p: Plano, n: number): Plano | null {
+  if (n === p.sessaoAtual) return p;
+  const x = p.sessoesAnteriores.find((y) => y.n === n);
+  return x ? { ...p, data: x.data || p.data, DATA: x.DATA, customAreas: x.customAreas } : null;
+}
+
+/** Contas de uma sessão: pacote, usado antes, distribuído nela e o que sobra para as próximas. */
+export function contaDaSessao(p: Plano, n: number) {
+  const v = planoDaSessao(p, n);
+  const pacote = saldoDe(p);
+  const antes = usadoEmAnteriores(p, n);
+  const nesta = v ? totalDistribuido(v) : 0;
+  return { n, sessoes: p.sessoesTotal, pacote, antes, nesta, resta: pacote - antes - nesta, ultima: n >= p.sessoesTotal };
+}
+
+/** Fecha a sessão aberta e abre a próxima, sem disparos, com a data do retorno. Nulo se não dá. */
+export function fecharSessao(p: Plano, hoje = hojeIso()): Plano | null {
+  if (p.sessaoAtual >= p.sessoesTotal || totalDistribuido(p) <= 0) return null;
+  const DATA: Record<string, Linha[]> = {};
+  for (const a of AREAS_FIXAS) DATA[a.id] = [linhaVazia(a)];
+  return {
+    ...p,
+    sessoesAnteriores: [...p.sessoesAnteriores, { n: p.sessaoAtual, data: p.data, DATA: p.DATA, customAreas: p.customAreas }],
+    sessaoAtual: p.sessaoAtual + 1,
+    data: p.dataRetorno || hoje,
+    dataRetorno: "",
+    customAreas: [],
+    DATA,
+  };
+}
+
+/** Volta para a sessão anterior (o que estava aberto agora é descartado). Nulo se não há anterior. */
+export function reabrirSessaoAnterior(p: Plano): Plano | null {
+  const ultima = p.sessoesAnteriores[p.sessoesAnteriores.length - 1];
+  if (!ultima) return null;
+  return {
+    ...p,
+    sessoesAnteriores: p.sessoesAnteriores.slice(0, -1),
+    sessaoAtual: ultima.n,
+    data: ultima.data || p.data,
+    customAreas: ultima.customAreas,
+    DATA: ultima.DATA,
+  };
 }
 
 export interface Alerta {
@@ -255,7 +381,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR");
 export function alertas(p: Plano): Alerta[] {
   const out: Alerta[] = [];
   const s = situacaoSaldo(p);
-  if (s.estado === "estourado") out.push({ texto: `Distribuído (${fmt(s.total)}) passa do saldo (${fmt(s.saldo)}) em ${fmt(-s.resta)} disparos.`, grave: true });
+  if (s.estado === "estourado") out.push({ texto: `Distribuído (${fmt(s.total)}) passa do saldo${s.anteriores > 0 ? " que sobrou" : ""} (${fmt(s.disponivel)}) em ${fmt(-s.resta)} disparos.`, grave: true });
   else if (s.estado === "baixo") out.push({ texto: `Saldo baixo: restam ${fmt(s.resta)} disparos (${Math.round(s.pct)}%).`, grave: false });
   for (const a of AREAS_FIXAS) {
     const max = maximoDaLinha(a.id);
@@ -310,9 +436,17 @@ export function textoResumo(p: Plano, agora = new Date()): string {
   t += `Procedimento: ${p.procNome || "—"}\n`;
   t += `Valor:        ${p.valorProc || "—"}\n`;
   t += `Queixa:       ${p.queixa || "—"}\n\n`;
-  t += `Saldo total:  ${fmt(s.saldo)} disparos\n`;
-  t += `Distribuído:  ${fmt(s.total)} disparos\n`;
-  t += `Restante:     ${fmt(s.resta)} disparos\n`;
+  if (p.sessoesTotal > 1) {
+    t += `Sessão:       ${p.sessaoAtual} de ${p.sessoesTotal}\n`;
+    t += `Pacote:       ${fmt(s.saldo)} disparos\n`;
+    if (s.anteriores > 0) t += `Já usados:    ${fmt(s.anteriores)} disparos (sessões anteriores)\n`;
+    t += `Nesta sessão: ${fmt(s.total)} disparos\n`;
+    t += s.sessao < s.sessoes ? `Para a próxima sessão: ${fmt(Math.max(0, s.resta))} disparos\n` : `Restante:     ${fmt(s.resta)} disparos\n`;
+  } else {
+    t += `Saldo total:  ${fmt(s.saldo)} disparos\n`;
+    t += `Distribuído:  ${fmt(s.total)} disparos\n`;
+    t += `Restante:     ${fmt(s.resta)} disparos\n`;
+  }
   t += "\n──────────────────────────────────\n";
   t += "          ÁREAS TRATADAS\n";
   t += "──────────────────────────────────\n\n";

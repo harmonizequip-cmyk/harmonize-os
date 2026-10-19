@@ -4,7 +4,7 @@
 // (Salvar como PDF).
 
 import { urlImagemCorporal } from "./corpo-foto";
-import { dataBr, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
+import { contaDaSessao, dataBr, planoDaSessao, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmt = (n: number) => n.toLocaleString("pt-BR");
@@ -19,7 +19,7 @@ function quadroSemFoto(nome: string): string {
 /** Imagem da área: foto do protocolo (com as setas do movimento), foto da modelo corporal ou quadro com a inicial. */
 export function imagemDaArea(a: Area, origem = ""): string {
   if (a.regiao === "corporal") return urlImagemCorporal(a.parte);
-  if (!a.manual) return `${origem}/ferramentas/areas/${a.id}.jpg`;
+  if (!a.manual) return `${origem}/ferramentas/areas/${a.id === "submandibular" ? "papada" : a.id}.jpg`;
   if (/p[aá]lpebra|olho/i.test(a.nome)) return `${origem}/ferramentas/areas/olhos.jpg`;
   return quadroSemFoto(a.nome);
 }
@@ -80,6 +80,18 @@ ${campo("Queixa principal", p.queixa || "—", true)}
 const rodape = (agora: Date) =>
   `<div class="pront-date-foot">Documento gerado em ${agora.toLocaleString("pt-BR")} · Harmonize · Locação de Equipamentos Médicos e Estéticos</div>`;
 
+/** Números do pacote numa sessão: pacote, já usados, nesta sessão e o que fica para a próxima. */
+function numerosDoPacote(p: Plano, n: number): string {
+  const c = contaDaSessao(p, n);
+  const item = (num: number, rotulo: string) => `<div class="pront-sum-item"><div class="n">${fmt(num)}</div><div class="l">${esc(rotulo)}</div></div>`;
+  return [
+    item(c.pacote, "Pacote"),
+    c.antes > 0 ? item(c.antes, "Já usados antes") : "",
+    item(c.nesta, `Nesta sessão (${n})`),
+    c.ultima ? item(c.resta, "Restante") : item(Math.max(0, c.resta), `Fica para a Sessão ${n + 1}`),
+  ].join("");
+}
+
 /** Prontuário interno: tudo, linha por linha. */
 export function htmlProntuario(p: Plano, origem = "", agora = new Date()): string {
   const s = situacaoSaldo(p);
@@ -106,12 +118,16 @@ export function htmlProntuario(p: Plano, origem = "", agora = new Date()): strin
   return `<div class="pront-page">
 ${cabecalho(origem, "Ficha de Procedimento")}
 <div class="pront-title">Prontuário de Atendimento</div>
-${s.estado === "estourado" ? `<div class="pront-alert">ATENÇÃO: total distribuído (${fmt(s.total)}) excede o saldo contratado (${fmt(s.saldo)}) em ${fmt(-s.resta)} disparos.</div>` : ""}
+${s.estado === "estourado" ? `<div class="pront-alert">ATENÇÃO: total distribuído (${fmt(s.total)}) excede o saldo contratado (${fmt(s.disponivel)}) em ${fmt(-s.resta)} disparos.</div>` : ""}
 ${identificacao(p, "Identificação do Paciente")}
-<div class="pront-section"><div class="pront-section-title">Resumo de Disparos</div><div class="pront-summary">
-<div class="pront-sum-item"><div class="n">${fmt(s.saldo)}</div><div class="l">Saldo total</div></div>
+<div class="pront-section"><div class="pront-section-title">Resumo de Disparos${p.sessoesTotal > 1 ? ` · Sessão ${p.sessaoAtual} de ${p.sessoesTotal}` : ""}</div><div class="pront-summary">
+${
+  p.sessoesTotal > 1
+    ? numerosDoPacote(p, p.sessaoAtual)
+    : `<div class="pront-sum-item"><div class="n">${fmt(s.saldo)}</div><div class="l">Saldo total</div></div>
 <div class="pront-sum-item"><div class="n">${fmt(s.total)}</div><div class="l">Distribuído</div></div>
-<div class="pront-sum-item"><div class="n">${fmt(s.resta)}</div><div class="l">Restante</div></div>
+<div class="pront-sum-item"><div class="n">${fmt(s.resta)}</div><div class="l">Restante</div></div>`
+}
 </div></div>
 <div class="pront-section"><div class="pront-section-title">Distribuição por Área</div><table class="pront-table">
 <thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th><th>Profund.</th><th>Direito</th><th>Esquerdo</th><th>Quad.</th><th>Total</th></tr></thead>
@@ -121,22 +137,45 @@ ${rodape(agora)}
 </div>`;
 }
 
-/** Ficha do paciente: só as áreas (com o que foi feito), recomendações e assinaturas. */
-export function htmlFichaPaciente(p: Plano, origem = "", agora = new Date()): string {
-  let linhas = "";
-  for (const a of todasAreas(p)) {
-    if (!totalArea(p, a)) continue;
-    const feito = (p.DATA[a.id] ?? []).some((r) => r.feito && (a.bilateral ? (r.dispD ?? 0) + (r.dispE ?? 0) > 0 : (r.disp ?? 0) > 0));
-    linhas += `<tr><td style="text-align:center"><span class="pront-chk${feito ? " on" : ""}">${feito ? "✓" : ""}</span></td><td><div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a, origem)}" alt=""><span>${esc(a.nome)}</span></div></td></tr>`;
+/**
+ * Ficha do paciente: áreas (com o que foi feito), recomendações e assinaturas.
+ * Com várias sessões (ou uma sessão pedida), vira a ficha daquela sessão: mostra o
+ * pacote, o que foi distribuído nela e quanto fica para a próxima, com os disparos de
+ * cada área, e é a folha que o paciente assina.
+ */
+export function htmlFichaPaciente(p: Plano, origem = "", agora = new Date(), sessao?: number): string {
+  const porSessao = p.sessoesTotal > 1 || sessao !== undefined;
+  const n = sessao ?? p.sessaoAtual;
+  let v = p;
+  if (porSessao) {
+    const daSessao = planoDaSessao(p, n);
+    if (daSessao) {
+      // A sessão fechada volta na data da seguinte; a aberta usa o retorno marcado.
+      const proxima = p.sessoesAnteriores.find((x) => x.n === n + 1)?.data || (n < p.sessaoAtual ? p.data : "");
+      v = { ...daSessao, dataRetorno: n === p.sessaoAtual ? p.dataRetorno : proxima };
+    }
   }
-  if (!linhas) linhas = `<tr><td colspan="2" style="text-align:center;color:#aaa;padding:14px">Nenhuma área registrada</td></tr>`;
+  let linhas = "";
+  for (const a of todasAreas(v)) {
+    const tot = totalArea(v, a);
+    if (!tot) continue;
+    const feito = (v.DATA[a.id] ?? []).some((r) => r.feito && (a.bilateral ? (r.dispD ?? 0) + (r.dispE ?? 0) > 0 : (r.disp ?? 0) > 0));
+    linhas += `<tr><td style="text-align:center"><span class="pront-chk${feito ? " on" : ""}">${feito ? "✓" : ""}</span></td><td><div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a, origem)}" alt=""><span>${esc(a.nome)}</span></div></td>${porSessao ? `<td style="text-align:right"><strong>${fmt(tot)}</strong></td>` : ""}</tr>`;
+  }
+  const colunas = porSessao ? 3 : 2;
+  if (!linhas) linhas = `<tr><td colspan="${colunas}" style="text-align:center;color:#aaa;padding:14px">Nenhuma área registrada</td></tr>`;
+  const titulo = porSessao ? `Ficha do Paciente · Sessão ${n} de ${p.sessoesTotal}` : "Ficha do Paciente";
+  const pacote = porSessao
+    ? `<div class="pront-section"><div class="pront-section-title">Disparos do pacote</div><div class="pront-summary">${numerosDoPacote(p, n)}</div></div>`
+    : "";
   return `<div class="pront-page">
 ${cabecalho(origem, "Comprovante de Atendimento")}
-<div class="pront-title">Ficha do Paciente</div>
-${identificacao(p, "Identificação")}
-<div class="pront-section"><div class="pront-section-title">Áreas Tratadas</div><table class="pront-table"><thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th></tr></thead><tbody>${linhas}</tbody></table></div>
+<div class="pront-title">${titulo}</div>
+${identificacao(v, "Identificação")}
+${pacote}
+<div class="pront-section"><div class="pront-section-title">Áreas Tratadas</div><table class="pront-table"><thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th>${porSessao ? '<th style="text-align:right">Disparos</th>' : ""}</tr></thead><tbody>${linhas}</tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Recomendações</div><div class="pront-obs">${esc(p.recomendacoes || "—")}</div></div>
-<div class="pront-footer"><div class="pront-sign"><div class="pront-sign-line">Assinatura do Profissional</div></div><div class="pront-sign"><div class="pront-sign-line">Assinatura do Paciente</div></div></div>
+<div class="pront-footer"><div class="pront-sign"><div class="pront-sign-line">Assinatura do Profissional</div></div><div class="pront-sign"><div class="pront-sign-line">Assinatura do Paciente${porSessao ? ` · Sessão ${n}` : ""}</div></div></div>
 ${rodape(agora)}
 </div>`;
 }
