@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Calculator, RotateCcw } from "lucide-react";
+import { ArrowLeft, Calculator, Download, ImageIcon, Loader2, RotateCcw, Share2 } from "lucide-react";
 import { Folha } from "@/components/planejador/Partes";
 import { formatCurrency } from "@/lib/format";
 import type { Plano } from "@/lib/planejador";
-import { TAXAS_PADRAO, areasParaCusto, custoDisparos, lerTaxa } from "@/lib/custo-disparos";
+import { TAXAS_PADRAO, aplicarQuantidades, areasParaCusto, custoDisparos, lerTaxa } from "@/lib/custo-disparos";
+import { carregarFotosAreas, drawCustoDisparos } from "@/lib/custo-disparos-imagem";
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 const rotuloTaxa = (t: number) => `R$ ${t.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`;
@@ -38,6 +39,17 @@ export default function CustoDisparos({
     setQtd(Object.fromEntries(areas.map((a) => [a.id, String(a.disparos)])));
   }, [aberta, areas]);
 
+  const [imagem, setImagem] = useState<{ url: string; arquivo: File | null } | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const [nota, setNota] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!aberta) {
+      setImagem(null);
+      setNota(null);
+    }
+  }, [aberta]);
+
   const numero = (id: string) => Math.max(0, Math.round(Number((qtd[id] ?? "").replace(/\D/g, "")) || 0));
   const linhas = areas.map((a) => ({ ...a, novo: numero(a.id), mudou: numero(a.id) !== a.disparos }));
   const totalAtual = linhas.reduce((t, l) => t + l.disparos, 0);
@@ -45,6 +57,46 @@ export default function CustoDisparos({
   const mudou = linhas.some((l) => l.mudou);
   const taxaOutra = lerTaxa(outra);
   const taxas = taxaOutra > 0 && !TAXAS_PADRAO.includes(taxaOutra) ? [...TAXAS_PADRAO, taxaOutra] : TAXAS_PADRAO;
+  async function gerarImagem() {
+    setGerando(true);
+    setNota(null);
+    try {
+      const mudadas = Object.fromEntries(linhas.filter((l) => l.mudou).map((l) => [l.id, l.novo]));
+      const simulado = aplicarQuantidades(plano, mudadas);
+      const fotos = await carregarFotosAreas(simulado);
+      const canvas = drawCustoDisparos(simulado, taxas, fotos);
+      const url = canvas.toDataURL("image/png");
+      const arquivo = await new Promise<File | null>((ok) => canvas.toBlob((b) => ok(b ? new File([b], "custo-disparos-hipro.png", { type: "image/png" }) : null), "image/png"));
+      setImagem({ url, arquivo });
+    } catch {
+      setNota("Não consegui montar a imagem. Tente de novo.");
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  function baixar() {
+    if (!imagem) return;
+    const a = document.createElement("a");
+    a.href = imagem.url;
+    a.download = "custo-disparos-hipro.png";
+    a.click();
+  }
+
+  async function enviar() {
+    if (!imagem?.arquivo) return baixar();
+    if ("canShare" in navigator && navigator.canShare({ files: [imagem.arquivo] })) {
+      try {
+        await navigator.share({ files: [imagem.arquivo], title: "Planejamento HIPRO: custo dos disparos" });
+        return;
+      } catch (e) {
+        if ((e as Error)?.name === "AbortError") return;
+      }
+    }
+    baixar();
+    setNota("Baixei a imagem. Mande pelo WhatsApp ou pelo que preferir.");
+  }
+
   const entrada = "w-28 rounded-xl bg-white px-3 py-2 text-right text-[15px] font-bold tabular-nums text-neutral-900 ring-1 ring-neutral-200 outline-none focus:ring-2 focus:ring-brand-teal";
 
   return (
@@ -53,7 +105,7 @@ export default function CustoDisparos({
       onFechar={onFechar}
       titulo="Custos de disparos"
       rodape={
-        podeAplicar && mudou ? (
+        !imagem && podeAplicar && mudou ? (
           <div className="flex gap-2">
             <button type="button" onClick={() => setQtd(Object.fromEntries(areas.map((a) => [a.id, String(a.disparos)])))} className="flex items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-neutral-700 ring-1 ring-neutral-200">
               <RotateCcw size={15} /> Voltar
@@ -73,7 +125,24 @@ export default function CustoDisparos({
       }
     >
       <div className="space-y-4 pb-2">
-        {areas.length === 0 ? (
+        {imagem ? (
+          <div className="space-y-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imagem.url} alt="Distribuição por área e cálculo do valor total" className="w-full rounded-2xl border border-neutral-200" />
+            {nota && <p className="text-xs text-brand-teal-dark">{nota}</p>}
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => setImagem(null)} className="flex items-center justify-center gap-1.5 rounded-2xl bg-white py-3 text-sm font-bold text-neutral-700 ring-1 ring-neutral-200">
+                <ArrowLeft size={15} /> Voltar
+              </button>
+              <button type="button" onClick={baixar} className="flex items-center justify-center gap-1.5 rounded-2xl bg-white py-3 text-sm font-bold text-neutral-700 ring-1 ring-neutral-200">
+                <Download size={15} /> Baixar
+              </button>
+              <button type="button" onClick={enviar} className="flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white">
+                <Share2 size={15} /> Enviar
+              </button>
+            </div>
+          </div>
+        ) : areas.length === 0 ? (
           <p className="rounded-2xl bg-neutral-50 p-5 text-center text-sm text-neutral-500">Distribua os disparos nas áreas para ver o custo.</p>
         ) : (
           <>
@@ -94,6 +163,11 @@ export default function CustoDisparos({
                 ))}
               </div>
             </div>
+
+            <button type="button" onClick={gerarImagem} disabled={gerando} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal disabled:opacity-60">
+              {gerando ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />} {gerando ? "Montando a imagem..." : "Gerar imagem para enviar"}
+            </button>
+            {nota && <p className="text-xs text-rose-600">{nota}</p>}
 
             <label className="block">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Outro valor por disparo (opcional)</span>

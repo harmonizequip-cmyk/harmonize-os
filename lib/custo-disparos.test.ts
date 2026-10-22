@@ -54,3 +54,23 @@ describe("custo dos disparos", () => {
     expect(plano.DATA.papada[0].disp).toBe(1000);
   });
 });
+
+import { montarTabelaCusto } from "./custo-disparos-imagem";
+
+describe("tabela da imagem de custos", () => {
+  it("monta áreas, profundidades, lados e total geral", () => {
+    const t = montarTabelaCusto(plano);
+    expect(t.total).toBe(6000);
+    expect(t.grupos.map((g) => g.id)).toEqual(["papada", "jowls", "frontal"]);
+    expect(t.grupos[0].linhas).toEqual([
+      { prof: "10.0", unico: 1000, total: 1000 },
+      { prof: "4.5", unico: 500, total: 500 },
+    ]);
+    expect(t.grupos[1].linhas).toEqual([{ prof: "4.5", dir: 1500, esq: 1500, total: 3000 }]);
+  });
+  it("o custo bate com o exemplo do dono: 16.500 disparos", () => {
+    expect(custoDisparos(16500, 0.12)).toBe(1980);
+    expect(custoDisparos(16500, 0.1)).toBe(1650);
+    expect(custoDisparos(16500, 0.07)).toBe(1155);
+  });
+});
