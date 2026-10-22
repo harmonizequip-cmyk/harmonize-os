@@ -47,32 +47,46 @@ describe("planejador nativo: estado antigo", () => {
     expect(p.recomendacoes).toBe("Beber bastante água e passar protetor solar");
     expect(p.data).toBe("2026-10-16");
   });
-  it("submandibular com direito e esquerdo (formato antigo) entra na papada e nasolabial manual vai para o jowls", () => {
+  it("submandibular com direito e esquerdo fica na própria área e a nasolabial manual vai para o jowls", () => {
     const q = normalizarPlano({
       customAreas: [{ id: "custom_1", nome: "Nasolabial", bilateral: true, regiao: "facial" }],
-      DATA: { submandibular: [{ prof: "4.5", dispD: 600, dispE: 600 }], papada: [{ prof: "10.0", disp: 800 }], custom_1: [{ prof: "3.0", dispD: 400, dispE: 400 }] },
+      DATA: { submandibular: [{ prof: "4.5", dispD: 600, dispE: 700 }], papada: [{ prof: "10.0", disp: 800 }], custom_1: [{ prof: "4.5", dispD: 400, dispE: 400 }] },
     });
-    expect(q.DATA.papada).toEqual([{ prof: "10.0", disp: 800 }, { prof: "4.5", disp: 1200 }]);
-    expect(q.DATA.jowls).toEqual([{ prof: "3.0", dispD: 400, dispE: 400 }]);
+    expect(q.DATA.submandibular).toEqual([{ prof: "4.5", dispD: 600, dispE: 700 }]);
+    expect(q.DATA.papada).toEqual([{ prof: "10.0", disp: 800 }]);
+    expect(q.DATA.jowls).toEqual([{ prof: "4.5", dispD: 400, dispE: 400 }]);
     expect(q.customAreas).toEqual([]);
-    expect(q.DATA.submandibular).toEqual([{ prof: "1.5", disp: 0 }]);
   });
-  it("submandibular novo (campo único) fica na própria área e não vai para a papada", () => {
+  it("linha da submandibular salva como campo único (versão de 19/10) é dividida entre os lados", () => {
     const q = normalizarPlano({ DATA: { submandibular: [{ prof: "3.0", disp: 900 }], papada: [{ prof: "10.0", disp: 800 }] } });
-    expect(q.DATA.submandibular).toEqual([{ prof: "3.0", disp: 900 }]);
+    expect(q.DATA.submandibular).toEqual([{ prof: "3.0", dispD: 450, dispE: 450 }]);
     expect(q.DATA.papada).toEqual([{ prof: "10.0", disp: 800 }]);
   });
-  it("Papada e Submandibular são áreas distintas, as duas de campo único", () => {
+  it("Papada é campo único e Submandibular tem direito e esquerdo (600 a 1.200 por lado)", () => {
     const pap = AREAS_FIXAS.find((a) => a.id === "papada")!;
     const sub = AREAS_FIXAS.find((a) => a.id === "submandibular")!;
     expect(pap.nome).toBe("Papada");
     expect(sub.nome).toBe("Submandibular");
     expect(pap.bilateral).toBe(false);
-    expect(sub.bilateral).toBe(false);
-    const q = normalizarPlano({ DATA: { submandibular: [{ prof: "4.5", disp: 1300 }] } });
-    expect(alertas(q).some((x) => x.areaId === "submandibular" && /1\.200/.test(x.texto) && !/por lado/.test(x.texto))).toBe(true);
-    const ok = normalizarPlano({ DATA: { submandibular: [{ prof: "4.5", disp: 1200 }] } });
-    expect(alertas(ok).some((x) => x.areaId === "submandibular")).toBe(false);
+    expect(sub.bilateral).toBe(true);
+    const acima = normalizarPlano({ DATA: { submandibular: [{ prof: "4.5", dispD: 1300, dispE: 1200 }] } });
+    expect(alertas(acima).some((x) => x.areaId === "submandibular" && /1\.200 por lado/.test(x.texto) && /máximo/.test(x.texto))).toBe(true);
+    const abaixo = normalizarPlano({ DATA: { submandibular: [{ prof: "4.5", dispD: 1200, dispE: 500 }] } });
+    expect(alertas(abaixo).some((x) => x.areaId === "submandibular" && /mínimo \(600 por lado\)/.test(x.texto))).toBe(true);
+    const ok = normalizarPlano({ DATA: { submandibular: [{ prof: "4.5", dispD: 600, dispE: 1200 }], arcomandibular: [{ prof: "3.0", dispD: 800, dispE: 800 }] } });
+    expect(alertas(ok).filter((x) => x.areaId === "submandibular" || x.areaId === "arcomandibular")).toEqual([]);
+    const semDisparo = normalizarPlano({ DATA: { arcomandibular: [{ prof: "3.0", dispD: 0, dispE: 0 }] } });
+    expect(alertas(semDisparo).some((x) => x.areaId === "arcomandibular")).toBe(false);
+    const terco = normalizarPlano({ DATA: { arcomandibular: [{ prof: "3.0", dispD: 100, dispE: 800 }] } });
+    expect(alertas(terco).some((x) => x.areaId === "arcomandibular" && /mínimo/.test(x.texto))).toBe(true);
+  });
+  it("Jowls só tem 4,5 mm e passa do máximo acima de 1.500 por lado", () => {
+    const jowls = AREAS_FIXAS.find((a) => a.id === "jowls")!;
+    expect(jowls.opts).toEqual(["4.5"]);
+    const q = normalizarPlano({ DATA: { jowls: [{ prof: "4.5", dispD: 1600, dispE: 1500 }] } });
+    expect(alertas(q).some((x) => x.areaId === "jowls" && /1\.500 por lado/.test(x.texto))).toBe(true);
+    const ok = normalizarPlano({ DATA: { jowls: [{ prof: "4.5", dispD: 1500, dispE: 1500 }] } });
+    expect(alertas(ok).some((x) => x.areaId === "jowls")).toBe(false);
   });
   it("Terço médio é o antigo arco mandibular e não há nasolabial", () => {
     expect(AREAS_FIXAS.find((a) => a.id === "arcomandibular")?.nome).toBe("Terço médio");

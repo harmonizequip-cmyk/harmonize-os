@@ -35,6 +35,8 @@ import SeletorPlanejamento from "@/components/SeletorPlanejamento";
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import { CartaoArea, Folha, FolhaModelo, FolhaNovaArea, fmt } from "@/components/planejador/Partes";
 import ResumoPlano from "@/components/planejador/ResumoPlano";
+import CustoDisparos from "@/components/planejador/CustoDisparos";
+import { aplicarQuantidades } from "@/lib/custo-disparos";
 import { formatDate } from "@/lib/format";
 import {
   ArrowLeft,
@@ -43,6 +45,7 @@ import {
   ClipboardCopy,
   Copy,
   FileText,
+  Calculator,
   ListChecks,
   Loader2,
   Minus,
@@ -101,6 +104,7 @@ export default function EditorPlanejamento({
   const [modelo, setModelo] = useState<Area | null>(null);
   const [novaArea, setNovaArea] = useState(false);
   const [seletor, setSeletor] = useState(false);
+  const [custos, setCustos] = useState(false);
   // Planejamento novo sempre pergunta quantas sessões o paciente vai fazer (planos que já existem, nunca).
   const [perguntarSessoes, setPerguntarSessoes] = useState(() => !planoId && estado.sessoesTotal === undefined && !somenteLeitura);
   const [maisSessoes, setMaisSessoes] = useState<number | null>(null);
@@ -956,12 +960,20 @@ export default function EditorPlanejamento({
               </button>
             )}
             {aba === "areas" && (
-              <button onClick={() => irPara("resumo")} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal active:scale-[0.99]">
-                Ver resumo <ArrowRight size={17} />
-              </button>
+              <>
+                <button onClick={() => setCustos(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white py-3.5 text-sm font-bold text-brand-teal-dark ring-1 ring-brand-teal/40 active:scale-[0.99]">
+                  <Calculator size={16} /> Custos de disparos
+                </button>
+                <button onClick={() => irPara("resumo")} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal active:scale-[0.99]">
+                  Ver resumo <ArrowRight size={17} />
+                </button>
+              </>
             )}
             {aba === "resumo" && (
               <>
+                <button onClick={() => setCustos(true)} className="flex items-center justify-center rounded-2xl bg-white px-3.5 py-3.5 text-brand-teal-dark ring-1 ring-brand-teal/40" aria-label="Custos de disparos" title="Custos de disparos">
+                  <Calculator size={17} />
+                </button>
                 <button onClick={copiarResumo} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white py-3.5 text-sm font-bold text-neutral-800 ring-1 ring-neutral-200">
                   <Copy size={16} /> Copiar
                 </button>
@@ -1032,6 +1044,16 @@ export default function EditorPlanejamento({
           )}
         </div>
       </Folha>
+      <CustoDisparos
+        aberta={custos}
+        onFechar={() => setCustos(false)}
+        plano={plano}
+        podeAplicar={!somenteLeitura}
+        onAplicar={(q) => {
+          mudar((p) => aplicarQuantidades(p, q));
+          mostrarAviso("Quantidades aplicadas no planejamento.");
+        }}
+      />
       <FolhaModelo area={modelo} onFechar={() => setModelo(null)} />
       <FolhaNovaArea aberta={novaArea} onFechar={() => setNovaArea(false)} onCriar={criarArea} />
       <Folha aberta={seletor} onFechar={() => setSeletor(false)} titulo="Montar pelas regras">

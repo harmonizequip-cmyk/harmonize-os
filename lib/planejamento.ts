@@ -160,7 +160,7 @@ export function dividirDisparos(total: number, partes: number): number[] {
 /** Máximo em cada profundidade (por lado; Submandibular e Papada são campo único). */
 export const MAXIMO_LINHA: Record<string, number> = {
   pescoco: 1200,
-  jowls: 1200,
+  jowls: 1500,
   submandibular: 1200,
   arcomandibular: 1200,
   temporal: 1200,
@@ -171,15 +171,22 @@ export const MAXIMO_LINHA: Record<string, number> = {
   mento: 1200,
 };
 
-/** Profundidades de cada área do rosto (regra: 4,5, 3,0 e 1,5; exceções do guia). */
+/** Mínimo por lado em cada profundidade (regra do dono, 22/10/2026). */
+export const MINIMO_LINHA: Record<string, number> = {
+  arcomandibular: 600,
+  submandibular: 600,
+};
+
+/** Profundidades de cada área do rosto (regra: 4,5, 3,0 e 1,5; exceções do guia; Jowls só 4,5). */
 export function profundidadesRosto(id: string): number[] {
+  if (id === "jowls") return [4.5];
   if (id === "frontal" || id === "olhos") return [4.5, 1.5];
   if (id === "perioral_sup" || id === "perioral_inf") return [1.5];
   return [4.5, 3, 1.5];
 }
 
 const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"]);
-const AREA_UNICA = new Set(["papada", "submandibular", "mento"]);
+const AREA_UNICA = new Set(["papada", "mento"]);
 const NOME_EXTRA: Record<string, string> = { olhos: "Pálpebras inferiores e lateral dos olhos", mento: "Mento" };
 
 export const PROFUNDIDADES_GORDURA = [6, 7, 8, 9, 10, 11, 12, 13];
@@ -242,7 +249,9 @@ const fx = (p: number) => p.toFixed(1);
 /**
  * Monta o planejamento pelas regras: papada e corporal com a conta fixa; o
  * resto do saldo dividido igual entre as profundidades e lados das áreas do
- * rosto, sem passar do máximo de cada uma (o que não cabe vira "sobra").
+ * rosto, sem passar do máximo de cada uma (o que não cabe vira "sobra"); Terço
+ * médio e Submandibular começam no mínimo de 600 por lado e o Jowls (só 4,5 mm,
+ * até 1.500 por lado) vai no máximo quando a queixa é derretimento da face.
  * Sem saldo, cada linha do rosto vai no máximo.
  */
 export function montarPlanejamento(e: EscolhaPlanejamento): PlanejamentoMontado {
@@ -304,7 +313,20 @@ export function montarPlanejamento(e: EscolhaPlanejamento): PlanejamentoMontado 
   const saldo = e.saldo && e.saldo > 0 ? e.saldo : null;
   if (saldo !== null && usado > saldo) avisos.push(`Papada e corporal (${usado.toLocaleString("pt-BR")}) já passam do saldo de ${saldo.toLocaleString("pt-BR")}.`);
   let resta = saldo === null ? Infinity : Math.max(0, saldo - usado);
-  let abertas = vagas.slice();
+  // Antes da divisão igual: o mínimo do Terço médio e da Submandibular (600 por lado em cada
+  // profundidade) e, quando a queixa é derretimento da face, o Jowls já vai no máximo (1.500 por lado).
+  const derretimento = /derret|melting/i.test(e.queixa ?? "");
+  let faltouMinimo = false;
+  for (const v of vagas) {
+    const ideal = MINIMO_LINHA[v.area] ?? (v.area === "jowls" && derretimento ? v.teto : 0);
+    if (!ideal) continue;
+    const add = Math.min(ideal, v.teto, resta === Infinity ? Infinity : Math.floor(resta / 10) * 10);
+    v.valor += add;
+    if (resta !== Infinity) resta -= add;
+    if (MINIMO_LINHA[v.area] && v.valor < MINIMO_LINHA[v.area]) faltouMinimo = true;
+  }
+  if (faltouMinimo) avisos.push("O saldo não cobre o mínimo de 600 por lado, em cada profundidade, do Terço médio e da Submandibular.");
+  let abertas = vagas.filter((v) => v.valor < v.teto);
   while (abertas.length && resta > 0) {
     const parte = resta === Infinity ? Infinity : Math.floor(resta / abertas.length / 10) * 10;
     if (parte <= 0) break;

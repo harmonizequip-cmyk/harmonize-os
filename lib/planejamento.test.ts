@@ -112,13 +112,15 @@ describe("montagem pelas regras", () => {
   });
   it("divide o saldo igual no rosto, respeitando o máximo de cada linha", () => {
     const m = montarPlanejamento({ areas: ["frontal", "jowls"], saldo: 6000 });
-    // frontal: 2 profundidades x 2 lados (teto 500); jowls: 3 x 2 (teto 1200)
+    // frontal: 2 profundidades x 2 lados (teto 500); jowls: só 4,5 x 2 lados (teto 1.500)
     const frontal = m.estado.DATA!.frontal as { dispD: number }[];
-    const jowls = m.estado.DATA!.jowls as { dispD: number }[];
+    const jowls = m.estado.DATA!.jowls as { prof: string; dispD: number; dispE: number }[];
     expect(frontal.every((l) => l.dispD === 500)).toBe(true);
-    expect(jowls[0].dispD).toBe(660);
-    expect(m.total).toBe(6000 - m.sobra);
-    expect(m.total).toBeLessThanOrEqual(6000);
+    expect(jowls.map((l) => l.prof)).toEqual(["4.5"]);
+    expect(jowls[0].dispD).toBe(1500);
+    expect(jowls[0].dispE).toBe(1500);
+    expect(m.total).toBe(5000);
+    expect(m.sobra).toBe(1000);
   });
   it("papada e corporal saem do saldo antes do rosto", () => {
     const m = montarPlanejamento({
@@ -129,17 +131,33 @@ describe("montagem pelas regras", () => {
     });
     expect(m.resumo.find((r) => r.area === "Papada")?.total).toBe(1500);
     expect(m.resumo.find((r) => r.area.startsWith("Abdômen"))?.total).toBe(3 * 3200 * 2);
-    expect(m.resumo.find((r) => r.area === "Jowls")?.total).toBe(7200);
+    expect(m.resumo.find((r) => r.area === "Jowls")?.total).toBe(3000);
     expect(m.estado.procNome).toBe("Jowls + Papada + Abdômen");
     expect((m.estado.customAreas as unknown[]).length).toBe(1);
   });
-  it("submandibular é área única fixa, até 1.200 por profundidade (não por lado)", () => {
+  it("submandibular tem direito e esquerdo, de 600 a 1.200 por lado em cada profundidade", () => {
     const m = montarPlanejamento({ areas: ["submandibular"] });
-    const linhas = (m.estado.DATA as Record<string, { prof: string; disp?: number; dispD?: number }[]>).submandibular;
+    const linhas = (m.estado.DATA as Record<string, { prof: string; dispD?: number; dispE?: number; disp?: number }[]>).submandibular;
     expect(linhas.map((l) => l.prof)).toEqual(["4.5", "3.0", "1.5"]);
-    expect(linhas.every((l) => l.disp === 1200 && l.dispD === undefined)).toBe(true);
+    expect(linhas.every((l) => l.dispD === 1200 && l.dispE === 1200 && l.disp === undefined)).toBe(true);
     expect((m.estado.customAreas as unknown[]).length).toBe(0);
-    expect(m.total).toBe(3600);
+    expect(m.total).toBe(7200);
+    const curto = montarPlanejamento({ areas: ["submandibular", "arcomandibular"], saldo: 9000 });
+    const lados = (id: string) => (curto.estado.DATA as Record<string, { dispD: number; dispE: number }[]>)[id].flatMap((l) => [l.dispD, l.dispE]);
+    expect(lados("submandibular").every((v) => v >= 600 && v <= 1200)).toBe(true);
+    expect(lados("arcomandibular").every((v) => v >= 600 && v <= 1200)).toBe(true);
+    expect(curto.total).toBeLessThanOrEqual(9000);
+    const pouco = montarPlanejamento({ areas: ["arcomandibular"], saldo: 3000 });
+    expect(pouco.avisos.some((a) => /mínimo de 600/.test(a))).toBe(true);
+  });
+  it("derretimento da face leva o Jowls ao máximo de 1.500 por lado", () => {
+    const m = montarPlanejamento({ areas: ["jowls", "frontal"], saldo: 4000, queixa: "Derretimento da face" });
+    const jowls = m.estado.DATA!.jowls as { dispD: number; dispE: number }[];
+    expect(jowls[0].dispD).toBe(1500);
+    expect(jowls[0].dispE).toBe(1500);
+    const frontal = m.estado.DATA!.frontal as { dispD: number }[];
+    expect(frontal.every((l) => l.dispD === 250)).toBe(true);
+    expect(m.total).toBe(4000);
   });
   it("disparos corporais ficam entre 3.200 e 4.000", () => {
     const m = montarPlanejamento({ areas: [], corporais: [{ nome: "Braço", tipo: "flacidez", profundidades: 2, quadrantes: 1, disparosPorProfundidade: 9999, bilateral: true }] });

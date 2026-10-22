@@ -201,7 +201,7 @@ const FERRAMENTAS = [
                     prof: { type: "string", description: "Profundidade em mm, ex.: 4.5" },
                     direito: { type: "integer", description: "Bilateral: disparos do lado direito." },
                     esquerdo: { type: "integer", description: "Bilateral: disparos do lado esquerdo." },
-                    disparos: { type: "integer", description: "Área única (papada, submandibular): disparos." },
+                    disparos: { type: "integer", description: "Área única (papada): disparos." },
                   },
                   required: ["prof"],
                 },
@@ -321,13 +321,20 @@ function dividirDisparos(total: number, partes: number): number[] {
   return r;
 }
 
-// Máximo da tabela do fabricante por lado e por profundidade (papada, campo
-// único, aceita a soma dos dois lados). Jowls pode passar (palavra do dono).
+// Máximo por lado e por profundidade (papada, campo único, aceita a soma dos
+// dois lados). Jowls: no máximo 1.500 por lado, só a profundidade 4,5 (dono, 22/10/2026).
+// Mínimo por lado e por profundidade (dono, 22/10/2026): Terço médio e Submandibular
+// têm de 600 a 1.200 de cada lado. Linha com os dois lados zerados não conta.
+const MINIMO_POR_LINHA: Record<string, number> = {
+  arcomandibular: 600,
+  submandibular: 600,
+};
+
 const MAXIMO_POR_LINHA: Record<string, number | null> = {
   pescoco: 1200,
   papada: 2400,
   submandibular: 1200,
-  jowls: null,
+  jowls: 1500,
   arcomandibular: 1200,
   temporal: 1200,
   frontal: 500,
@@ -337,8 +344,8 @@ const MAXIMO_POR_LINHA: Record<string, number | null> = {
 const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs: string[] }> = {
   pescoco: { nome: "Pescoço", bilateral: true, profs: PROF_STD },
   papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
-  submandibular: { nome: "Submandibular", bilateral: false, profs: PROF_STD },
-  jowls: { nome: "Jowls", bilateral: true, profs: PROF_STD },
+  submandibular: { nome: "Submandibular", bilateral: true, profs: PROF_STD },
+  jowls: { nome: "Jowls", bilateral: true, profs: ["4.5"] },
   arcomandibular: { nome: "Terço médio", bilateral: true, profs: PROF_STD },
   temporal: { nome: "Temporal e Arco Zigomático", bilateral: true, profs: PROF_STD },
   frontal: { nome: "Frontal", bilateral: true, profs: PROF_STD },
@@ -604,6 +611,8 @@ async function executarFerramenta(
             const d = n(l.direito ?? l.disparos);
             const e = n(l.esquerdo ?? l.disparos);
             if (teto && (d > teto || e > teto)) problemas.push(`${def.nome} ${prof} mm passa do máximo de ${teto} por lado`);
+            const minimo = MINIMO_POR_LINHA[String(a.id)];
+            if (minimo && d + e > 0 && (d < minimo || e < minimo)) problemas.push(`${def.nome} ${prof} mm fica abaixo do mínimo de ${minimo} por lado (direito ${d}, esquerdo ${e})`);
             linhas.push({ prof, dispD: d, dispE: e });
             totArea += d + e;
           } else {

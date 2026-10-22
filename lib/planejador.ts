@@ -6,7 +6,7 @@
 // do corpo em `parte` (antes iam com a imagem inteira dentro do estado).
 
 import type { EstadoPlanejador } from "./planejamento";
-import { MAXIMO_LINHA } from "./planejamento";
+import { MAXIMO_LINHA, MINIMO_LINHA } from "./planejamento";
 
 export const OPTS_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 export const OPTS_PAP = [...OPTS_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
@@ -43,13 +43,13 @@ export interface Area {
   manual?: boolean;
 }
 
-/** Áreas fixas, na ordem do dono (pescoço, papada, submandibular, jowls, terço médio...). Nasolabial saiu (fica no Jowls). Papada e Submandibular voltaram a ser áreas separadas, com a mesma foto (regra do dono, 19/10/2026). */
+/** Áreas fixas, na ordem do dono (pescoço, papada, submandibular, jowls, terço médio...). Nasolabial saiu (fica no Jowls). Papada (campo único) e Submandibular (direito e esquerdo) são áreas separadas, com a mesma foto (regra do dono, 19 e 22/10/2026). */
 export const AREAS_FIXAS: Area[] = [
   { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
   { id: "papada", nome: "Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
-  { id: "submandibular", nome: "Submandibular", bilateral: false, opts: OPTS_STD, hint: "Área central única, até 1.200 por profundidade. Iniciar da maior profundidade." },
-  { id: "jowls", nome: "Jowls", bilateral: true, opts: OPTS_STD },
-  { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD },
+  { id: "submandibular", nome: "Submandibular", bilateral: true, opts: OPTS_STD, hint: "Direito e esquerdo, de 600 a 1.200 por lado em cada profundidade. Iniciar da maior profundidade." },
+  { id: "jowls", nome: "Jowls", bilateral: true, opts: ["4.5"], hint: "Só a profundidade 4,5 mm, até 1.500 por lado (derretimento da face chega perto do máximo)." },
+  { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD, hint: "De 600 a 1.200 por lado em cada profundidade." },
   { id: "temporal", nome: "Temporal e Arco Zigomático", bilateral: true, opts: OPTS_STD, hint: "Usar óculos/gaze. Não tratar pálpebra." },
   { id: "frontal", nome: "Frontal", bilateral: true, opts: OPTS_STD },
   { id: "perioral_sup", nome: "Perioral Superior", bilateral: true, opts: OPTS_STD },
@@ -69,11 +69,15 @@ export const MOVIMENTO_DA_AREA: Record<string, string> = {
   perioral_inf: "Abaixo do lábio inferior, do centro para os cantos.",
 };
 
-/** Máximo por linha (por lado; papada = campo único, soma dos lados). Jowls pode passar. */
+/** Máximo por linha (por lado; papada = campo único, soma dos lados). Jowls: 1.500 por lado, só em 4,5 mm. */
 export function maximoDaLinha(areaId: string): number | null {
-  if (areaId === "jowls") return null;
   if (areaId === "papada") return 2400;
   return MAXIMO_LINHA[areaId] ?? null;
+}
+
+/** Mínimo por lado em cada profundidade que tem disparo (Terço médio e Submandibular: 600). */
+export function minimoDaLinha(areaId: string): number | null {
+  return MINIMO_LINHA[areaId] ?? null;
 }
 
 export interface Plano {
@@ -123,7 +127,13 @@ export function linhaVazia(a: Area, prof?: string): Linha {
 function normalizarLinha(a: Area, r: unknown): Linha {
   const o = (r ?? {}) as Record<string, unknown>;
   const prof = txt(o.prof) || a.opts[0];
-  const l: Linha = a.bilateral ? { prof, dispD: num(o.dispD), dispE: num(o.dispE) } : { prof, disp: num(o.disp) };
+  // Linha de campo único (disp) numa área que agora tem os dois lados: divide entre direito e esquerdo.
+  const soDisp = a.bilateral && o.dispD === undefined && o.dispE === undefined && o.disp !== undefined;
+  const l: Linha = a.bilateral
+    ? soDisp
+      ? { prof, dispD: Math.ceil(num(o.disp) / 2), dispE: Math.floor(num(o.disp) / 2) }
+      : { prof, dispD: num(o.dispD), dispE: num(o.dispE) }
+    : { prof, disp: num(o.disp) };
   if (a.regiao === "corporal") l.quad = Math.max(1, num(o.quad) || 1);
   if (o.feito) l.feito = true;
   return l;
@@ -152,27 +162,13 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
   const s = (e ?? {}) as Record<string, unknown>;
   let customAreas = (Array.isArray(s.customAreas) ? s.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
   const bruto = (s.DATA && typeof s.DATA === "object" ? s.DATA : {}) as Record<string, unknown>;
-  // Submandibular do planejador antigo tinha Direito e Esquerdo (dispD/dispE) e foi somado na papada;
-  // a área nova é campo único (disp). Só o formato antigo é somado na papada.
-  const subAntigo = Array.isArray(bruto.submandibular) && (bruto.submandibular as unknown[]).some((r) => r && typeof r === "object" && ("dispD" in r || "dispE" in r));
-  const DATA = lerDATA(subAntigo ? { ...bruto, submandibular: [] } : bruto, customAreas);
-  // Planos antigos: o Submandibular (D/E) vira linhas da área única "Papada" (soma dos
-  // lados) e a área manual Nasolabial vai para o Jowls.
+  const DATA = lerDATA(bruto, customAreas);
+  // Planos antigos: a área manual Nasolabial vai para o Jowls.
   const juntar = (destino: string, novas: Linha[]) => {
     if (!novas.length) return;
     const atuais = DATA[destino].filter((l) => (l.disp ?? 0) + (l.dispD ?? 0) + (l.dispE ?? 0) > 0);
     DATA[destino] = [...atuais, ...novas];
   };
-  if (subAntigo) {
-    const papada = AREAS_FIXAS.find((a) => a.id === "papada")!;
-    juntar(
-      "papada",
-      (bruto.submandibular as unknown[])
-        .map((r) => normalizarLinha({ ...papada, bilateral: true }, r))
-        .filter((l) => (l.dispD ?? 0) + (l.dispE ?? 0) > 0)
-        .map((l) => ({ prof: l.prof, disp: (l.dispD ?? 0) + (l.dispE ?? 0), ...(l.feito ? { feito: true } : {}) }))
-    );
-  }
   const nasolabiais = customAreas.filter((a) => a.regiao !== "corporal" && /nasolabial/i.test(a.nome));
   if (nasolabiais.length) {
     const jowls = AREAS_FIXAS.find((a) => a.id === "jowls")!;
@@ -393,7 +389,23 @@ export function alertas(p: Plano): Alerta[] {
       }
     }
   }
+  for (const a of AREAS_FIXAS) {
+    for (const r of p.DATA[a.id] ?? []) {
+      const min = linhaAbaixoDoMinimo(a, r);
+      if (min) out.push({ texto: `${a.nome} ${r.prof} mm abaixo do mínimo (${fmt(min)} por lado).`, grave: false, areaId: a.id });
+    }
+  }
   return out;
+}
+
+/** Linha com disparos em que algum lado fica abaixo do mínimo da área (Terço médio, Submandibular). */
+export function linhaAbaixoDoMinimo(a: Area, r: Linha): number | null {
+  const min = minimoDaLinha(a.id);
+  if (!min || a.manual || !a.bilateral) return null;
+  const d = r.dispD ?? 0;
+  const e = r.dispE ?? 0;
+  if (d + e <= 0) return null;
+  return d < min || e < min ? min : null;
 }
 
 export function linhaAcimaDoMaximo(a: Area, r: Linha): number | null {

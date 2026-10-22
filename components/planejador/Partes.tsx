@@ -12,7 +12,7 @@ import { confirmar } from "@/components/Dialogos";
 import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
 import { imagemDaArea } from "@/lib/planejador-impressao";
 import { urlCorpoInteiro } from "@/lib/corpo-foto";
-import { MOVIMENTO_DA_AREA, OPTS_PAP, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
+import { MOVIMENTO_DA_AREA, OPTS_PAP, linhaAbaixoDoMinimo, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
 
 export const fmt = (n: number) => n.toLocaleString("pt-BR");
 
@@ -79,6 +79,8 @@ export function CampoDisparos({ rotulo, valor, onMudar, alerta, passo = 50 }: { 
 function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: Area; linha: Linha; podeRemover: boolean; onMudar: (l: Linha) => void; onRemover: () => void }) {
   const corporal = area.regiao === "corporal";
   const acima = linhaAcimaDoMaximo(area, linha);
+  const abaixo = linhaAbaixoDoMinimo(area, linha);
+  const opcoes = area.opts.includes(linha.prof) ? area.opts : [linha.prof, ...area.opts];
   const sub = subtotalLinha(area, linha);
   const max = maximoDaLinha(area.id);
   // Lados iguais: mexeu no direito e o esquerdo estava igual, ele acompanha.
@@ -118,7 +120,7 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
             className="appearance-none rounded-full bg-white py-1.5 pl-3 pr-7 text-sm font-bold text-brand-teal-dark ring-1 ring-brand-teal/40 outline-none focus:ring-2 focus:ring-brand-teal"
             aria-label="Profundidade"
           >
-            {area.opts.map((p) => (
+            {opcoes.map((p) => (
               <option key={p} value={p}>
                 {p.replace(".", ",")} mm
               </option>
@@ -145,6 +147,7 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
         {corporal && <CampoDisparos rotulo="Quadrantes" valor={linha.quad ?? 1} passo={1} onMudar={(v) => onMudar({ ...linha, quad: Math.max(1, v) })} />}
       </div>
       {acima && <p className="mt-1.5 text-[11px] font-medium text-amber-700">Acima do máximo do fabricante: {fmt(acima)}{area.bilateral ? " por lado" : ""}.</p>}
+      {abaixo && <p className="mt-1.5 text-[11px] font-medium text-amber-700">Abaixo do mínimo: {fmt(abaixo)} por lado em cada profundidade.</p>}
     </div>
   );
 }
@@ -174,7 +177,7 @@ export function CartaoArea({
     // Próxima profundidade: a primeira da lista que ainda não está em uso (rosto vai de 4,5 para 1,5).
     const usadas = new Set(linhas.map((l) => l.prof));
     const ordem = area.id === "papada" || area.manual ? [...area.opts].reverse() : ["4.5", "3.0", "1.5", ...area.opts];
-    return ordem.find((p) => !usadas.has(p)) ?? area.opts[0];
+    return ordem.filter((p) => area.opts.includes(p)).find((p) => !usadas.has(p)) ?? null;
   };
   return (
     <section id={`area-${area.id}`} className={`overflow-hidden rounded-3xl bg-white shadow-[0_1px_2px_rgba(16,24,40,.04),0_8px_24px_-12px_rgba(16,24,40,.12)] ring-1 transition ${total > 0 ? "ring-brand-teal/45" : "ring-neutral-200/80"}`}>
@@ -221,8 +224,12 @@ export function CartaoArea({
             <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => onLinhas([...linhas, linhaVazia(area, proxima())])}
-                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-teal/60 px-3.5 py-2 text-xs font-bold text-brand-teal-dark active:bg-brand-teal/10"
+                onClick={() => {
+                  const prof = proxima();
+                  if (prof) onLinhas([...linhas, linhaVazia(area, prof)]);
+                }}
+                disabled={proxima() === null}
+                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-teal/60 px-3.5 py-2 text-xs font-bold text-brand-teal-dark active:bg-brand-teal/10 disabled:opacity-30"
               >
                 <Plus size={14} /> Profundidade
               </button>
