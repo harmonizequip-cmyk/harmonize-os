@@ -6,7 +6,7 @@
 // do corpo em `parte` (antes iam com a imagem inteira dentro do estado).
 
 import type { EstadoPlanejador } from "./planejamento";
-import { MAXIMO_LINHA, MINIMO_LINHA } from "./planejamento";
+import { MAXIMO_LINHA, MINIMO_LINHA, MAX_PROFUNDIDADES } from "./planejamento";
 
 export const OPTS_STD = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5"];
 export const OPTS_PAP = [...OPTS_STD, "6.0", "7.0", "8.0", "9.0", "10.0", "11.0", "12.0", "13.0"];
@@ -51,7 +51,7 @@ export const AREAS_FIXAS: Area[] = [
   { id: "jowls", nome: "Jowls", bilateral: true, opts: ["4.5"], hint: "Só a profundidade 4,5 mm, até 1.500 por lado (derretimento da face chega perto do máximo)." },
   { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD, hint: "De 600 a 1.200 por lado em cada profundidade." },
   { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, opts: OPTS_STD, hint: "Usar gaze, nunca sobre o globo ocular. Normalmente 1,5 mm, até 500 por lado." },
-  { id: "frontal", nome: "Frontal", bilateral: true, opts: OPTS_STD },
+  { id: "frontal", nome: "Frontal", bilateral: true, opts: ["1.5"], hint: "Uma profundidade só (1,5 mm), até 500 por lado." },
   { id: "perioral_sup", nome: "Perioral Superior", bilateral: true, opts: OPTS_STD },
   { id: "perioral_inf", nome: "Perioral Inferior", bilateral: true, opts: OPTS_STD },
 ];
@@ -408,6 +408,11 @@ export function alertas(p: Plano): Alerta[] {
     }
   }
   for (const a of AREAS_FIXAS) {
+    const limite = MAX_PROFUNDIDADES[a.id];
+    if (limite) {
+      const usadas = new Set((p.DATA[a.id] ?? []).filter((r) => subtotalLinha(a, r) > 0).map((r) => r.prof));
+      if (usadas.size > limite) out.push({ texto: `${a.nome} só pode ter ${limite} profundidade (${a.opts[0].replace(".", ",")} mm), e há ${usadas.size} com disparos.`, grave: false, areaId: a.id });
+    }
     for (const r of p.DATA[a.id] ?? []) {
       const min = linhaAbaixoDoMinimo(a, r);
       if (min) out.push({ texto: `${a.nome} ${r.prof} mm abaixo do mínimo (${fmt(min)} por lado).`, grave: false, areaId: a.id });

@@ -113,6 +113,14 @@ describe("planejador nativo: estado antigo", () => {
     expect(q.sessoesAnteriores[0].DATA.olhos).toEqual([{ prof: "1.5", dispD: 200, dispE: 200 }]);
     expect(totalDistribuido(q)).toBe(1400);
   });
+  it("Frontal só tem uma profundidade (1,5 mm): mais de uma com disparos gera aviso", () => {
+    const frontal = AREAS_FIXAS.find((a) => a.id === "frontal")!;
+    expect(frontal.opts).toEqual(["1.5"]);
+    const ok = normalizarPlano({ DATA: { frontal: [{ prof: "1.5", dispD: 500, dispE: 500 }] } });
+    expect(alertas(ok).some((x) => x.areaId === "frontal")).toBe(false);
+    const duas = normalizarPlano({ DATA: { frontal: [{ prof: "4.5", dispD: 300, dispE: 300 }, { prof: "1.5", dispD: 200, dispE: 200 }] } });
+    expect(alertas(duas).some((x) => x.areaId === "frontal" && /só pode ter 1 profundidade/.test(x.texto))).toBe(true);
+  });
   it("Terço médio é o antigo arco mandibular e não há nasolabial", () => {
     expect(AREAS_FIXAS.find((a) => a.id === "arcomandibular")?.nome).toBe("Terço médio");
     expect(AREAS_FIXAS.some((a) => /nasolabial/i.test(a.nome))).toBe(false);

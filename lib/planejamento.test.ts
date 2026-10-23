@@ -112,15 +112,16 @@ describe("montagem pelas regras", () => {
   });
   it("divide o saldo igual no rosto, respeitando o máximo de cada linha", () => {
     const m = montarPlanejamento({ areas: ["frontal", "jowls"], saldo: 6000 });
-    // frontal: 2 profundidades x 2 lados (teto 500); jowls: só 4,5 x 2 lados (teto 1.500)
+    // frontal: só 1,5 mm x 2 lados (teto 500); jowls: só 4,5 x 2 lados (teto 1.500)
     const frontal = m.estado.DATA!.frontal as { dispD: number }[];
     const jowls = m.estado.DATA!.jowls as { prof: string; dispD: number; dispE: number }[];
+    expect(frontal.map((l) => l.prof)).toEqual(["1.5"]);
     expect(frontal.every((l) => l.dispD === 500)).toBe(true);
     expect(jowls.map((l) => l.prof)).toEqual(["4.5"]);
     expect(jowls[0].dispD).toBe(1500);
     expect(jowls[0].dispE).toBe(1500);
-    expect(m.total).toBe(5000);
-    expect(m.sobra).toBe(1000);
+    expect(m.total).toBe(4000);
+    expect(m.sobra).toBe(2000);
   });
   it("papada e corporal saem do saldo antes do rosto", () => {
     const m = montarPlanejamento({
@@ -156,7 +157,7 @@ describe("montagem pelas regras", () => {
     expect(jowls[0].dispD).toBe(1500);
     expect(jowls[0].dispE).toBe(1500);
     const frontal = m.estado.DATA!.frontal as { dispD: number }[];
-    expect(frontal.every((l) => l.dispD === 250)).toBe(true);
+    expect(frontal.every((l) => l.dispD === 500)).toBe(true);
     expect(m.total).toBe(4000);
   });
   it("olhos é área fixa só em 1,5 mm, até 500 por lado", () => {

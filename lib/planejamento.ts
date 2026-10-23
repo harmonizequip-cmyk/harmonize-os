@@ -169,17 +169,20 @@ export const MAXIMO_LINHA: Record<string, number> = {
   mento: 1200,
 };
 
+/** Áreas que só aceitam uma profundidade com disparos (Frontal e Jowls). */
+export const MAX_PROFUNDIDADES: Record<string, number> = { frontal: 1, jowls: 1 };
+
 /** Mínimo por lado em cada profundidade (regra do dono, 22/10/2026). */
 export const MINIMO_LINHA: Record<string, number> = {
   arcomandibular: 600,
   submandibular: 600,
 };
 
-/** Profundidades de cada área do rosto (regra: 4,5, 3,0 e 1,5; exceções do guia; Jowls só 4,5). */
+/** Profundidades de cada área do rosto (regra: 4,5, 3,0 e 1,5; exceções do guia; Jowls só 4,5; Frontal e Olhos só 1,5). */
 export function profundidadesRosto(id: string): number[] {
   if (id === "jowls") return [4.5];
   if (id === "olhos") return [1.5];
-  if (id === "frontal") return [4.5, 1.5];
+  if (id === "frontal") return [1.5];
   if (id === "perioral_sup" || id === "perioral_inf") return [1.5];
   return [4.5, 3, 1.5];
 }

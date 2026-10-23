@@ -341,6 +341,9 @@ const MAXIMO_POR_LINHA: Record<string, number | null> = {
   perioral_sup: 600,
   perioral_inf: 600,
 };
+// Áreas que só aceitam UMA profundidade com disparos (espelha MAX_PROFUNDIDADES de lib/planejamento.ts).
+const MAX_PROFUNDIDADES: Record<string, number> = { frontal: 1, jowls: 1 };
+
 const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs: string[] }> = {
   pescoco: { nome: "Pescoço", bilateral: true, profs: PROF_STD },
   papada: { nome: "Papada", bilateral: false, profs: PROF_PAP },
@@ -348,7 +351,7 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
   jowls: { nome: "Jowls", bilateral: true, profs: ["4.5"] },
   arcomandibular: { nome: "Terço médio", bilateral: true, profs: PROF_STD },
   olhos: { nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, profs: PROF_STD },
-  frontal: { nome: "Frontal", bilateral: true, profs: PROF_STD },
+  frontal: { nome: "Frontal", bilateral: true, profs: ["1.5"] },
   perioral_sup: { nome: "Perioral Superior", bilateral: true, profs: PROF_STD },
   perioral_inf: { nome: "Perioral Inferior", bilateral: true, profs: PROF_STD },
 };
@@ -621,6 +624,15 @@ async function executarFerramenta(
             linhas.push({ prof, disp: d });
             totArea += d;
           }
+        }
+        const limiteProf = MAX_PROFUNDIDADES[String(a.id)];
+        if (limiteProf) {
+          const comDisparo = new Set(
+            (linhas as { prof: string; dispD?: number; dispE?: number; disp?: number }[])
+              .filter((l) => (l.dispD ?? 0) + (l.dispE ?? 0) + (l.disp ?? 0) > 0)
+              .map((l) => l.prof)
+          );
+          if (comDisparo.size > limiteProf) problemas.push(`${def.nome} só pode ter ${limiteProf} profundidade (${def.profs[0]} mm), mas veio com ${comDisparo.size}`);
         }
         if (linhas.length) {
           DATA[String(a.id)] = linhas;
