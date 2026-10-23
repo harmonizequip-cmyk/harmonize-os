@@ -7,6 +7,7 @@
 // classe dela vencer de novo.
 
 import { useMemo, useState, useEffect } from "react";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -294,6 +295,13 @@ export default function RelacionamentoClient({
                         {p.totalFaturado > 0 ? ` · ${formatCurrency(p.totalFaturado)} em ${p.locacoes.length} locaç${p.locacoes.length === 1 ? "ão" : "ões"}` : ""}
                       </p>
                     </div>
+                    <MenuAtalhosCliente
+                      clienteId={p.id}
+                      nome={p.nome}
+                      nomeCurto={p.displayName}
+                      tratamento={p.treatment}
+                      className="-mr-2 -mt-2 flex-shrink-0"
+                    />
                   </div>
                   {!somenteLeitura && (
                     <div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-2">
@@ -379,8 +387,8 @@ export default function RelacionamentoClient({
           <ul className="cartao">
             {listaCarteira.length === 0 && <li className="p-6 text-center text-sm text-neutral-400">Ninguém aqui.</li>}
             {listaCarteira.slice(0, 200).map((p) => (
-              <li key={p.id} className="border-b border-neutral-100 last:border-0">
-                <Link href={`/clientes/${p.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-neutral-50">
+              <li key={p.id} className="flex items-center border-b border-neutral-100 pr-2 last:border-0">
+                <Link href={`/clientes/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 active:bg-neutral-50">
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
                       <span className="truncate text-sm font-semibold text-neutral-900">{nomeCurto(p)}</span>
@@ -399,6 +407,7 @@ export default function RelacionamentoClient({
                   {p.totalFaturado > 0 && <span className="text-xs font-bold tabular-nums text-neutral-700">{formatCurrency(p.totalFaturado)}</span>}
                   <ChevronRight size={16} className="flex-shrink-0 text-neutral-300" />
                 </Link>
+                <MenuAtalhosCliente clienteId={p.id} nome={p.nome} nomeCurto={p.displayName} tratamento={p.treatment} className="flex-shrink-0" />
               </li>
             ))}
           </ul>

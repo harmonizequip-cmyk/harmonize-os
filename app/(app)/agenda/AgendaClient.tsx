@@ -26,6 +26,7 @@ import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
 import { taxaVencida } from "@/lib/taxa";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import { LinkCliente } from "@/components/Atalhos";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { resumoCredito, temCredito, type SaldoCredito } from "@/lib/creditos";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import NovoEventoModal from "./NovoEventoModal";
@@ -506,7 +507,7 @@ export default function AgendaClient({
         className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
       >
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-start gap-2">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
             <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${meta.dot}`} />
             <div>
               <p className="text-sm font-medium text-neutral-900">{e.title}</p>
@@ -582,6 +583,16 @@ export default function AgendaClient({
           >
             {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
           </button>
+          {e.client_id && (
+            <MenuAtalhosCliente
+              clienteId={e.client_id}
+              nome={e.clients?.name ?? null}
+              nomeCurto={e.clients?.display_name ?? null}
+              tratamento={e.clients?.treatment ?? null}
+              eventoId={e.id}
+              className="-mr-2 -mt-2 flex-shrink-0"
+            />
+          )}
         </div>
 
         {/* Ação independente da confirmação: manda a mensagem, nunca

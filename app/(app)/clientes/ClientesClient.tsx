@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NovoClienteModal from "./NovoClienteModal";
@@ -193,10 +194,17 @@ export default function ClientesClient({
         {filtered.map((c) => (
           <div
             key={c.id}
-            className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
+            className="relative rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
           >
+            <MenuAtalhosCliente
+              clienteId={c.id}
+              nome={c.name}
+              whatsapp={c.whatsapp}
+              endereco={c.address}
+              className="absolute right-2 top-2"
+            />
             <Link href={`/clientes/${c.id}`}>
-              <p className="font-medium text-neutral-900">{c.name}</p>
+              <p className="pr-9 font-medium text-neutral-900">{c.name}</p>
               {c.clinic_name && <p className="mt-0.5 text-sm text-neutral-500">{c.clinic_name}</p>}
               <p className="mt-0.5 text-xs text-neutral-400">{c.city ?? "-"}</p>
 

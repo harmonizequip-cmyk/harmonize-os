@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import Link from "next/link";
 import { Clock, Users, Wallet } from "lucide-react";
 import HeroTela from "@/components/ui/HeroTela";
@@ -163,8 +164,8 @@ export default function PendenciasClient({
             );
             return (
               <div key={t.eventId} className="rounded-xl bg-white/70 p-2.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-medium text-neutral-900">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">
                     {t.cliente}
                     {t.vencida && (
                       <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
@@ -175,6 +176,7 @@ export default function PendenciasClient({
                   {t.valor > 0 && (
                     <p className="text-sm font-semibold text-red-700">{formatCurrency(t.valor)}</p>
                   )}
+                  {t.clientId && <MenuAtalhosCliente clienteId={t.clientId} nome={t.cliente} eventoId={t.eventId} className="-mr-2 flex-shrink-0" />}
                 </div>
                 <p className="text-xs text-neutral-500">
                   Reserva para {formatDate(t.dataEvento)} · taxa sem pagar há {t.diasSemPagar}{" "}
@@ -248,7 +250,8 @@ export default function PendenciasClient({
             const whatsapp = buildWhatsAppLink(c.whatsapp, mensagem);
             return (
               <div key={c.clientId} className={card}>
-                <button type="button" onClick={() => alternar(c.clientId)} className="flex w-full items-center gap-3 text-left">
+                <div className="flex items-center gap-1">
+                <button type="button" onClick={() => alternar(c.clientId)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-neutral-900">{c.cliente}</p>
                     <p className="text-xs text-neutral-500">
@@ -259,6 +262,8 @@ export default function PendenciasClient({
                   <p className="text-sm font-semibold text-amber-600">{formatCurrency(c.total)}</p>
                   <span className="text-xs text-neutral-400">{aberto ? "▲" : "▼"}</span>
                 </button>
+                <MenuAtalhosCliente clienteId={c.clientId} nome={c.cliente} whatsapp={c.whatsapp} className="-mr-2 flex-shrink-0" />
+                </div>
 
                 {aberto && (
                   <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3">

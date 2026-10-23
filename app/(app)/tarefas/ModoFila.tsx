@@ -6,6 +6,7 @@
 // (vêm por props), só que em sequência.
 
 import { useMemo, useState } from "react";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { X } from "lucide-react";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
@@ -115,7 +116,18 @@ export default function ModoFila({
 
   return casca(
     <>
-      <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[11px] font-medium text-brand-blue">{TIPOS[t.type]}</span>
+      <div className="flex items-start justify-between gap-2">
+        <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[11px] font-medium text-brand-blue">{TIPOS[t.type]}</span>
+        {t.client_id && (
+          <MenuAtalhosCliente
+            clienteId={t.client_id}
+            nome={t.client_name}
+            eventoId={t.event_id}
+            comTexto
+            className="-mr-2 -mt-2"
+          />
+        )}
+      </div>
       <p className="mt-2 text-base font-semibold text-neutral-900">
         {t.client_name ? <LinkCliente id={t.client_id}>{t.client_name}</LinkCliente> : t.title}
       </p>

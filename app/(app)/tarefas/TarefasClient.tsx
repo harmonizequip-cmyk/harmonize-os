@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -97,20 +98,19 @@ export default function TarefasClient({
   }, [searchParams]);
 
   const term = search.trim().toLowerCase();
-  const filteredPendentes = useMemo(
-    () =>
-      term
-        ? pendentes.filter((t) => t.title.toLowerCase().includes(term) || (t.client_name ?? "").toLowerCase().includes(term))
-        : pendentes,
-    [pendentes, term]
-  );
-  const filteredConcluidas = useMemo(
-    () =>
-      term
-        ? concluidas.filter((t) => t.title.toLowerCase().includes(term) || (t.client_name ?? "").toLowerCase().includes(term))
-        : concluidas,
-    [concluidas, term]
-  );
+  // /tarefas?cliente=<id>: atalho do menu dos cartões, só as tarefas daquela cliente.
+  const clienteFiltro = searchParams.get("cliente");
+  const nomeClienteFiltro = clienteFiltro
+    ? [...pendentes, ...concluidas].find((t) => t.client_id === clienteFiltro)?.client_name ?? "esta cliente"
+    : null;
+  const filtrar = (lista: TarefaRow[]) =>
+    lista.filter(
+      (t) =>
+        (!clienteFiltro || t.client_id === clienteFiltro) &&
+        (!term || t.title.toLowerCase().includes(term) || (t.client_name ?? "").toLowerCase().includes(term))
+    );
+  const filteredPendentes = useMemo(() => filtrar(pendentes), [pendentes, term, clienteFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filteredConcluidas = useMemo(() => filtrar(concluidas), [concluidas, term, clienteFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // As ações devolvem se gravou: a fila só passa para a próxima (e conta como feita) quando deu certo.
   async function registerContactAttempt(taskId: string, responded: boolean): Promise<boolean> {
@@ -225,6 +225,17 @@ export default function TarefasClient({
         />
       )}
 
+      {clienteFiltro && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-teal-50 px-3 py-2 text-sm text-teal-800 ring-1 ring-teal-100">
+          <span>
+            Só as tarefas de <b>{nomeClienteFiltro}</b>
+          </span>
+          <button type="button" onClick={() => router.replace("/tarefas")} className="ml-auto rounded-full bg-white px-3 py-1 text-xs font-bold text-teal-700 ring-1 ring-teal-200">
+            Ver todas
+          </button>
+        </div>
+      )}
+
       <input
         placeholder="Buscar por título ou cliente..."
         value={search}
@@ -252,9 +263,10 @@ export default function TarefasClient({
                   id={`task-${task.id}`}
                   className="overflow-hidden rounded-xl border border-brand-blue/20 bg-brand-blue/5"
                 >
+                  <div className="flex items-center">
                   <button
                     onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-left"
                   >
                     <span className="text-xs">
                       <span className="font-medium text-neutral-900">{task.title}</span>
@@ -276,6 +288,10 @@ export default function TarefasClient({
                     </span>
                     <span className="flex-shrink-0 text-[10px] text-neutral-400">{expanded ? "▲" : "▼"}</span>
                   </button>
+                  {task.client_id && (
+                    <MenuAtalhosCliente clienteId={task.client_id} nome={task.client_name} eventoId={task.event_id} className="mr-1 flex-shrink-0" />
+                  )}
+                  </div>
                   {expanded && (
                     <div className="border-t border-brand-blue/10 px-3 py-2">
                       {task.event_id && (
@@ -419,9 +435,10 @@ export default function TarefasClient({
                   id={`task-${task.id}`}
                   className="overflow-hidden rounded-xl bg-neutral-100/70"
                 >
+                  <div className="flex items-center">
                   <button
                     onClick={() => setExpandedTaskId((cur) => (cur === task.id ? null : task.id))}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-xs"
                   >
                     <div>
                       <p className="font-medium text-neutral-500 line-through decoration-neutral-400">
@@ -437,6 +454,10 @@ export default function TarefasClient({
                       {task.completed_at ? formatDate(task.completed_at.slice(0, 10)) : ""}
                     </span>
                   </button>
+                  {task.client_id && (
+                    <MenuAtalhosCliente clienteId={task.client_id} nome={task.client_name} eventoId={task.event_id} className="mr-1 flex-shrink-0" />
+                  )}
+                  </div>
                   {expanded && (
                     <div className="border-t border-neutral-200 px-3 py-2">
                       <button

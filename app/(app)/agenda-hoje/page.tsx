@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import Link from "next/link";
@@ -131,11 +132,14 @@ export default async function AgendaHojePage() {
               ) : (
                 <p className="text-sm font-medium text-neutral-900">{r.cliente ?? "-"}</p>
               )}
-              {r.pendente && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                  sem disparos ainda
-                </span>
-              )}
+              <div className="flex flex-shrink-0 items-center gap-1">
+                {r.pendente && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    sem disparos ainda
+                  </span>
+                )}
+                {r.clientId && <MenuAtalhosCliente clienteId={r.clientId} nome={r.cliente} eventoId={r.eventId} className="-mr-2" />}
+              </div>
             </div>
             <p className="text-xs text-neutral-500">
               {r.equipamento ? `${r.equipamento} · ` : ""}

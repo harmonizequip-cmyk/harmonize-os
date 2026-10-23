@@ -11,6 +11,7 @@ import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
 import { Atalho, LinkCliente } from "@/components/Atalhos";
+import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { linkEvento } from "@/lib/atalhos";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
@@ -1142,7 +1143,7 @@ function LeadCardContent({
       }
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 text-sm font-medium text-neutral-900">{lead.name}</p>
+        <p className="min-w-0 flex-1 text-sm font-medium text-neutral-900">{lead.name}</p>
         {lead.parceiro && (
           <span className="flex-shrink-0 rounded-full bg-brand-lilac/15 px-2 py-0.5 text-[11px] font-semibold text-brand-lilac">
             🤝 Parceiro
@@ -1152,6 +1153,18 @@ function LeadCardContent({
           <span className="flex-shrink-0 rounded-full bg-brand-lilac/15 px-2 py-0.5 text-[11px] font-semibold text-brand-lilac">
             Sem taxa
           </span>
+        )}
+        {!floating && (
+          <MenuAtalhosCliente
+            clienteId={lead.id}
+            nome={lead.name}
+            nomeCurto={lead.display_name ?? null}
+            tratamento={lead.treatment ?? null}
+            whatsapp={lead.whatsapp}
+            endereco={lead.address}
+            eventoId={lead.nextEvent?.id ?? null}
+            className="-mr-2 -mt-2 flex-shrink-0"
+          />
         )}
       </div>
       {lead.city && <p className="mt-0.5 text-xs text-neutral-500">{lead.city}</p>}

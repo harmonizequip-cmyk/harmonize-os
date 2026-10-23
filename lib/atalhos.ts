@@ -23,6 +23,18 @@ export const linkLocacoesCliente = (clientId: string) => `/locacoes?cliente=${cl
 
 export const linkTarefa = (taskId: string) => `/tarefas?highlight=${taskId}`;
 
+/** Tarefas só da cliente (filtro na tela de Tarefas). */
+export const linkTarefasCliente = (clientId: string) => `/tarefas?cliente=${clientId}`;
+
+/** Planejamentos da cliente. */
+export const linkPlanejamentosCliente = (clientId: string) => `/planejador?cliente=${clientId}`;
+
+/** Ficha da cliente já abrindo "Agendar sem disparos" (reserva). */
+export const linkAgendarCliente = (clientId: string) => `/clientes/${clientId}?acao=agendar`;
+
+/** Ficha da cliente já abrindo "+ Nova locação" (calculadora). */
+export const linkNovaLocacaoCliente = (clientId: string) => `/clientes/${clientId}?acao=locacao`;
+
 export const linkPlanejamento = (id: string) => `/planejador/${id}`;
 
 /** Onde o cartão do assistente deixa o planejamento montado pela IA para o planejador abrir (?ia=1). */

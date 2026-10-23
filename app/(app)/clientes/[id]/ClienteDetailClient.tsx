@@ -23,7 +23,7 @@ import HistoricoClienteSection from "./HistoricoClienteSection";
 import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
 import CreditosClienteCard from "@/components/CreditosClienteCard";
 import { Atalho, Atalhos } from "@/components/Atalhos";
-import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento } from "@/lib/atalhos";
+import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento, linkTarefasCliente } from "@/lib/atalhos";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -202,6 +202,21 @@ export default function ClienteDetailClient({
   const [editingRental, setEditingRental] = useState<RentalRow | null>(null);
   const [contratoOrigem, setContratoOrigem] = useState<OrigemContrato | null>(null);
 
+  // /clientes/<id>?acao=agendar|locacao: atalho do menu dos cartões (components/MenuAtalhosCliente)
+  // que abre direto "Agendar sem disparos" ou "+ Nova locação" desta ficha.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const acao = url.searchParams.get("acao");
+    if (acao !== "agendar" && acao !== "locacao") return;
+    url.searchParams.delete("acao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    if (somenteLeitura) return;
+    if (acao === "agendar") setReservaOpen(true);
+    else setModalOpen(true);
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // /clientes/<id>?locacao=<rentalId>: atalho de outras telas (Agenda,
   // Financeiro, Locações, Contratos...) que abre direto aquela locação.
   useEffect(() => {
@@ -278,7 +293,7 @@ export default function ClienteDetailClient({
           <Atalhos className="mt-2">
             <Atalho href={linkLancamentosCliente(client.id)} emoji="💰">Lançamentos</Atalho>
             <Atalho href={linkLocacoesCliente(client.id)} emoji="📦">Locações</Atalho>
-            <Atalho href="/tarefas" emoji="🗒️">Tarefas</Atalho>
+            <Atalho href={linkTarefasCliente(client.id)} emoji="🗒️">Tarefas</Atalho>
             <Atalho href={`/planejador?cliente=${client.id}`} emoji="📋">Planejamentos</Atalho>
             {!somenteLeitura && (
               <Atalho href={linkNovoPlanejamento(client.id)} emoji="📋">Novo planejamento</Atalho>
