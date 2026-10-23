@@ -222,7 +222,7 @@ const FERRAMENTAS = [
         },
         areas_extras: {
           type: "array",
-          description: "Áreas manuais (as que não são fixas no planejador): mento, áreas corporais... Terço médio é a área fixa arcomandibular e Pálpebras inferiores e lateral dos olhos é a área fixa olhos (mande em "areas", nunca aqui).",
+          description: "Áreas manuais (as que não são fixas no planejador): mento, áreas corporais... Terço médio é a área fixa arcomandibular e Pálpebras inferiores e lateral dos olhos é a área fixa olhos (mande em \"areas\", nunca aqui).",
           items: {
             type: "object",
             properties: {
