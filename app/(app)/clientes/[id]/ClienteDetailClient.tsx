@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import HistoricoClienteSection from "./HistoricoClienteSection";
 import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
 import CreditosClienteCard from "@/components/CreditosClienteCard";
+import AnotacoesFicha from "@/components/AnotacoesFicha";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento, linkTarefasCliente } from "@/lib/atalhos";
 
@@ -688,6 +689,8 @@ export default function ClienteDetailClient({
           </tbody>
         </table>
       </div>
+
+      <AnotacoesFicha clienteId={client.id} nome={client.name} />
 
       <CreditosClienteCard clientId={client.id} />
 

@@ -88,6 +88,29 @@ const FERRAMENTAS = [
     },
   },
   {
+    name: "ler_dossie_cliente",
+    description:
+      "Tudo o que existe de uma cliente numa chamada só (cadastro, anotações, memórias, agenda, locações, pagamentos, quanto deve, créditos, lançamentos, tarefas, agendas enviadas, planejamentos, mentorias, histórico e um resumo com totais e ritmo). Use antes de responder sobre uma cliente que não é a da conversa, ou para comparar clientes. A cliente da conversa já vem com o dossiê no contexto.",
+    input_schema: {
+      type: "object",
+      properties: { client_id: { type: "string", description: "id da cliente (clients.id)." } },
+      required: ["client_id"],
+    },
+  },
+  {
+    name: "guardar_anotacao",
+    description:
+      "Grava uma anotação com data e hora no histórico da cliente (o mesmo das Anotações da ficha). Use quando ele contar um acontecimento ou informação sobre ela (\"ela vai abrir outra clínica\", \"reclamou do horário\", \"pediu orçamento de 2 dias\"). Preferência ou combinado que vale sempre vai em guardar_memoria.",
+    input_schema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string", description: "id da cliente (clients.id)." },
+        texto: { type: "string", description: "A anotação, clara e curta, em até 500 caracteres." },
+      },
+      required: ["client_id", "texto"],
+    },
+  },
+  {
     name: "gerar_planilha",
     description:
       "Prepara uma planilha (.xlsx com o layout da Harmonize) que o dono baixa com um toque. Use quando ele pedir planilha, lista para baixar ou exportar. A consulta pode trazer até 5000 linhas.",
@@ -804,6 +827,25 @@ async function executarFerramenta(
         erro: false,
       };
     }
+    if (nome === "ler_dossie_cliente") {
+      if (estado.escopo === "pessoal") return { texto: "Dossiê de cliente só existe na Harmonize.", erro: true };
+      const clientId = String(entrada.client_id ?? "");
+      if (!UUID.test(clientId)) return { texto: "client_id inválido.", erro: true };
+      const { data, error } = await supabase.rpc("dossie_cliente", { p_client_id: clientId });
+      if (error) return { texto: `Erro ao ler o dossiê: ${error.message}`, erro: true };
+      if (!data) return { texto: "Cliente não encontrada.", erro: true };
+      return { texto: JSON.stringify(data), erro: false };
+    }
+    if (nome === "guardar_anotacao") {
+      if (estado.escopo === "pessoal") return { texto: "Anotação de cliente só existe na Harmonize.", erro: true };
+      const clientId = String(entrada.client_id ?? "");
+      const texto = String(entrada.texto ?? "").trim().slice(0, 500);
+      if (!UUID.test(clientId)) return { texto: "client_id inválido.", erro: true };
+      if (!texto) return { texto: "Anotação vazia.", erro: true };
+      const { error } = await supabase.rpc("salvar_anotacao_cliente", { p_client_id: clientId, p_texto: texto, p_origem: "assistente" });
+      if (error) return { texto: `Não consegui anotar: ${error.message}`, erro: true };
+      return { texto: "Anotação guardada no histórico da cliente.", erro: false };
+    }
     if (nome === "vincular_cliente" || nome === "preparar_whatsapp") {
       const clientId = String(entrada.client_id ?? "");
       if (!UUID.test(clientId)) return { texto: "client_id inválido.", erro: true };
@@ -816,7 +858,11 @@ async function executarFerramenta(
       const nomeCliente = [c.treatment, c.display_name || c.name].filter(Boolean).join(" ");
       if (nome === "vincular_cliente") {
         estado.clienteId = c.id;
-        return { texto: `Conversa amarrada a ${nomeCliente}.`, erro: false };
+        const { data: dossie } = await supabase.rpc("dossie_cliente", { p_client_id: c.id });
+        return {
+          texto: `Conversa amarrada a ${nomeCliente}.` + (dossie ? `\nDossiê dela:\n${JSON.stringify(dossie)}` : ""),
+          erro: false,
+        };
       }
       const texto = String(entrada.texto ?? "").trim();
       if (!texto) return { texto: "Mensagem vazia.", erro: true };
@@ -938,6 +984,7 @@ Deno.serve(async (req) => {
     .limit(100);
 
   let blocoCliente = "";
+  let blocoDossie = "";
   if (estado.clienteId && !pessoal) {
     const [{ data: c }, { data: memCliente }] = await Promise.all([
       supabase
@@ -961,7 +1008,9 @@ Deno.serve(async (req) => {
         (memCliente?.length
           ? `\nMemórias desta cliente:\n${memCliente.map((m) => `- [${m.id}] ${m.texto}`).join("\n")}`
           : "\nMemórias desta cliente: nenhuma ainda.") +
-        "\nPara responder sobre ela, consulte o que precisar (reservas, locações, pagamentos, tarefas).";
+        "\nO dossiê dela vem logo abaixo: use-o antes de responder e consulte o banco só para o que não estiver nele.";
+      const { data: dossie } = await supabase.rpc("dossie_cliente", { p_client_id: c.id });
+      if (dossie) blocoDossie = `Dossiê da cliente ${c.name} (JSON gerado agora; listas trazem os itens mais recentes, o resumo usa tudo):\n${JSON.stringify(dossie)}`;
     }
   }
 
@@ -1000,6 +1049,7 @@ Deno.serve(async (req) => {
           { type: "text", text: pessoal ? CONHECIMENTO_PESSOAL : CONHECIMENTO, cache_control: { type: "ephemeral" } },
           ...(modoInsights ? [{ type: "text", text: INSIGHTS }] : []),
           { type: "text", text: contexto },
+          ...(blocoDossie && !modoInsights ? [{ type: "text", text: blocoDossie, cache_control: { type: "ephemeral" } }] : []),
         ],
         tools: modoInsights ? FERRAMENTAS_INSIGHTS : pessoal ? FERRAMENTAS_PESSOAL : FERRAMENTAS,
         // Na última rodada, sem ferramentas: responde com o que já tem.

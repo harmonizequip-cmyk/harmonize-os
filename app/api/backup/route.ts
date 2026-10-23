@@ -40,6 +40,7 @@ const TABELAS = [
   "orcamentos_pessoais",
   "insights",
   "assistente_memoria",
+  "cliente_anotacoes",
 ];
 
 const PAGINA = 1000;

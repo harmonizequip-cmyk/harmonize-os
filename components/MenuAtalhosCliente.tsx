@@ -20,6 +20,7 @@ import {
   Navigation,
   Package,
   PlusCircle,
+  StickyNote,
   Wallet,
   X,
   type LucideIcon,
@@ -37,6 +38,7 @@ import {
   linkTarefasCliente,
 } from "@/lib/atalhos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import AnotacoesCliente from "@/components/AnotacoesCliente";
 
 interface DadosCliente {
   nome: string | null;
@@ -52,6 +54,8 @@ interface Item {
   icone: LucideIcon;
   href: string | null;
   externo?: boolean;
+  /** Ação na própria tela (sem trocar de página), como abrir as anotações. */
+  acao?: () => void;
   /** Por que está indisponível (sem WhatsApp, sem endereço). */
   motivo?: string;
 }
@@ -84,6 +88,7 @@ export default function MenuAtalhosCliente({
 }) {
   const somenteLeitura = useSomenteLeitura();
   const [aberto, setAberto] = useState(false);
+  const [anotacoes, setAnotacoes] = useState(false);
   const [celular, setCelular] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [dados, setDados] = useState<DadosCliente>({
@@ -208,6 +213,16 @@ export default function MenuAtalhosCliente({
     {
       titulo: "Contato",
       itens: [
+        {
+          chave: "anotacoes",
+          rotulo: "Anotações",
+          icone: StickyNote,
+          href: null,
+          acao: () => {
+            fechar(false);
+            setAnotacoes(true);
+          },
+        },
         { chave: "whatsapp", rotulo: "WhatsApp", icone: MessageCircle, href: zap, externo: true, motivo: esperando ? "carregando..." : "sem WhatsApp no cadastro" },
         { chave: "waze", rotulo: "Waze", icone: Navigation, href: waze, externo: true, motivo: esperando ? "carregando..." : "sem endereço no cadastro" },
       ],
@@ -260,7 +275,11 @@ export default function MenuAtalhosCliente({
           <p className="mb-1 px-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400">{g.titulo}</p>
           <div className={celular ? "grid grid-cols-2 gap-1" : "space-y-0.5"}>
             {g.itens.map((it) =>
-              !it.href ? (
+              it.acao ? (
+                <button key={it.chave} type="button" role="menuitem" onClick={it.acao} className={classeItem}>
+                  {conteudoItem(it)}
+                </button>
+              ) : !it.href ? (
                 <span key={it.chave} role="menuitem" aria-disabled="true" tabIndex={-1} className={`${classeItem} cursor-not-allowed opacity-50`}>
                   {conteudoItem(it)}
                 </span>
@@ -344,6 +363,7 @@ export default function MenuAtalhosCliente({
           ),
           document.body
         )}
+      {anotacoes && <AnotacoesCliente clienteId={clienteId} nome={dados.nome || nome} onClose={() => setAnotacoes(false)} />}
     </span>
   );
 }
