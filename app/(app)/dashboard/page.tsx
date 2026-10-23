@@ -25,6 +25,7 @@ import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
 import { CalendarDays, HandCoins, Wallet } from "lucide-react";
 import { IconeChip } from "@/components/ui/Visual";
 import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
+import { carregarEncaixe } from "@/lib/carregar-encaixe";
 import { LIMITE_DIARIO } from "@/lib/relacionamento";
 
 // Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
@@ -625,11 +626,27 @@ export default async function DashboardPage(
     });
   // Relacionamento: quem está na hora de uma conversa (no máximo 8 por dia).
   let paraChamar = 0;
+  let encaixes: Awaited<ReturnType<typeof carregarEncaixe>> = [];
   try {
-    paraChamar = (await carregarRelacionamento(supabase, todayStr)).filter((p) => p.devida).length;
+    const carteira = await carregarRelacionamento(supabase, todayStr);
+    paraChamar = carteira.filter((p) => p.devida).length;
+    // Encaixe: datas livres coladas a um atendimento, com gente por perto.
+    encaixes = await carregarEncaixe(supabase, todayStr, { pessoas: carteira }).catch(() => []);
   } catch {
     // aviso opcional: sem ele o Dashboard segue
   }
+  if (encaixes.length > 0)
+    avisos.push({
+      id: "encaixe",
+      icone: "agenda",
+      texto: `${encaixes.length} ${encaixes.length === 1 ? "data livre para encaixar" : "datas livres para encaixar"} perto de onde você vai estar`,
+      detalhe: encaixes
+        .slice(0, 2)
+        .map((o) => `${o.data.slice(8, 10)}/${o.data.slice(5, 7)} perto de ${o.ancoras[0].cidade} (${o.candidatas.length})`)
+        .join(" · "),
+      href: encaixes.length === 1 ? `/agenda/encaixe?data=${encaixes[0].data}` : "/agenda/encaixe",
+      nivel: "info",
+    });
   if (paraChamar > 0)
     avisos.push({
       id: "relacionamento",

@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
+  CalendarCheck,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
@@ -33,6 +34,7 @@ export type NivelAviso = "urgente" | "atencao" | "info";
 // quadradinho de cor clara, no lugar de emoji).
 const ICONES: Record<string, { icone: LucideIcon; cor: CorVisual }> = {
   taxa: { icone: CreditCard, cor: "ambar" },
+  agenda: { icone: CalendarCheck, cor: "teal" },
   disparos: { icone: ReceiptText, cor: "roxo" },
   confirmacao: { icone: Phone, cor: "azul" },
   tarefas: { icone: ClipboardCheck, cor: "verde" },

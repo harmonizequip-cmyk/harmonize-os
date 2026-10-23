@@ -147,6 +147,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Tela Equipamentos > cartão "Aplicadores" (`components/AplicadoresCard.tsx`, `lib/aplicador.ts`). Aviso no Dashboard com a garantia entre 90% e 100%, levando a `/equipamentos#aplicadores`; no resumo das 7h30, o mesmo só às segundas. Fora da garantia só aparece no cartão, sem aviso.
 - Revisão anual é do equipamento: `equipments.ultima_revisao`, gravada por `registrar_revisao_equipamento`. Próxima = última + 1 ano. Aviso no Dashboard 30 dias antes ou vencida (leva a `/equipamentos#revisao-<code>`), e no resumo das 7h30 às segundas.
 
+## Encaixe de datas livres (23/10/2026)
+
+- Dia livre (os dois HIPROs sem evento nem bloqueio, fora domingo, nos próximos 30 dias) com atendimento no dia anterior ou no seguinte: a cidade das clientes desses atendimentos diz onde o dono vai estar, e entram clientes e leads até 150 km (`RAIO_KM`, decisão do dono) dali, sem reserva marcada e fora desqualificado. Ordem: "hora de conversar" do Relacionamento, depois a prioridade, depois a distância. Regras puras em `lib/encaixe.ts` (testadas), carga em `lib/carregar-encaixe.ts`.
+- Distância em linha reta pela posição de cada cidade (`lib/cidades-coordenadas.ts`, grátis, sem serviço de mapa; cidade que não estiver na lista não entra: acrescentar lá). Cliente sem cidade no cadastro não entra.
+- Tela `/agenda/encaixe` (todas as datas) e `/agenda/encaixe?data=` (um dia): cada pessoa com classe, "~N km de <cidade>", botão "Oferecer" (WhatsApp com `mensagemEncaixe`) e o menu ⋮. Aviso no Dashboard ("N datas livres para encaixar..."). Cancelar ou reagendar uma reserva de HIPRO com data futura pergunta "Ver quem encaixar" (`EditarEventoModal`).
+
 ## Previsão de caixa
 
 - Dashboard > "Previsão de caixa" (`components/PrevisaoCaixaCard.tsx`, conta em `lib/previsao.ts`), 30 ou 60 dias: reservas marcadas (sem `rental_id`) estimadas pela média das locações do próprio cliente ou pela média geral, menos a taxa já paga; mais o a receber vencido (`buscarPendencias`); menos custos das locações (proporção despesas/faturamento de `rentals_lucro`) e contas fixas de Configurações (1 vez a cada 30 dias). Mentoria sem histórico fica "sem estimativa".

@@ -19,7 +19,7 @@ import { linkCliente, linkLancamentosCliente, linkLocacao, linkNovoPlanejamento 
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing";
 import { valorParaNumero } from "@/lib/valor";
-import { duracaoEmDias, somarDias } from "@/lib/period";
+import { duracaoEmDias, hojeLocal, somarDias } from "@/lib/period";
 import { confirmar } from "@/components/Dialogos";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
@@ -273,6 +273,21 @@ export default function EditarEventoModal({
   const [reagendando, setReagendando] = useState(false);
   const [reagendarError, setReagendarError] = useState<string | null>(null);
 
+
+  // Data de HIPRO liberada no futuro: oferece ver quem está perto para encaixar
+  // (lib/encaixe.ts). A janela já fechou; o diálogo é global.
+  async function oferecerEncaixe(dataLiberada: string) {
+    const ehHipro = event.event_type === "hipro_1" || event.event_type === "hipro_2";
+    if (!ehHipro || dataLiberada <= hojeLocal()) return;
+    const ok = await confirmar({
+      titulo: "Data liberada",
+      texto: `${formatDate(dataLiberada)} ficou livre. Quer ver quem está perto de onde você vai estar para encaixar nessa data?`,
+      confirmar: "Ver quem encaixar",
+      cancelar: "Agora não",
+    });
+    if (ok) router.push(`/agenda/encaixe?data=${dataLiberada}`);
+  }
+
   async function handleReagendar() {
     if (!novaData) {
       setReagendarError("Escolha a nova data.");
@@ -303,6 +318,7 @@ export default function EditarEventoModal({
       return;
     }
     onSaved();
+    if (novaData !== event.date_start) void oferecerEncaixe(event.date_start);
   }
 
   const [contratoState, setContratoState] = useState<{ origem: OrigemContrato; client: ClienteContratoInfo } | null>(
@@ -456,6 +472,7 @@ export default function EditarEventoModal({
       return;
     }
     onDeleted();
+    void oferecerEncaixe(event.date_start);
   }
 
   async function handleAbrirContratoReserva() {
