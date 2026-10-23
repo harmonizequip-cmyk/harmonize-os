@@ -43,14 +43,14 @@ export interface Area {
   manual?: boolean;
 }
 
-/** Áreas fixas, na ordem do dono (pescoço, papada, submandibular, jowls, terço médio...). Nasolabial saiu (fica no Jowls). Papada (campo único) e Submandibular (direito e esquerdo) são áreas separadas, com a mesma foto (regra do dono, 19 e 22/10/2026). */
+/** Áreas fixas, na ordem do dono (pescoço, papada, submandibular, jowls, terço médio...). Nasolabial saiu (fica no Jowls). Papada (campo único) e Submandibular (direito e esquerdo) são áreas separadas, com a mesma foto (regra do dono, 19 e 22/10/2026). Temporal e Arco Zigomático saiu: só ficou Pálpebras inferiores e lateral dos olhos (23/10/2026). */
 export const AREAS_FIXAS: Area[] = [
   { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
   { id: "papada", nome: "Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
   { id: "submandibular", nome: "Submandibular", bilateral: true, opts: OPTS_STD, hint: "Direito e esquerdo, de 600 a 1.200 por lado em cada profundidade. Iniciar da maior profundidade." },
   { id: "jowls", nome: "Jowls", bilateral: true, opts: ["4.5"], hint: "Só a profundidade 4,5 mm, até 1.500 por lado (derretimento da face chega perto do máximo)." },
   { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD, hint: "De 600 a 1.200 por lado em cada profundidade." },
-  { id: "temporal", nome: "Temporal e Arco Zigomático", bilateral: true, opts: OPTS_STD, hint: "Usar óculos/gaze. Não tratar pálpebra." },
+  { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, opts: OPTS_STD, hint: "Usar gaze, nunca sobre o globo ocular. Normalmente 1,5 mm, até 500 por lado." },
   { id: "frontal", nome: "Frontal", bilateral: true, opts: OPTS_STD },
   { id: "perioral_sup", nome: "Perioral Superior", bilateral: true, opts: OPTS_STD },
   { id: "perioral_inf", nome: "Perioral Inferior", bilateral: true, opts: OPTS_STD },
@@ -59,7 +59,7 @@ export const AREAS_FIXAS: Area[] = [
 /** Como a ponteira anda em cada área (texto curto, para a tela e o prontuário). */
 export const MOVIMENTO_DA_AREA: Record<string, string> = {
   frontal: "Do centro da testa para as laterais, em linhas paralelas.",
-  temporal: "Em arco, de baixo do olho subindo pela lateral até a têmpora.",
+  olhos: "Em arco, de baixo do olho subindo pela lateral até a têmpora. Usar gaze e nunca passar sobre o globo ocular.",
   arcomandibular: "Em diagonal, do sulco perto da boca subindo até a frente da orelha.",
   jowls: "Dois campos ovais (bigode chinês e jowls), com o movimento de baixo para cima.",
   pescoco: "Da parte de baixo da orelha descendo em curva até embaixo do queixo.",
@@ -161,7 +161,7 @@ export function hojeIso(): string {
 export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = hojeIso()): Plano {
   const s = (e ?? {}) as Record<string, unknown>;
   let customAreas = (Array.isArray(s.customAreas) ? s.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
-  const bruto = (s.DATA && typeof s.DATA === "object" ? s.DATA : {}) as Record<string, unknown>;
+  const bruto = temporalParaOlhos((s.DATA && typeof s.DATA === "object" ? s.DATA : {}) as Record<string, unknown>);
   const DATA = lerDATA(bruto, customAreas);
   // Planos antigos: a área manual Nasolabial vai para o Jowls.
   const juntar = (destino: string, novas: Linha[]) => {
@@ -169,20 +169,25 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
     const atuais = DATA[destino].filter((l) => (l.disp ?? 0) + (l.dispD ?? 0) + (l.dispE ?? 0) > 0);
     DATA[destino] = [...atuais, ...novas];
   };
-  const nasolabiais = customAreas.filter((a) => a.regiao !== "corporal" && /nasolabial/i.test(a.nome));
-  if (nasolabiais.length) {
-    const jowls = AREAS_FIXAS.find((a) => a.id === "jowls")!;
-    for (const a of nasolabiais) {
+  // Áreas manuais que viraram fixas: o que estava nelas vai para a área certa (Nasolabial para o Jowls,
+  // "Pálpebra"/"Olho" para Pálpebras inferiores e lateral dos olhos).
+  const absorver = (destinoId: string, regex: RegExp) => {
+    const manuais = customAreas.filter((a) => a.regiao !== "corporal" && regex.test(a.nome));
+    if (!manuais.length) return;
+    const destino = AREAS_FIXAS.find((a) => a.id === destinoId)!;
+    for (const a of manuais) {
       juntar(
-        "jowls",
+        destinoId,
         (DATA[a.id] ?? [])
           .filter((l) => subtotalLinha(a, l) > 0)
-          .map((l) => (a.bilateral ? normalizarLinha(jowls, l) : normalizarLinha(jowls, { prof: l.prof, dispD: Math.ceil((l.disp ?? 0) / 2), dispE: Math.floor((l.disp ?? 0) / 2), feito: l.feito })))
+          .map((l) => (a.bilateral ? normalizarLinha(destino, l) : normalizarLinha(destino, { prof: l.prof, dispD: Math.ceil((l.disp ?? 0) / 2), dispE: Math.floor((l.disp ?? 0) / 2), feito: l.feito })))
       );
       delete DATA[a.id];
     }
-    customAreas = customAreas.filter((a) => !nasolabiais.includes(a));
-  }
+    customAreas = customAreas.filter((a) => !manuais.includes(a));
+  };
+  absorver("jowls", /nasolabial/i);
+  absorver("olhos", /p[aá]lpebra|olho/i);
   const seqSalvo = num(s.customSeq);
   const maiorId = customAreas.reduce((m, a) => Math.max(m, Number(a.id.replace(/\D/g, "")) || 0), 0);
   return {
@@ -206,6 +211,19 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
   };
 }
 
+/** A área Temporal e Arco Zigomático saiu (era a mesma região dos olhos): o que estava nela vai para "Pálpebras inferiores e lateral dos olhos". */
+function temporalParaOlhos(bruto: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(bruto.temporal)) return bruto;
+  const { temporal, ...resto } = bruto;
+  const com = (l: unknown) => {
+    const o = (l ?? {}) as Record<string, unknown>;
+    return num(o.dispD) + num(o.dispE) + num(o.disp) > 0;
+  };
+  const novas = (temporal as unknown[]).filter(com);
+  const atuais = Array.isArray(resto.olhos) ? (resto.olhos as unknown[]).filter(com) : [];
+  return novas.length ? { ...resto, olhos: [...atuais, ...novas] } : resto;
+}
+
 /** DATA completo: toda área (fixa e manual) com ao menos uma linha. */
 function lerDATA(bruto: Record<string, unknown>, customAreas: Area[]): Record<string, Linha[]> {
   const DATA: Record<string, Linha[]> = {};
@@ -222,7 +240,7 @@ function lerSessoesAnteriores(v: unknown): SessaoFechada[] {
   v.forEach((x, i) => {
     const o = (x ?? {}) as Record<string, unknown>;
     const custom = (Array.isArray(o.customAreas) ? o.customAreas : []).map(normalizarCustom).filter((a): a is Area => !!a);
-    const bruto = (o.DATA && typeof o.DATA === "object" ? o.DATA : {}) as Record<string, unknown>;
+    const bruto = temporalParaOlhos((o.DATA && typeof o.DATA === "object" ? o.DATA : {}) as Record<string, unknown>);
     out.push({ n: num(o.n) || i + 1, data: txt(o.data), customAreas: custom, DATA: lerDATA(bruto, custom) });
   });
   return out.sort((a, b) => a.n - b.n);

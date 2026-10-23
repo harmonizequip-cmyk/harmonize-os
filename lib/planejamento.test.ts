@@ -58,7 +58,7 @@ describe("planejamento", () => {
 });
 
 describe("nome do procedimento pela escolha de áreas", () => {
-  const rosto = ["frontal", "temporal", "arcomandibular", "jowls"];
+  const rosto = ["frontal", "arcomandibular", "jowls"];
   it("rosto inteiro (sem as pequenas) é Full Face", () => {
     expect(nomeProcedimento(rosto)).toBe("Full Face");
     expect(nomeProcedimento([...rosto, "perioral_sup", "mento"])).toBe("Full Face");
@@ -158,6 +158,14 @@ describe("montagem pelas regras", () => {
     const frontal = m.estado.DATA!.frontal as { dispD: number }[];
     expect(frontal.every((l) => l.dispD === 250)).toBe(true);
     expect(m.total).toBe(4000);
+  });
+  it("olhos é área fixa só em 1,5 mm, até 500 por lado", () => {
+    const m = montarPlanejamento({ areas: ["olhos"], saldo: 5000 });
+    const linhas = (m.estado.DATA as Record<string, { prof: string; dispD: number; dispE: number }[]>).olhos;
+    expect(linhas).toEqual([{ prof: "1.5", dispD: 500, dispE: 500 }]);
+    expect((m.estado.customAreas as unknown[]).length).toBe(0);
+    expect(m.total).toBe(1000);
+    expect(m.sobra).toBe(4000);
   });
   it("disparos corporais ficam entre 3.200 e 4.000", () => {
     const m = montarPlanejamento({ areas: [], corporais: [{ nome: "Braço", tipo: "flacidez", profundidades: 2, quadrantes: 1, disparosPorProfundidade: 9999, bilateral: true }] });

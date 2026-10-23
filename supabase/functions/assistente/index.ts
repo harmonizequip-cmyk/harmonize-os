@@ -49,7 +49,7 @@ type Mensagem = { role: "user" | "assistant"; content: string | Bloco[] };
 
 // Áreas do seletor (lib/planejamento.ts CATALOGO_AREAS + lib/boneco-corporal.ts CATALOGO_CORPORAL).
 const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
-const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
 
 const FERRAMENTAS = [
   {
@@ -192,7 +192,7 @@ const FERRAMENTAS = [
           items: {
             type: "object",
             properties: {
-              id: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"] },
+              id: { type: "string", enum: ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "olhos", "frontal", "perioral_sup", "perioral_inf"] },
               linhas: {
                 type: "array",
                 items: {
@@ -222,7 +222,7 @@ const FERRAMENTAS = [
         },
         areas_extras: {
           type: "array",
-          description: "Áreas manuais (as que não são fixas no planejador): olhos, mento, áreas corporais... Terço médio é a área fixa arcomandibular.",
+          description: "Áreas manuais (as que não são fixas no planejador): mento, áreas corporais... Terço médio é a área fixa arcomandibular e Pálpebras inferiores e lateral dos olhos é a área fixa olhos (mande em "areas", nunca aqui).",
           items: {
             type: "object",
             properties: {
@@ -336,7 +336,7 @@ const MAXIMO_POR_LINHA: Record<string, number | null> = {
   submandibular: 1200,
   jowls: 1500,
   arcomandibular: 1200,
-  temporal: 1200,
+  olhos: 500,
   frontal: 500,
   perioral_sup: 600,
   perioral_inf: 600,
@@ -347,7 +347,7 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
   submandibular: { nome: "Submandibular", bilateral: true, profs: PROF_STD },
   jowls: { nome: "Jowls", bilateral: true, profs: ["4.5"] },
   arcomandibular: { nome: "Terço médio", bilateral: true, profs: PROF_STD },
-  temporal: { nome: "Temporal e Arco Zigomático", bilateral: true, profs: PROF_STD },
+  olhos: { nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, profs: PROF_STD },
   frontal: { nome: "Frontal", bilateral: true, profs: PROF_STD },
   perioral_sup: { nome: "Perioral Superior", bilateral: true, profs: PROF_STD },
   perioral_inf: { nome: "Perioral Inferior", bilateral: true, profs: PROF_STD },
@@ -355,7 +355,7 @@ const AREAS_PLANEJADOR: Record<string, { nome: string; bilateral: boolean; profs
 
 // Nome do procedimento pelas áreas (espelha nomeProcedimento de lib/planejamento.ts):
 // todas as áreas grandes do rosto = Full Face; papada, submandibular e pescoço somam no nome (ordem do CATALOGO_AREAS).
-const ROSTO_GRANDES = ["frontal", "temporal", "arcomandibular", "jowls"];
+const ROSTO_GRANDES = ["frontal", "arcomandibular", "jowls"];
 const FORA_DO_ROSTO: [string, string][] = [["papada", "Papada"], ["submandibular", "Submandibular"], ["pescoco", "Pescoço"]];
 const ID_POR_NOME: Record<string, string> = { "terco medio": "arcomandibular", mento: "mento", olhos: "olhos" };
 function nomeDoProcedimento(ids: Set<string>, nomes: string[]): string {
@@ -634,6 +634,10 @@ async function executarFerramenta(
         const nomeArea = String(x.nome ?? "").trim().slice(0, 60);
         if (!nomeArea) continue;
         const corporal = x.regiao === "corporal";
+        if (!corporal && /p[aá]lpebra|olho|temporal/i.test(nomeArea)) {
+          problemas.push(`${nomeArea}: é a área fixa "olhos" (Pálpebras inferiores e lateral dos olhos, até 500 por lado, normalmente 1,5 mm); mande em "areas"`);
+          continue;
+        }
         const bilateral = !!x.bilateral;
         const quad = corporal ? Math.max(1, Math.round(Number(x.quadrantes) || 1)) : 1;
         const id = `custom_${customAreas.length + 1}`;

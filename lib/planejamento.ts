@@ -89,7 +89,6 @@ export interface AreaCatalogo {
 
 export const CATALOGO_AREAS: AreaCatalogo[] = [
   { id: "frontal", nome: "Frontal", grupo: "face" },
-  { id: "temporal", nome: "Temporal e Arco Zigomático", grupo: "face" },
   { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", grupo: "face", pequena: true },
   { id: "arcomandibular", nome: "Terço médio", grupo: "face" },
   { id: "perioral_sup", nome: "Perioral Superior", grupo: "face", pequena: true },
@@ -163,11 +162,10 @@ export const MAXIMO_LINHA: Record<string, number> = {
   jowls: 1500,
   submandibular: 1200,
   arcomandibular: 1200,
-  temporal: 1200,
   frontal: 500,
   perioral_sup: 600,
   perioral_inf: 600,
-  olhos: 1200,
+  olhos: 500,
   mento: 1200,
 };
 
@@ -180,12 +178,13 @@ export const MINIMO_LINHA: Record<string, number> = {
 /** Profundidades de cada área do rosto (regra: 4,5, 3,0 e 1,5; exceções do guia; Jowls só 4,5). */
 export function profundidadesRosto(id: string): number[] {
   if (id === "jowls") return [4.5];
-  if (id === "frontal" || id === "olhos") return [4.5, 1.5];
+  if (id === "olhos") return [1.5];
+  if (id === "frontal") return [4.5, 1.5];
   if (id === "perioral_sup" || id === "perioral_inf") return [1.5];
   return [4.5, 3, 1.5];
 }
 
-const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "temporal", "frontal", "perioral_sup", "perioral_inf"]);
+const AREAS_FIXAS_PLANEJADOR = new Set(["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "olhos", "frontal", "perioral_sup", "perioral_inf"]);
 const AREA_UNICA = new Set(["papada", "mento"]);
 const NOME_EXTRA: Record<string, string> = { olhos: "Pálpebras inferiores e lateral dos olhos", mento: "Mento" };
 

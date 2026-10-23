@@ -88,6 +88,31 @@ describe("planejador nativo: estado antigo", () => {
     const ok = normalizarPlano({ DATA: { jowls: [{ prof: "4.5", dispD: 1500, dispE: 1500 }] } });
     expect(alertas(ok).some((x) => x.areaId === "jowls")).toBe(false);
   });
+  it("Temporal e Arco Zigomático saiu: só existe Pálpebras e lateral dos olhos, até 500 por lado", () => {
+    expect(AREAS_FIXAS.some((a) => a.id === "temporal")).toBe(false);
+    const olhos = AREAS_FIXAS.find((a) => a.id === "olhos")!;
+    expect(olhos.nome).toBe("Pálpebras inferiores e lateral dos olhos");
+    expect(olhos.bilateral).toBe(true);
+    const ok = normalizarPlano({ DATA: { olhos: [{ prof: "1.5", dispD: 500, dispE: 500 }] } });
+    expect(alertas(ok).some((x) => x.areaId === "olhos")).toBe(false);
+    const acima = normalizarPlano({ DATA: { olhos: [{ prof: "1.5", dispD: 600, dispE: 500 }] } });
+    expect(alertas(acima).some((x) => x.areaId === "olhos" && /500 por lado/.test(x.texto))).toBe(true);
+  });
+  it("o que estava em Temporal (e na área manual de olhos) vai para Pálpebras e lateral dos olhos, sem perder disparos", () => {
+    const q = normalizarPlano({
+      customAreas: [{ id: "custom_1", nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, regiao: "facial" }],
+      DATA: { temporal: [{ prof: "1.5", dispD: 400, dispE: 400 }], custom_1: [{ prof: "4.5", dispD: 300, dispE: 300 }] },
+      sessoesAnteriores: [{ n: 1, data: "2026-10-01", DATA: { temporal: [{ prof: "1.5", dispD: 200, dispE: 200 }] } }],
+    });
+    expect(q.DATA.temporal).toBeUndefined();
+    expect(q.DATA.olhos).toEqual([
+      { prof: "1.5", dispD: 400, dispE: 400 },
+      { prof: "4.5", dispD: 300, dispE: 300 },
+    ]);
+    expect(q.customAreas).toEqual([]);
+    expect(q.sessoesAnteriores[0].DATA.olhos).toEqual([{ prof: "1.5", dispD: 200, dispE: 200 }]);
+    expect(totalDistribuido(q)).toBe(1400);
+  });
   it("Terço médio é o antigo arco mandibular e não há nasolabial", () => {
     expect(AREAS_FIXAS.find((a) => a.id === "arcomandibular")?.nome).toBe("Terço médio");
     expect(AREAS_FIXAS.some((a) => /nasolabial/i.test(a.nome))).toBe(false);
