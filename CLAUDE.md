@@ -20,6 +20,13 @@ Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e men
 - Um aviso no Dashboard deve levar à lista do que ele avisa, nunca a uma tela genérica.
 - A tela de Pendências é só para quem deve ou ainda não foi cobrado.
 
+## Orientações para execução de tarefas
+
+- Não execute tarefas sozinho: delegue o trabalho sempre que possível.
+- Tarefas simples (buscas, leituras, edições pequenas, conferências, publicações de rotina) vão para um subagente.
+- Use o Opus 5.5 somente para tarefas complexas (decisões de arquitetura, mudanças que mexem em várias partes, bugs difíceis, regras de dinheiro e banco).
+- Ao delegar, passe o contexto completo e confira o resultado antes de dizer que está pronto.
+
 ## Banco de dados: protocolo
 
 - Toda mudança de estrutura ou função vira um arquivo em `migrations/`, nomeado `AAAA-MM-DD-descricao.sql`.
