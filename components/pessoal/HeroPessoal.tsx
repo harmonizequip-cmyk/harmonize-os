@@ -26,7 +26,7 @@ export default function HeroPessoal({ rotuloMes, resumo }: { rotuloMes: string; 
 
       <div className="relative mt-2 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-violet-200">{temEntrada ? (sobrou >= 0 ? "Sobrou" : "Faltou") : "Já saiu"}</p>
+          <p className="text-[13px] font-medium text-violet-200">{temEntrada ? (sobrou >= 0 ? "Resultado do mês: sobrou" : "Resultado do mês: faltou") : "Já saiu no mês"}</p>
           <p className="whitespace-nowrap text-[1.75rem] font-black leading-tight tabular-nums">
             {formatCurrency(temEntrada ? Math.abs(sobrou) : saidas)}
           </p>

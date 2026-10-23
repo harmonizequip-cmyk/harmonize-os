@@ -128,7 +128,7 @@ export default async function PessoalInicioPage() {
       <div className="grid grid-cols-3 gap-2">
         <Link href="/pessoal/lancamentos" className="cartao p-3 active:bg-violet-50">
           <Wallet size={18} className="text-violet-600" />
-          <p className="mt-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">Na conta</p>
+          <p className="mt-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">Saldo hoje</p>
           <p className={`text-[15px] font-black tabular-nums ${saldo < 0 ? "text-rose-600" : "text-slate-900"}`}>{formatCurrency(saldo)}</p>
         </Link>
         <Link href="/pessoal/cartoes" className="cartao p-3 active:bg-violet-50">
