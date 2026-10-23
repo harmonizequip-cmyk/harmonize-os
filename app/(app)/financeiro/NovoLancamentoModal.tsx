@@ -40,6 +40,7 @@ export default function NovoLancamentoModal({
   clients,
   porVoz = false,
   escopoInicial = "harmonize",
+  clienteInicial = "",
   onClose,
   onCreated,
 }: {
@@ -47,6 +48,8 @@ export default function NovoLancamentoModal({
   clients: ClientOption[];
   porVoz?: boolean;
   escopoInicial?: "harmonize" | "pessoal";
+  /** Cliente já escolhido (ex.: veio do atalho Lançamentos de um cartão). */
+  clienteInicial?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -55,7 +58,7 @@ export default function NovoLancamentoModal({
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(() => (clients.some((c) => c.id === clienteInicial) ? clienteInicial : ""));
   // Locação ou reserva a que a despesa pertence. Só vale para saída com cliente.
   const [vinculo, setVinculo] = useState<VinculoDespesa>(SEM_VINCULO);
   const [paymentMethod, setPaymentMethod] = useState("pix");

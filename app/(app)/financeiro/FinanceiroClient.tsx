@@ -136,6 +136,8 @@ export default function FinanceiroClient({
   const somenteLeitura = useSomenteLeitura();
   const pessoal = escopo === "pessoal";
   const [modalOpen, setModalOpen] = useState(false);
+  // Cliente do filtro da tela: o Novo lançamento já abre com ela escolhida.
+  const [clienteNovo, setClienteNovo] = useState("");
   const [editing, setEditing] = useState<TransactionRow | null>(null);
 
   // A filtragem inteira mora na consulta do servidor agora, então o que
@@ -302,7 +304,10 @@ export default function FinanceiroClient({
           )}
           {!somenteLeitura && (
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={() => {
+                setClienteNovo(new URLSearchParams(window.location.search).get("cliente") ?? "");
+                setModalOpen(true);
+              }}
               className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal transition hover:brightness-110 active:scale-[0.98]"
             >
               + Novo lançamento
@@ -619,6 +624,7 @@ export default function FinanceiroClient({
           categories={pessoal ? categories.filter((c) => (c as any).scope === "harmonize") : categories}
           clients={clients}
           escopoInicial={escopo}
+          clienteInicial={clienteNovo}
           onClose={() => setModalOpen(false)}
           onCreated={handleCreated}
         />
