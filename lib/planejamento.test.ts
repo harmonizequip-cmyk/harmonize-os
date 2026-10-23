@@ -113,7 +113,7 @@ describe("montagem pelas regras", () => {
   it("divide o saldo igual no rosto, respeitando o máximo de cada linha", () => {
     const m = montarPlanejamento({ areas: ["frontal", "jowls"], saldo: 6000 });
     // frontal: só 1,5 mm x 2 lados (teto 500); jowls: só 4,5 x 2 lados (teto 1.500)
-    const frontal = m.estado.DATA!.frontal as { dispD: number }[];
+    const frontal = m.estado.DATA!.frontal as { prof: string; dispD: number }[];
     const jowls = m.estado.DATA!.jowls as { prof: string; dispD: number; dispE: number }[];
     expect(frontal.map((l) => l.prof)).toEqual(["1.5"]);
     expect(frontal.every((l) => l.dispD === 500)).toBe(true);
