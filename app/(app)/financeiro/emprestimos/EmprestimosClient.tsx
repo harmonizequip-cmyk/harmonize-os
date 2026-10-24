@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
-import type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
+import type { ResumoDevedor, MovimentoEmprestimo } from "@/lib/emprestimos";
 import { usePreferencias } from "@/lib/usar-preferencias";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { confirmar, avisar } from "@/components/Dialogos";

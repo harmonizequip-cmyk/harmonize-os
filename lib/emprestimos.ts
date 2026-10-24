@@ -1,7 +1,7 @@
 // Empréstimos a terceiros: dinheiro que sai do caixa e deve voltar. Os
 // lançamentos espelho ficam nestas categorias, e as telas os deixam fora de
 // Entradas/Saídas/Resultado e do faturamento (continuam no Saldo do caixa).
-import { DEFAULT_PREFERENCIAS } from "@/lib/preferencias";
+import { DEFAULT_PREFERENCIAS } from "./preferencias";
 
 export const CATEGORIA_EMPRESTIMO = "Empréstimo concedido";
 export const CATEGORIA_DEVOLUCAO = "Devolução de empréstimo";

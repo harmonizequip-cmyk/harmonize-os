@@ -1,7 +1,7 @@
 // Cadastros que chegam do formulário (Google Forms da Contourline Academy):
 // achar o cliente que já existe e separar cidade e UF.
 
-import { DEFAULT_PREFERENCIAS } from "@/lib/preferencias";
+import { DEFAULT_PREFERENCIAS } from "./preferencias";
 
 // Link de cadastro da Academy: só o dono usa (ele cadastra a cliente). Nunca mandar para a cliente.
 export const LINK_ACADEMY = DEFAULT_PREFERENCIAS.listas.linkAcademy;
