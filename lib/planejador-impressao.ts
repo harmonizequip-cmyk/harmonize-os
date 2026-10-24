@@ -4,6 +4,7 @@
 // (Salvar como PDF).
 
 import { urlImagemCorporal } from "./corpo-foto";
+import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { contaDaSessao, dataBr, planoDaSessao, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -77,8 +78,13 @@ ${campo("Queixa principal", p.queixa || "—", true)}
 </div></div>`;
 }
 
-const rodape = (agora: Date) =>
-  `<div class="pront-date-foot">Documento gerado em ${agora.toLocaleString("pt-BR")} · Harmonize · Locação de Equipamentos Médicos e Estéticos</div>`;
+/** Dados da empresa que entram nos documentos (Configurações > Empresa e contrato). */
+type CfgDocumentos = Pick<Preferencias, "empresa">;
+
+const rodape = (agora: Date, cfg: CfgDocumentos) => {
+  const extra = cfg.empresa.rodapeDocumentos.trim();
+  return `<div class="pront-date-foot">Documento gerado em ${agora.toLocaleString("pt-BR")}${extra ? ` · ${esc(extra)}` : ""}</div>`;
+};
 
 /** Números do pacote numa sessão: pacote, já usados, nesta sessão e o que fica para a próxima. */
 function numerosDoPacote(p: Plano, n: number): string {
@@ -93,7 +99,7 @@ function numerosDoPacote(p: Plano, n: number): string {
 }
 
 /** Prontuário interno: tudo, linha por linha. */
-export function htmlProntuario(p: Plano, origem = "", agora = new Date()): string {
+export function htmlProntuario(p: Plano, origem = "", agora = new Date(), cfg: CfgDocumentos = DEFAULT_PREFERENCIAS): string {
   const s = situacaoSaldo(p);
   let linhas = "";
   for (const a of todasAreas(p)) {
@@ -133,7 +139,7 @@ ${
 <thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th><th>Profund.</th><th>Direito</th><th>Esquerdo</th><th>Quad.</th><th>Total</th></tr></thead>
 <tbody>${linhas}<tr class="tot"><td colspan="6">TOTAL GERAL DE DISPAROS</td><td>${fmt(s.total)}</td></tr></tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Observações Clínicas</div><div class="pront-obs">${esc(p.obs || "—")}</div></div>
-${rodape(agora)}
+${rodape(agora, cfg)}
 </div>`;
 }
 
@@ -143,7 +149,13 @@ ${rodape(agora)}
  * pacote, o que foi distribuído nela e quanto fica para a próxima, com os disparos de
  * cada área, e é a folha que o paciente assina.
  */
-export function htmlFichaPaciente(p: Plano, origem = "", agora = new Date(), sessao?: number): string {
+export function htmlFichaPaciente(
+  p: Plano,
+  origem = "",
+  agora = new Date(),
+  sessao?: number,
+  cfg: CfgDocumentos = DEFAULT_PREFERENCIAS,
+): string {
   const porSessao = p.sessoesTotal > 1 || sessao !== undefined;
   const n = sessao ?? p.sessaoAtual;
   let v = p;
@@ -176,7 +188,7 @@ ${pacote}
 <div class="pront-section"><div class="pront-section-title">Áreas Tratadas</div><table class="pront-table"><thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th>${porSessao ? '<th style="text-align:right">Disparos</th>' : ""}</tr></thead><tbody>${linhas}</tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Recomendações</div><div class="pront-obs">${esc(p.recomendacoes || "—")}</div></div>
 <div class="pront-footer"><div class="pront-sign"><div class="pront-sign-line">Assinatura do Profissional</div></div><div class="pront-sign"><div class="pront-sign-line">Assinatura do Paciente${porSessao ? ` · Sessão ${n}` : ""}</div></div></div>
-${rodape(agora)}
+${rodape(agora, cfg)}
 </div>`;
 }
 

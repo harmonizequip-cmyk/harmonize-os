@@ -52,7 +52,8 @@ export default function ReciboHost() {
   const [whats, setWhats] = useState<{ tel: string | null; texto: string } | null>(null);
 
   // Configurações > Recibo: desligado, o evento continua disparando mas a oferta não abre.
-  const oferecer = usePreferencias().recibo.oferecer;
+  const preferencias = usePreferencias();
+  const oferecer = preferencias.recibo.oferecer;
   const oferecerRef = useRef(oferecer);
   oferecerRef.current = oferecer;
 
@@ -108,7 +109,7 @@ export default function ReciboHost() {
         totalPago: Number(sit.total_pago) + Number(sit.credito_taxa),
         saldo: Number(sit.saldo),
       };
-      const canvas = await drawReciboImage(dados);
+      const canvas = await drawReciboImage(dados, preferencias);
       setArquivo(await canvasToPngFile(canvas, `recibo-${pagamento.data}.png`));
       setPrevia(canvas.toDataURL("image/png"));
       const saudacao = saudacaoCurta({ name: c?.name, treatment: c?.treatment, displayName: c?.display_name });

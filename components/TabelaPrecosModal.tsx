@@ -47,7 +47,12 @@ export default function TabelaPrecosModal({
         logo.src = "/harmonize-logo-full.png";
       });
       if (!ativo) return;
-      const canvas = drawTabelaPrecos(settings.pricing, settings.reservationFee, logo.complete && logo.naturalWidth ? logo : null);
+      const canvas = drawTabelaPrecos(
+        settings.pricing,
+        settings.reservationFee,
+        logo.complete && logo.naturalWidth ? logo : null,
+        settings.preferencias.tabelaPrecos,
+      );
       setUrl(canvas.toDataURL("image/png"));
       canvas.toBlob((b) => {
         if (b && ativo) setArquivo(new File([b], "tabela-precos-hipro-harmonize.png", { type: "image/png" }));

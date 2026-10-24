@@ -10,6 +10,9 @@ import { useEffect, useState } from "react";
 import {
   BadgeDollarSign,
   BellRing,
+  Building2,
+  ScrollText,
+  Table2,
   CalendarClock,
   ClipboardList,
   HeartHandshake,
@@ -49,6 +52,9 @@ import PrefsAgenda from "./secoes/PrefsAgenda";
 import PrefsListas from "./secoes/PrefsListas";
 import PrefsDashboard from "./secoes/PrefsDashboard";
 import PrefsPlanejador from "./secoes/PrefsPlanejador";
+import PrefsEmpresa from "./secoes/PrefsEmpresa";
+import PrefsContrato from "./secoes/PrefsContrato";
+import PrefsTabelaPrecos from "./secoes/PrefsTabelaPrecos";
 import Tags, { type TagRow } from "./secoes/Tags";
 import MinhaConta from "./secoes/MinhaConta";
 import Aparencia from "./secoes/Aparencia";
@@ -245,6 +251,9 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
         {secao === "listas" && <PrefsListas preferencias={settings.preferencias} />}
         {secao === "dashboard" && <PrefsDashboard preferencias={settings.preferencias} />}
         {secao === "planejador" && <PrefsPlanejador preferencias={settings.preferencias} />}
+        {secao === "empresa" && <PrefsEmpresa preferencias={settings.preferencias} />}
+        {secao === "contrato" && <PrefsContrato preferencias={settings.preferencias} />}
+        {secao === "tabelaPrecos" && <PrefsTabelaPrecos preferencias={settings.preferencias} />}
         {secao === "tags" && <Tags iniciais={tags} />}
         {secao === "contas" && <ContasFixasCard inicial={settings.despesasFixas} />}
         {secao === "avisos" && <AvisosCelularCard />}
@@ -297,6 +306,27 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           resumo: `${automacoesLigadas} de 4 ligadas`,
           icone: Zap,
           cor: "bg-violet-50 text-violet-600",
+        },
+        {
+          id: "empresa",
+          titulo: "Empresa",
+          resumo: settings.preferencias.empresa.razaoSocial,
+          icone: Building2,
+          cor: "bg-slate-100 text-slate-700",
+        },
+        {
+          id: "contrato",
+          titulo: "Contrato",
+          resumo: `Multa ${settings.preferencias.contrato.multaPercentual}% · aviso ${settings.preferencias.contrato.avisoRescisaoHoras} h`,
+          icone: ScrollText,
+          cor: "bg-blue-50 text-blue-600",
+        },
+        {
+          id: "tabelaPrecos",
+          titulo: "Tabela de preços",
+          resumo: `${settings.preferencias.tabelaPrecos.estimativas.length} estimativas na arte`,
+          icone: Table2,
+          cor: "bg-cyan-50 text-cyan-600",
         },
       ],
     },

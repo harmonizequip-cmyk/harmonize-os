@@ -75,6 +75,58 @@ export function Campo({
   );
 }
 
+/** Campo de texto com rótulo e, embaixo, o padrão de sempre como dica. */
+export function CampoTexto({
+  rotulo,
+  valor,
+  onChange,
+  padrao,
+  maxLength,
+  placeholder,
+  multilinha = false,
+  tipo = "text",
+}: {
+  rotulo: string;
+  valor: string;
+  onChange: (v: string) => void;
+  padrao?: string;
+  maxLength?: number;
+  placeholder?: string;
+  multilinha?: boolean;
+  tipo?: "text" | "email";
+}) {
+  const classe =
+    "w-full min-w-0 rounded-xl border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/20";
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">{rotulo}</span>
+      {multilinha ? (
+        <textarea
+          value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={maxLength}
+          placeholder={placeholder}
+          rows={2}
+          className={`${classe} resize-none`}
+        />
+      ) : (
+        <input
+          type={tipo}
+          inputMode={tipo === "email" ? "email" : undefined}
+          value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={maxLength}
+          placeholder={placeholder}
+          className={`${classe} h-11`}
+        />
+      )}
+      {padrao !== undefined && (
+        <span className="mt-1 block text-[11px] leading-snug text-neutral-400">padrão: {padrao || "(vazio)"}</span>
+      )}
+    </label>
+  );
+}
+
 /**
  * Botão de salvar que flutua acima da barra de baixo enquanto há alteração
  * não salva, e vira "Salvo" por um instante depois de gravar.

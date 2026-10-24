@@ -15,6 +15,14 @@
 // sujeita a ajuste; quando é uma pré-reserva sem disparos definidos
 // ainda, o texto descreve só a tabela de tarifas.
 import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer";
+import {
+  contratadoDoContrato,
+  termosDoContrato,
+  textoPenalidades,
+  textoRescisao,
+  type DadosContratado,
+  type TermosContrato,
+} from "./contrato-textos";
 
 export interface ContratoDados {
   contratante: {
@@ -56,19 +64,12 @@ export interface ContratoDados {
     tier3Rate: number;
   };
   gerado_em: string;
+  // Retrato dos dados da Harmonize e dos números das cláusulas
+  // (Configurações > Empresa e contrato) no momento da geração. Contratos
+  // antigos não têm: valem os padrões, iguais ao texto de antes.
+  contratado?: DadosContratado;
+  termos?: TermosContrato;
 }
-
-// Dados do Contratado (Harmonize) — fixos, porque é sempre a mesma
-// empresa assinando. Se algum dia mudar (razão social, endereço,
-// responsável), edite só aqui.
-const CONTRATADO = {
-  razaoSocial: "Harmonize Bella Prime LTDA",
-  cnpj: "41.107.803/0001-27",
-  endereco: "Rua Hidelbrando Tourinho, 18, Salas 101 e 102 — Miramar, João Pessoa/PB",
-  responsavel: "Eder Campos de Almeida",
-  email: "harmonizequip@gmail.com",
-  cidadeForo: "João Pessoa/PB",
-};
 
 // Categoria do equipamento: hoje toda a frota (HIPRO 1 e HIPRO 2) é do
 // mesmo tipo (HIFU médico-estético). Se um dia entrar um equipamento de
@@ -155,6 +156,8 @@ function InfoTable({ rows }: { rows: [string, string][] }) {
 function ContratoDocument({ dados }: { dados: ContratoDados }) {
   const { flatPackageLimit, flatPackageValue, tier2Limit, tier2Rate, tier3Rate } = dados.precificacao;
   const paymentLabel = PAYMENT_LABELS[dados.locacao.payment_method] ?? dados.locacao.payment_method;
+  const CONTRATADO = contratadoDoContrato(dados.contratado);
+  const termos = termosDoContrato(dados.termos);
 
   // Fechamento da cláusula de valor: nunca no passado ("foi apurado"),
   // porque o contrato é sempre assinado antes da locação acontecer. Com
@@ -260,17 +263,10 @@ function ContratoDocument({ dados }: { dados: ContratoDados }) {
         </Text>
 
         <Text style={styles.clauseTitle}>6ª CLÁUSULA. DAS PENALIDADES</Text>
-        <Text style={styles.paragraph}>
-          Em caso de descumprimento de quaisquer obrigações previstas neste instrumento, a parte infratora ficará
-          sujeita a: (a) multa de 20% (vinte por cento) sobre o valor total do contrato; (b) responsabilidade integral
-          pelos danos causados, sem prejuízo das demais cominações legais.
-        </Text>
+        <Text style={styles.paragraph}>{textoPenalidades(termos)}</Text>
 
         <Text style={styles.clauseTitle}>7ª CLÁUSULA. DA RESCISÃO</Text>
-        <Text style={styles.paragraph}>
-          O presente contrato poderá ser rescindido por qualquer das partes mediante comunicação prévia de 48
-          (quarenta e oito) horas, respondendo a parte que der causa à rescisão pelas perdas e danos decorrentes.
-        </Text>
+        <Text style={styles.paragraph}>{textoRescisao(termos)}</Text>
 
         <Text style={styles.clauseTitle}>8ª CLÁUSULA. DO FORO</Text>
         <Text style={styles.paragraph}>

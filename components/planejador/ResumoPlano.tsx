@@ -8,11 +8,13 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { alertas, situacaoSaldo, textoResumo, todasAreas, totalArea, type Plano } from "@/lib/planejador";
 import { CSS_PRONTUARIO, htmlFichaPaciente, htmlProntuario, imagemDaArea } from "@/lib/planejador-impressao";
 import { fmt } from "./Partes";
+import { usePreferencias } from "@/lib/usar-preferencias";
 
 type Modo = "lista" | "prontuario" | "paciente";
 
 export default function ResumoPlano({ plano, onIrParaArea }: { plano: Plano; onIrParaArea: (id: string) => void }) {
   const [modo, setModo] = useState<Modo>("lista");
+  const preferencias = usePreferencias();
   const s = situacaoSaldo(plano);
   const avisos = alertas(plano);
   const areas = todasAreas(plano)
@@ -23,8 +25,11 @@ export default function ResumoPlano({ plano, onIrParaArea }: { plano: Plano; onI
   const previa = useMemo(() => {
     if (modo === "lista") return "";
     const origem = typeof window !== "undefined" ? window.location.origin : "";
-    return modo === "prontuario" ? htmlProntuario(plano, origem) : htmlFichaPaciente(plano, origem);
-  }, [modo, plano]);
+    const agora = new Date();
+    return modo === "prontuario"
+      ? htmlProntuario(plano, origem, agora, preferencias)
+      : htmlFichaPaciente(plano, origem, agora, undefined, preferencias);
+  }, [modo, plano, preferencias]);
 
   const numero = (rotulo: string, valor: string, destaque = "") => (
     <div className="rounded-2xl bg-white p-3 ring-1 ring-neutral-200/80">

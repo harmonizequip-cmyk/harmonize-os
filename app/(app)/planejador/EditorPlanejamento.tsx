@@ -88,7 +88,8 @@ export default function EditorPlanejamento({
   const supabase = createClient();
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
-  const perfisSalvos = usePreferencias().planejador.perfis;
+  const preferencias = usePreferencias();
+  const perfisSalvos = preferencias.planejador.perfis;
   // "Nenhum" sempre primeiro; o valor do botão é o número de disparos como texto.
   const perfisTela = useMemo(
     () => [{ valor: "0", nome: "Nenhum", disparos: 0 }, ...perfisSalvos.map((p) => ({ valor: String(p.disparos), nome: p.nome, disparos: p.disparos }))],
@@ -431,13 +432,15 @@ export default function EditorPlanejamento({
     const origem = window.location.origin;
     const nome = plano.paciente || "paciente";
     const ok =
-      tipo === "prontuario" ? imprimir(htmlProntuario(plano, origem), `Prontuario - ${nome}`) : imprimir(htmlFichaPaciente(plano, origem), `Ficha do paciente - ${nome}`);
+      tipo === "prontuario"
+        ? imprimir(htmlProntuario(plano, origem, new Date(), preferencias), `Prontuario - ${nome}`)
+        : imprimir(htmlFichaPaciente(plano, origem, new Date(), undefined, preferencias), `Ficha do paciente - ${nome}`);
     mostrarAviso(ok ? "Abrindo para salvar em PDF…" : "O aparelho bloqueou a janela. Permita pop-ups para o Harmonize.");
   }
 
   function fichaSessao(n: number) {
     const nome = plano.paciente || "paciente";
-    const ok = imprimir(htmlFichaPaciente(plano, window.location.origin, new Date(), n), `Ficha da Sessão ${n} - ${nome}`);
+    const ok = imprimir(htmlFichaPaciente(plano, window.location.origin, new Date(), n, preferencias), `Ficha da Sessão ${n} - ${nome}`);
     mostrarAviso(ok ? "Abrindo a ficha para imprimir…" : "O aparelho bloqueou a janela. Permita pop-ups para o Harmonize.");
   }
 

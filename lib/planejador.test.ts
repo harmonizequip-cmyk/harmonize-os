@@ -16,6 +16,7 @@ import {
 } from "./planejador";
 import { htmlFichaPaciente, htmlProntuario, imagemDaArea } from "./planejador-impressao";
 import { existsSync } from "node:fs";
+import { DEFAULT_PREFERENCIAS } from "./preferencias";
 
 // Estado salvo pelo planejador antigo (HTML): áreas manuais levavam a imagem dentro.
 const antigo = {
@@ -148,6 +149,14 @@ describe("planejador nativo: estado antigo", () => {
     expect(htmlProntuario(p)).toContain("Coxa posterior");
     expect(htmlFichaPaciente(p)).toContain("Assinatura do Paciente");
     expect(htmlProntuario({ ...p, paciente: "<b>x</b>" })).not.toContain("<b>x</b>");
+  });
+  it("rodapé dos documentos vem de Configurações (padrão = texto de antes; vazio some)", () => {
+    const agora = new Date(2026, 9, 16, 10, 0);
+    expect(htmlProntuario(p, "", agora)).toContain("· Harmonize · Locação de Equipamentos Médicos e Estéticos</div>");
+    const cfg = { empresa: { ...DEFAULT_PREFERENCIAS.empresa, rodapeDocumentos: "Clínica <Nova>" } };
+    expect(htmlFichaPaciente(p, "", agora, undefined, cfg)).toContain("· Clínica &lt;Nova&gt;</div>");
+    const semRodape = { empresa: { ...DEFAULT_PREFERENCIAS.empresa, rodapeDocumentos: "" } };
+    expect(htmlProntuario(p, "", agora, semRodape)).not.toContain("Harmonize · Locação");
   });
   it("plano vazio abre com a data de hoje", () => {
     const v = normalizarPlano({}, "2026-10-20");

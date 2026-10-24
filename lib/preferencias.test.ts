@@ -59,4 +59,49 @@ describe("lerPreferencias", () => {
     const p = lerPreferencias({ metas: { min: 22, max: 28 } });
     expect(Object.keys(diferencasDoPadrao(p))).toEqual(["metas"]);
   });
+
+  it("empresa: texto obrigatório vazio volta ao padrão; rodapé pode ficar vazio; corta no limite", () => {
+    const p = lerPreferencias({ empresa: { razaoSocial: "  ", cnpj: "12.345.678/0001-90", rodapeRecibo: "", endereco: "x".repeat(500) } });
+    expect(p.empresa.razaoSocial).toBe(DEFAULT_PREFERENCIAS.empresa.razaoSocial);
+    expect(p.empresa.cnpj).toBe("12.345.678/0001-90");
+    expect(p.empresa.rodapeRecibo).toBe("");
+    expect(p.empresa.rodapeDocumentos).toBe(DEFAULT_PREFERENCIAS.empresa.rodapeDocumentos);
+    expect(p.empresa.endereco).toHaveLength(200);
+  });
+
+  it("contrato: números na faixa, fora volta ao padrão", () => {
+    expect(lerPreferencias({ contrato: { multaPercentual: 10, avisoRescisaoHoras: "72" } }).contrato).toEqual({ multaPercentual: 10, avisoRescisaoHoras: 72 });
+    expect(lerPreferencias({ contrato: { multaPercentual: 0 } }).contrato.multaPercentual).toBe(0);
+    expect(lerPreferencias({ contrato: { multaPercentual: 150, avisoRescisaoHoras: 0 } }).contrato).toEqual(DEFAULT_PREFERENCIAS.contrato);
+  });
+
+  it("tabela de preços: estimativas válidas, no máximo 6; inválidas somem", () => {
+    const p = lerPreferencias({
+      tabelaPrecos: {
+        estimativas: [{ procedimento: "Papada", disparos: 2500 }, { procedimento: "", disparos: 100 }, { procedimento: "X", disparos: 5 }, ...Array(8).fill({ procedimento: "Y", disparos: 100 })],
+      },
+    });
+    expect(p.tabelaPrecos.estimativas[0]).toEqual({ procedimento: "Papada", disparos: 2500 });
+    expect(p.tabelaPrecos.estimativas).toHaveLength(6);
+    expect(lerPreferencias({ tabelaPrecos: { estimativas: [] } }).tabelaPrecos.estimativas).toEqual(DEFAULT_PREFERENCIAS.tabelaPrecos.estimativas);
+  });
+
+  it("tabela de preços: destaque vazio some, destaque inválido volta ao padrão; infos vazias aceitas", () => {
+    expect(lerPreferencias({ tabelaPrecos: { destaque: { procedimento: "", disparos: 0 } } }).tabelaPrecos.destaque).toEqual({ procedimento: "", disparos: 0 });
+    expect(lerPreferencias({ tabelaPrecos: { destaque: { procedimento: "Combo", disparos: 1 } } }).tabelaPrecos.destaque).toEqual(DEFAULT_PREFERENCIAS.tabelaPrecos.destaque);
+    expect(lerPreferencias({ tabelaPrecos: { infos: [] } }).tabelaPrecos.infos).toEqual([]);
+    expect(lerPreferencias({ tabelaPrecos: {} }).tabelaPrecos.infos).toEqual(DEFAULT_PREFERENCIAS.tabelaPrecos.infos);
+    expect(lerPreferencias({ tabelaPrecos: { infos: [" a ", "", 3] } }).tabelaPrecos.infos).toEqual(["a"]);
+  });
+
+  it("padrões dos grupos novos são os textos de antes", () => {
+    expect(DEFAULT_PREFERENCIAS.empresa.razaoSocial).toBe("Harmonize Bella Prime LTDA");
+    expect(DEFAULT_PREFERENCIAS.contrato).toEqual({ multaPercentual: 20, avisoRescisaoHoras: 48 });
+    expect(DEFAULT_PREFERENCIAS.tabelaPrecos.estimativas).toHaveLength(6);
+  });
+
+  it("diferencasDoPadrao grava só os grupos novos que mudaram", () => {
+    const p = lerPreferencias({ contrato: { multaPercentual: 10 }, empresa: { razaoSocial: DEFAULT_PREFERENCIAS.empresa.razaoSocial } });
+    expect(diferencasDoPadrao(p)).toEqual({ contrato: { multaPercentual: 10, avisoRescisaoHoras: 48 } });
+  });
 });

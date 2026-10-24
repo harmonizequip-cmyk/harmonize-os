@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { ContratoDados } from "@/lib/contrato-pdf";
 import type { PricingConfig } from "@/lib/rental-pricing";
 import { DEFAULT_PRICING } from "@/lib/rental-pricing";
+import { carregarPreferenciasNoNavegador } from "@/lib/usar-preferencias";
 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: "PIX",
@@ -132,6 +133,10 @@ export default function GerarContratoModal({
     setError(null);
     setGerando(true);
 
+    // Lê na hora de gerar (não no abrir da janela) para nunca sair com o padrão
+    // por ainda não ter carregado o que está salvo em Configurações.
+    const preferencias = await carregarPreferenciasNoNavegador();
+
     const dados: ContratoDados = {
       contratante: {
         nome: nome.trim(),
@@ -166,6 +171,17 @@ export default function GerarContratoModal({
         tier3Rate: (pricingConfig ?? DEFAULT_PRICING).tier3Rate,
       },
       gerado_em: new Date().toISOString(),
+      // Dados da Harmonize e números das cláusulas (Configurações > Empresa e
+      // contrato), guardados no retrato para "baixar de novo" sair igual.
+      contratado: {
+        razaoSocial: preferencias.empresa.razaoSocial,
+        cnpj: preferencias.empresa.cnpj,
+        endereco: preferencias.empresa.endereco,
+        responsavel: preferencias.empresa.responsavel,
+        email: preferencias.empresa.email,
+        cidadeForo: preferencias.empresa.cidadeForo,
+      },
+      termos: { ...preferencias.contrato },
     };
 
     // Registra ANTES de gerar o PDF: garante que o "controle dos

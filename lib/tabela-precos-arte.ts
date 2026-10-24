@@ -1,12 +1,15 @@
 import { roundedRectPath } from "./availability-image";
 import type { PricingConfig } from "./rental-pricing";
+import { DEFAULT_PREFERENCIAS, type EstimativaDisparos, type Preferencias } from "./preferencias";
 
 // ============================================================
 // ARTE DA TABELA DE PREÇOS DO HIPRO (layout da Harmonize)
 //
 // Os valores saem de Configurações (PricingConfig e taxa de reserva):
 // mudou o preço lá, a arte já sai com o novo. As estimativas de disparos
-// por procedimento são as da tabela que o dono usava.
+// por procedimento, a linha em destaque, as "Informações importantes" e a
+// nota vêm de Configurações > Tabela de preços (padrão = a tabela que o dono
+// usava).
 // ============================================================
 
 const FONTE = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
@@ -24,15 +27,22 @@ const COR = {
   lilasEscuro: "#7E62A8",
 };
 
-export const ESTIMATIVAS_DISPAROS: { procedimento: string; disparos: number }[] = [
-  { procedimento: "Full face", disparos: 12000 },
-  { procedimento: "Terço inferior", disparos: 4000 },
-  { procedimento: "Papada", disparos: 2000 },
-  { procedimento: "Pescoço", disparos: 2000 },
-  { procedimento: "Pálpebra inferior", disparos: 800 },
-  { procedimento: "Fox eyes", disparos: 800 },
-  { procedimento: "Full face + pescoço + papada", disparos: 16000 },
+/** Padrão das estimativas (as 6 da grade e, por último, a linha em destaque). */
+export const ESTIMATIVAS_DISPAROS: EstimativaDisparos[] = [
+  ...DEFAULT_PREFERENCIAS.tabelaPrecos.estimativas,
+  DEFAULT_PREFERENCIAS.tabelaPrecos.destaque,
 ];
+
+/** O que entra no quadro de estimativas: até 6 itens na grade e o destaque (ou nenhum). */
+export function estimativasDaArte(tp: Preferencias["tabelaPrecos"] = DEFAULT_PREFERENCIAS.tabelaPrecos): {
+  itens: EstimativaDisparos[];
+  destaque: EstimativaDisparos | null;
+} {
+  return {
+    itens: tp.estimativas.slice(0, 6),
+    destaque: tp.destaque.procedimento.trim() && tp.destaque.disparos > 0 ? tp.destaque : null,
+  };
+}
 
 export const LARGURA_TABELA = 1080;
 // Altura máxima do rascunho; a arte é recortada na altura que ocupou.
@@ -103,7 +113,12 @@ function tituloSecao(ctx: CanvasRenderingContext2D, texto: string, x: number, y:
   ctx.fillText(texto.toUpperCase(), x, y);
 }
 
-export function drawTabelaPrecos(cfg: PricingConfig, taxaReserva: number, logo: HTMLImageElement | null): HTMLCanvasElement {
+export function drawTabelaPrecos(
+  cfg: PricingConfig,
+  taxaReserva: number,
+  logo: HTMLImageElement | null,
+  tabela: Preferencias["tabelaPrecos"] = DEFAULT_PREFERENCIAS.tabelaPrecos,
+): HTMLCanvasElement {
   const W = LARGURA_TABELA;
   const H = ALTURA_RASCUNHO;
   const canvas = document.createElement("canvas");
@@ -236,30 +251,29 @@ export function drawTabelaPrecos(cfg: PricingConfig, taxaReserva: number, logo: 
   y += hRes + 30;
 
   // Informações importantes.
-  const infos = [
-    "Não existe mínimo de disparos.",
-    "Deslocamento cobrado à parte, conforme a localização.",
-    "Valores referentes ao uso do equipamento HIPRO.",
-    "Pacote válido para uma única locação (até 12 horas).",
-  ];
-  const hInfo = 92 + infos.length * 50;
-  cartao(ctx, M, y, CW, hInfo);
-  tituloSecao(ctx, "Informações importantes", M + 48, y + 62);
-  infos.forEach((t, i) => {
-    const cy = y + 112 + i * 50;
-    check(ctx, M + 64, cy - 9, 15);
-    ctx.fillStyle = COR.texto;
-    ctx.textAlign = "left";
-    ctx.font = `500 27px ${FONTE}`;
-    ctx.fillText(t, M + 96, cy);
-  });
-  y += hInfo + 30;
+  const infos = tabela.infos;
+  if (infos.length > 0) {
+    const hInfo = 92 + infos.length * 50;
+    cartao(ctx, M, y, CW, hInfo);
+    tituloSecao(ctx, "Informações importantes", M + 48, y + 62);
+    infos.forEach((t, i) => {
+      const cy = y + 112 + i * 50;
+      check(ctx, M + 64, cy - 9, 15);
+      ctx.fillStyle = COR.texto;
+      ctx.textAlign = "left";
+      ctx.font = `500 27px ${FONTE}`;
+      ctx.fillText(t, M + 96, cy, CW - 96 - 48);
+    });
+    y += hInfo + 30;
+  }
 
   // Estimativa de disparos por procedimento.
-  const itens = ESTIMATIVAS_DISPAROS.slice(0, 6);
-  const combo = ESTIMATIVAS_DISPAROS[6];
+  const { itens, destaque: combo } = estimativasDaArte(tabela);
   const linhas = Math.ceil(itens.length / 2);
-  const hEst = 100 + linhas * 62 + 96 + 52;
+  ctx.font = `italic 400 22px ${FONTE}`;
+  const linhasNota = tabela.nota ? quebrar(ctx, tabela.nota, CW - 96) : [];
+  // Mesma altura de sempre com destaque e nota de uma linha; sem eles, o quadro encolhe.
+  const hEst = 100 + linhas * 62 + (combo ? 96 : 0) + (linhasNota.length ? 24 + linhasNota.length * 28 : 0) + (combo || linhasNota.length ? 0 : 10);
   cartao(ctx, M, y, CW, hEst);
   tituloSecao(ctx, "Estimativa de disparos por procedimento", M + 48, y + 62);
   const colW = (CW - 96 - 40) / 2;
@@ -271,7 +285,7 @@ export function drawTabelaPrecos(cfg: PricingConfig, taxaReserva: number, logo: 
     ctx.textAlign = "left";
     ctx.fillStyle = COR.texto;
     ctx.font = `600 27px ${FONTE}`;
-    ctx.fillText(it.procedimento, x, yy);
+    ctx.fillText(it.procedimento, x, yy, colW - 130);
     ctx.textAlign = "right";
     ctx.fillStyle = COR.tealEscuro;
     ctx.font = `800 28px ${FONTE}`;
@@ -284,22 +298,24 @@ export function drawTabelaPrecos(cfg: PricingConfig, taxaReserva: number, logo: 
     ctx.stroke();
   });
   const yc = y + 100 + linhas * 62 + 6;
-  roundedRectPath(ctx, M + 48, yc, CW - 96, 76, 20);
-  ctx.fillStyle = "rgba(61, 191, 184, 0.10)";
-  ctx.fill();
-  ctx.textAlign = "left";
-  ctx.fillStyle = COR.texto;
-  ctx.font = `700 27px ${FONTE}`;
-  ctx.fillText(combo.procedimento, M + 76, yc + 48);
-  ctx.textAlign = "right";
-  ctx.fillStyle = COR.tealEscuro;
-  ctx.font = `800 32px ${FONTE}`;
-  ctx.fillText(milhar(combo.disparos), W - M - 76, yc + 50);
+  if (combo) {
+    roundedRectPath(ctx, M + 48, yc, CW - 96, 76, 20);
+    ctx.fillStyle = "rgba(61, 191, 184, 0.10)";
+    ctx.fill();
+    ctx.textAlign = "left";
+    ctx.fillStyle = COR.texto;
+    ctx.font = `700 27px ${FONTE}`;
+    ctx.fillText(combo.procedimento, M + 76, yc + 48, CW - 96 - 56 - 200);
+    ctx.textAlign = "right";
+    ctx.fillStyle = COR.tealEscuro;
+    ctx.font = `800 32px ${FONTE}`;
+    ctx.fillText(milhar(combo.disparos), W - M - 76, yc + 50);
+  }
   ctx.textAlign = "left";
   ctx.fillStyle = COR.cinza;
   ctx.font = `italic 400 22px ${FONTE}`;
-  const nota = "Valores médios por região. Podem variar conforme a avaliação do profissional.";
-  quebrar(ctx, nota, CW - 96).forEach((l, i) => ctx.fillText(l, M + 48, yc + 116 + i * 28));
+  const yNota = combo ? yc + 116 : yc + 20;
+  linhasNota.forEach((l, i) => ctx.fillText(l, M + 48, yNota + i * 28));
   y += hEst + 34;
 
   // Rodapé.

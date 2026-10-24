@@ -1,4 +1,5 @@
 import { roundedRectPath } from "./availability-image";
+import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 
 // ============================================================
 // IMAGEM DO RECIBO DE PAGAMENTO
@@ -53,7 +54,11 @@ function carregarLogo(): Promise<HTMLImageElement | null> {
   });
 }
 
-export async function drawReciboImage(d: DadosRecibo): Promise<HTMLCanvasElement> {
+/** Rodapé do recibo vem de Configurações > Empresa e contrato (vazio = sem rodapé). */
+export async function drawReciboImage(
+  d: DadosRecibo,
+  cfg: Pick<Preferencias, "empresa"> = DEFAULT_PREFERENCIAS,
+): Promise<HTMLCanvasElement> {
   const logo = await carregarLogo();
   const altoLogo = logo ? 56 : 0;
   const altura = 24 + (logo ? altoLogo + 16 : 0) + 78 + 130 + 3 * 60 + 50;
@@ -136,6 +141,6 @@ export async function drawReciboImage(d: DadosRecibo): Promise<HTMLCanvasElement
   ctx.fillStyle = COR.suave;
   ctx.font = `500 12px ${FONTE}`;
   ctx.textAlign = "center";
-  ctx.fillText("Obrigado pela confiança! Harmonize · Locação de equipamentos", LARGURA / 2, y + 16);
+  if (cfg.empresa.rodapeRecibo) ctx.fillText(cfg.empresa.rodapeRecibo, LARGURA / 2, y + 16, util);
   return canvas;
 }
