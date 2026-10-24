@@ -2,8 +2,10 @@ import Link from "next/link";
 import { CalendarCheck, MapPin, MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hojeLocal } from "@/lib/period";
+import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
 import { carregarEncaixe } from "@/lib/carregar-encaixe";
-import { mensagemEncaixe, RAIO_KM } from "@/lib/encaixe";
+import { mensagemEncaixe } from "@/lib/encaixe";
+import { fetchPreferencias } from "@/lib/settings";
 import { ROTULO_CLASSE } from "@/lib/relacionamento";
 import { saudacaoCurta } from "@/lib/saudacao";
 import { buildWhatsAppLink } from "@/lib/format";
@@ -17,8 +19,6 @@ import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 // cancelamento ou reagendamento).
 export const dynamic = "force-dynamic";
 
-const POR_DATA = 12;
-
 function dataLonga(iso: string) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
 }
@@ -27,10 +27,18 @@ export default async function EncaixePage(props: { searchParams: Promise<{ data?
   const sp = await props.searchParams;
   const somenteDia = sp.data && /^\d{4}-\d{2}-\d{2}$/.test(sp.data) ? sp.data : null;
   const hoje = hojeLocal();
+  const supabase = createClient();
+  const { encaixe, relacionamento } = await fetchPreferencias(supabase);
+  const RAIO_KM = encaixe.raioKm;
+  const POR_DATA = encaixe.porData;
   let erro: string | null = null;
   let lista: Awaited<ReturnType<typeof carregarEncaixe>> = [];
   try {
-    lista = await carregarEncaixe(createClient(), hoje, { somenteDia });
+    lista = await carregarEncaixe(supabase, hoje, {
+      somenteDia,
+      encaixe,
+      pessoas: await carregarRelacionamento(supabase, hoje, relacionamento),
+    });
   } catch (e) {
     erro = e instanceof Error ? e.message : "Não consegui montar o encaixe.";
   }
@@ -45,7 +53,7 @@ export default async function EncaixePage(props: { searchParams: Promise<{ data?
         apoio={
           somenteDia
             ? `${totalPessoas === 1 ? "pessoa perto" : "pessoas perto"} de onde você vai estar`
-            : `nos próximos 30 dias, com atendimento no dia anterior ou seguinte · até ${RAIO_KM} km`
+            : `nos próximos ${encaixe.diasAFrente} dias, com atendimento no dia anterior ou seguinte · até ${RAIO_KM} km`
         }
         chips={[{ texto: `Raio de ${RAIO_KM} km em linha reta`, icone: MapPin }]}
       />
@@ -61,7 +69,7 @@ export default async function EncaixePage(props: { searchParams: Promise<{ data?
               tenha atendimento no dia anterior nem no seguinte, ou que ninguém sem reserva more a até {RAIO_KM} km.
             </>
           ) : (
-            <>Nenhuma data livre colada a um atendimento nos próximos 30 dias com alguém por perto.</>
+            <>Nenhuma data livre colada a um atendimento nos próximos {encaixe.diasAFrente} dias com alguém por perto.</>
           )}
           {somenteDia && (
             <Link href="/agenda/encaixe" className="mt-3 block font-semibold text-brand-teal-dark">

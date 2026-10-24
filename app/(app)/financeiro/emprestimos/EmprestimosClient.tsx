@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
-import { DEVEDORES_SUGERIDOS, type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
+import type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { confirmar, avisar } from "@/components/Dialogos";
 
@@ -25,6 +26,7 @@ type Tipo = "concedido" | "devolucao";
 export default function EmprestimosClient({ devedores }: { devedores: ResumoDevedor[] }) {
   const supabase = createClient();
   const router = useRouter();
+  const sugeridos = usePreferencias().listas.devedores;
   const totalAReceber = devedores.reduce((s, d) => s + Math.max(0, d.saldo), 0);
 
   const somenteLeitura = useSomenteLeitura();
@@ -41,7 +43,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
   const [erro, setErro] = useState<string | null>(null);
   const [removendo, setRemovendo] = useState<string | null>(null);
 
-  const nomes = Array.from(new Set([...devedores.map((d) => d.devedor), ...DEVEDORES_SUGERIDOS]));
+  const nomes = Array.from(new Set([...devedores.map((d) => d.devedor), ...sugeridos]));
 
   function abrir(tipo: Tipo, devedor: string) {
     setForm({ tipo, devedor });

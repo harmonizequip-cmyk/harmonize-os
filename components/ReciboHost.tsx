@@ -6,13 +6,14 @@
 // ReceberPagamentoBotao dispara, porque o botão costuma sumir da tela assim
 // que a locação fica paga.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { canvasToPngFile } from "@/lib/availability-image";
 import { drawReciboImage, reaisRecibo, type DadosRecibo } from "@/lib/recibo-image";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
+import { usePreferencias } from "@/lib/usar-preferencias";
 
 export const EVENTO_PAGAMENTO = "harmonize:pagamento-registrado";
 
@@ -50,8 +51,14 @@ export default function ReciboHost() {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [whats, setWhats] = useState<{ tel: string | null; texto: string } | null>(null);
 
+  // Configurações > Recibo: desligado, o evento continua disparando mas a oferta não abre.
+  const oferecer = usePreferencias().recibo.oferecer;
+  const oferecerRef = useRef(oferecer);
+  oferecerRef.current = oferecer;
+
   useEffect(() => {
     const ouvir = (e: Event) => {
+      if (!oferecerRef.current) return;
       setPagamento((e as CustomEvent<PagamentoRegistrado>).detail);
       setPrevia(null);
       setArquivo(null);

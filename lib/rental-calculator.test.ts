@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularResumoLocacao,
+  calcularValorDeslocamento,
   descontarTaxaDosPagamentos,
   ordenarContagens,
   valorDosDisparos,
@@ -142,5 +143,21 @@ describe("base do desconto em porcentagem", () => {
     expect(
       valorDosDisparos({ isMentoria: true, shots: 0, pricing: null, mentoriaPricing: { totalValue: 1500 }, custoManualPorDisparo: null })
     ).toBe(1500);
+  });
+});
+
+describe("deslocamento configurável", () => {
+  it("padrão 50/50 = regra de sempre", () => {
+    expect(calcularValorDeslocamento(0)).toBe(0);
+    expect(calcularValorDeslocamento(60)).toBe(100);
+    expect(calcularValorDeslocamento(70)).toBe(150);
+  });
+  it("valor e bloco diferentes", () => {
+    expect(calcularValorDeslocamento(60, { valorPorBloco: 80, kmPorBloco: 40 })).toBe(240);
+  });
+  it("o resumo usa a configuração quando passada", () => {
+    const r = calcularResumoLocacao(entrada({ kmIda: 60, deslocamentoCfg: { valorPorBloco: 80, kmPorBloco: 40 } }));
+    expect(r.valorDeslocamento).toBe(240);
+    expect(calcularResumoLocacao(entrada({ kmIda: 60 })).valorDeslocamento).toBe(100);
   });
 });

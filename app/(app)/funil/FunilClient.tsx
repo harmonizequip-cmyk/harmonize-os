@@ -15,7 +15,8 @@ import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { linkEvento } from "@/lib/atalhos";
 import LeadCardModal from "./LeadCardModal";
 import NovaTarefaModal from "./NovaTarefaModal";
-import { ORIGENS } from "./NovoLeadModal";
+import { origensParaTela, rotuloDaOrigem } from "./NovoLeadModal";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import {
   DndContext,
   DragOverlay,
@@ -141,6 +142,7 @@ export default function FunilClient({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const origens = origensParaTela(usePreferencias().listas.origens);
   const [leads, setLeads] = useState(initialClients);
   const [tasks, setTasks] = useState(initialTasks);
   const [selected, setSelected] = useState<LeadRow | null>(null);
@@ -251,7 +253,7 @@ export default function FunilClient({
     );
   }, [leads, aba, search, tagFilter, origemFilter]);
 
-  const origemLabel = (valor: string | null) => ORIGENS.find((o) => o.value === valor)?.label ?? valor ?? "";
+  const origemLabel = (valor: string | null) => rotuloDaOrigem(origens, valor);
 
   function baixarCsv() {
     exportarTabela(
@@ -660,7 +662,7 @@ export default function FunilClient({
           className="rounded-lg border border-neutral-300 bg-white px-2.5 py-2 text-xs text-neutral-600"
         >
           <option value="">Todas as origens</option>
-          {ORIGENS.map((o) => (
+          {origens.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>

@@ -36,7 +36,6 @@ import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatCurrency } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
 import {
-  LIMITE_DIARIO,
   ROTULO_CLASSE,
   ROTULO_VALOR,
   mensagemRelacionamento,
@@ -103,10 +102,12 @@ export default function RelacionamentoClient({
   pessoas,
   hoje,
   abaInicial,
+  limiteDiario,
 }: {
   pessoas: PessoaClassificada[];
   hoje: string;
   abaInicial: Aba;
+  limiteDiario: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -139,8 +140,8 @@ export default function RelacionamentoClient({
   }
 
   const devidas = useMemo(() => pessoas.filter((p) => p.devida), [pessoas]);
-  const fila = devidas.filter((p) => !pulados.has(p.id)).slice(0, LIMITE_DIARIO + feitos.size);
-  const filaVisivel = fila.filter((p) => !feitos.has(p.id)).slice(0, LIMITE_DIARIO);
+  const fila = devidas.filter((p) => !pulados.has(p.id)).slice(0, limiteDiario + feitos.size);
+  const filaVisivel = fila.filter((p) => !feitos.has(p.id)).slice(0, limiteDiario);
   const restantes = Math.max(0, devidas.length - pulados.size - feitos.size - filaVisivel.length);
 
   const clientes = pessoas.filter((p) => p.ehCliente || p.locacoes.length > 0);
@@ -262,7 +263,7 @@ export default function RelacionamentoClient({
       {aba === "hoje" && (
         <>
           <p className="px-1 text-[12px] leading-snug text-slate-500">
-            No máximo {LIMITE_DIARIO} por dia, quem vale mais e está há mais tempo sem conversa primeiro. Mandou mensagem, a pessoa sai da lista e volta só no tempo certo.
+            No máximo {limiteDiario} por dia, quem vale mais e está há mais tempo sem conversa primeiro. Mandou mensagem, a pessoa sai da lista e volta só no tempo certo.
           </p>
 
           {filaVisivel.length === 0 ? (

@@ -114,7 +114,7 @@ export default async function ClienteDetailPage(props: { params: Promise<{ id: s
   // Classificação do Relacionamento (precisa de todos para a curva de valor).
   let relacao = null;
   try {
-    relacao = (await carregarRelacionamento(supabase, hojeLocal())).find((p) => p.id === params.id) ?? null;
+    relacao = (await carregarRelacionamento(supabase, hojeLocal(), settings.preferencias.relacionamento)).find((p) => p.id === params.id) ?? null;
   } catch {
     // só um selo: sem ele a ficha abre igual
   }

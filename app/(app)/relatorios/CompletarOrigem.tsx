@@ -7,12 +7,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ORIGENS } from "@/app/(app)/funil/NovoLeadModal";
+import { origensParaTela } from "@/app/(app)/funil/NovoLeadModal";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { LinkCliente } from "@/components/Atalhos";
 
 export default function CompletarOrigem({ clientes }: { clientes: { id: string; name: string }[] }) {
   const supabase = createClient();
   const router = useRouter();
+  const origens = origensParaTela(usePreferencias().listas.origens);
   const [restantes, setRestantes] = useState(clientes);
   const [salvando, setSalvando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function CompletarOrigem({ clientes }: { clientes: { id: string; 
                   <LinkCliente id={c.id}>{c.name}</LinkCliente>
                 </p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {ORIGENS.map((o) => (
+                  {origens.map((o) => (
                     <button
                       key={o.value}
                       type="button"

@@ -46,5 +46,8 @@ describe("linkAcademyPreenchido", () => {
   it("leva nome e e-mail no endereço", () => {
     expect(linkAcademyPreenchido("Ana Lima", "Ana@X.com")).toBe("https://academy.contourline.com.br/invites/xOP09Q/join?name=Ana+Lima&email=ana%40x.com");
     expect(linkAcademyPreenchido(null, null)).toBe("https://academy.contourline.com.br/invites/xOP09Q/join");
+    expect(linkAcademyPreenchido("Ana", null, "https://exemplo.com/convite")).toBe("https://exemplo.com/convite?name=Ana");
+    expect(linkAcademyPreenchido("Ana", null, "https://exemplo.com/c?x=1")).toBe("https://exemplo.com/c?x=1&name=Ana");
+    expect(linkAcademyPreenchido(null, null, "https://exemplo.com/convite")).toBe("https://exemplo.com/convite");
   });
 });

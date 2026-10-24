@@ -1,8 +1,10 @@
 // Cadastros que chegam do formulário (Google Forms da Contourline Academy):
 // achar o cliente que já existe e separar cidade e UF.
 
+import { DEFAULT_PREFERENCIAS } from "@/lib/preferencias";
+
 // Link de cadastro da Academy: só o dono usa (ele cadastra a cliente). Nunca mandar para a cliente.
-export const LINK_ACADEMY = "https://academy.contourline.com.br/invites/xOP09Q/join";
+export const LINK_ACADEMY = DEFAULT_PREFERENCIAS.listas.linkAcademy;
 
 export interface CadastroRecebido {
   id: string;
@@ -119,10 +121,10 @@ export function tratamentoSugerido(cad: CadastroRecebido): "Dr." | "Dra." | "" {
  * melhor email"; se a plataforma aceitar os campos pelo endereço, abre
  * preenchida. Se não aceitar, ignora e abre vazia (os botões de copiar ficam).
  */
-export function linkAcademyPreenchido(nome: string | null, email: string | null): string {
+export function linkAcademyPreenchido(nome: string | null, email: string | null, base: string = LINK_ACADEMY): string {
   const p = new URLSearchParams();
   if (nome) p.set("name", nome.trim());
   if (email) p.set("email", email.trim().toLowerCase());
   const q = p.toString();
-  return q ? `${LINK_ACADEMY}?${q}` : LINK_ACADEMY;
+  return q ? `${base}${base.includes("?") ? "&" : "?"}${q}` : base;
 }

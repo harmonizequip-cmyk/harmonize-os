@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { CHAVE_PLANO_IA, linkCliente, linkEvento, linkNovoPlanejamento } from "@/lib/atalhos";
 import { temConteudo, type EstadoPlanejador, type PlanejamentoMontado } from "@/lib/planejamento";
 import {
   MAX_SESSOES,
-  PERFIS,
   alertas,
   areasPreenchidas,
   fecharSessao,
@@ -88,6 +88,12 @@ export default function EditorPlanejamento({
   const supabase = createClient();
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
+  const perfisSalvos = usePreferencias().planejador.perfis;
+  // "Nenhum" sempre primeiro; o valor do botão é o número de disparos como texto.
+  const perfisTela = useMemo(
+    () => [{ valor: "0", nome: "Nenhum", disparos: 0 }, ...perfisSalvos.map((p) => ({ valor: String(p.disparos), nome: p.nome, disparos: p.disparos }))],
+    [perfisSalvos]
+  );
   const base = portal ? "/portal" : "/planejador";
   const [id, setId] = useState<string | null>(planoId);
   const [cliente, setCliente] = useState(clienteId ?? "");
@@ -792,8 +798,8 @@ export default function EditorPlanejamento({
 
               <div className={cartao}>
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">{varias ? "Saldo de disparos do pacote" : "Saldo de disparos"}</p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {PERFIS.map((pf) => {
+                <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${perfisTela.length <= 4 ? 4 : 3}, minmax(0, 1fr))` }}>
+                  {perfisTela.map((pf) => {
                     const on = plano.perfil === pf.valor;
                     return (
                       <button

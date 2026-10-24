@@ -21,6 +21,7 @@ import type { PricingConfig, MentoriaPricingConfig } from "@/lib/rental-pricing"
 import { valorParaNumero } from "@/lib/valor";
 import { duracaoEmDias, hojeLocal, somarDias } from "@/lib/period";
 import { confirmar } from "@/components/Dialogos";
+import { usePreferencias } from "@/lib/usar-preferencias";
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   hipro_1: "HIPRO 1",
@@ -276,7 +277,9 @@ export default function EditarEventoModal({
 
   // Data de HIPRO liberada no futuro: oferece ver quem está perto para encaixar
   // (lib/encaixe.ts). A janela já fechou; o diálogo é global.
+  const preferencias = usePreferencias();
   async function oferecerEncaixe(dataLiberada: string) {
+    if (!preferencias.encaixe.perguntarAoCancelar) return;
     const ehHipro = event.event_type === "hipro_1" || event.event_type === "hipro_2";
     if (!ehHipro || dataLiberada <= hojeLocal()) return;
     const ok = await confirmar({

@@ -12,6 +12,7 @@ import { CalendarClock, ClipboardList, History, Pencil, Plus, Search, SlidersHor
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { createClient } from "@/lib/supabase/client";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import HistoricoPaciente from "@/components/planejador/HistoricoPaciente";
 import { normalizarNome, planosDoPaciente, saldoParaProximaSessao } from "@/lib/historico-paciente";
 
@@ -211,7 +212,8 @@ export default function PlanejadorLista({
 
   const doHistorico = useMemo(() => (historico ? planosDoPaciente(planejamentos, historico) : []), [historico, planejamentos]);
   const grupos = useMemo(() => agruparPorCliente(filtrados), [filtrados]);
-  const retornos = useMemo(() => retornosProximos(filtrados, hoje), [filtrados, hoje]);
+  const retornoDias = usePreferencias().planejador.retornoDias;
+  const retornos = useMemo(() => retornosProximos(filtrados, hoje, retornoDias), [filtrados, hoje, retornoDias]);
   const nomeCliente = clientes.find((c) => c.id === cliente)?.name;
   const linkNovo = portal ? "/portal/novo" : linkNovoPlanejamento(cliente || null);
 
@@ -337,7 +339,7 @@ export default function PlanejadorLista({
       {retornos.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
-            <CalendarClock size={14} /> Retornos nos próximos 15 dias
+            <CalendarClock size={14} /> Retornos nos próximos {retornoDias} dias
           </p>
           <div className="space-y-2">
             {retornos.map((p) => (

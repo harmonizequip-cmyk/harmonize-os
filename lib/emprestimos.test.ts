@@ -22,3 +22,21 @@ describe("empréstimos", () => {
     expect(ehCategoriaDeEmprestimo(null)).toBe(false);
   });
 });
+
+describe("devedores configuráveis", () => {
+  it("padrão igual ao de antes", async () => {
+    const m = await import("./emprestimos");
+    expect(m.DEVEDORES_SUGERIDOS).toEqual(["LASER DREAM CAMPINA GRANDE", "LASER DREAM JOÃO PESSOA"]);
+    expect(m.rotuloDevedor("LASER DREAM CAMPINA GRANDE")).toBe("Campina Grande");
+    expect(m.rotuloDevedor("LASER DREAM JOÃO PESSOA")).toBe("João Pessoa");
+    expect(m.tituloEmprestimo()).toBe("Empréstimo para a Laser Dream");
+  });
+  it("lista diferente", async () => {
+    const m = await import("./emprestimos");
+    const l = ["CLINICA SOL", "STUDIO LUA"];
+    expect(m.rotuloDevedor("CLINICA SOL", l)).toBe("Clinica Sol");
+    expect(m.tituloEmprestimo(l)).toBe("Empréstimo");
+    expect(m.tituloEmprestimo(["ANA PAULA", "ANA MARIA"])).toBe("Empréstimo para Ana");
+    expect(m.tituloEmprestimo([])).toBe("Empréstimo");
+  });
+});

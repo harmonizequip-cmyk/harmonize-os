@@ -10,7 +10,8 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { interpretarDespesa, type ClienteParaVoz } from "@/lib/voz";
-import { DEVEDORES_SUGERIDOS } from "@/lib/emprestimos";
+import { rotuloDevedor, tituloEmprestimo } from "@/lib/emprestimos";
+import { usePreferencias } from "@/lib/usar-preferencias";
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
   { value: "dinheiro", label: "Dinheiro" },
@@ -54,6 +55,7 @@ export default function NovoLancamentoModal({
   onCreated: () => void;
 }) {
   const supabase = createClient();
+  const devedoresSugeridos = usePreferencias().listas.devedores;
   const [type, setType] = useState<"entrada" | "saida">(porVoz ? "saida" : "entrada");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
@@ -278,21 +280,21 @@ export default function NovoLancamentoModal({
           <span className="text-[11px] text-neutral-400">(não entra no caixa da Harmonize)</span>
         </label>
 
-        {!pessoal && (
+        {!pessoal && devedoresSugeridos.length > 0 && (
           <div className="-mt-2 mb-4 rounded-xl border border-neutral-200 px-3 py-2">
             <label className="flex items-center gap-2 text-sm text-neutral-700">
               <input
                 type="checkbox"
                 checked={!!emprestimo}
-                onChange={(e) => setEmprestimo(e.target.checked ? DEVEDORES_SUGERIDOS[0] : null)}
+                onChange={(e) => setEmprestimo(e.target.checked ? devedoresSugeridos[0] : null)}
                 className="h-4 w-4"
               />
-              Empréstimo para a Laser Dream
+              {tituloEmprestimo(devedoresSugeridos)}
             </label>
             {emprestimo && (
               <>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  {DEVEDORES_SUGERIDOS.map((d) => (
+                  {devedoresSugeridos.map((d) => (
                     <button
                       key={d}
                       type="button"
@@ -301,7 +303,7 @@ export default function NovoLancamentoModal({
                         emprestimo === d ? "border-brand-teal bg-brand-teal text-white" : "border-neutral-300 text-neutral-600"
                       }`}
                     >
-                      {d.replace("LASER DREAM ", "").replace("CAMPINA GRANDE", "Campina Grande").replace("JOÃO PESSOA", "João Pessoa")}
+                      {rotuloDevedor(d, devedoresSugeridos)}
                     </button>
                   ))}
                 </div>

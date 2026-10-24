@@ -71,4 +71,15 @@ describe("encaixe", () => {
     expect(m).toContain("11/11");
     expect(m).toContain("Caruaru");
   });
+
+  it("raio e janela configuráveis (padrão 150 km e 30 dias)", () => {
+    const ancoras = [{ dia: "2026-11-10", cidade: "Caruaru" }];
+    const pessoas = [pessoa("perto", "Gravatá")];
+    expect(candidatasPerto(ancoras, pessoas)).toHaveLength(1);
+    expect(candidatasPerto(ancoras, pessoas, 10)).toHaveLength(0);
+    const params = { hoje: "2026-11-01", ocupados: new Set(["2026-11-10"]), eventos, pessoas };
+    expect(oportunidadesDeEncaixe(params).map((o) => o.data)).toContain("2026-11-09");
+    expect(oportunidadesDeEncaixe({ ...params, diasAFrente: 3 })).toEqual([]);
+    expect(oportunidadesDeEncaixe({ ...params, raioKm: 10 })).toEqual([]);
+  });
 });

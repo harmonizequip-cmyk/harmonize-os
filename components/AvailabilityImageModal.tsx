@@ -19,6 +19,7 @@ import { buildWhatsAppLink } from "@/lib/format";
 import { canvasToPngFile, drawAvailabilityImage } from "@/lib/availability-image";
 import { mensagemDatasDisponiveis } from "@/lib/saudacao";
 import { diasDoPeriodo } from "@/lib/period";
+import { usePreferencias } from "@/lib/usar-preferencias";
 
 const HOME_CITY_KEY = "harmonize_cidade_base";
 
@@ -110,7 +111,10 @@ export default function AvailabilityImageModal({
     clientName ? mensagemDatasDisponiveis({ name: clientName, treatment, displayName }) : ""
   );
   const [shareNote, setShareNote] = useState<string | null>(null);
-  const [homeCity, setHomeCity] = useState("");
+  const cidadeBaseConfig = usePreferencias().encaixe.cidadeBase;
+  // Valor digitado ou guardado no aparelho (null = nunca mexeu) vale mais que a cidade base das Configurações.
+  const [cidadeDoAparelho, setCidadeDoAparelho] = useState<string | null>(null);
+  const homeCity = cidadeDoAparelho ?? cidadeBaseConfig;
 
   // Guarda o valor mais recente da cidade base pra usar assim que o mês
   // carrega, sem precisar recarregar do servidor a cada letra digitada no
@@ -124,14 +128,14 @@ export default function AvailabilityImageModal({
   useEffect(() => {
     try {
       const saved = localStorage.getItem(HOME_CITY_KEY);
-      if (saved) setHomeCity(saved);
+      if (saved) setCidadeDoAparelho(saved);
     } catch {
       // Sem localStorage disponível (modo privado etc) — segue sem lembrar a cidade base.
     }
   }, []);
 
   function updateHomeCity(value: string) {
-    setHomeCity(value);
+    setCidadeDoAparelho(value);
     try {
       localStorage.setItem(HOME_CITY_KEY, value);
     } catch {

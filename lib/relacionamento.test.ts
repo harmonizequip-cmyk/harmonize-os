@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { classificarTodas, valorPorFaturamento, type PessoaBase } from "./relacionamento";
+import { CADENCIA, LIMITE_DIARIO, classificarTodas, valorPorFaturamento, type PessoaBase } from "./relacionamento";
+import { DEFAULT_PREFERENCIAS } from "./preferencias";
 
 const HOJE = "2026-10-17";
 
@@ -75,5 +76,43 @@ describe("valor por faturamento (curva ABC)", () => {
     expect(v.get("a")).toBe("vip");
     expect(v.get("b")).toBe("boa");
     expect(v.get("c")).toBe("comum");
+  });
+});
+
+describe("classificação com configuração própria", () => {
+  const base = DEFAULT_PREFERENCIAS.relacionamento;
+
+  it("sem configuração usa os padrões (CADENCIA e LIMITE_DIARIO derivam deles)", () => {
+    expect(CADENCIA.ativa).toBe(21);
+    expect(LIMITE_DIARIO).toBe(8);
+  });
+
+  it("sumidaDias menor faz a cliente virar sumida antes", () => {
+    const p = pessoa({ locacoes: [{ data: "2026-05-01", valor: 1000 }, { data: "2026-06-01", valor: 1000 }] }); // 138 dias
+    expect(classificarTodas([p], HOJE)[0].classe).toBe("sumida");
+    const [c] = classificarTodas([pessoa({ locacoes: [{ data: "2026-08-10", valor: 1000 }, { data: "2026-09-01", valor: 1000 }] })], HOJE, { ...base, sumidaDias: 30 });
+    expect(c.classe).toBe("sumida"); // 46 dias
+    expect(classificarTodas([pessoa({ locacoes: [{ data: "2026-08-10", valor: 1000 }, { data: "2026-09-01", valor: 1000 }] })], HOJE)[0].classe).not.toBe("sumida");
+  });
+
+  it("cadência diferente muda quando a pessoa entra em chamar hoje", () => {
+    const p = pessoa({ locacoes: [{ data: "2026-10-01", valor: 2500 }], ultimoContato: "2026-10-12" }); // 5 dias sem contato
+    expect(classificarTodas([p], HOJE)[0].devida).toBe(false);
+    const [c] = classificarTodas([p], HOJE, { ...base, cadencia: { ...base.cadencia, nova: 4 } });
+    expect(c.cadencia).toBe(4);
+    expect(c.devida).toBe(true);
+  });
+
+  it("novaAteDias e riscoSemRitmoDias mudam a classe", () => {
+    const p = pessoa({ locacoes: [{ data: "2026-08-17", valor: 1000 }] }); // 61 dias, 1 locação
+    expect(classificarTodas([p], HOJE)[0].classe).toBe("em_risco");
+    expect(classificarTodas([p], HOJE, { ...base, novaAteDias: 90 })[0].classe).toBe("nova");
+    expect(classificarTodas([p], HOJE, { ...base, riscoSemRitmoDias: 100 })[0].classe).toBe("ativa");
+  });
+
+  it("vipFatia e frequenteFatia mudam a curva", () => {
+    const totais = new Map([["a", 600], ["b", 300], ["c", 100]]);
+    expect(valorPorFaturamento(totais).get("b")).toBe("boa");
+    expect(valorPorFaturamento(totais, { ...base, vipFatia: 0.7 }).get("b")).toBe("vip");
   });
 });
