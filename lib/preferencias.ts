@@ -79,7 +79,56 @@ export interface Preferencias {
     /** Oferecer o recibo depois de receber um pagamento. */
     oferecer: boolean;
   };
+  /** Dados da Harmonize em contrato, recibo e prontuário/ficha do paciente. */
+  empresa: {
+    razaoSocial: string;
+    cnpj: string;
+    endereco: string;
+    /** Quem assina pela Harmonize no contrato. */
+    responsavel: string;
+    email: string;
+    /** Cidade do foro do contrato (também a cidade da data no fim do contrato). */
+    cidadeForo: string;
+    /** Rodapé do prontuário e da ficha do paciente. */
+    rodapeDocumentos: string;
+    /** Rodapé da imagem do recibo. */
+    rodapeRecibo: string;
+  };
+  /** Números do contrato de locação (o texto jurídico continua fixo). */
+  contrato: {
+    /** 6ª cláusula: multa sobre o valor total do contrato, em %. */
+    multaPercentual: number;
+    /** 7ª cláusula: aviso prévio para rescindir, em horas. */
+    avisoRescisaoHoras: number;
+  };
+  /** Arte da tabela de preços. */
+  tabelaPrecos: {
+    /** Estimativas por procedimento, em duas colunas (até 6). */
+    estimativas: EstimativaDisparos[];
+    /** Linha em destaque embaixo das estimativas (procedimento vazio = sem destaque). */
+    destaque: EstimativaDisparos;
+    /** Itens de "Informações importantes" (lista vazia tira o quadro). */
+    infos: string[];
+    /** Nota em itálico embaixo das estimativas. */
+    nota: string;
+  };
 }
+
+export interface EstimativaDisparos {
+  procedimento: string;
+  disparos: number;
+}
+
+/** Limites dos grupos de texto (usados também nas telas, em maxLength). */
+export const LIMITES_TEXTO = {
+  empresaCurto: 120,
+  empresaLongo: 200,
+  procedimento: 40,
+  info: 80,
+  nota: 160,
+  maxEstimativas: 6,
+  maxInfos: 6,
+} as const;
 
 /** Avisos do Dashboard que podem ser escondidos (id usado em dashboard/page.tsx). */
 export const AVISOS_DASHBOARD: { id: string; rotulo: string; dica: string }[] = [
@@ -140,6 +189,35 @@ export const DEFAULT_PREFERENCIAS: Preferencias = {
     ],
   },
   recibo: { oferecer: true },
+  empresa: {
+    razaoSocial: "Harmonize Bella Prime LTDA",
+    cnpj: "41.107.803/0001-27",
+    endereco: "Rua Hidelbrando Tourinho, 18, Salas 101 e 102 — Miramar, João Pessoa/PB",
+    responsavel: "Eder Campos de Almeida",
+    email: "harmonizequip@gmail.com",
+    cidadeForo: "João Pessoa/PB",
+    rodapeDocumentos: "Harmonize · Locação de Equipamentos Médicos e Estéticos",
+    rodapeRecibo: "Obrigado pela confiança! Harmonize · Locação de equipamentos",
+  },
+  contrato: { multaPercentual: 20, avisoRescisaoHoras: 48 },
+  tabelaPrecos: {
+    estimativas: [
+      { procedimento: "Full face", disparos: 12000 },
+      { procedimento: "Terço inferior", disparos: 4000 },
+      { procedimento: "Papada", disparos: 2000 },
+      { procedimento: "Pescoço", disparos: 2000 },
+      { procedimento: "Pálpebra inferior", disparos: 800 },
+      { procedimento: "Fox eyes", disparos: 800 },
+    ],
+    destaque: { procedimento: "Full face + pescoço + papada", disparos: 16000 },
+    infos: [
+      "Não existe mínimo de disparos.",
+      "Deslocamento cobrado à parte, conforme a localização.",
+      "Valores referentes ao uso do equipamento HIPRO.",
+      "Pacote válido para uma única locação (até 12 horas).",
+    ],
+    nota: "Valores médios por região. Podem variar conforme a avaliação do profissional.",
+  },
 };
 
 type Obj = Record<string, unknown>;
@@ -221,6 +299,36 @@ export function lerPreferencias(bruto: unknown): Preferencias {
     if (nome && disparos > 0) perfis.push({ nome, disparos });
   }
 
+  const emp = obj(r.empresa);
+  const L = LIMITES_TEXTO;
+  // Texto obrigatório: vazio volta ao padrão (contrato sem razão social não serve).
+  const obrig = (v: unknown, padrao: string, max: number) => texto(v, padrao, max) || padrao;
+
+  const ctr = obj(r.contrato);
+
+  const tp = obj(r.tabelaPrecos);
+  const estimativa = (v: unknown): EstimativaDisparos | null => {
+    const e = obj(v);
+    const procedimento = texto(e.procedimento, "", L.procedimento);
+    const disparos = num(e.disparos, -1, 10, 200000);
+    return procedimento && disparos > 0 ? { procedimento, disparos } : null;
+  };
+  const estimativas = lista(tp.estimativas)
+    .map(estimativa)
+    .filter((e): e is EstimativaDisparos => !!e)
+    .slice(0, L.maxEstimativas);
+  const destBruto = obj(tp.destaque);
+  const destaque =
+    "destaque" in tp
+      ? typeof destBruto.procedimento === "string" && destBruto.procedimento.trim() === ""
+        ? { procedimento: "", disparos: 0 }
+        : (estimativa(tp.destaque) ?? d.tabelaPrecos.destaque)
+      : d.tabelaPrecos.destaque;
+  const infos = lista(tp.infos)
+    .map((x) => texto(x, "", L.info))
+    .filter(Boolean)
+    .slice(0, L.maxInfos);
+
   return {
     metas: { min, max, baseLucroDias: num(metas.baseLucroDias, d.metas.baseLucroDias, 30, 365) },
     deslocamento: {
@@ -262,6 +370,28 @@ export function lerPreferencias(bruto: unknown): Preferencias {
       perfis: perfis.length ? perfis : d.planejador.perfis,
     },
     recibo: { oferecer: bool(obj(r.recibo).oferecer, d.recibo.oferecer) },
+    empresa: {
+      razaoSocial: obrig(emp.razaoSocial, d.empresa.razaoSocial, L.empresaCurto),
+      cnpj: obrig(emp.cnpj, d.empresa.cnpj, 30),
+      endereco: obrig(emp.endereco, d.empresa.endereco, L.empresaLongo),
+      responsavel: obrig(emp.responsavel, d.empresa.responsavel, L.empresaCurto),
+      email: obrig(emp.email, d.empresa.email, L.empresaCurto),
+      cidadeForo: obrig(emp.cidadeForo, d.empresa.cidadeForo, 60),
+      // Rodapés podem ficar vazios (o dono tirou a frase).
+      rodapeDocumentos: texto(emp.rodapeDocumentos, d.empresa.rodapeDocumentos, L.empresaLongo),
+      rodapeRecibo: texto(emp.rodapeRecibo, d.empresa.rodapeRecibo, L.empresaLongo),
+    },
+    contrato: {
+      multaPercentual: num(ctr.multaPercentual, d.contrato.multaPercentual, 0, 100),
+      avisoRescisaoHoras: num(ctr.avisoRescisaoHoras, d.contrato.avisoRescisaoHoras, 1, 720),
+    },
+    tabelaPrecos: {
+      estimativas: estimativas.length ? estimativas : d.tabelaPrecos.estimativas,
+      destaque,
+      // Lista vazia é válida (tira o quadro); só volta ao padrão se o campo nem existir.
+      infos: Array.isArray(tp.infos) ? infos : d.tabelaPrecos.infos,
+      nota: texto(tp.nota, d.tabelaPrecos.nota, L.nota),
+    },
   };
 }
 
