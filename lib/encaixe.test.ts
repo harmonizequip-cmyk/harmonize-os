@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { coordenadasDaCidade, distanciaKm, normalizarCidade } from "./cidades-coordenadas";
+import { CIDADES_PADRAO, coordenadasDaCidade, distanciaKm, lerCoordenadas, normalizarCidade } from "./cidades-coordenadas";
+import { cidadesSemPosicao, mapaDasCidades } from "./carregar-cidades";
 import { ancorasDoDia, candidatasPerto, mensagemEncaixe, oportunidadesDeEncaixe } from "./encaixe";
 import type { PessoaClassificada } from "./relacionamento";
 
@@ -81,5 +82,53 @@ describe("encaixe", () => {
     expect(oportunidadesDeEncaixe(params).map((o) => o.data)).toContain("2026-11-09");
     expect(oportunidadesDeEncaixe({ ...params, diasAFrente: 3 })).toEqual([]);
     expect(oportunidadesDeEncaixe({ ...params, raioKm: 10 })).toEqual([]);
+  });
+});
+
+describe("cidades do banco (mapa)", () => {
+  it("sem mapa usa a lista fixa; com mapa, só o que está nele", () => {
+    const mapa = { "lagoa seca": [-7.17, -35.85] as [number, number] };
+    expect(coordenadasDaCidade("Caruaru")).not.toBeNull();
+    expect(coordenadasDaCidade("Caruaru", mapa)).toBeNull();
+    expect(coordenadasDaCidade("LAGOA SECA - PB", mapa)).toEqual([-7.17, -35.85]);
+    expect(coordenadasDaCidade("constructor", mapa)).toBeNull();
+  });
+
+  it("encaixe com o mapa do banco: cidade nova entra, cidade fora do mapa não", () => {
+    const mapa = { ...CIDADES_PADRAO, "lagoa seca": [-7.17, -35.85] as [number, number] };
+    const eventos = [{ data: "2026-11-10", ate: null, cidade: "Campina Grande" }];
+    const pessoas = [pessoa("nova", "Lagoa Seca"), pessoa("fora", "Cidade Inventada")];
+    expect(candidatasPerto(ancorasDoDia("2026-11-11", eventos, mapa), pessoas, 150, mapa).map((c) => c.pessoa.id)).toEqual(["nova"]);
+    expect(candidatasPerto(ancorasDoDia("2026-11-11", eventos), pessoas).map((c) => c.pessoa.id)).toEqual([]);
+    const ops = oportunidadesDeEncaixe({ hoje: "2026-11-01", ocupados: new Set(["2026-11-10"]), eventos, pessoas, mapa, somenteDia: "2026-11-11" });
+    expect(ops[0]?.candidatas.map((c) => c.pessoa.id)).toEqual(["nova"]);
+    // Âncora sem posição no mapa não entra.
+    expect(ancorasDoDia("2026-11-11", eventos, { "lagoa seca": [-7.17, -35.85] })).toEqual([]);
+  });
+
+  it("lê a posição colada do Google Maps e outros formatos", () => {
+    expect(lerCoordenadas("-7.1153, -34.861")).toEqual([-7.1153, -34.861]);
+    expect(lerCoordenadas("-7.1153,-34.861")).toEqual([-7.1153, -34.861]);
+    expect(lerCoordenadas("-7.1153 -34.861")).toEqual([-7.1153, -34.861]);
+    expect(lerCoordenadas("-7,1153; -34,861")).toEqual([-7.1153, -34.861]);
+    expect(lerCoordenadas("-7,1153 -34,861")).toEqual([-7.1153, -34.861]);
+    expect(lerCoordenadas("-7,1153, -34,861")).toEqual([-7.1153, -34.861]);
+    expect(lerCoordenadas("")).toBeNull();
+    expect(lerCoordenadas("abc")).toBeNull();
+    expect(lerCoordenadas("-95, 10")).toBeNull();
+    expect(lerCoordenadas("1 2 3")).toBeNull();
+  });
+
+  it("monta o mapa das linhas do banco e acha cidades de clientes que faltam", () => {
+    const mapa = mapaDasCidades([
+      { id: "1", nome: "recife", nome_exibicao: "Recife", uf: "PE", latitude: -8.05, longitude: -34.88 },
+      { id: "2", nome: "joao pessoa", nome_exibicao: "João Pessoa", uf: "PB", latitude: -7.11, longitude: -34.86 },
+    ]);
+    expect(Object.keys(mapa).sort()).toEqual(["joao pessoa", "recife"]);
+    const faltam = cidadesSemPosicao(["RECIFE", "Lagoa Seca", "LAGOA SECA - PB", "lagoa seca", "Natal", null, "  ", "João Pessoa"], mapa);
+    expect(faltam).toEqual([
+      { nome: "lagoa seca", exibir: "Lagoa Seca", clientes: 3 },
+      { nome: "natal", exibir: "Natal", clientes: 1 },
+    ]);
   });
 });

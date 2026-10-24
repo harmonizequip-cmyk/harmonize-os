@@ -123,7 +123,7 @@ export default function QuickActionsButton({
     setMenuOpen(true);
     const [clientsRes, categoriesRes, equipmentsRes] = await Promise.all([
       supabase.from("clients").select("id, name, city, whatsapp, parceiro, isento_taxa").order("name"),
-      supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name"),
+      supabase.from("categories").select("*").eq("scope", "harmonize").order("name"),
       supabase.from("equipments").select("id, code, name").order("code"),
     ]);
     // Para a Calculadora e a reserva, isenta da taxa vale como parceiro.

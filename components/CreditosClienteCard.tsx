@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Coins } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { paraEscolha } from "@/lib/categorias";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { Atalho } from "@/components/Atalhos";
 import { linkLocacao } from "@/lib/atalhos";
@@ -106,11 +107,11 @@ export default function CreditosClienteCard({ clientId }: { clientId: string }) 
     if (!aberto || aba !== "permuta" || destino !== "pessoal" || categorias.length) return;
     createClient()
       .from("categories")
-      .select("id, name")
+      .select("*")
       .eq("scope", "pessoal")
       .eq("type", "saida")
       .order("name")
-      .then(({ data: c }) => setCategorias((c ?? []) as { id: string; name: string }[]));
+      .then(({ data: c }) => setCategorias(paraEscolha((c ?? []) as { id: string; name: string }[])));
   }, [aberto, aba, destino, categorias.length]);
 
   function abrir() {

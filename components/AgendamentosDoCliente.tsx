@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { PIX_CONTAS } from "@/lib/rental-calculator";
+import { codigoPadrao, contasParaEscolha } from "@/lib/contas-pix";
+import { useContasPix } from "@/lib/usar-contas-pix";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 
 import { hojeLocal } from "@/lib/period";
@@ -103,6 +104,7 @@ export default function AgendamentosDoCliente({
   onChanged?: () => void;
 }) {
   const supabase = createClient();
+  const contasPix = useContasPix();
   const [itens, setItens] = useState<Agendamento[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -117,7 +119,7 @@ export default function AgendamentosDoCliente({
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [dataPagamento, setDataPagamento] = useState(hoje());
   const [valorPagamento, setValorPagamento] = useState("");
-  const [pixConta, setPixConta] = useState<string>("harmonize");
+  const [pixConta, setPixConta] = useState<string>(codigoPadrao(contasPix));
   const [saldos, setSaldos] = useState<Record<string, Saldo>>({});
 
   const carregar = useCallback(async () => {
@@ -467,9 +469,9 @@ export default function AgendamentosDoCliente({
                         aria-label="Conta PIX que recebeu"
                         className="min-w-0 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs"
                       >
-                        {PIX_CONTAS.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.nome}
+                        {contasParaEscolha(contasPix, pixConta).map((c) => (
+                          <option key={c.codigo} value={c.codigo}>
+                            {c.titular}
                           </option>
                         ))}
                       </select>

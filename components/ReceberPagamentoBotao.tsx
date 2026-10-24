@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { PIX_CONTAS } from "@/lib/rental-calculator";
+import { paraEscolha } from "@/lib/categorias";
+import { codigoPadrao, contasParaEscolha } from "@/lib/contas-pix";
+import { useContasPix } from "@/lib/usar-contas-pix";
 import { formatCurrency } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
@@ -48,11 +50,12 @@ export default function ReceberPagamentoBotao({
   onDone?: () => void;
 }) {
   const supabase = createClient();
+  const contasPix = useContasPix();
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [valor, setValor] = useState("");
   const [forma, setForma] = useState("pix");
-  const [conta, setConta] = useState("harmonize");
+  const [conta, setConta] = useState(codigoPadrao(contasPix));
   const [data, setData] = useState(hojeLocal());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -102,18 +105,18 @@ export default function ReceberPagamentoBotao({
     if (categorias) return;
     const { data: cats } = await supabase
       .from("categories")
-      .select("id, name")
+      .select("*")
       .eq("scope", "pessoal")
       .eq("type", "saida")
       .order("name");
-    setCategorias((cats ?? []) as CategoriaPessoal[]);
+    setCategorias(paraEscolha((cats ?? []) as CategoriaPessoal[]));
   }
 
   function abrir() {
     setSaldoAtual(saldo);
     setValor(numeroParaCampo(saldo));
     setForma("pix");
-    setConta("harmonize");
+    setConta(codigoPadrao(contasPix));
     setData(hojeLocal());
     setErro(null);
     setAviso(null);
@@ -379,9 +382,9 @@ export default function ReceberPagamentoBotao({
             aria-label="Conta PIX que recebeu"
             className={`min-w-0 flex-1 ${campo}`}
           >
-            {PIX_CONTAS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.nome}
+            {contasParaEscolha(contasPix, conta).map((c) => (
+              <option key={c.codigo} value={c.codigo}>
+                {c.titular}
               </option>
             ))}
           </select>

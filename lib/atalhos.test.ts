@@ -12,6 +12,9 @@ describe("atalhos", () => {
   it("movimentação leva ao item certo pela entidade", () => {
     expect(linkDaMovimentacao("transactions", "t1")).toBe("/financeiro?lancamento=t1");
     expect(linkDaMovimentacao("calendar_events", "e1")).toBe("/agenda?evento=e1");
+    expect(linkDaMovimentacao("categories", "c1")).toBe("/configuracoes?secao=categorias");
+    expect(linkDaMovimentacao("contas_pix", "p1")).toBe("/configuracoes?secao=contasPix");
+    expect(linkDaMovimentacao("cidades_coordenadas", "x1")).toBe("/configuracoes?secao=cidades");
     expect(linkDaMovimentacao("rentals", "r1", { client_id: "c1" })).toBe("/clientes/c1?locacao=r1");
     expect(linkDaMovimentacao("rentals", "r1")).toBeNull();
     expect(linkDaMovimentacao("equipments", "x")).toBe("/equipamentos");

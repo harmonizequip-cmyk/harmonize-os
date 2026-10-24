@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { carregarMapaCidades } from "./carregar-cidades";
 import { carregarRelacionamento } from "./carregar-relacionamento";
 import { oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
@@ -18,7 +19,7 @@ export async function carregarEncaixe(
   const enc = opcoes.encaixe ?? DEFAULT_PREFERENCIAS.encaixe;
   const ate = somarDias(opcoes.somenteDia && opcoes.somenteDia > hoje ? opcoes.somenteDia : hoje, enc.diasAFrente + 1);
   const de = somarDias(hoje, -1);
-  const [{ data: eventos, error: e1 }, { data: bloqueios, error: e2 }, pessoas] = await Promise.all([
+  const [{ data: eventos, error: e1 }, { data: bloqueios, error: e2 }, pessoas, mapa] = await Promise.all([
     supabase
       .from("calendar_events")
       .select("date_start, date_end, event_type, clients(city)")
@@ -28,6 +29,7 @@ export async function carregarEncaixe(
       .lte("date_start", ate),
     supabase.from("bloqueios_equipamento").select("data_inicio, data_fim").lte("data_inicio", ate).gte("data_fim", de),
     opcoes.pessoas ? Promise.resolve(opcoes.pessoas) : carregarRelacionamento(supabase, hoje),
+    carregarMapaCidades(supabase),
   ]);
   if (e1 || e2) throw new Error(`Não consegui carregar a agenda para o encaixe: ${(e1 ?? e2)!.message}`);
 
@@ -42,5 +44,5 @@ export async function carregarEncaixe(
   }
   for (const b of bloqueios ?? []) for (const d of diasDoPeriodo(b.data_inicio, b.data_fim, 400)) ocupados.add(d);
 
-  return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm });
+  return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm, mapa });
 }

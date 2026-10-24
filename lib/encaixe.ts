@@ -5,7 +5,7 @@
 // RAIO_KM dali, sem reserva marcada. Ordem: quem já está na hora de conversar,
 // depois a prioridade do Relacionamento, depois a distância.
 
-import { coordenadasDaCidade, distanciaKm, normalizarCidade } from "./cidades-coordenadas";
+import { coordenadasDaCidade, distanciaKm, normalizarCidade, type MapaCidades } from "./cidades-coordenadas";
 import { somarDias } from "./period";
 import type { PessoaClassificada } from "./relacionamento";
 
@@ -40,13 +40,16 @@ function cobre(e: EventoComCidade, dia: string) {
   return e.data <= dia && (e.ate && e.ate > e.data ? e.ate : e.data) >= dia;
 }
 
-/** Onde ele vai estar no dia anterior e no seguinte (cidades com posição conhecida). */
-export function ancorasDoDia(dia: string, eventos: EventoComCidade[]): Ancora[] {
+/**
+ * Onde ele vai estar no dia anterior e no seguinte (cidades com posição
+ * conhecida). `mapa` = cidades do banco; sem ele, a lista fixa de sempre.
+ */
+export function ancorasDoDia(dia: string, eventos: EventoComCidade[], mapa?: Readonly<MapaCidades>): Ancora[] {
   const vistas = new Set<string>();
   const ancoras: Ancora[] = [];
   for (const vizinho of [somarDias(dia, -1), somarDias(dia, 1)]) {
     for (const e of eventos) {
-      if (!cobre(e, vizinho) || !e.cidade || !coordenadasDaCidade(e.cidade)) continue;
+      if (!cobre(e, vizinho) || !e.cidade || !coordenadasDaCidade(e.cidade, mapa)) continue;
       const chave = normalizarCidade(e.cidade);
       if (vistas.has(chave)) continue;
       vistas.add(chave);
@@ -56,12 +59,20 @@ export function ancorasDoDia(dia: string, eventos: EventoComCidade[]): Ancora[] 
   return ancoras;
 }
 
-export function candidatasPerto(ancoras: Ancora[], pessoas: PessoaClassificada[], raioKm = RAIO_KM): Candidata[] {
-  const pontos = ancoras.map((a) => ({ a, c: coordenadasDaCidade(a.cidade)! }));
+export function candidatasPerto(
+  ancoras: Ancora[],
+  pessoas: PessoaClassificada[],
+  raioKm = RAIO_KM,
+  mapa?: Readonly<MapaCidades>
+): Candidata[] {
+  const pontos = ancoras.flatMap((a) => {
+    const c = coordenadasDaCidade(a.cidade, mapa);
+    return c ? [{ a, c }] : [];
+  });
   const lista: Candidata[] = [];
   for (const p of pessoas) {
     if (p.proximaReserva || p.stage === "desqualificado") continue;
-    const c = coordenadasDaCidade(p.cidade);
+    const c = coordenadasDaCidade(p.cidade, mapa);
     if (!c) continue;
     let melhor: Candidata | null = null;
     for (const { a, c: ca } of pontos) {
@@ -90,17 +101,19 @@ export function oportunidadesDeEncaixe(params: {
   somenteDia?: string | null;
   diasAFrente?: number;
   raioKm?: number;
+  /** Cidades do banco (cidades_coordenadas); sem ele, a lista fixa de sempre. */
+  mapa?: Readonly<MapaCidades>;
 }): Oportunidade[] {
-  const { hoje, ocupados, eventos, pessoas, somenteDia, diasAFrente = DIAS_A_FRENTE, raioKm = RAIO_KM } = params;
+  const { hoje, ocupados, eventos, pessoas, somenteDia, diasAFrente = DIAS_A_FRENTE, raioKm = RAIO_KM, mapa } = params;
   const dias: string[] = [];
   if (somenteDia) dias.push(somenteDia);
   else for (let i = 1; i <= diasAFrente; i++) dias.push(somarDias(hoje, i));
   const lista: Oportunidade[] = [];
   for (const dia of dias) {
     if (dia <= hoje || ocupados.has(dia) || new Date(`${dia}T12:00:00`).getDay() === 0) continue;
-    const ancoras = ancorasDoDia(dia, eventos);
+    const ancoras = ancorasDoDia(dia, eventos, mapa);
     if (ancoras.length === 0) continue;
-    const candidatas = candidatasPerto(ancoras, pessoas, raioKm);
+    const candidatas = candidatasPerto(ancoras, pessoas, raioKm, mapa);
     if (candidatas.length > 0) lista.push({ data: dia, ancoras, candidatas });
   }
   return lista;

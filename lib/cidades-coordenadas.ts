@@ -1,9 +1,14 @@
 // Posição aproximada (latitude, longitude) das cidades onde a Harmonize atende,
 // para o encaixe de datas livres saber quem está perto. Distância em linha reta
 // (grátis, sem serviço de mapa); a estrada costuma dar uns 20% a 30% a mais.
-// Cidade nova que não estiver aqui não entra na busca: é só acrescentar.
+// Desde 24/10/2026 a lista mora na tabela cidades_coordenadas (Configurações >
+// Cidades; carga em lib/carregar-cidades.ts). Esta lista fixa é a reserva
+// quando a tabela não pode ser lida e o padrão das funções sem mapa.
 
-const CIDADES: Record<string, [number, number]> = {
+/** Nome normalizado (normalizarCidade) → [latitude, longitude]. */
+export type MapaCidades = Record<string, [number, number]>;
+
+const CIDADES: MapaCidades = {
   // Pernambuco
   recife: [-8.0476, -34.877],
   olinda: [-8.0089, -34.8553],
@@ -90,9 +95,31 @@ export function normalizarCidade(nome: string | null | undefined): string {
     .trim();
 }
 
-export function coordenadasDaCidade(nome: string | null | undefined): [number, number] | null {
+/** Lista fixa de sempre (reserva). */
+export const CIDADES_PADRAO: Readonly<MapaCidades> = CIDADES;
+
+/** Posição da cidade no mapa dado (sem mapa, a lista fixa de sempre). */
+export function coordenadasDaCidade(nome: string | null | undefined, mapa: Readonly<MapaCidades> = CIDADES): [number, number] | null {
   const n = normalizarCidade(nome);
-  return n ? (CIDADES[n] ?? null) : null;
+  return n && Object.prototype.hasOwnProperty.call(mapa, n) ? mapa[n] : null;
+}
+
+/**
+ * Lê "-7.1153, -34.861" (ou com ponto e vírgula, espaço, ou vírgula decimal
+ * como "-7,1153 -34,861") em [latitude, longitude]. null se não der.
+ */
+export function lerCoordenadas(texto: string): [number, number] | null {
+  const t = texto.trim();
+  if (!t) return null;
+  let partes: string[];
+  if (t.includes(";")) partes = t.split(";");
+  else if (t.includes(".")) partes = t.split(/[,\s]+/); // "-7.1153, -34.861" (Google Maps)
+  else partes = t.split(/,?\s+/); // vírgula decimal: "-7,1153 -34,861" ou "-7,1153, -34,861"
+  partes = partes.map((p) => p.trim()).filter(Boolean);
+  if (partes.length !== 2) return null;
+  const [la, lo] = partes.map((p) => Number(p.replace(",", ".")));
+  if (!Number.isFinite(la) || !Number.isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) return null;
+  return [la, lo];
 }
 
 /** Distância em linha reta, em km. */

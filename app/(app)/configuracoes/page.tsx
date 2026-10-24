@@ -10,12 +10,16 @@ export default async function ConfiguracoesPage(props: { searchParams: Promise<{
   const sp = await props.searchParams;
   const supabase = createClient();
 
-  const [settings, { data: tags }, { data: teste }, { data: auth }, { count: acessos }] = await Promise.all([
+  const [settings, { data: tags }, { data: teste }, { data: auth }, { count: acessos }, categorias, contasPix, cidades] = await Promise.all([
     fetchSettings(supabase),
     supabase.from("tags").select("id, name, color, is_automatic").order("name"),
     supabase.from("settings").select("test_mode").eq("id", true).single(),
     supabase.auth.getUser(),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("somente_leitura", true).eq("active", true),
+    // Resumos dos blocos Categorias, Contas PIX e Cidades (nulo se a tabela ainda não existe).
+    supabase.from("categories").select("id", { count: "exact", head: true }),
+    supabase.from("contas_pix").select("id", { count: "exact", head: true }).eq("ativa", true),
+    supabase.from("cidades_coordenadas").select("id", { count: "exact", head: true }),
   ]);
 
   const user = auth.user;
@@ -38,6 +42,11 @@ export default async function ConfiguracoesPage(props: { searchParams: Promise<{
         nome: perfil?.name ?? "",
         email: user?.email ?? "",
         acessosVisualizacao: acessos ?? 0,
+        totais: {
+          categorias: categorias.error ? null : (categorias.count ?? 0),
+          contasPix: contasPix.error ? null : (contasPix.count ?? 0),
+          cidades: cidades.error ? null : (cidades.count ?? 0),
+        },
       }}
     />
   );

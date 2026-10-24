@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildResumoWhatsApp,
   calcularResumoLocacao,
   calcularValorDeslocamento,
   descontarTaxaDosPagamentos,
@@ -159,5 +160,35 @@ describe("deslocamento configurável", () => {
     const r = calcularResumoLocacao(entrada({ kmIda: 60, deslocamentoCfg: { valorPorBloco: 80, kmPorBloco: 40 } }));
     expect(r.valorDeslocamento).toBe(240);
     expect(calcularResumoLocacao(entrada({ kmIda: 60 })).valorDeslocamento).toBe(100);
+  });
+});
+
+describe("PIX no resumo do WhatsApp", () => {
+  const base = {
+    ...entrada({ pricing: null, shots: 0 }),
+    initialCount: 0,
+    finalCount: 0,
+    patientCount: 0,
+    clientName: "Dra. Ana",
+    eventDate: "2026-11-10",
+    pagamentos: [{ id: "p1", forma: "pix", valor: 100, valorTexto: "100", pixConta: "harmonize", data: "2026-11-10" }],
+  };
+  const resumo = calcularResumoLocacao(entrada({ pricing: { totalValue: 100 } as any }));
+
+  it("sem contas da tabela, usa as de sempre", () => {
+    const t = buildResumoWhatsApp(base, resumo);
+    expect(t).toContain("PIX (Harmonize Bella Prime LTDA)");
+    expect(t).toContain("Chave: *harmonizequip@gmail.com*");
+  });
+
+  it("com as contas da tabela, usa o titular e a chave de lá", () => {
+    const contasPix = [
+      { codigo: "harmonize", rotulo: "Harmonize", titular: "Harmonize Nova LTDA", tipo_chave: "cnpj" as const, chave: "12345678000190", ordem: 1, ativa: true, padrao: true },
+    ];
+    const t = buildResumoWhatsApp({ ...base, contasPix }, resumo);
+    expect(t).toContain("Favorecido: *Harmonize Nova LTDA*");
+    expect(t).toContain("Chave: *12345678000190*");
+    const outra = buildResumoWhatsApp({ ...base, contasPix, pagamentos: [{ ...base.pagamentos[0], pixConta: "eder" }] }, resumo);
+    expect(outra).toContain("Favorecido: *Eder Campos de Almeida*");
   });
 });

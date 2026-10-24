@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { paraEscolha } from "@/lib/categorias";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal, somarDias } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
@@ -107,15 +108,15 @@ export default function DespesasDaReserva({
         .eq("type", "saida")
         .order("date", { ascending: false }),
       consultaAvulsas,
-      supabase.from("categories").select("id, name").eq("type", "saida").eq("scope", "harmonize").order("name"),
-      supabase.from("categories").select("id, name").eq("type", "saida").eq("scope", "pessoal").order("name"),
+      supabase.from("categories").select("*").eq("type", "saida").eq("scope", "harmonize").order("name"),
+      supabase.from("categories").select("*").eq("type", "saida").eq("scope", "pessoal").order("name"),
     ]);
     setDespesas((daReserva.data ?? []).map(paraDespesa));
     const de = somarDias(dataEvento, -JANELA_AVULSAS);
     const ate = somarDias(dataEvento, JANELA_AVULSAS);
     setAvulsas((soltas.data ?? []).map(paraDespesa).filter((d) => d.date >= de && d.date <= ate).slice(0, 50));
-    setCategorias(cats.data ?? []);
-    setCategoriasPessoais(catsPessoais.data ?? []);
+    setCategorias(paraEscolha(cats.data));
+    setCategoriasPessoais(paraEscolha(catsPessoais.data));
     setCarregando(false);
   }
 

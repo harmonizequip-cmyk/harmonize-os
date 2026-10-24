@@ -5,8 +5,10 @@ import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkCliente, linkEvento, linkLocacao } from "@/lib/atalhos";
 import ClientPicker from "@/components/ClientPicker";
 import { createClient } from "@/lib/supabase/client";
+import { paraEscolha } from "@/lib/categorias";
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
-import { PIX_CONTAS } from "@/lib/rental-calculator";
+import { codigoPadrao, contasParaEscolha } from "@/lib/contas-pix";
+import { useContasPix } from "@/lib/usar-contas-pix";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { valorParaNumero, numeroParaCampo } from "@/lib/valor";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
@@ -74,6 +76,7 @@ export default function EditarLancamentoModal({
   onDeleted: () => void;
 }) {
   const supabase = createClient();
+  const contasPix = useContasPix();
   const [type, setType] = useState<"entrada" | "saida">(transaction.type);
   const [description, setDescription] = useState(transaction.description);
   const [amount, setAmount] = useState(String(transaction.amount));
@@ -110,7 +113,7 @@ export default function EditarLancamentoModal({
   const [pagValor, setPagValor] = useState("");
   const [pagData, setPagData] = useState("");
   const [pagForma, setPagForma] = useState("pix");
-  const [pagConta, setPagConta] = useState("harmonize");
+  const [pagConta, setPagConta] = useState(codigoPadrao(contasPix));
 
   useEffect(() => {
     if (!ehEntradaLocacao) return;
@@ -133,7 +136,7 @@ export default function EditarLancamentoModal({
         setPagValor(numeroParaCampo(Number(p.valor)));
         setPagData(p.data);
         setPagForma(p.forma);
-        setPagConta(p.pix_conta ?? "harmonize");
+        setPagConta(p.pix_conta ?? codigoPadrao(contasPix));
         const { data: sit } = await supabase
           .from("rentals_situacao_pagamento")
           .select("saldo")
@@ -207,7 +210,8 @@ export default function EditarLancamentoModal({
 
   // Locação e Mentoria (entrada) são geradas pelo sistema; só aparecem
   // aqui quando o lançamento já é de uma delas, para não sumir da tela.
-  const categoriasDoTipo = categories.filter(
+  // Arquivada só aparece se já é a do lançamento.
+  const categoriasDoTipo = paraEscolha(categories, transaction.category_id).filter(
     (c) =>
       c.type === type &&
       (c.id === transaction.category_id ||
@@ -309,9 +313,9 @@ export default function EditarLancamentoModal({
             <div>
               <label className={rotulo}>Conta PIX que recebeu</label>
               <select value={pagConta} onChange={(e) => setPagConta(e.target.value)} className={campo}>
-                {PIX_CONTAS.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.nome}
+                {contasParaEscolha(contasPix, pagConta).map((c) => (
+                  <option key={c.codigo} value={c.codigo}>
+                    {c.titular}
                   </option>
                 ))}
               </select>

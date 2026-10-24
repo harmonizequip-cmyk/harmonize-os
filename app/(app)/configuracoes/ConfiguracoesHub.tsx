@@ -16,8 +16,11 @@ import {
   CalendarClock,
   ClipboardList,
   HeartHandshake,
+  FolderTree,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
+  MapPinned,
   Target,
   ChevronLeft,
   ChevronRight,
@@ -55,6 +58,9 @@ import PrefsPlanejador from "./secoes/PrefsPlanejador";
 import PrefsEmpresa from "./secoes/PrefsEmpresa";
 import PrefsContrato from "./secoes/PrefsContrato";
 import PrefsTabelaPrecos from "./secoes/PrefsTabelaPrecos";
+import Categorias from "./secoes/Categorias";
+import ContasPix from "./secoes/ContasPix";
+import Cidades from "./secoes/Cidades";
 import Tags, { type TagRow } from "./secoes/Tags";
 import MinhaConta from "./secoes/MinhaConta";
 import Aparencia from "./secoes/Aparencia";
@@ -67,6 +73,8 @@ interface Dados {
   nome: string;
   email: string;
   acessosVisualizacao: number;
+  /** Quantidades para os resumos; null = tabela ainda não existe (SQL não rodado). */
+  totais?: { categorias: number | null; contasPix: number | null; cidades: number | null };
 }
 
 type Situacao = "ok" | "pendente" | "carregando";
@@ -254,6 +262,9 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
         {secao === "empresa" && <PrefsEmpresa preferencias={settings.preferencias} />}
         {secao === "contrato" && <PrefsContrato preferencias={settings.preferencias} />}
         {secao === "tabelaPrecos" && <PrefsTabelaPrecos preferencias={settings.preferencias} />}
+        {secao === "categorias" && <Categorias />}
+        {secao === "contasPix" && <ContasPix />}
+        {secao === "cidades" && <Cidades />}
         {secao === "tags" && <Tags iniciais={tags} />}
         {secao === "contas" && <ContasFixasCard inicial={settings.despesasFixas} />}
         {secao === "avisos" && <AvisosCelularCard />}
@@ -328,6 +339,20 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           icone: Table2,
           cor: "bg-cyan-50 text-cyan-600",
         },
+        {
+          id: "categorias",
+          titulo: "Categorias",
+          resumo: dados.totais?.categorias ? `${dados.totais.categorias} de lançamento` : "Entradas e saídas",
+          icone: FolderTree,
+          cor: "bg-orange-50 text-orange-600",
+        },
+        {
+          id: "contasPix",
+          titulo: "Contas PIX",
+          resumo: dados.totais?.contasPix != null ? `${dados.totais.contasPix} ${dados.totais.contasPix === 1 ? "ativa" : "ativas"}` : "3 de sempre",
+          icone: KeyRound,
+          cor: "bg-teal-50 text-teal-600",
+        },
       ],
     },
     {
@@ -346,6 +371,13 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           resumo: `Raio de ${settings.preferencias.encaixe.raioKm} km`,
           icone: CalendarClock,
           cor: "bg-sky-50 text-sky-600",
+        },
+        {
+          id: "cidades",
+          titulo: "Cidades",
+          resumo: dados.totais?.cidades != null ? `${dados.totais.cidades} com posição` : "Lista de sempre",
+          icone: MapPinned,
+          cor: "bg-lime-50 text-lime-700",
         },
         {
           id: "listas",

@@ -81,6 +81,12 @@ export function linkDaMovimentacao(
       return "/equipamentos";
     case "cartoes":
       return "/financeiro/cartoes";
+    case "categories":
+      return "/configuracoes?secao=categorias";
+    case "contas_pix":
+      return "/configuracoes?secao=contasPix";
+    case "cidades_coordenadas":
+      return "/configuracoes?secao=cidades";
     default:
       return null;
   }

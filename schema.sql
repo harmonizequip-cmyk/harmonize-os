@@ -367,7 +367,13 @@ create table public.categories (
   type entry_type not null,
   scope scope_type not null default 'harmonize',
   is_default boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Categorias editáveis em Configurações (2026-10-24): cadeado nas que o
+  -- sistema procura pelo nome, arquivar e ordem. Marcação e funções no fim
+  -- deste arquivo (migration 2026-10-24-categorias-editaveis.sql).
+  sistema boolean not null default false,
+  arquivada boolean not null default false,
+  ordem integer not null default 0
 );
 
 insert into categories (name, type, is_default) values
@@ -795,9 +801,10 @@ create policy "equipments_write" on equipments for insert with check (has_module
 create policy "equipments_update" on equipments for update using (has_module_permission('configuracoes'));
 
 -- categorias: leitura ampla (usada em formulários), escrita em configurações
-create policy "categories_select" on categories for select using (auth.uid() is not null);
-create policy "categories_write" on categories for insert with check (has_module_permission('configuracoes'));
-create policy "categories_update" on categories for update using (has_module_permission('configuracoes'));
+-- Categorias: leitura para financeiro/pessoal/configurações; gravação só
+-- pelas funções salvar_categoria, arquivar_categoria e excluir_categoria (2026-10-24).
+create policy "categories_select" on categories for select
+  using (has_module_permission('financeiro') or has_module_permission('configuracoes') or has_module_permission('pessoal'));
 
 -- transações: harmonize exige permissão de financeiro; pessoal só o
 -- dono vê. Sem policy de delete (leva E).
@@ -962,22 +969,21 @@ create table public.rental_payments (
   valor numeric(12,2) not null check (valor > 0),
   data date not null default public.hoje_local(),
   -- Só preenchido quando forma = 'pix': em qual conta o dinheiro caiu.
-  -- Lista fechada de propósito (são as três contas reais do negócio);
-  -- se um dia entrar uma quarta conta, é uma migration de uma linha.
+  -- Aponta para contas_pix.codigo (chave estrangeira criada no fim deste
+  -- arquivo, migration 2026-10-24-contas-pix.sql).
   pix_conta text,
   transaction_id uuid references public.transactions(id) on delete cascade,
   notes text,
   created_by uuid references public.profiles(id),
   created_at timestamptz not null default now(),
   is_test boolean not null default false,
-  check (pix_conta is null or pix_conta in ('eder', 'harmonize', 'laser_dream')),
   check ((forma = 'pix' and pix_conta is not null) or (forma <> 'pix' and pix_conta is null))
 );
 
 comment on table public.rental_payments is
   'Pagamentos de uma locação, um por linha (permite dividir entre PIX e dinheiro, ou registrar parcial). rentals.pago/pago_em são recalculados automaticamente sempre que uma linha daqui muda (ver trigger rental_payments_recalcula), somando estes valores e descontando o crédito de taxa de reserva já paga.';
 comment on column public.rental_payments.pix_conta is
-  'eder = Eder Campos de Almeida, harmonize = Harmonize Bella Prime LTDA, laser_dream = Laser Dream Campina Grande LTDA. Obrigatório quando forma = pix, e só faz sentido nesse caso.';
+  'Conta PIX que recebeu (contas_pix.codigo: eder, harmonize, laser_dream e as que o dono cadastrar). Obrigatório quando forma = pix, e só faz sentido nesse caso.';
 comment on column public.rental_payments.transaction_id is
   'Lançamento no caixa gerado por este pagamento. on delete cascade: se o lançamento for apagado por qualquer caminho (inclusive a cascata de exclusão da locação), este registro de pagamento some junto, para nunca sobrar pagamento órfão sem lançamento.';
 
@@ -10555,3 +10561,680 @@ revoke execute on function public.dossie_cliente(uuid) from public, anon;
 grant execute on function public.salvar_anotacao_cliente(uuid, text, text) to authenticated, service_role;
 grant execute on function public.excluir_anotacao_cliente(uuid) to authenticated, service_role;
 grant execute on function public.dossie_cliente(uuid) to authenticated, service_role;
+
+-- ============================================================
+-- CATEGORIAS EDITÁVEIS (2026-10-24, migration 2026-10-24-categorias-editaveis.sql)
+-- ============================================================
+-- Categorias de lançamento editáveis em Configurações (24/10/2026, etapa 2b).
+-- As categorias já moram na tabela categories (o lançamento guarda category_id,
+-- não o nome): esta migration só acrescenta o que falta para o dono cuidar
+-- delas pela tela, sem mudar nada do que existe hoje.
+--   1. Colunas sistema (cadeado: não renomeia, não arquiva, não apaga),
+--      arquivada (some da escolha, continua nos relatórios) e ordem.
+--   2. Marca como sistema as que o banco ou o código procuram pelo nome.
+--   3. Um nome por espaço e tipo (sem diferença de maiúscula/espaço).
+--   4. Escrita só pelas funções salvar_categoria, arquivar_categoria e
+--      excluir_categoria (as políticas de gravação direta saem).
+--   5. View categorias_uso: quantos lançamentos cada categoria tem.
+-- Não apaga nem altera lançamentos.
+
+alter table public.categories add column if not exists sistema boolean not null default false;
+alter table public.categories add column if not exists arquivada boolean not null default false;
+alter table public.categories add column if not exists ordem integer not null default 0;
+
+comment on column public.categories.sistema is
+  'Categoria usada pelo sistema pelo nome (funções, gatilhos ou telas): não se renomeia, arquiva nem apaga.';
+comment on column public.categories.arquivada is
+  'Arquivada: some da lista de escolha, mas continua nos lançamentos antigos e nos relatórios.';
+comment on column public.categories.ordem is
+  'Ordem na lista de escolha (empate pelo nome). 0 = ordem alfabética de sempre.';
+
+-- Categorias que o sistema procura pelo nome (conferido nas funções em 24/10/2026):
+--   Locação, Mentoria (finalize_rental_reservation, create_rental, pagamentos),
+--   Taxa de reserva (definir_taxa_agendamento, por 'Taxa%'),
+--   Deslocamento (versões antigas de create_rental; relatórios deixam de fora),
+--   Retiradas (espelhar_retirada, registrar_permuta), Outros de saída da
+--   Harmonize (registrar_permuta), Empréstimo concedido e Devolução de
+--   empréstimo (registrar_emprestimo, editar_emprestimo e telas), Pagamento de
+--   fatura (pagar_fatura_cartao, importar_compras_cartao) e Retirada da
+--   Harmonize (entrada no Pessoal criada por espelhar_retirada).
+update public.categories c
+   set sistema = true, arquivada = false
+  from (values
+    ('harmonize', 'entrada', 'Locação'),
+    ('harmonize', 'entrada', 'Mentoria'),
+    ('harmonize', 'entrada', 'Taxa de reserva'),
+    ('harmonize', 'entrada', 'Deslocamento'),
+    ('harmonize', 'entrada', 'Devolução de empréstimo'),
+    ('harmonize', 'saida', 'Retiradas'),
+    ('harmonize', 'saida', 'Outros'),
+    ('harmonize', 'saida', 'Empréstimo concedido'),
+    ('harmonize', 'saida', 'Pagamento de fatura'),
+    ('pessoal', 'entrada', 'Retirada da Harmonize'),
+    ('pessoal', 'saida', 'Pagamento de fatura')
+  ) as s(scope, type, name)
+ where c.scope::text = s.scope and c.type::text = s.type and c.name = s.name
+   and not c.sistema;
+
+create unique index if not exists categories_nome_uk
+  on public.categories (scope, type, lower(btrim(name)));
+
+-- Leitura: quem vê o financeiro, o pessoal ou as configurações. Gravação direta
+-- não existe mais (só pelas funções abaixo).
+drop policy if exists "categories_select" on public.categories;
+drop policy if exists "categories_write" on public.categories;
+drop policy if exists "categories_update" on public.categories;
+create policy "categories_select" on public.categories for select
+  using (has_module_permission('financeiro') or has_module_permission('configuracoes') or has_module_permission('pessoal'));
+
+-- Quantos lançamentos cada categoria tem (respeita o RLS de quem consulta).
+create or replace view public.categorias_uso
+with (security_invoker = true) as
+select category_id, count(*)::int as lancamentos
+  from public.transactions
+ where category_id is not null
+ group by category_id;
+grant select on public.categorias_uso to authenticated;
+revoke all on public.categorias_uso from anon;
+
+-- Nome que o sistema procura por pedaço ou que já é de uma categoria do sistema
+-- no mesmo espaço (qualquer tipo): recusado para não confundir as funções.
+create or replace function public.categoria_nome_reservado(p_scope scope_type, p_type entry_type, p_nome text, p_id uuid default null)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when p_type = 'entrada' and lower(btrim(p_nome)) ~ '^(taxa|loca|mentoria|deslocamento)'
+      then 'Nome reservado: entradas começando com Taxa, Loca, Mentoria ou Deslocamento são do sistema.'
+    when exists (
+      select 1 from categories c
+       where c.sistema and c.scope = p_scope and c.id is distinct from p_id
+         and lower(btrim(c.name)) = lower(btrim(p_nome))
+    ) then 'Já existe uma categoria do sistema com esse nome.'
+    else null
+  end;
+$$;
+
+-- Cria (p_id nulo) ou renomeia uma categoria. Renomear não mexe nos lançamentos
+-- (eles apontam pelo id), só no orçamento pessoal, que guarda o nome.
+create or replace function public.salvar_categoria(
+  p_id uuid,
+  p_nome text,
+  p_scope scope_type default 'harmonize',
+  p_type entry_type default 'saida'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nome text := regexp_replace(btrim(coalesce(p_nome, '')), '\s+', ' ', 'g');
+  v_cat categories%rowtype;
+  v_motivo text;
+  v_id uuid;
+  v_ordem int;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas categorias.';
+  end if;
+  if v_nome = '' then
+    raise exception 'Escreva o nome da categoria.';
+  end if;
+  if length(v_nome) > 60 then
+    raise exception 'Nome longo demais (máximo 60 caracteres).';
+  end if;
+
+  if p_id is null then
+    if p_scope = 'pessoal' and not has_module_permission('pessoal') then
+      raise exception 'Sem permissão para o Pessoal.';
+    end if;
+    v_motivo := categoria_nome_reservado(p_scope, p_type, v_nome, null);
+    if v_motivo is not null then raise exception '%', v_motivo; end if;
+    if exists (select 1 from categories where scope = p_scope and type = p_type and lower(btrim(name)) = lower(v_nome)) then
+      raise exception 'Já existe a categoria "%" nesta lista.', v_nome;
+    end if;
+    select coalesce(max(ordem), 0) into v_ordem from categories where scope = p_scope and type = p_type;
+    insert into categories (name, type, scope, is_default, sistema, arquivada, ordem)
+    values (v_nome, p_type, p_scope, false, false, false, case when v_ordem > 0 then v_ordem + 1 else 0 end)
+    returning id into v_id;
+    perform registrar_movimentacao('criado', 'categories', v_id,
+      'Categoria criada: ' || v_nome || ' (' || p_scope::text || ', ' || p_type::text || ')',
+      jsonb_build_object('nome', v_nome, 'escopo', p_scope, 'tipo', p_type));
+    return v_id;
+  end if;
+
+  select * into v_cat from categories where id = p_id for update;
+  if not found then
+    raise exception 'Categoria não encontrada.';
+  end if;
+  if v_cat.scope = 'pessoal' and not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para o Pessoal.';
+  end if;
+  if v_cat.sistema then
+    raise exception 'A categoria "%" é do sistema e não pode ser renomeada.', v_cat.name;
+  end if;
+  if v_cat.name = v_nome then
+    return v_cat.id;
+  end if;
+  v_motivo := categoria_nome_reservado(v_cat.scope, v_cat.type, v_nome, v_cat.id);
+  if v_motivo is not null then raise exception '%', v_motivo; end if;
+  if exists (select 1 from categories where scope = v_cat.scope and type = v_cat.type and id <> v_cat.id
+                and lower(btrim(name)) = lower(v_nome)) then
+    raise exception 'Já existe a categoria "%" nesta lista.', v_nome;
+  end if;
+
+  update categories set name = v_nome where id = v_cat.id;
+  if v_cat.scope = 'pessoal' and v_cat.type = 'saida' then
+    update orcamentos_pessoais set categoria = v_nome
+     where lower(btrim(categoria)) = lower(btrim(v_cat.name));
+  end if;
+
+  perform registrar_movimentacao('editado', 'categories', v_cat.id,
+    'Categoria renomeada: ' || v_cat.name || ' → ' || v_nome,
+    jsonb_build_object('antes', v_cat.name, 'depois', v_nome,
+      'lancamentos', (select count(*) from transactions where category_id = v_cat.id)));
+  return v_cat.id;
+end;
+$$;
+
+-- Arquiva (some da escolha) ou reativa.
+create or replace function public.arquivar_categoria(p_id uuid, p_arquivar boolean default true)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cat categories%rowtype;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas categorias.';
+  end if;
+  select * into v_cat from categories where id = p_id for update;
+  if not found then
+    raise exception 'Categoria não encontrada.';
+  end if;
+  if v_cat.scope = 'pessoal' and not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para o Pessoal.';
+  end if;
+  if v_cat.sistema and coalesce(p_arquivar, true) then
+    raise exception 'A categoria "%" é do sistema e não pode ser arquivada.', v_cat.name;
+  end if;
+  if v_cat.arquivada = coalesce(p_arquivar, true) then
+    return;
+  end if;
+  update categories set arquivada = coalesce(p_arquivar, true) where id = p_id;
+  perform registrar_movimentacao('editado', 'categories', p_id,
+    case when coalesce(p_arquivar, true) then 'Categoria arquivada: ' else 'Categoria reativada: ' end || v_cat.name,
+    jsonb_build_object('arquivada', coalesce(p_arquivar, true)));
+end;
+$$;
+
+-- Apaga só categoria sem nenhum lançamento, limite de gasto ou orçamento.
+create or replace function public.excluir_categoria(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cat categories%rowtype;
+  v_qtd int;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas categorias.';
+  end if;
+  select * into v_cat from categories where id = p_id for update;
+  if not found then
+    raise exception 'Categoria não encontrada.';
+  end if;
+  if v_cat.scope = 'pessoal' and not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para o Pessoal.';
+  end if;
+  if v_cat.sistema then
+    raise exception 'A categoria "%" é do sistema e não pode ser apagada.', v_cat.name;
+  end if;
+  select count(*) into v_qtd from transactions where category_id = p_id;
+  if v_qtd > 0 then
+    raise exception 'A categoria "%" tem % lançamento(s): arquive em vez de apagar.', v_cat.name, v_qtd;
+  end if;
+  if exists (select 1 from expense_limits where category_id = p_id) then
+    raise exception 'A categoria "%" tem limite de gasto: tire o limite antes.', v_cat.name;
+  end if;
+  if v_cat.scope = 'pessoal' and exists (
+    select 1 from orcamentos_pessoais where lower(btrim(categoria)) = lower(btrim(v_cat.name))
+  ) then
+    raise exception 'A categoria "%" tem orçamento no Pessoal: tire o orçamento antes.', v_cat.name;
+  end if;
+
+  delete from categories where id = p_id;
+  perform registrar_movimentacao('excluido', 'categories', p_id,
+    'Categoria apagada: ' || v_cat.name,
+    jsonb_build_object('nome', v_cat.name, 'escopo', v_cat.scope, 'tipo', v_cat.type));
+end;
+$$;
+
+revoke execute on function public.categoria_nome_reservado(scope_type, entry_type, text, uuid) from public, anon;
+revoke execute on function public.salvar_categoria(uuid, text, scope_type, entry_type) from public, anon;
+revoke execute on function public.arquivar_categoria(uuid, boolean) from public, anon;
+revoke execute on function public.excluir_categoria(uuid) from public, anon;
+grant execute on function public.categoria_nome_reservado(scope_type, entry_type, text, uuid) to authenticated, service_role;
+grant execute on function public.salvar_categoria(uuid, text, scope_type, entry_type) to authenticated, service_role;
+grant execute on function public.arquivar_categoria(uuid, boolean) to authenticated, service_role;
+grant execute on function public.excluir_categoria(uuid) to authenticated, service_role;
+
+-- ============================================================
+-- CONTAS PIX (2026-10-24, migration 2026-10-24-contas-pix.sql)
+-- ============================================================
+-- Contas PIX editáveis em Configurações (24/10/2026, etapa 2b).
+-- As três contas que estavam fixas no código (lib/rental-calculator.ts) e na
+-- regra do banco (rental_payments.pix_conta só aceitava eder, harmonize e
+-- laser_dream) passam para a tabela contas_pix. O código de cada conta é o
+-- mesmo gravado nos pagamentos, então nada muda nos pagamentos antigos.
+--   1. Tabela contas_pix com as três contas de hoje.
+--   2. rental_payments.pix_conta deixa a lista fixa e passa a apontar para
+--      contas_pix.codigo (conta usada em pagamento não se apaga: desativa).
+--   3. Escrita só por salvar_conta_pix e excluir_conta_pix.
+-- Não apaga nem altera pagamentos.
+
+create table if not exists public.contas_pix (
+  id uuid primary key default gen_random_uuid(),
+  codigo text not null unique check (codigo ~ '^[a-z0-9_]{2,40}$'),
+  rotulo text not null check (length(btrim(rotulo)) between 1 and 40),
+  titular text not null check (length(btrim(titular)) between 1 and 120),
+  tipo_chave text not null check (tipo_chave in ('cpf', 'cnpj', 'email', 'telefone', 'aleatoria')),
+  chave text not null check (length(btrim(chave)) between 1 and 120),
+  ordem integer not null default 0,
+  ativa boolean not null default true,
+  padrao boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists contas_pix_uma_padrao on public.contas_pix (padrao) where padrao;
+
+comment on table public.contas_pix is
+  'Contas PIX que recebem pagamentos (codigo = rental_payments.pix_conta). Escrita só por salvar_conta_pix e excluir_conta_pix. A padrão vem marcada nas telas de pagamento.';
+
+insert into public.contas_pix (codigo, rotulo, titular, tipo_chave, chave, ordem, ativa, padrao)
+values
+  ('eder', 'Eder', 'Eder Campos de Almeida', 'cpf', '07442790623', 1, true, false),
+  ('harmonize', 'Harmonize', 'Harmonize Bella Prime LTDA', 'email', 'harmonizequip@gmail.com', 2, true, true),
+  ('laser_dream', 'Laser Dream', 'Laser Dream Campina Grande LTDA', 'aleatoria', 'ed21011f-1880-4293-9cb3-cdc087ac80de', 3, true, false)
+on conflict (codigo) do nothing;
+
+alter table public.contas_pix enable row level security;
+drop policy if exists "contas_pix_select" on public.contas_pix;
+create policy "contas_pix_select" on public.contas_pix for select
+  using (has_module_permission('financeiro') or has_module_permission('agenda') or has_module_permission('configuracoes'));
+grant select on public.contas_pix to authenticated;
+revoke all on public.contas_pix from anon;
+
+drop trigger if exists trg_somente_leitura on public.contas_pix;
+create trigger trg_somente_leitura before insert or update or delete on public.contas_pix
+  for each statement execute function public.bloquear_somente_leitura();
+
+-- Pagamento PIX aponta para a conta pelo código (antes: lista fixa no check).
+alter table public.rental_payments drop constraint if exists rental_payments_pix_conta_check;
+alter table public.rental_payments drop constraint if exists rental_payments_pix_conta_fkey;
+alter table public.rental_payments
+  add constraint rental_payments_pix_conta_fkey foreign key (pix_conta) references public.contas_pix(codigo);
+comment on column public.rental_payments.pix_conta is
+  'Conta PIX que recebeu (contas_pix.codigo: eder, harmonize, laser_dream e as que o dono cadastrar). Obrigatório quando forma = pix, e só faz sentido nesse caso.';
+
+-- Cria (p_id nulo) ou altera uma conta. O código nasce do rótulo e não muda
+-- depois (é o que fica gravado nos pagamentos).
+create or replace function public.salvar_conta_pix(
+  p_id uuid,
+  p_rotulo text,
+  p_titular text,
+  p_tipo_chave text,
+  p_chave text,
+  p_ativa boolean default true,
+  p_padrao boolean default false,
+  p_ordem integer default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rotulo text := btrim(coalesce(p_rotulo, ''));
+  v_titular text := btrim(coalesce(p_titular, ''));
+  v_tipo text := lower(btrim(coalesce(p_tipo_chave, '')));
+  v_chave text := btrim(coalesce(p_chave, ''));
+  v_antes contas_pix%rowtype;
+  v_codigo text;
+  v_base text;
+  v_n int := 1;
+  v_id uuid;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas contas PIX.';
+  end if;
+  if v_rotulo = '' or length(v_rotulo) > 40 then
+    raise exception 'Escreva um nome curto para a conta (até 40 caracteres).';
+  end if;
+  if v_titular = '' or length(v_titular) > 120 then
+    raise exception 'Escreva o nome do titular (favorecido).';
+  end if;
+  if v_tipo not in ('cpf', 'cnpj', 'email', 'telefone', 'aleatoria') then
+    raise exception 'Tipo de chave inválido.';
+  end if;
+  if v_chave = '' or length(v_chave) > 120 then
+    raise exception 'Escreva a chave PIX.';
+  end if;
+  if v_tipo in ('cpf', 'cnpj', 'telefone') then
+    v_chave := regexp_replace(v_chave, '[^0-9+]', '', 'g');
+    if v_tipo = 'cpf' and length(v_chave) <> 11 then raise exception 'CPF precisa ter 11 números.'; end if;
+    if v_tipo = 'cnpj' and length(v_chave) <> 14 then raise exception 'CNPJ precisa ter 14 números.'; end if;
+    if v_tipo = 'telefone' and length(regexp_replace(v_chave, '\D', '', 'g')) < 10 then raise exception 'Telefone incompleto.'; end if;
+  end if;
+  if v_tipo = 'email' and v_chave !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'E-mail inválido.';
+  end if;
+  if coalesce(p_padrao, false) and not coalesce(p_ativa, true) then
+    raise exception 'A conta padrão precisa estar ativa.';
+  end if;
+
+  if p_id is null then
+    v_base := left(regexp_replace(lower(translate(v_rotulo,
+      'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+      'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')), '[^a-z0-9]+', '_', 'g'), 30);
+    v_base := btrim(v_base, '_');
+    if length(v_base) < 2 then v_base := 'conta'; end if;
+    v_codigo := v_base;
+    while exists (select 1 from contas_pix where codigo = v_codigo) loop
+      v_n := v_n + 1;
+      v_codigo := v_base || '_' || v_n;
+    end loop;
+    if coalesce(p_padrao, false) then
+      update contas_pix set padrao = false where padrao;
+    end if;
+    insert into contas_pix (codigo, rotulo, titular, tipo_chave, chave, ordem, ativa, padrao)
+    values (v_codigo, v_rotulo, v_titular, v_tipo, v_chave,
+            coalesce(p_ordem, (select coalesce(max(ordem), 0) + 1 from contas_pix)),
+            coalesce(p_ativa, true), coalesce(p_padrao, false))
+    returning id into v_id;
+    perform registrar_movimentacao('criado', 'contas_pix', v_id,
+      'Conta PIX criada: ' || v_rotulo || ' (' || v_titular || ')',
+      jsonb_build_object('codigo', v_codigo, 'tipo_chave', v_tipo, 'chave', v_chave));
+    return v_id;
+  end if;
+
+  select * into v_antes from contas_pix where id = p_id for update;
+  if not found then
+    raise exception 'Conta PIX não encontrada.';
+  end if;
+  if v_antes.padrao and not coalesce(p_padrao, false) then
+    raise exception 'Escolha outra conta como padrão antes de tirar o padrão desta.';
+  end if;
+  if coalesce(p_padrao, false) and not v_antes.padrao then
+    update contas_pix set padrao = false where padrao;
+  end if;
+  update contas_pix
+     set rotulo = v_rotulo, titular = v_titular, tipo_chave = v_tipo, chave = v_chave,
+         ativa = coalesce(p_ativa, true), padrao = coalesce(p_padrao, false),
+         ordem = coalesce(p_ordem, ordem), updated_at = now()
+   where id = p_id;
+  perform registrar_movimentacao('editado', 'contas_pix', p_id,
+    'Conta PIX alterada: ' || v_rotulo,
+    jsonb_build_object(
+      'antes', jsonb_build_object('rotulo', v_antes.rotulo, 'titular', v_antes.titular, 'tipo_chave', v_antes.tipo_chave,
+                                  'chave', v_antes.chave, 'ativa', v_antes.ativa, 'padrao', v_antes.padrao),
+      'depois', jsonb_build_object('rotulo', v_rotulo, 'titular', v_titular, 'tipo_chave', v_tipo,
+                                   'chave', v_chave, 'ativa', coalesce(p_ativa, true), 'padrao', coalesce(p_padrao, false))));
+  return p_id;
+end;
+$$;
+
+-- Apaga só conta que nunca recebeu pagamento e não é a padrão.
+create or replace function public.excluir_conta_pix(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_c contas_pix%rowtype;
+  v_qtd int;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas contas PIX.';
+  end if;
+  select * into v_c from contas_pix where id = p_id for update;
+  if not found then
+    raise exception 'Conta PIX não encontrada.';
+  end if;
+  if v_c.padrao then
+    raise exception 'A conta padrão não pode ser apagada: escolha outra como padrão antes.';
+  end if;
+  select count(*) into v_qtd from rental_payments where pix_conta = v_c.codigo;
+  if v_qtd > 0 then
+    raise exception 'A conta "%" já recebeu % pagamento(s): desative em vez de apagar.', v_c.rotulo, v_qtd;
+  end if;
+  delete from contas_pix where id = p_id;
+  perform registrar_movimentacao('excluido', 'contas_pix', p_id,
+    'Conta PIX apagada: ' || v_c.rotulo,
+    jsonb_build_object('codigo', v_c.codigo, 'titular', v_c.titular, 'chave', v_c.chave));
+end;
+$$;
+
+revoke execute on function public.salvar_conta_pix(uuid, text, text, text, text, boolean, boolean, integer) from public, anon;
+revoke execute on function public.excluir_conta_pix(uuid) from public, anon;
+grant execute on function public.salvar_conta_pix(uuid, text, text, text, text, boolean, boolean, integer) to authenticated, service_role;
+grant execute on function public.excluir_conta_pix(uuid) to authenticated, service_role;
+
+-- ============================================================
+-- CIDADES DO ENCAIXE (2026-10-24, migration 2026-10-24-cidades-coordenadas.sql)
+-- ============================================================
+-- Cidades do encaixe no banco (24/10/2026, etapa 2b).
+-- A lista fixa de lib/cidades-coordenadas.ts (posição de cada cidade, usada no
+-- encaixe de datas livres para medir distância em linha reta) passa para a
+-- tabela cidades_coordenadas, editável em Configurações > Cidades. A migration
+-- copia exatamente as cidades de hoje; o app continua com a lista fixa de
+-- reserva se a tabela não puder ser lida.
+--   1. normalizar_cidade(texto): igual a normalizarCidade do app
+--      ("JOÃO PESSOA - PB" vira "joao pessoa").
+--   2. Tabela cidades_coordenadas (nome normalizado único).
+--   3. Escrita só por salvar_cidade e excluir_cidade.
+-- Não apaga nem altera dados existentes.
+
+create or replace function public.normalizar_cidade(p_nome text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select btrim(regexp_replace(regexp_replace(
+    lower(translate(coalesce(p_nome, ''),
+      'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ',
+      'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN')),
+    '\s*[-/,(].*$', ''), '\s+', ' ', 'g'));
+$$;
+
+create table if not exists public.cidades_coordenadas (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null unique check (nome <> '' and nome = public.normalizar_cidade(nome)),
+  nome_exibicao text not null check (length(btrim(nome_exibicao)) between 1 and 80),
+  uf text check (uf is null or uf ~ '^[A-Z]{2}$'),
+  latitude numeric(9,6) not null check (latitude between -90 and 90),
+  longitude numeric(9,6) not null check (longitude between -180 and 180),
+  created_at timestamptz not null default now()
+);
+
+comment on table public.cidades_coordenadas is
+  'Posição das cidades para o encaixe de datas livres (distância em linha reta). nome = normalizar_cidade(nome_exibicao). Escrita só por salvar_cidade e excluir_cidade.';
+
+-- Cidades de hoje (geradas de lib/cidades-coordenadas.ts por script).
+insert into public.cidades_coordenadas (nome, nome_exibicao, uf, latitude, longitude)
+values
+  ('recife', 'Recife', 'PE', -8.0476, -34.877),
+  ('olinda', 'Olinda', 'PE', -8.0089, -34.8553),
+  ('paulista', 'Paulista', 'PE', -7.9408, -34.8728),
+  ('jaboatao dos guararapes', 'Jaboatão dos Guararapes', 'PE', -8.1128, -35.0147),
+  ('jaboatao', 'Jaboatão', 'PE', -8.1128, -35.0147),
+  ('camaragibe', 'Camaragibe', 'PE', -8.0236, -34.9814),
+  ('sao lourenco da mata', 'São Lourenço da Mata', 'PE', -8.0022, -35.0181),
+  ('moreno', 'Moreno', 'PE', -8.1186, -35.0922),
+  ('abreu e lima', 'Abreu e Lima', 'PE', -7.9008, -34.8986),
+  ('igarassu', 'Igarassu', 'PE', -7.8342, -34.9064),
+  ('itamaraca', 'Itamaracá', 'PE', -7.7478, -34.8256),
+  ('ilha de itamaraca', 'Ilha de Itamaracá', 'PE', -7.7478, -34.8256),
+  ('cabo de santo agostinho', 'Cabo de Santo Agostinho', 'PE', -8.2836, -35.0353),
+  ('ipojuca', 'Ipojuca', 'PE', -8.3986, -35.0639),
+  ('porto de galinhas', 'Porto de Galinhas', 'PE', -8.5039, -35.0047),
+  ('escada', 'Escada', 'PE', -8.3592, -35.2236),
+  ('sirinhaem', 'Sirinhaém', 'PE', -8.5908, -35.1161),
+  ('tamandare', 'Tamandaré', 'PE', -8.76, -35.1047),
+  ('palmares', 'Palmares', 'PE', -8.6833, -35.5917),
+  ('vitoria de santo antao', 'Vitória de Santo Antão', 'PE', -8.1181, -35.2914),
+  ('gravata', 'Gravatá', 'PE', -8.2011, -35.5647),
+  ('bezerros', 'Bezerros', 'PE', -8.2333, -35.7967),
+  ('caruaru', 'Caruaru', 'PE', -8.2836, -35.9761),
+  ('bonito', 'Bonito', 'PE', -8.4703, -35.7286),
+  ('bom jardim', 'Bom Jardim', 'PE', -7.7961, -35.5872),
+  ('limoeiro', 'Limoeiro', 'PE', -7.8742, -35.45),
+  ('carpina', 'Carpina', 'PE', -7.8508, -35.2544),
+  ('surubim', 'Surubim', 'PE', -7.8331, -35.7547),
+  ('goiana', 'Goiana', 'PE', -7.5606, -35.0025),
+  ('timbauba', 'Timbaúba', 'PE', -7.505, -35.3183),
+  ('santa cruz do capibaribe', 'Santa Cruz do Capibaribe', 'PE', -7.9572, -36.2047),
+  ('toritama', 'Toritama', 'PE', -8.0067, -36.0567),
+  ('belo jardim', 'Belo Jardim', 'PE', -8.3356, -36.4242),
+  ('pesqueira', 'Pesqueira', 'PE', -8.3578, -36.6964),
+  ('garanhuns', 'Garanhuns', 'PE', -8.8828, -36.4969),
+  ('arcoverde', 'Arcoverde', 'PE', -8.4189, -37.0539),
+  ('serra talhada', 'Serra Talhada', 'PE', -7.9858, -38.2958),
+  ('sao jose do egito', 'São José do Egito', 'PE', -7.4789, -37.2742),
+  ('petrolina', 'Petrolina', 'PE', -9.3986, -40.5008),
+  ('joao pessoa', 'João Pessoa', 'PB', -7.1153, -34.861),
+  ('cabedelo', 'Cabedelo', 'PB', -6.9811, -34.8339),
+  ('bayeux', 'Bayeux', 'PB', -7.125, -34.9322),
+  ('santa rita', 'Santa Rita', 'PB', -7.1139, -34.9781),
+  ('conde', 'Conde', 'PB', -7.2597, -34.9075),
+  ('mamanguape', 'Mamanguape', 'PB', -6.8386, -35.1261),
+  ('sape', 'Sapé', 'PB', -7.0936, -35.2333),
+  ('itabaiana', 'Itabaiana', 'PB', -7.3286, -35.3322),
+  ('guarabira', 'Guarabira', 'PB', -6.8547, -35.49),
+  ('campina grande', 'Campina Grande', 'PB', -7.2306, -35.8811),
+  ('remigio', 'Remígio', 'PB', -6.9497, -35.8017),
+  ('esperanca', 'Esperança', 'PB', -7.0225, -35.8597),
+  ('areia', 'Areia', 'PB', -6.9628, -35.6919),
+  ('queimadas', 'Queimadas', 'PB', -7.3583, -35.8981),
+  ('monteiro', 'Monteiro', 'PB', -7.8894, -37.12),
+  ('patos', 'Patos', 'PB', -7.0244, -37.28),
+  ('pombal', 'Pombal', 'PB', -6.7703, -37.8017),
+  ('sousa', 'Sousa', 'PB', -6.7592, -38.2311),
+  ('cajazeiras', 'Cajazeiras', 'PB', -6.89, -38.5569),
+  ('maceio', 'Maceió', 'AL', -9.6658, -35.735),
+  ('arapiraca', 'Arapiraca', 'AL', -9.7525, -36.6611),
+  ('penedo', 'Penedo', 'AL', -10.29, -36.5858),
+  ('natal', 'Natal', 'RN', -5.7945, -35.211),
+  ('parnamirim', 'Parnamirim', 'RN', -5.9156, -35.2628),
+  ('mossoro', 'Mossoró', 'RN', -5.1875, -37.3442),
+  ('aracaju', 'Aracaju', 'SE', -10.9472, -37.0731),
+  ('fortaleza', 'Fortaleza', 'CE', -3.7319, -38.5267),
+  ('salvador', 'Salvador', 'BA', -12.9714, -38.5014),
+  ('sao paulo', 'São Paulo', 'SP', -23.5505, -46.6333)
+on conflict (nome) do nothing;
+
+alter table public.cidades_coordenadas enable row level security;
+drop policy if exists "cidades_coordenadas_select" on public.cidades_coordenadas;
+create policy "cidades_coordenadas_select" on public.cidades_coordenadas for select
+  using (has_module_permission('agenda') or has_module_permission('dashboard') or has_module_permission('configuracoes'));
+grant select on public.cidades_coordenadas to authenticated;
+revoke all on public.cidades_coordenadas from anon;
+
+drop trigger if exists trg_somente_leitura on public.cidades_coordenadas;
+create trigger trg_somente_leitura before insert or update or delete on public.cidades_coordenadas
+  for each statement execute function public.bloquear_somente_leitura();
+
+-- Cria ou atualiza (pelo nome normalizado) uma cidade.
+create or replace function public.salvar_cidade(
+  p_nome text,
+  p_latitude numeric,
+  p_longitude numeric,
+  p_uf text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exibir text := regexp_replace(btrim(regexp_replace(coalesce(p_nome, ''), '\s*[-/,(].*$', '')), '\s+', ' ', 'g');
+  v_nome text := normalizar_cidade(p_nome);
+  v_uf text := nullif(upper(btrim(coalesce(p_uf, ''))), '');
+  v_antes cidades_coordenadas%rowtype;
+  v_id uuid;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas cidades.';
+  end if;
+  if v_nome = '' or length(v_exibir) > 80 then
+    raise exception 'Escreva o nome da cidade.';
+  end if;
+  if p_latitude is null or p_longitude is null
+     or p_latitude not between -90 and 90 or p_longitude not between -180 and 180 then
+    raise exception 'Latitude ou longitude inválida.';
+  end if;
+  if v_uf is not null and v_uf !~ '^[A-Z]{2}$' then
+    raise exception 'UF deve ter duas letras (ex.: PE).';
+  end if;
+
+  select * into v_antes from cidades_coordenadas where nome = v_nome for update;
+  if found then
+    update cidades_coordenadas
+       set nome_exibicao = v_exibir, uf = coalesce(v_uf, uf), latitude = round(p_latitude, 6), longitude = round(p_longitude, 6)
+     where id = v_antes.id;
+    perform registrar_movimentacao('editado', 'cidades_coordenadas', v_antes.id,
+      'Cidade alterada: ' || v_exibir,
+      jsonb_build_object('antes', jsonb_build_object('lat', v_antes.latitude, 'lon', v_antes.longitude, 'uf', v_antes.uf),
+                         'depois', jsonb_build_object('lat', round(p_latitude, 6), 'lon', round(p_longitude, 6), 'uf', coalesce(v_uf, v_antes.uf))));
+    return v_antes.id;
+  end if;
+
+  insert into cidades_coordenadas (nome, nome_exibicao, uf, latitude, longitude)
+  values (v_nome, v_exibir, v_uf, round(p_latitude, 6), round(p_longitude, 6))
+  returning id into v_id;
+  perform registrar_movimentacao('criado', 'cidades_coordenadas', v_id,
+    'Cidade cadastrada: ' || v_exibir,
+    jsonb_build_object('nome', v_nome, 'lat', round(p_latitude, 6), 'lon', round(p_longitude, 6), 'uf', v_uf));
+  return v_id;
+end;
+$$;
+
+create or replace function public.excluir_cidade(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_c cidades_coordenadas%rowtype;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas cidades.';
+  end if;
+  select * into v_c from cidades_coordenadas where id = p_id for update;
+  if not found then
+    raise exception 'Cidade não encontrada.';
+  end if;
+  delete from cidades_coordenadas where id = p_id;
+  perform registrar_movimentacao('excluido', 'cidades_coordenadas', p_id,
+    'Cidade removida: ' || v_c.nome_exibicao,
+    jsonb_build_object('nome', v_c.nome, 'lat', v_c.latitude, 'lon', v_c.longitude, 'uf', v_c.uf));
+end;
+$$;
+
+revoke execute on function public.normalizar_cidade(text) from public, anon;
+revoke execute on function public.salvar_cidade(text, numeric, numeric, text) from public, anon;
+revoke execute on function public.excluir_cidade(uuid) from public, anon;
+grant execute on function public.normalizar_cidade(text) to authenticated, service_role;
+grant execute on function public.salvar_cidade(text, numeric, numeric, text) to authenticated, service_role;
+grant execute on function public.excluir_cidade(uuid) to authenticated, service_role;

@@ -84,7 +84,7 @@ export default function PrefsAgenda({ preferencias }: { preferencias: Preferenci
     <div className="space-y-4 pb-28">
       <Bloco
         titulo="Encaixe de datas livres"
-        dica="Um dia livre nos dois HIPROs, colado a um atendimento, vira oportunidade para oferecer a quem mora perto. A distância é em linha reta; cidade que não está na lista de coordenadas do app (lib/cidades-coordenadas.ts) não entra."
+        dica="Um dia livre nos dois HIPROs, colado a um atendimento, vira oportunidade para oferecer a quem mora perto. A distância é em linha reta; cidade que não está em Configurações > Cidades não entra."
       >
         <div className="space-y-3">
           <div>

@@ -13,6 +13,8 @@ const TABELAS = [
   "settings",
   "equipments",
   "categories",
+  "contas_pix",
+  "cidades_coordenadas",
   "tags",
   "cartoes",
   "aplicadores",

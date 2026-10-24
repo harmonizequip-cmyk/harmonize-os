@@ -31,6 +31,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { paraEscolha } from "@/lib/categorias";
 import ClientPicker from "@/components/ClientPicker";
 import {
   calculateRentalValue,
@@ -47,7 +48,6 @@ import {
   buildResumoWhatsApp,
   PAYMENT_METHODS,
   PAYMENT_LABELS,
-  PIX_CONTAS,
   RESERVATION_FEE,
   ordenarContagens,
   valorDosDisparos,
@@ -65,6 +65,8 @@ import CalculoImagemBotao from "@/components/CalculoImagemBotao";
 import { montarDadosCalculo, montarDadosMentoria } from "@/lib/calculo-image";
 import { avisar as avisarApp, confirmar as confirmarApp } from "@/components/Dialogos";
 import { somarContagens, creditoUsavel, disparosCobrados, type Contagem } from "@/lib/creditos";
+import { codigoPadrao, contasParaEscolha } from "@/lib/contas-pix";
+import { useContasPix } from "@/lib/usar-contas-pix";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -186,6 +188,7 @@ export default function CalculadoraLocacaoModal({
   onDone: () => void;
 }) {
   const supabase = createClient();
+  const contasPix = useContasPix();
   const fee = reservationFee ?? RESERVATION_FEE;
   const mentoriaPricingResolved = mentoriaPricing ?? DEFAULT_MENTORIA_PRICING;
   const isMentoria = mode.kind === "finalize" && !!mode.isMentoria;
@@ -586,7 +589,7 @@ export default function CalculadoraLocacaoModal({
   // mentoria porque a forma da primeira linha decide à vista ou parcelado; do
   // contrário a mentoria travava ao abrir (usava a forma antes de existir).
   const [pagamentos, setPagamentos] = useState<PagamentoTela[]>([
-    { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() },
+    { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: codigoPadrao(contasPix), data: hojeLocal() },
   ]);
   const primeiraFormaPagamento = pagamentos[0]?.forma ?? "";
 
@@ -739,7 +742,7 @@ export default function CalculadoraLocacaoModal({
     setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
   function addPagamento() {
-    setPagamentos((prev) => [...prev, { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: "harmonize", data: hojeLocal() }]);
+    setPagamentos((prev) => [...prev, { id: newId("pag"), forma: "pix", valor: 0, valorTexto: "", pixConta: codigoPadrao(contasPix), data: hojeLocal() }]);
   }
   function removePagamento(id: string) {
     setPagamentos((prev) => prev.filter((p) => p.id !== id));
@@ -825,11 +828,11 @@ export default function CalculadoraLocacaoModal({
     if (!temPermutaPessoal || categoriasPessoais !== null) return;
     supabase
       .from("categories")
-      .select("id, name")
+      .select("*")
       .eq("type", "saida")
       .eq("scope", "pessoal")
       .order("name")
-      .then(({ data }) => setCategoriasPessoais(data ?? []));
+      .then(({ data }) => setCategoriasPessoais(paraEscolha(data)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [temPermutaPessoal]);
 
@@ -873,6 +876,7 @@ export default function CalculadoraLocacaoModal({
         disparosRealizados: totalDisparos,
         creditoUsado,
         viraCredito: disparosViraCredito,
+        contasPix,
       },
       resumo
     );
@@ -1281,6 +1285,7 @@ export default function CalculadoraLocacaoModal({
           disparosRealizados: totalDisparos,
           creditoUsado,
           viraCredito: disparosViraCredito,
+          contasPix,
         },
         resumo
       )
@@ -1317,11 +1322,11 @@ export default function CalculadoraLocacaoModal({
     if (!summary || categoriasSaida !== null) return;
     supabase
       .from("categories")
-      .select("id, name")
+      .select("*")
       .eq("type", "saida")
       .eq("scope", "harmonize")
       .order("name")
-      .then(({ data }) => setCategoriasSaida(data ?? []));
+      .then(({ data }) => setCategoriasSaida(paraEscolha(data)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summary]);
 
@@ -2172,7 +2177,7 @@ export default function CalculadoraLocacaoModal({
                           onChange={(e) =>
                             updatePagamento(p.id, {
                               forma: e.target.value,
-                              pixConta: e.target.value === "pix" ? p.pixConta || "harmonize" : "",
+                              pixConta: e.target.value === "pix" ? p.pixConta || codigoPadrao(contasPix) : "",
                               ...(e.target.value === "permuta" && !p.permutaDestino ? { permutaDestino: "empresa" as const } : {}),
                             })
                           }
@@ -2212,9 +2217,9 @@ export default function CalculadoraLocacaoModal({
                           className="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                         >
                           <option value="">Conta PIX que recebeu...</option>
-                          {PIX_CONTAS.map((c) => (
-                            <option key={c.value} value={c.value}>
-                              {c.nome}
+                          {contasParaEscolha(contasPix, p.pixConta).map((c) => (
+                            <option key={c.codigo} value={c.codigo}>
+                              {c.titular}
                             </option>
                           ))}
                         </select>

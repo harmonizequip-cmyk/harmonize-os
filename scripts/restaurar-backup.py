@@ -23,7 +23,8 @@ import sys
 
 # Ordem que respeita as chaves estrangeiras (pai antes de filho).
 ORDEM = [
-    "profiles", "settings", "equipments", "categories", "tags", "cartoes",
+    "profiles", "settings", "equipments", "categories", "contas_pix",
+    "cidades_coordenadas", "tags", "cartoes",
     "aplicadores", "aplicador_montagens", "bloqueios_equipamento", "clients",
     "client_tags", "calendar_events", "rentals", "rental_payments", "transactions",
     "emprestimos", "mentoring_events", "expense_limits", "tasks",
@@ -33,7 +34,7 @@ ORDEM = [
     "assistente_memoria", "cliente_anotacoes",
 ]
 # Tabelas que o schema.sql já semeia com linhas padrão: saem antes da carga.
-SEMEADAS = ["settings", "equipments", "categories", "tags"]
+SEMEADAS = ["settings", "equipments", "categories", "tags", "contas_pix", "cidades_coordenadas"]
 
 
 def colunas_do_backup(linhas: list) -> list:
@@ -53,10 +54,14 @@ def main() -> int:
         backup = json.load(f)
     tabelas = backup["tabelas"]
     esperado = backup.get("contagens", {})
+    # Tabela semeada que o backup não traz (backup antigo) fica com a semente do schema.sql.
+    semeadas = [n for n in SEMEADAS if n in tabelas]
+    mantem_semente = {n for n in SEMEADAS if n not in tabelas}
     for nome in ORDEM:
         if nome not in tabelas:
             # Backup anterior à tabela existir (emprestimos entrou em 06/10/2026; créditos,
-            # cartões, planejamentos e outras em 18/10/2026).
+            # cartões, planejamentos e outras em 18/10/2026; contas_pix e
+            # cidades_coordenadas em 24/10/2026: o schema.sql já semeia as de sempre).
             tabelas[nome] = []
             esperado.setdefault(nome, 0)
         if esperado.get(nome) != len(tabelas[nome]):
@@ -75,7 +80,7 @@ begin
   end if;
 end $$;""")
     sql.append("set local session_replication_role = replica;")
-    for nome in SEMEADAS:
+    for nome in semeadas:
         sql.append(f"delete from public.{nome};")
     for nome in ORDEM:
         corpo = json.dumps(tabelas[nome], ensure_ascii=False)
@@ -94,6 +99,8 @@ end $$;""")
     sql.append("-- Conferência linha a linha: cada linha do arquivo precisa existir idêntica no banco.")
     sql.append("do $$\ndeclare v_dif integer;\nbegin")
     for nome in ORDEM:
+        if nome in mantem_semente:
+            continue
         corpo = json.dumps(tabelas[nome], ensure_ascii=False)
         chaves = "array[" + ", ".join(f"'{c}'" for c in colunas_do_backup(tabelas[nome])) + "]::text[]"
         sql.append(

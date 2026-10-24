@@ -133,7 +133,8 @@ equipments: id, code (hipro_1, hipro_2), name, status (ativo, manutencao), statu
 Ligar equipamento: rentals.equipment_id = equipments.id.
 
 ## Pagamentos e o que falta receber
-rental_payments: rental_id, forma, valor, data, pix_conta (eder, harmonize, laser_dream), notes.
+rental_payments: rental_id, forma, valor, data, pix_conta (contas_pix.codigo: eder, harmonize, laser_dream e as que o dono cadastrar), notes.
+contas_pix: codigo, rotulo, titular, tipo_chave, chave, ativa, padrao (contas que recebem PIX; a padrão vem marcada ao receber pagamento).
 View rentals_situacao_pagamento: rental_id, calculated_value, credito_taxa (taxa de reserva paga, abate do valor), total_pago, saldo, situacao (aberto, parcial, pago).
 Pendência (quem deve): locação não cancelada, is_test = false, pago = false, último dia (coalesce(event_date_end, event_date)) antes de hoje e saldo > 0. Dias de atraso = hoje_local() - último dia.
 Taxa de reserva: calendar_events.taxa_status/taxa_valor. Parceiro não paga taxa. View clientes_taxas: client_id, taxas_pendentes, taxas_pagas, valor_pendente, valor_pago, proxima_pendente.
@@ -151,7 +152,8 @@ Locação cancelada não tem despesa.
 
 ## Financeiro (caixa)
 transactions: id, type (entrada, saida), category_id (categories.id), description, amount (sempre positivo), payment_method (pix, dinheiro, debito, credito, transferencia, outros), date, data_compra, notes, scope (harmonize ou pessoal), client_id, rental_id, calendar_event_id, conta_no_lucro, cartao_id, cartao_mov (compra, pagamento), fatura_ref ('AAAA-MM'), parcela_num, parcelas_total, vinculo_id, is_test.
-categories: id, name, type, scope.
+categories: id, name, type, scope, sistema (usada pelo sistema pelo nome), arquivada (não aparece para escolher, mas continua nos lançamentos antigos).
+cidades_coordenadas: nome (normalizado, sem acento), nome_exibicao, uf, latitude, longitude (cidades com posição para o encaixe de datas livres; cidade fora daqui não entra no encaixe).
 Para somar use transactions_contabilizaveis (sem teste e sem itens de locação cancelada).
 Regras das somas de Entradas/Saídas/Resultado: só scope = 'harmonize' (a não ser que ele pergunte do pessoal); ficam fora o pagamento de fatura (cartao_mov = 'pagamento', categoria 'Pagamento de fatura') e os empréstimos (categorias 'Empréstimo concedido' e 'Devolução de empréstimo'). Compra no cartão conta como gasto no mês em que a fatura vence: em compra de cartão, date é o vencimento da fatura e data_compra é o dia da compra (use data_compra só para dizer quando comprou).
 "Retiradas" (saída da Harmonize) vira entrada "Retirada da Harmonize" no pessoal.
@@ -236,7 +238,7 @@ export const CONHECIMENTO_PESSOAL = `Você é o assistente financeiro pessoal do
 # Dados do pessoal (scope = 'pessoal'; para a empresa, use a seção Saúde da empresa acima)
 transactions: id, type (entrada, saida), category_id (categories.id), description, amount (positivo), payment_method (pix, dinheiro, debito, credito, transferencia, permuta, outros), date, data_compra, notes, scope, cartao_id, cartao_mov (compra, pagamento), fatura_ref ('AAAA-MM'), parcela_num, parcelas_total, vinculo_id, is_test.
 Para somar use transactions_contabilizaveis (sem teste), sempre com scope = 'pessoal'. Para gastos, saidas fora do pagamento de fatura (cartao_mov = 'pagamento' ou categoria 'Pagamento de fatura') e fora de empréstimos ('Empréstimo concedido', 'Devolução de empréstimo'). Compra no cartão conta como gasto no mês em que a fatura vence (date = vencimento da fatura; data_compra = dia da compra), mas não sai do saldo até a fatura ser paga.
-categories: id, name, type, scope (use scope = 'pessoal').
+categories: id, name, type, scope (use scope = 'pessoal'), arquivada.
 Saldo da conta pessoal: entradas menos saídas de scope = 'pessoal', ignorando compra de cartão ainda não paga (cartao_mov = 'compra') e payment_method = 'permuta'.
 "Retirada da Harmonize" (entrada) é o dinheiro que ele tira da empresa e que cai aqui sozinho.
 Contas fixas pessoais: settings.despesas_fixas (lista JSON com nome, valor, tipo; use as de tipo 'pessoal').

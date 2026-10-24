@@ -17,6 +17,7 @@ import type {
 } from "./rental-pricing";
 import { RESERVATION_FEE } from "./rental-pricing";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
+import { CONTAS_PIX_PADRAO, contaPorCodigo, type ContaPix } from "./contas-pix";
 
 export const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -34,16 +35,13 @@ export const PAYMENT_LABELS: Record<string, string> = {
   permuta: "Permuta",
 };
 
-// As três contas PIX reais do negócio (ver rental_payments.pix_conta no
-// banco — lista fechada de propósito, igual lá). Nome/chave usados só para
-// exibir na tela e no texto de WhatsApp.
-export const PIX_CONTAS = [
-  { value: "eder", nome: "Eder Campos de Almeida", chave: "07442790623" },
-  { value: "harmonize", nome: "Harmonize Bella Prime LTDA", chave: "harmonizequip@gmail.com" },
-  { value: "laser_dream", nome: "Laser Dream Campina Grande LTDA", chave: "ed21011f-1880-4293-9cb3-cdc087ac80de" },
-] as const;
+// Contas PIX de sempre, no formato antigo (value/nome/chave). Desde 24/10/2026
+// as contas vêm da tabela contas_pix (Configurações > Contas PIX; nas telas,
+// useContasPix); esta lista é só a reserva quando a tabela não pode ser lida.
+export const PIX_CONTAS = CONTAS_PIX_PADRAO.map((c) => ({ value: c.codigo, nome: c.titular, chave: c.chave }));
 
-export type PixContaValue = (typeof PIX_CONTAS)[number]["value"];
+/** Código da conta (contas_pix.codigo, o mesmo de rental_payments.pix_conta). */
+export type PixContaValue = string;
 
 export type ReservationFeeStatus = "nao_aplica" | "ja_paga" | "cobrar_agora";
 
@@ -277,6 +275,8 @@ export interface ResumoWhatsAppInput extends ResumoLocacaoInput {
   creditoUsado?: number;
   // Disparos das contagens marcadas que viram crédito para a próxima.
   viraCredito?: number;
+  // Contas PIX da tabela contas_pix (sem elas, as de sempre).
+  contasPix?: ContaPix[];
 }
 
 // Monta o texto de resumo (mesmo formato do protótipo aprovado, com
@@ -398,7 +398,8 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
     linhas.push("");
     linhas.push("💵 *PAGAMENTO*");
     for (const p of pagamentosValidos) {
-      const contaTxt = p.forma === "pix" && p.pixConta ? ` (${PIX_CONTAS.find((c) => c.value === p.pixConta)?.nome})` : "";
+      const conta = p.forma === "pix" ? contaPorCodigo(input.contasPix, p.pixConta) : null;
+      const contaTxt = conta ? ` (${conta.titular})` : "";
       linhas.push(`  • ${PAYMENT_LABELS[p.forma] ?? p.forma}${contaTxt}: ${fmtMoney(p.valor)}`);
     }
     const somaPagamentos = round2(pagamentosValidos.reduce((acc, p) => acc + p.valor, 0));
@@ -414,11 +415,11 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
   // Chave PIX de quem vai receber (só a primeira conta PIX usada, se houver)
   const contaPix = pagamentosValidos.find((p) => p.forma === "pix" && p.pixConta)?.pixConta;
   if (contaPix) {
-    const p = PIX_CONTAS.find((c) => c.value === contaPix);
+    const p = contaPorCodigo(input.contasPix, contaPix);
     if (p) {
       linhas.push("");
       linhas.push("🔑 *PIX para pagamento*");
-      linhas.push(`  Favorecido: *${p.nome}*`);
+      linhas.push(`  Favorecido: *${p.titular}*`);
       linhas.push(`  Chave: *${p.chave}*`);
     }
   }

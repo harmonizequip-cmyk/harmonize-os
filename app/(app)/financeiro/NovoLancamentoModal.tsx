@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mic } from "lucide-react";
 import ClientPicker from "@/components/ClientPicker";
 import { createClient } from "@/lib/supabase/client";
+import { paraEscolha } from "@/lib/categorias";
 import LocacaoDoClienteSelect, { SEM_VINCULO, type VinculoDespesa } from "@/components/LocacaoDoClienteSelect";
 
 import { hojeLocal } from "@/lib/period";
@@ -87,7 +88,7 @@ export default function NovoLancamentoModal({
   useEffect(() => {
     supabase
       .from("categories")
-      .select("id, name, type")
+      .select("*")
       .eq("scope", "pessoal")
       .order("name")
       .then(({ data }) => setCategoriasPessoais((data ?? []) as CategoryRow[]));
@@ -124,7 +125,7 @@ export default function NovoLancamentoModal({
         return;
       }
       const r = interpretarDespesa(final, {
-        categorias: categories.filter((c) => c.type === "saida"),
+        categorias: paraEscolha(categories).filter((c) => c.type === "saida"),
         clientes: clientesRef.current,
         hoje: hojeLocal(),
       });
@@ -160,7 +161,8 @@ export default function NovoLancamentoModal({
   // Custo do atendimento usa as categorias da Harmonize (Combustível...);
   // o resto do pessoal usa as categorias pessoais.
   const listaCategorias = pessoal && !contaNoLucro ? categoriasPessoais : categories;
-  const filteredCategories = listaCategorias.filter(
+  // Arquivadas (Configurações > Categorias) não aparecem para escolher.
+  const filteredCategories = paraEscolha(listaCategorias).filter(
     (c) => c.type === type && !(type === "entrada" && CATEGORIAS_AUTOMATICAS.includes(c.name.trim().toLowerCase()))
   );
 

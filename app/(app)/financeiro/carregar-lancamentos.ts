@@ -80,8 +80,8 @@ export async function carregarLancamentos(
   const [{ data: transactions, error: erroLancamentos }, { data: categories }, { data: clients }, { data: cartoes }] = await Promise.all([
     buscarPaginas(),
     escopo === "harmonize"
-      ? supabase.from("categories").select("id, name, type").eq("scope", "harmonize").order("name")
-      : supabase.from("categories").select("id, name, type, scope").or("scope.eq.pessoal,and(scope.eq.harmonize,type.eq.saida)").order("name"),
+      ? supabase.from("categories").select("*").eq("scope", "harmonize").order("name")
+      : supabase.from("categories").select("*").or("scope.eq.pessoal,and(scope.eq.harmonize,type.eq.saida)").order("name"),
     supabase.from("clients").select("id, name, city, whatsapp").order("name"),
     // Nome do cartão para a linha da fatura (as compras do cartão aparecem agrupadas).
     supabase.from("cartoes").select("id, nome"),

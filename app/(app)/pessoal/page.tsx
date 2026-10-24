@@ -59,7 +59,7 @@ export default async function PessoalInicioPage() {
           return r;
         }),
       supabase.from("cartoes").select("id, nome"),
-      supabase.from("categories").select("id, name, type").eq("scope", "harmonize").eq("type", "saida").order("name"),
+      supabase.from("categories").select("*").eq("scope", "harmonize").eq("type", "saida").order("name"),
       supabase.from("clients").select("id, name").order("name"),
       supabase.from("orcamentos_pessoais").select("categoria, limite"),
     ]);

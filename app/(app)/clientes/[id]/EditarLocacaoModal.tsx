@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { paraEscolha } from "@/lib/categorias";
 import { calculateRentalValue, type PricingConfig } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
@@ -10,6 +11,8 @@ import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamento } from "@/lib/atalhos";
 import { somarContagens, disparosCobrados } from "@/lib/creditos";
 import { confirmar } from "@/components/Dialogos";
+import { codigoPadrao, contaPorCodigo, contasParaEscolha } from "@/lib/contas-pix";
+import { useContasPix } from "@/lib/usar-contas-pix";
 
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -124,6 +127,7 @@ export default function EditarLocacaoModal({
   onPaymentsChanged?: () => void;
 }) {
   const supabase = createClient();
+  const contasPix = useContasPix();
   const [equipmentId, setEquipmentId] = useState(rental.equipment_id);
   const [eventDate, setEventDate] = useState(rental.event_date);
   // Leva W: período de vários dias. Nasce marcado se a locação já era um
@@ -209,7 +213,7 @@ export default function EditarLocacaoModal({
 
   const [novoValor, setNovoValor] = useState("");
   const [novaForma, setNovaForma] = useState("pix");
-  const [novaPixConta, setNovaPixConta] = useState("harmonize");
+  const [novaPixConta, setNovaPixConta] = useState(codigoPadrao(contasPix));
   const [addingPayment, setAddingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -231,11 +235,11 @@ export default function EditarLocacaoModal({
   useEffect(() => {
     supabase
       .from("categories")
-      .select("id, name")
+      .select("*")
       .eq("type", "saida")
       .eq("scope", "harmonize")
       .order("name")
-      .then(({ data }) => setCategoriasSaida(data ?? []));
+      .then(({ data }) => setCategoriasSaida(paraEscolha(data)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -814,7 +818,7 @@ export default function EditarLocacaoModal({
                   <li key={p.id} className="flex items-center justify-between gap-2 text-sm text-neutral-700">
                     <span>
                       {formatCurrency(p.valor)} — {PAYMENT_METHODS.find((m) => m.value === p.forma)?.label ?? p.forma}
-                      {p.pix_conta ? ` (${p.pix_conta})` : ""} · {new Date(p.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                      {p.pix_conta ? ` (${contaPorCodigo(contasPix, p.pix_conta)?.rotulo ?? p.pix_conta})` : ""} · {new Date(p.data + "T00:00:00").toLocaleDateString("pt-BR")}
                     </span>
                     {p.transaction_id && (
                       <Atalho href={linkLancamento(p.transaction_id)} emoji="💰" title="Abrir o lançamento no Financeiro">
@@ -863,9 +867,11 @@ export default function EditarLocacaoModal({
                     onChange={(e) => setNovaPixConta(e.target.value)}
                     className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-sm"
                   >
-                    <option value="eder">Eder</option>
-                    <option value="harmonize">Harmonize</option>
-                    <option value="laser_dream">Laser Dream</option>
+                    {contasParaEscolha(contasPix, novaPixConta).map((c) => (
+                      <option key={c.codigo} value={c.codigo}>
+                        {c.rotulo}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}
