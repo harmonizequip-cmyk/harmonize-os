@@ -59,6 +59,7 @@ import {
 } from "@/lib/rental-calculator";
 import { formatCurrency, formatDate, buildWhatsAppLink } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { valorParaNumero, lerCustoPorDisparo, limparCampoCustoPorDisparo } from "@/lib/valor";
 import CalculoImagemBotao from "@/components/CalculoImagemBotao";
 import { montarDadosCalculo, montarDadosMentoria } from "@/lib/calculo-image";
@@ -615,7 +616,8 @@ export default function CalculadoraLocacaoModal({
   // ------------------------------------------------------------
   const [kmIda, setKmIda] = useState("");
   const kmIdaNumber = Number(onlyDigits(kmIda)) || 0;
-  const valorDeslocamentoPreview = calcularValorDeslocamento(kmIdaNumber);
+  const prefsDeslocamento = usePreferencias().deslocamento;
+  const valorDeslocamentoPreview = calcularValorDeslocamento(kmIdaNumber, prefsDeslocamento);
 
   // ------------------------------------------------------------
   // Ajustes finais: aluguel (+) e desconto (-) fixos do protótipo, mais
@@ -756,11 +758,12 @@ export default function CalculadoraLocacaoModal({
       custoManualPorDisparo,
       mentoriaPricing: mentoriaCalc,
       kmIda: kmIdaNumber,
+      deslocamentoCfg: prefsDeslocamento,
       itens,
       reservationFeeStatus,
       reservationFee: feeDoResumo,
     });
-  }, [isMentoria, mentoriaCalc, pricing, tudoNoCredito, shots, custoManualPorDisparo, kmIdaNumber, itens, reservationFeeStatus, feeDoResumo]);
+  }, [isMentoria, mentoriaCalc, pricing, tudoNoCredito, shots, custoManualPorDisparo, kmIdaNumber, prefsDeslocamento, itens, reservationFeeStatus, feeDoResumo]);
 
   // Deslocamento lançado na reserva: fica cobrado à parte na locação (soma no saldo a receber)
   // e pode ser recebido junto aqui. Digitar km acima troca pelo cálculo da calculadora.

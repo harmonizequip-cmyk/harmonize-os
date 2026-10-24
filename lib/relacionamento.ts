@@ -13,6 +13,8 @@
 // Relacionamento (que grava uma tarefa concluída).
 // ============================================================
 
+import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
+
 export type ClasseCliente = "agendada" | "nova" | "ativa" | "em_risco" | "sumida";
 export type ClasseLead = "quente" | "morna" | "fria";
 export type Classe = ClasseCliente | ClasseLead;
@@ -85,33 +87,41 @@ const ETAPAS_QUENTES = new Set(["qualificado", "agendado"]);
 /** Cadência (dias entre conversas) por classe. Agendada não entra: a confirmação já cuida. */
 export const CADENCIA: Record<Classe, number | null> = {
   agendada: null,
-  nova: 10,
-  ativa: 21,
-  em_risco: 14,
-  sumida: 30,
-  quente: 3,
-  morna: 7,
-  fria: 30,
+  ...DEFAULT_PREFERENCIAS.relacionamento.cadencia,
 };
+
+type ConfigRelacionamento = Preferencias["relacionamento"];
+
+function cadenciaDaClasse(classe: Classe, cfg: ConfigRelacionamento): number | null {
+  return classe === "agendada" ? null : cfg.cadencia[classe];
+}
 
 /**
  * Curva ABC do faturamento: VIP são as clientes que, somadas, fazem a
  * primeira metade do faturamento; Frequente, as que fazem os 30% seguintes.
  */
-export function valorPorFaturamento(totais: Map<string, number>): Map<string, Valor> {
+export function valorPorFaturamento(
+  totais: Map<string, number>,
+  cfg: ConfigRelacionamento = DEFAULT_PREFERENCIAS.relacionamento
+): Map<string, Valor> {
   const lista = Array.from(totais.entries()).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const soma = lista.reduce((s, [, v]) => s + v, 0);
   const resultado = new Map<string, Valor>();
   let acumulado = 0;
   for (const [id, v] of lista) {
     const antes = acumulado / (soma || 1);
-    resultado.set(id, antes < 0.5 ? "vip" : antes < 0.8 ? "boa" : "comum");
+    resultado.set(id, antes < cfg.vipFatia ? "vip" : antes < cfg.frequenteFatia ? "boa" : "comum");
     acumulado += v;
   }
   return resultado;
 }
 
-export function classificar(p: PessoaBase, hoje: string, valor: Valor): PessoaClassificada {
+export function classificar(
+  p: PessoaBase,
+  hoje: string,
+  valor: Valor,
+  cfg: ConfigRelacionamento = DEFAULT_PREFERENCIAS.relacionamento
+): PessoaClassificada {
   const locs = [...p.locacoes].filter((l) => l.data <= hoje).sort((a, b) => a.data.localeCompare(b.data));
   const totalFaturado = p.locacoes.reduce((s, l) => s + l.valor, 0);
   const ultimaLocacao = locs.length ? locs[locs.length - 1].data : null;
@@ -128,11 +138,11 @@ export function classificar(p: PessoaBase, hoje: string, valor: Valor): PessoaCl
   const cliente = p.ehCliente || locs.length > 0;
 
   if (cliente) {
-    const limiteRisco = ritmo ? Math.max(30, Math.round(ritmo * 1.5)) : 60;
+    const limiteRisco = ritmo ? Math.max(cfg.riscoMinimoDias, Math.round(ritmo * cfg.riscoMultiplicador)) : cfg.riscoSemRitmoDias;
     if (p.proximaReserva) classe = "agendada";
     else if (diasSemLocar === null) classe = "sumida";
-    else if (diasSemLocar > 120) classe = "sumida";
-    else if (locs.length === 1 && diasSemLocar <= 60) classe = "nova";
+    else if (diasSemLocar > cfg.sumidaDias) classe = "sumida";
+    else if (locs.length === 1 && diasSemLocar <= cfg.novaAteDias) classe = "nova";
     else if (diasSemLocar > limiteRisco) classe = "em_risco";
     else classe = "ativa";
 
@@ -147,7 +157,7 @@ export function classificar(p: PessoaBase, hoje: string, valor: Valor): PessoaCl
     else if (classe === "ativa") motivo = "Sem data marcada: ofereça as próximas datas";
   } else {
     if (ETAPAS_QUENTES.has(p.stage) || (p.proximaReserva && !cliente)) classe = "quente";
-    else if (p.stage === "em_contato" || diasSemContato <= 14) classe = "morna";
+    else if (p.stage === "em_contato" || diasSemContato <= cfg.mornaDias) classe = "morna";
     else classe = "fria";
     motivo =
       classe === "quente"
@@ -157,7 +167,7 @@ export function classificar(p: PessoaBase, hoje: string, valor: Valor): PessoaCl
           : `Lead parado há ${diasSemContato} dias`;
   }
 
-  const cadencia = CADENCIA[classe];
+  const cadencia = cadenciaDaClasse(classe, cfg);
   const devida = cadencia !== null && diasSemContato >= cadencia;
 
   // Prioridade (maior primeiro): valor da cliente, risco de perder e atraso
@@ -184,17 +194,21 @@ export function classificar(p: PessoaBase, hoje: string, valor: Valor): PessoaCl
 }
 
 /** Classifica todas e devolve em ordem de prioridade. */
-export function classificarTodas(pessoas: PessoaBase[], hoje: string): PessoaClassificada[] {
+export function classificarTodas(
+  pessoas: PessoaBase[],
+  hoje: string,
+  cfg: ConfigRelacionamento = DEFAULT_PREFERENCIAS.relacionamento
+): PessoaClassificada[] {
   const totais = new Map<string, number>();
   for (const p of pessoas) totais.set(p.id, p.locacoes.reduce((s, l) => s + l.valor, 0));
-  const valores = valorPorFaturamento(totais);
+  const valores = valorPorFaturamento(totais, cfg);
   return pessoas
-    .map((p) => classificar(p, hoje, valores.get(p.id) ?? "comum"))
+    .map((p) => classificar(p, hoje, valores.get(p.id) ?? "comum", cfg))
     .sort((a, b) => b.prioridade - a.prioridade || a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 /** Quantas pessoas aparecem por dia em "chamar hoje" (o resto espera, sem virar pilha). */
-export const LIMITE_DIARIO = 8;
+export const LIMITE_DIARIO = DEFAULT_PREFERENCIAS.relacionamento.limiteDiario;
 
 export function mensagemRelacionamento(p: Pick<PessoaClassificada, "classe" | "nome" | "treatment" | "displayName">, saudacao: string): string {
   const s = `${saudacao} 😊`;

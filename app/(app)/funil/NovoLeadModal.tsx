@@ -6,17 +6,29 @@ import { BookUser } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 import { escolherContato, podeEscolherContato } from "@/lib/contatos";
+import { DEFAULT_PREFERENCIAS } from "@/lib/preferencias";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format";
 
 // Exportado para o filtro do Funil usar a mesma lista, em vez de duplicar
 // os valores em outro arquivo.
-export const ORIGENS = [
-  { value: "indicacao", label: "Indicação" },
-  { value: "instagram", label: "Instagram" },
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "formulario", label: "Formulário" },
-  { value: "outro", label: "Outro" },
-];
+// A lista vem de Configurações (preferencias.listas.origens); este export é o
+// padrão, para quem ainda usa a lista fixa.
+export const ORIGENS = DEFAULT_PREFERENCIAS.listas.origens.map((o) => ({ value: o.valor, label: o.rotulo }));
+
+/** Origens configuradas no formato { value, label } das telas. */
+export function origensParaTela(origens: { valor: string; rotulo: string }[]) {
+  return origens.map((o) => ({ value: o.valor, label: o.rotulo }));
+}
+
+/** Rótulo de uma origem; se foi removida da lista, o código com a primeira letra maiúscula. */
+export function rotuloDaOrigem(origens: { value: string; label: string }[], valor: string | null | undefined): string {
+  if (!valor) return "";
+  const achada = origens.find((o) => o.value === valor);
+  if (achada) return achada.label;
+  const t = valor.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 
 export default function NovoLeadModal({
   onClose,
@@ -26,6 +38,8 @@ export default function NovoLeadModal({
   onCreated: () => void;
 }) {
   const supabase = createClient();
+  const preferencias = usePreferencias();
+  const origens = origensParaTela(preferencias.listas.origens);
   const [name, setName] = useState("");
   // Tratamento + Nome de exibição alimentam as mensagens automáticas
   // (ex: pedido de confirmação por WhatsApp) em vez do campo "Nome"
@@ -36,7 +50,7 @@ export default function NovoLeadModal({
   const [whatsapp, setWhatsapp] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
-  const [origem, setOrigem] = useState("indicacao");
+  const [origem, setOrigem] = useState(DEFAULT_PREFERENCIAS.listas.origens[0].valor);
   const [indicadoPor, setIndicadoPor] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [parceiro, setParceiro] = useState(false);
@@ -181,7 +195,7 @@ export default function NovoLeadModal({
               onChange={(e) => setOrigem(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             >
-              {ORIGENS.map((o) => (
+              {origens.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

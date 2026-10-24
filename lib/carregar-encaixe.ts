@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { carregarRelacionamento } from "./carregar-relacionamento";
-import { oportunidadesDeEncaixe, DIAS_A_FRENTE, type Oportunidade } from "./encaixe";
+import { oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
+import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { diasDoPeriodo, somarDias } from "./period";
 import type { PessoaClassificada } from "./relacionamento";
 
@@ -12,9 +13,10 @@ import type { PessoaClassificada } from "./relacionamento";
 export async function carregarEncaixe(
   supabase: SupabaseClient,
   hoje: string,
-  opcoes: { somenteDia?: string | null; pessoas?: PessoaClassificada[] } = {}
+  opcoes: { somenteDia?: string | null; pessoas?: PessoaClassificada[]; encaixe?: Preferencias["encaixe"] } = {}
 ): Promise<Oportunidade[]> {
-  const ate = somarDias(opcoes.somenteDia && opcoes.somenteDia > hoje ? opcoes.somenteDia : hoje, DIAS_A_FRENTE + 1);
+  const enc = opcoes.encaixe ?? DEFAULT_PREFERENCIAS.encaixe;
+  const ate = somarDias(opcoes.somenteDia && opcoes.somenteDia > hoje ? opcoes.somenteDia : hoje, enc.diasAFrente + 1);
   const de = somarDias(hoje, -1);
   const [{ data: eventos, error: e1 }, { data: bloqueios, error: e2 }, pessoas] = await Promise.all([
     supabase
@@ -40,5 +42,5 @@ export async function carregarEncaixe(
   }
   for (const b of bloqueios ?? []) for (const d of diasDoPeriodo(b.data_inicio, b.data_fim, 400)) ocupados.add(d);
 
-  return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia });
+  return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm });
 }

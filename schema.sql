@@ -325,7 +325,11 @@ create table public.settings (
   -- Contas fixas do mês (2026-10-06), editadas em Configurações: base do
   -- quadro "Este mês" do Dashboard. [{"nome","valor","tipo": negocio|pessoal}]
   despesas_fixas jsonb not null default '[]'::jsonb,
-  constraint settings_despesas_fixas_lista check (jsonb_typeof(despesas_fixas) = 'array')
+  constraint settings_despesas_fixas_lista check (jsonb_typeof(despesas_fixas) = 'array'),
+  -- Preferências de Configurações (2026-10-24): metas, relacionamento, encaixe,
+  -- deslocamento, listas, dashboard, planejador e recibo. Padrões em lib/preferencias.ts.
+  preferencias jsonb not null default '{}'::jsonb,
+  constraint settings_preferencias_objeto check (jsonb_typeof(preferencias) = 'object')
 );
 
 comment on column public.settings.mentoria_valor_avista is

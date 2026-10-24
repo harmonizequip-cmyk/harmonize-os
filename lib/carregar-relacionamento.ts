@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buscarPendencias } from "./pendencias";
 import { buscarTodas } from "./buscar-todas";
+import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { classificarTodas, type PessoaBase, type PessoaClassificada } from "./relacionamento";
 
 // Busca todas as páginas e troca a mensagem de erro genérica por uma que diz o que faltou.
@@ -33,7 +34,11 @@ function maior(a: string | null | undefined, b: string | null | undefined): stri
  * último contato (tarefas concluídas, agenda enviada, pedido de confirmação),
  * tarefas pendentes e quem deve.
  */
-export async function carregarRelacionamento(supabase: SupabaseClient, hoje: string): Promise<PessoaClassificada[]> {
+export async function carregarRelacionamento(
+  supabase: SupabaseClient,
+  hoje: string,
+  cfg: Preferencias["relacionamento"] = DEFAULT_PREFERENCIAS.relacionamento
+): Promise<PessoaClassificada[]> {
   // Tudo em páginas (o Supabase corta em 1000 linhas) e com ordem fixa. Qualquer
   // erro derruba a carga: sem locações ou contatos todo mundo viraria "Sumida"/"Fria".
   const [clientes, locacoesRows, reservasRows, tarefasRows, enviosRows, confirmacoesRows] = await Promise.all([
@@ -133,5 +138,5 @@ export async function carregarRelacionamento(supabase: SupabaseClient, hoje: str
     tarefasPendentes: pendentes.get(c.id) ?? 0,
   }));
 
-  return classificarTodas(pessoas, hoje);
+  return classificarTodas(pessoas, hoje, cfg);
 }

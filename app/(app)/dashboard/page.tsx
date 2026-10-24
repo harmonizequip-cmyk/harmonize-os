@@ -26,12 +26,7 @@ import { CalendarDays, HandCoins, Wallet } from "lucide-react";
 import { IconeChip } from "@/components/ui/Visual";
 import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
 import { carregarEncaixe } from "@/lib/carregar-encaixe";
-import { LIMITE_DIARIO } from "@/lib/relacionamento";
-
-// Meta mensal de locações: 25 a 30 é a faixa de meta; acima de 30 é a meta
-// máxima. Ficam aqui, juntas, para mudar num lugar só.
-const META_MIN = 25;
-const META_MAX = 30;
+import { filtrarAvisosOcultos } from "@/lib/avisos-dashboard";
 
 function formatWeekdayDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -206,22 +201,22 @@ export default async function DashboardPage(
   // passaram do prazo de cobrança (settings.dias_cobranca_taxa) ficam em
   // destaque. Só aviso, sempre sobre o presente, independente do filtro de
   // período. A baixa é feita em Pendências, no mesmo lugar do aviso.
-  const { diasCobrancaTaxa, despesasFixas: todasFixas } = await fetchSettings(supabase);
+  const { diasCobrancaTaxa, despesasFixas: todasFixas, preferencias } = await fetchSettings(supabase);
   // Contas fixas pessoais ficam no Financeiro pessoal; aqui só as do negócio.
   const despesasFixas = todasFixas.filter((f) => f.tipo === "negocio");
 
   // Quadro "Este mês": sobra (lucro) das locações do mês contra as contas
   // fixas de Configurações. Só locações que contam como faturamento
   // (rentals_contabilizaveis); o lucro de cada uma vem de rentals_lucro.
-  // A média por locação usa os últimos 90 dias, para estimar quantas faltam.
+  // A média por locação usa os últimos dias da base (Configurações, padrão 90), para estimar quantas faltam.
   let metaDoMes = null as ReturnType<typeof calcularMetaDoMes> | null;
   if (despesasFixas.length > 0) {
-    const noventaDiasAtras = somarDias(todayStr, -90);
+    const inicioBaseLucro = somarDias(todayStr, -preferencias.metas.baseLucroDias);
     const [{ data: contabilizaveis }, { count: reservasRestantes }] = await Promise.all([
       supabase
         .from("rentals_contabilizaveis")
         .select("id, event_date")
-        .gte("event_date", noventaDiasAtras < mesInicio ? noventaDiasAtras : mesInicio)
+        .gte("event_date", inicioBaseLucro < mesInicio ? inicioBaseLucro : mesInicio)
         .lte("event_date", mesFim),
       supabase
         .from("calendar_events")
@@ -252,7 +247,7 @@ export default async function DashboardPage(
         sobraDoMes += lucro;
         locacoesDoMes += 1;
       }
-      if (r.event_date >= noventaDiasAtras && r.event_date <= todayStr) {
+      if (r.event_date >= inicioBaseLucro && r.event_date <= todayStr) {
         somaRecentes += lucro;
         qtdRecentes += 1;
       }
@@ -628,10 +623,10 @@ export default async function DashboardPage(
   let paraChamar = 0;
   let encaixes: Awaited<ReturnType<typeof carregarEncaixe>> = [];
   try {
-    const carteira = await carregarRelacionamento(supabase, todayStr);
+    const carteira = await carregarRelacionamento(supabase, todayStr, preferencias.relacionamento);
     paraChamar = carteira.filter((p) => p.devida).length;
     // Encaixe: datas livres coladas a um atendimento, com gente por perto.
-    encaixes = await carregarEncaixe(supabase, todayStr, { pessoas: carteira }).catch(() => []);
+    encaixes = await carregarEncaixe(supabase, todayStr, { pessoas: carteira, encaixe: preferencias.encaixe }).catch(() => []);
   } catch {
     // aviso opcional: sem ele o Dashboard segue
   }
@@ -651,7 +646,7 @@ export default async function DashboardPage(
     avisos.push({
       id: "relacionamento",
       icone: "conversa",
-      texto: `${Math.min(paraChamar, LIMITE_DIARIO)} ${Math.min(paraChamar, LIMITE_DIARIO) === 1 ? "pessoa para chamar hoje" : "pessoas para chamar hoje"}`,
+      texto: `${Math.min(paraChamar, preferencias.relacionamento.limiteDiario)} ${Math.min(paraChamar, preferencias.relacionamento.limiteDiario) === 1 ? "pessoa para chamar hoje" : "pessoas para chamar hoje"}`,
       detalhe: "Clientes e leads na hora de uma conversa, com o WhatsApp pronto",
       href: "/relacionamento",
       nivel: "info",
@@ -684,6 +679,10 @@ export default async function DashboardPage(
       nivel: "info",
     });
 
+  // Avisos escondidos em Configurações (urgente e acesso nunca somem).
+  const avisosMostrados = filtrarAvisosOcultos(avisos, preferencias.dashboard.avisosOcultos);
+  const blocoVisivel = (id: string) => !preferencias.dashboard.blocosOcultos.includes(id);
+
   // Próximos dias na prévia: hoje e os próximos, até 3 dias com atendimento.
   const proximosDias = upcomingGroups.slice(0, 3);
   const rotuloPeriodo = resolverPeriodo(searchParams.period, searchParams.from, searchParams.to).rotulo;
@@ -695,15 +694,16 @@ export default async function DashboardPage(
         rotuloMes={rotuloMesAtual}
         locacoes={locMes}
         preReservas={preMes}
-        metaMin={META_MIN}
-        metaMax={META_MAX}
+        metaMin={preferencias.metas.min}
+        metaMax={preferencias.metas.max}
         meta={metaDoMes}
         faturamento={faturamentoMes}
       />
 
-      <PrecisaDeVoce avisos={avisos} />
+      <PrecisaDeVoce avisos={avisosMostrados} visiveis={preferencias.dashboard.avisosVisiveis} />
 
       {/* Dinheiro agora */}
+      {blocoVisivel("dinheiro") && (
       <div className="grid grid-cols-2 gap-2">
         <Link href="/financeiro" className="cartao p-4 active:bg-neutral-50">
           <IconeChip icone={Wallet} cor="teal" className="mb-2" />
@@ -722,12 +722,13 @@ export default async function DashboardPage(
           </p>
         </Link>
       </div>
+      )}
 
-      <PrevisaoCaixaCard p30={previsao30} p60={previsao60} />
+      {blocoVisivel("previsao") && <PrevisaoCaixaCard p30={previsao30} p60={previsao60} />}
 
-      <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />
+      {blocoVisivel("radar") && <OpportunityRadar freeDays={freeDays} citiesInRoute={citiesInRoute} leads={dormantLeads ?? []} />}
 
-      {proximosDias.length > 0 && (
+      {blocoVisivel("proximos") && proximosDias.length > 0 && (
         <section className="cartao p-4">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Próximos dias</p>
@@ -764,6 +765,7 @@ export default async function DashboardPage(
       )}
 
       {/* Números do período escolhido */}
+      {blocoVisivel("numeros") && (
       <section className="space-y-3 pt-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-bold text-neutral-800">Números do período · {rotuloPeriodo}</p>
@@ -821,6 +823,7 @@ export default async function DashboardPage(
           rotuloPeriodo={rotuloPeriodo}
         />
       </section>
+      )}
     </div>
   );
 }

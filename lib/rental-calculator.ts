@@ -16,6 +16,7 @@ import type {
   MentoriaPricingBreakdown,
 } from "./rental-pricing";
 import { RESERVATION_FEE } from "./rental-pricing";
+import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 
 export const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -84,11 +85,15 @@ function round2(value: number): number {
 // para 100 -> R$ 100; 70 km de ida = 140 km -> arredonda para 150 -> R$ 150).
 // kmIda é só a distância de ida, digitada uma vez (a volta é assumida
 // igual) — ver comentário de rentals.km_ida no schema.
-export function calcularValorDeslocamento(kmIda: number): number {
+// Valor e tamanho do bloco vêm de Configurações (padrão 50 e 50).
+export function calcularValorDeslocamento(
+  kmIda: number,
+  cfg: Preferencias["deslocamento"] = DEFAULT_PREFERENCIAS.deslocamento
+): number {
   if (!kmIda || kmIda <= 0) return 0;
   const idaEVolta = kmIda * 2;
-  const blocosDe50 = Math.round(idaEVolta / 50);
-  return blocosDe50 * 50;
+  const blocos = Math.round(idaEVolta / cfg.kmPorBloco);
+  return Math.round(blocos * cfg.valorPorBloco * 100) / 100;
 }
 
 export interface ResumoLocacaoInput {
@@ -103,6 +108,8 @@ export interface ResumoLocacaoInput {
   mentoriaPricing: MentoriaPricingBreakdown | null;
 
   kmIda: number;
+  // Regra do deslocamento (Configurações). Ausente = padrão 50/50.
+  deslocamentoCfg?: Preferencias["deslocamento"];
   itens: ItemAjuste[];
 
   reservationFeeStatus: ReservationFeeStatus;
@@ -207,7 +214,7 @@ export function calcularResumoLocacao(input: ResumoLocacaoInput): ResumoLocacao 
       : subtotalTabela;
 
   const economiaCustoManual = round2(subtotalTabela - subtotalProduto);
-  const valorDeslocamento = calcularValorDeslocamento(input.kmIda);
+  const valorDeslocamento = calcularValorDeslocamento(input.kmIda, input.deslocamentoCfg);
 
   const totalItensMais = round2(
     input.itens.filter((i) => i.tipo === "mais").reduce((acc, i) => acc + i.valor, 0)

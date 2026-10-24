@@ -7,6 +7,7 @@ import {
   type MentoriaPricingConfig,
 } from "./rental-pricing";
 import { lerDespesasFixas, type DespesaFixa } from "./meta-mes";
+import { DEFAULT_PREFERENCIAS, diferencasDoPadrao, lerPreferencias, type Preferencias } from "./preferencias";
 
 export interface AppSettings {
   pricing: PricingConfig;
@@ -23,6 +24,8 @@ export interface AppSettings {
   tarefaTaxaAtiva: boolean;
   diasCobrancaTaxa: number;
   despesasFixas: DespesaFixa[];
+  /** Preferências de Configurações (metas, relacionamento, encaixe...). Ver lib/preferencias.ts. */
+  preferencias: Preferencias;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -40,6 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tarefaTaxaAtiva: true,
   diasCobrancaTaxa: 3,
   despesasFixas: [],
+  preferencias: DEFAULT_PREFERENCIAS,
 };
 
 /**
@@ -51,13 +55,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
  * nunca quebra uma tela por causa disso.
  */
 export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettings> {
-  const { data, error } = await supabase
-    .from("settings")
-    .select(
-      "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias, recontato_automatico, tarefa_confirmacao_ativa, dias_antes_confirmacao, tarefa_pos_locacao_ativa, dias_pos_locacao, tarefa_taxa_ativa, dias_cobranca_taxa, despesas_fixas"
-    )
-    .eq("id", true)
-    .single();
+  const colunas =
+    "flat_package_limit, flat_package_value, tier2_limit, tier2_rate, tier3_rate, reservation_fee, inactive_days_threshold, mentoria_valor_avista, mentoria_valor_parcelado, dias_ate_reativar, recontato_intervalo_dias, recontato_automatico, tarefa_confirmacao_ativa, dias_antes_confirmacao, tarefa_pos_locacao_ativa, dias_pos_locacao, tarefa_taxa_ativa, dias_cobranca_taxa, despesas_fixas";
+  // A coluna `preferencias` veio depois (2026-10-24). Se ainda não existir no
+  // banco, tenta de novo sem ela: o app segue com os padrões de sempre.
+  let { data, error } = await supabase.from("settings").select(`${colunas}, preferencias`).eq("id", true).single();
+  if (error || !data) {
+    const retry = await supabase.from("settings").select(colunas).eq("id", true).single();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     return DEFAULT_SETTINGS;
@@ -88,5 +95,35 @@ export async function fetchSettings(supabase: SupabaseClient): Promise<AppSettin
     tarefaTaxaAtiva: data.tarefa_taxa_ativa ?? true,
     diasCobrancaTaxa: data.dias_cobranca_taxa ?? 3,
     despesasFixas: lerDespesasFixas(data.despesas_fixas),
+    preferencias: lerPreferencias((data as { preferencias?: unknown }).preferencias),
   };
+}
+
+/** Só as preferências (leitura leve para telas e componentes que não precisam do resto). */
+export async function fetchPreferencias(supabase: SupabaseClient): Promise<Preferencias> {
+  const { data, error } = await supabase.from("settings").select("preferencias").eq("id", true).single();
+  if (error || !data) return DEFAULT_PREFERENCIAS;
+  return lerPreferencias((data as { preferencias?: unknown }).preferencias);
+}
+
+/**
+ * Grava um grupo de preferências (ex.: "metas"), mantendo os outros grupos como
+ * estão no banco. Valida tudo por lerPreferencias antes de gravar.
+ */
+export async function salvarPreferencias(
+  supabase: SupabaseClient,
+  mudanca: Partial<Preferencias>
+): Promise<{ erro: string | null; preferencias: Preferencias }> {
+  const { data, error } = await supabase.from("settings").select("preferencias").eq("id", true).single();
+  if (error || !data) {
+    return { erro: "Não consegui ler as configurações atuais. Confira a internet e tente de novo.", preferencias: DEFAULT_PREFERENCIAS };
+  }
+  const atual = lerPreferencias((data as { preferencias?: unknown }).preferencias);
+  const novas = lerPreferencias({ ...atual, ...mudanca });
+  const { error: erroGravar } = await supabase
+    .from("settings")
+    .update({ preferencias: diferencasDoPadrao(novas) })
+    .eq("id", true);
+  if (erroGravar) return { erro: erroGravar.message || "Não consegui salvar.", preferencias: atual };
+  return { erro: null, preferencias: novas };
 }

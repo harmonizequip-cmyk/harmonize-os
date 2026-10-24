@@ -2,7 +2,7 @@
 
 // Bloco "Precisa de você" do Dashboard: todos os avisos num cartão só, os
 // urgentes primeiro, em linhas curtas. Cada linha leva à lista do que avisa
-// (regra do CLAUDE.md). Mostra os 4 primeiros; o resto abre em "ver mais".
+// (regra do CLAUDE.md). Mostra os primeiros (4 por padrão); o resto abre em "ver mais".
 
 import Link from "next/link";
 import { useState } from "react";
@@ -73,16 +73,19 @@ export default function PrecisaDeVoce({
   titulo = "Precisa de você",
   vazioTitulo = "Nada pendente agora",
   vazioTexto = "Sem cobrança atrasada, confirmação ou tarefa vencida.",
+  visiveis: quantosInicio = 4,
 }: {
   avisos: AvisoDash[];
   titulo?: string;
   vazioTitulo?: string;
   vazioTexto?: string;
+  /** Quantos avisos aparecem antes do "Ver mais" (padrão 4). */
+  visiveis?: number;
 }) {
   const [aberto, setAberto] = useState(false);
   const lista = [...avisos].sort((a, b) => ORDEM[a.nivel] - ORDEM[b.nivel]);
   const urgentes = lista.filter((a) => a.nivel === "urgente").length;
-  const visiveis = aberto ? lista : lista.slice(0, 4);
+  const mostrados = aberto ? lista : lista.slice(0, quantosInicio);
 
   if (lista.length === 0) {
     return (
@@ -109,7 +112,7 @@ export default function PrecisaDeVoce({
         )}
       </div>
       <ul className="divide-y divide-slate-100">
-        {visiveis.map((a) => (
+        {mostrados.map((a) => (
           <li key={a.id}>
             <Link href={a.href} className="flex items-center gap-3 px-2 py-3 active:bg-neutral-50">
               <span className="relative flex-shrink-0">
@@ -125,13 +128,13 @@ export default function PrecisaDeVoce({
           </li>
         ))}
       </ul>
-      {lista.length > 4 && (
+      {lista.length > quantosInicio && (
         <button
           type="button"
           onClick={() => setAberto((v) => !v)}
           className="flex w-full items-center justify-center gap-1 rounded-2xl py-2 text-xs font-semibold text-neutral-500"
         >
-          {aberto ? "Mostrar menos" : `Ver mais ${lista.length - 4}`}
+          {aberto ? "Mostrar menos" : `Ver mais ${lista.length - quantosInicio}`}
           <ChevronDown size={14} className={aberto ? "rotate-180" : ""} />
         </button>
       )}
