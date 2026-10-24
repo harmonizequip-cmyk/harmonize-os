@@ -16,6 +16,7 @@ import { buildWhatsAppLink, toUpperOrNull } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
 import { Check, ClipboardList, Copy, MessageCircle } from "lucide-react";
 import { confirmar } from "@/components/Dialogos";
+import LiberarAcademy from "@/components/LiberarAcademy";
 
 interface ClienteAcesso {
   id: string;
@@ -288,6 +289,7 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
               <button onClick={liberarDoFormulario} disabled={ocupado} className="mt-2 w-full rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {ocupado ? "Liberando..." : "Liberar acesso"}
               </button>
+              <LiberarAcademy nome={cliente.name} email={convite!.email_login} className="mt-2" />
             </div>
           ) : (
             <>
@@ -442,6 +444,7 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
               <Copy size={13} /> {copiado ? "Copiado" : "Copiar"}
             </button>
           </div>
+          <LiberarAcademy nome={cliente.name} email={pronto.email} />
         </div>
       )}
 

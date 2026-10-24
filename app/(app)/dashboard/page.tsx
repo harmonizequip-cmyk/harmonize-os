@@ -679,7 +679,7 @@ export default async function DashboardPage(
       id: `acesso-${c.clientId}`,
       icone: "acesso",
       texto: `${c.nome} quer acesso ao Planejador`,
-      detalhe: "Preencheu o cadastro: toque para liberar",
+      detalhe: "Preencheu o cadastro: liberar no Planejador e na Academy",
       href: `/clientes/${c.clientId}`,
       nivel: "info",
     });

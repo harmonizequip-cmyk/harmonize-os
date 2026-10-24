@@ -5,12 +5,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { Atalho, Atalhos } from "@/components/Atalhos";
+import LiberarAcademy from "@/components/LiberarAcademy";
 import { linkCliente } from "@/lib/atalhos";
 import {
   acharParecidos,
   digitos,
   dividirCidadeEstado,
-  linkAcademyPreenchido,
   notaDoCadastro,
   tratamentoSugerido,
   type CadastroRecebido,
@@ -34,26 +34,6 @@ const ROTULOS: Record<Campo, string> = {
   city: "Cidade",
   state: "UF",
 };
-
-function CopiarBotao({ rotulo, texto }: { rotulo: string; texto: string }) {
-  const [ok, setOk] = useState(false);
-  return (
-    <button
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(texto);
-          setOk(true);
-          setTimeout(() => setOk(false), 2000);
-        } catch {
-          // sem permissão de copiar
-        }
-      }}
-      className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700"
-    >
-      {ok ? "Copiado ✓" : rotulo}
-    </button>
-  );
-}
 
 type Feito = { clientId: string; nome: string; treatment: string | null; whatsapp: string | null; novo: boolean };
 
@@ -189,16 +169,7 @@ function Cartao({
           ✓ {feito.novo ? "Lead criado" : "Cadastro atualizado"}: {feito.nome}
         </p>
         {/* O link da Academy é só do dono: ele mesmo cadastra a cliente, nunca vai para ela. */}
-        <div className="mt-3 rounded-xl border border-emerald-200 bg-white p-3">
-          <p className="mb-2 text-xs font-medium text-neutral-600">Liberar na Contourline Academy</p>
-          <div className="flex flex-wrap gap-2">
-            {cad.nome && <CopiarBotao rotulo="Copiar nome" texto={cad.nome} />}
-            {cad.email && <CopiarBotao rotulo="Copiar e-mail" texto={cad.email} />}
-            <a href={linkAcademyPreenchido(cad.nome, cad.email)} target="_blank" rel="noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
-              Abrir cadastro da Academy
-            </a>
-          </div>
-        </div>
+        <LiberarAcademy nome={cad.nome} email={cad.email} className="mt-3" />
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/clientes/${feito.clientId}`} className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700">
             Abrir ficha
