@@ -5,11 +5,10 @@ import { formatCurrency } from "@/lib/format";
 import type { PricingCliff } from "@/lib/pricing-opportunity";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
-import { ORIGENS } from "@/app/(app)/funil/NovoLeadModal";
+import { origensParaTela, rotuloDaOrigem } from "@/app/(app)/funil/NovoLeadModal";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import CompletarOrigem from "./CompletarOrigem";
 import { LinkCliente } from "@/components/Atalhos";
-
-const rotuloOrigem = (v: string) => ORIGENS.find((o) => o.value === v)?.label ?? v;
 
 interface TopClient {
   id?: string | null;
@@ -151,6 +150,8 @@ export default function RelatoriosClient({
   lucroTotal: number;
   despesasTotal: number;
 }) {
+  const origensConfiguradas = origensParaTela(usePreferencias().listas.origens);
+  const rotuloOrigem = (v: string) => rotuloDaOrigem(origensConfiguradas, v);
   // Origem "vencedora": só entra na conclusão se tiver pelo menos 3 leads
   // (senão um único lead convertido vira "100% de conversão", que é
   // estatisticamente vazio e só atrapalharia a leitura).

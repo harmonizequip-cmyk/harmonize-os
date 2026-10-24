@@ -10,6 +10,12 @@ import { useEffect, useState } from "react";
 import {
   BadgeDollarSign,
   BellRing,
+  CalendarClock,
+  ClipboardList,
+  HeartHandshake,
+  LayoutDashboard,
+  ListChecks,
+  Target,
   ChevronLeft,
   ChevronRight,
   DatabaseBackup,
@@ -35,6 +41,14 @@ import AcessoVisualizacaoCard from "@/components/AcessoVisualizacaoCard";
 import ContasFixasCard from "@/components/ContasFixasCard";
 import Precos from "./secoes/Precos";
 import Automacoes from "./secoes/Automacoes";
+import PrefsMetas from "./secoes/PrefsMetas";
+import PrefsDeslocamento from "./secoes/PrefsDeslocamento";
+import PrefsRecibo from "./secoes/PrefsRecibo";
+import PrefsRelacionamento from "./secoes/PrefsRelacionamento";
+import PrefsAgenda from "./secoes/PrefsAgenda";
+import PrefsListas from "./secoes/PrefsListas";
+import PrefsDashboard from "./secoes/PrefsDashboard";
+import PrefsPlanejador from "./secoes/PrefsPlanejador";
 import Tags, { type TagRow } from "./secoes/Tags";
 import MinhaConta from "./secoes/MinhaConta";
 import Aparencia from "./secoes/Aparencia";
@@ -213,8 +227,24 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           </Link>
           <h1 className="mt-1 text-xl font-semibold text-neutral-900">{TITULOS[secao]}</h1>
         </div>
-        {secao === "precos" && <Precos settings={settings} />}
-        {secao === "automacoes" && <Automacoes settings={settings} />}
+        {secao === "precos" && (
+          <>
+            <Precos settings={settings} />
+            <PrefsDeslocamento preferencias={settings.preferencias} />
+          </>
+        )}
+        {secao === "metas" && <PrefsMetas preferencias={settings.preferencias} />}
+        {secao === "automacoes" && (
+          <>
+            <Automacoes settings={settings} />
+            <PrefsRecibo preferencias={settings.preferencias} />
+          </>
+        )}
+        {secao === "relacionamento" && <PrefsRelacionamento preferencias={settings.preferencias} />}
+        {secao === "agenda" && <PrefsAgenda preferencias={settings.preferencias} />}
+        {secao === "listas" && <PrefsListas preferencias={settings.preferencias} />}
+        {secao === "dashboard" && <PrefsDashboard preferencias={settings.preferencias} />}
+        {secao === "planejador" && <PrefsPlanejador preferencias={settings.preferencias} />}
         {secao === "tags" && <Tags iniciais={tags} />}
         {secao === "contas" && <ContasFixasCard inicial={settings.despesasFixas} />}
         {secao === "avisos" && <AvisosCelularCard />}
@@ -247,6 +277,13 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           cor: "bg-emerald-50 text-emerald-600",
         },
         {
+          id: "metas",
+          titulo: "Metas",
+          resumo: `${settings.preferencias.metas.min} a ${settings.preferencias.metas.max} locações`,
+          icone: Target,
+          cor: "bg-rose-50 text-rose-600",
+        },
+        {
           id: "contas",
           titulo: "Contas fixas",
           resumo: totalFixas > 0 ? `${formatCurrency(totalFixas)}/mês` : "Nenhuma ainda",
@@ -260,6 +297,51 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           resumo: `${automacoesLigadas} de 4 ligadas`,
           icone: Zap,
           cor: "bg-violet-50 text-violet-600",
+        },
+      ],
+    },
+    {
+      titulo: "Clientes e agenda",
+      blocos: [
+        {
+          id: "relacionamento",
+          titulo: "Relacionamento",
+          resumo: `${settings.preferencias.relacionamento.limiteDiario} chamadas por dia`,
+          icone: HeartHandshake,
+          cor: "bg-pink-50 text-pink-600",
+        },
+        {
+          id: "agenda",
+          titulo: "Agenda e encaixe",
+          resumo: `Raio de ${settings.preferencias.encaixe.raioKm} km`,
+          icone: CalendarClock,
+          cor: "bg-sky-50 text-sky-600",
+        },
+        {
+          id: "listas",
+          titulo: "Listas",
+          resumo: `${settings.preferencias.listas.origens.length} origens de lead`,
+          icone: ListChecks,
+          cor: "bg-teal-50 text-teal-600",
+        },
+      ],
+    },
+    {
+      titulo: "Telas",
+      blocos: [
+        {
+          id: "dashboard",
+          titulo: "Dashboard",
+          resumo: `${settings.preferencias.dashboard.avisosVisiveis} avisos de início`,
+          icone: LayoutDashboard,
+          cor: "bg-indigo-50 text-indigo-600",
+        },
+        {
+          id: "planejador",
+          titulo: "Planejador",
+          resumo: `Retornos em ${settings.preferencias.planejador.retornoDias} dias`,
+          icone: ClipboardList,
+          cor: "bg-emerald-50 text-emerald-600",
         },
       ],
     },

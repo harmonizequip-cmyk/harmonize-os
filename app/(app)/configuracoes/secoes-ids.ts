@@ -2,9 +2,15 @@
 // navegador porque a página (servidor) também precisa conferir o id.
 export const TITULOS_SECAO = {
   precos: "Preços",
+  metas: "Metas do mês",
   contas: "Contas fixas",
   tags: "Tags",
   automacoes: "Automações",
+  relacionamento: "Relacionamento",
+  agenda: "Agenda e encaixe",
+  listas: "Listas",
+  dashboard: "Dashboard",
+  planejador: "Planejador",
   avisos: "Avisos no celular",
   digital: "Entrar com a digital",
   aparencia: "Aparência",
