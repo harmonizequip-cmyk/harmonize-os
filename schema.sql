@@ -10335,15 +10335,16 @@ create table if not exists public.cliente_anotacoes (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.clients(id) on delete cascade,
   texto text not null check (length(trim(texto)) between 1 and 2000),
-  origem text not null default 'digitada' check (origem in ('digitada', 'voz', 'assistente')),
+  origem text not null default 'digitada' check (origem in ('digitada', 'voz', 'assistente', 'campanha')),
   created_by uuid default auth.uid() references public.profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
 create index if not exists cliente_anotacoes_cliente_idx
   on public.cliente_anotacoes (client_id, created_at desc);
 
+-- A origem 'campanha' veio na migration 2026-10-26-campanha-registra-anotacao.sql.
 comment on table public.cliente_anotacoes is
-  'Anotações da cliente com data e hora. Escrita só por salvar_anotacao_cliente e excluir_anotacao_cliente.';
+  'Anotações da cliente com data e hora. Escrita só por salvar_anotacao_cliente e excluir_anotacao_cliente; as de origem campanha nascem de registrar_envio_campanha e desfazer_envio_campanha.';
 
 alter table public.cliente_anotacoes enable row level security;
 drop policy if exists "cliente_anotacoes_select" on public.cliente_anotacoes;
@@ -11449,9 +11450,11 @@ begin
 end;
 $$;
 
+-- (versão da migration 2026-10-26-campanha-registra-anotacao.sql: grava anotação na cliente)
 -- Cria ou atualiza o envio de uma cliente numa campanha. 'enviado' grava a
 -- hora do envio (a primeira) e o texto exato; os outros status mantêm a hora.
 -- Campanha arquivada não recebe envio novo (só muda o que já existe).
+-- Cada mudança de status (menos 'pulado') vira anotação da cliente.
 create or replace function public.registrar_envio_campanha(
   p_campanha uuid,
   p_client uuid,
@@ -11471,6 +11474,9 @@ declare
   v_antes campanha_envios%rowtype;
   v_id uuid;
   v_rotulo text;
+  v_enviado_em timestamptz;
+  v_texto_enviado text;
+  v_anotacao text;
 begin
   if not has_module_permission('clientes') then
     raise exception 'Sem permissão para registrar envios de campanha.';
@@ -11508,27 +11514,48 @@ begin
     insert into campanha_envios (campanha_id, client_id, status, mensagem, enviado_em, atualizado_em)
     values (p_campanha, p_client, v_status, v_msg,
             case when v_status = 'enviado' then now() end, now())
-    returning id into v_id;
+    returning id, enviado_em, mensagem into v_id, v_enviado_em, v_texto_enviado;
     perform registrar_movimentacao('criado', 'envio_campanha', v_id,
       'Campanha "' || v_c.nome || '" ' || v_rotulo || v_cliente,
       jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'status', v_status));
-    return v_id;
+  else
+    update campanha_envios
+       set status = v_status,
+           mensagem = coalesce(v_msg, mensagem),
+           enviado_em = case when v_status = 'enviado' then coalesce(enviado_em, now()) else enviado_em end,
+           atualizado_em = now()
+     where id = v_antes.id
+    returning id, enviado_em, mensagem into v_id, v_enviado_em, v_texto_enviado;
+    perform registrar_movimentacao('editado', 'envio_campanha', v_antes.id,
+      'Campanha "' || v_c.nome || '" ' || v_rotulo || v_cliente,
+      jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'antes', v_antes.status, 'depois', v_status));
   end if;
 
-  update campanha_envios
-     set status = v_status,
-         mensagem = coalesce(v_msg, mensagem),
-         enviado_em = case when v_status = 'enviado' then coalesce(enviado_em, now()) else enviado_em end,
-         atualizado_em = now()
-   where id = v_antes.id;
-  perform registrar_movimentacao('editado', 'envio_campanha', v_antes.id,
-    'Campanha "' || v_c.nome || '" ' || v_rotulo || v_cliente,
-    jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'antes', v_antes.status, 'depois', v_status));
-  return v_antes.id;
+  -- Anotação na cliente: só quando o status muda (v_antes.status é nulo se o
+  -- envio é novo) e nunca para 'pulado'.
+  if v_status <> 'pulado' and v_status is distinct from v_antes.status then
+    v_anotacao := 'Campanha «' || v_c.nome || '»: ' || case v_status
+      when 'enviado' then
+        'mensagem enviada em '
+        || to_char(v_enviado_em at time zone 'America/Sao_Paulo', 'DD/MM/YYYY')
+        || ' às ' || to_char(v_enviado_em at time zone 'America/Sao_Paulo', 'HH24:MI')
+        || ' (horário de Brasília). Texto enviado: ' || coalesce(v_texto_enviado, '')
+      when 'respondeu' then 'respondeu.'
+      when 'agendou' then 'agendou.'
+      else 'pediu para não receber campanhas.' end;
+    if length(v_anotacao) > 2000 then
+      v_anotacao := left(v_anotacao, 1999) || '…';
+    end if;
+    insert into cliente_anotacoes (client_id, texto, origem, created_by)
+    values (p_client, v_anotacao, 'campanha', auth.uid());
+  end if;
+
+  return v_id;
 end;
 $$;
 
 -- Desfaz o envio (apaga a linha): a cliente volta para a fila da campanha.
+-- Se houve contato, a anotação "envio desfeito" fica no histórico da cliente.
 create or replace function public.desfazer_envio_campanha(p_campanha uuid, p_client uuid)
 returns void
 language plpgsql
@@ -11554,6 +11581,11 @@ begin
     'Envio desfeito: campanha "' || coalesce(v_nome_campanha, '') || '" para ' || coalesce(v_cliente, 'cliente'),
     jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'status', v_e.status,
                        'mensagem', v_e.mensagem, 'enviado_em', v_e.enviado_em));
+  if v_e.status <> 'pulado' or v_e.enviado_em is not null then
+    insert into cliente_anotacoes (client_id, texto, origem, created_by)
+    values (p_client, 'Campanha «' || coalesce(v_nome_campanha, '') || '»: envio desfeito (voltou para a fila).',
+            'campanha', auth.uid());
+  end if;
 end;
 $$;
 
