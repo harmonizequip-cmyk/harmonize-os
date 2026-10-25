@@ -66,13 +66,14 @@ export default function BackupCard() {
     }
     const texto = await resposta.text();
     const base = `backup-harmonize-${hojeLocal()}`;
-    // O Compartilhar do Android costuma recusar .json; .txt passa e o
-    // conteúdo é o mesmo (o script de restauração lê qualquer um dos dois).
+    // O conteúdo é o mesmo nos dois formatos (o script de restauração lê qualquer um).
     const json = new File([texto], `${base}.json`, { type: "application/json" });
     const txt = new File([texto], `${base}.txt`, { type: "text/plain" });
     const aceita = (f: File) => typeof navigator !== "undefined" && "canShare" in navigator && navigator.canShare({ files: [f] });
-    if (aceita(json)) return { principal: json, reserva: aceita(txt) ? txt : null };
-    return { principal: txt, reserva: null };
+    // O .txt é o que o Compartilhar do Android aceita (o .json deu NotAllowedError no celular do dono,
+    // 25/10/2026), então vai primeiro; o .json fica de reserva para aparelhos que preferirem.
+    if (aceita(txt)) return { principal: txt, reserva: aceita(json) ? json : null };
+    return { principal: json, reserva: null };
   }
 
   async function prepararParaDrive() {
