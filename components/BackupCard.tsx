@@ -23,6 +23,8 @@ export default function BackupCard() {
   const [baixando, setBaixando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [pronto, setPronto] = useState<File | null>(null);
+  // Mesmo conteúdo em outro tipo de arquivo, para tentar de novo se o Compartilhar recusar o primeiro.
+  const [reserva, setReserva] = useState<File | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const cartao = useRef<HTMLDivElement>(null);
 
@@ -55,7 +57,7 @@ export default function BackupCard() {
     setUltimo(agora);
   }
 
-  async function gerarArquivo(): Promise<File> {
+  async function gerarArquivos(): Promise<{ principal: File; reserva: File | null }> {
     const resposta = await fetch("/api/backup", { cache: "no-store" });
     if (!resposta.ok) {
       const corpo = await resposta.json().catch(() => null);
@@ -66,15 +68,19 @@ export default function BackupCard() {
     // O Compartilhar do Android costuma recusar .json; .txt passa e o
     // conteúdo é o mesmo (o script de restauração lê qualquer um dos dois).
     const json = new File([texto], `${base}.json`, { type: "application/json" });
-    if (typeof navigator !== "undefined" && "canShare" in navigator && navigator.canShare({ files: [json] })) return json;
-    return new File([texto], `${base}.txt`, { type: "text/plain" });
+    const txt = new File([texto], `${base}.txt`, { type: "text/plain" });
+    const aceita = (f: File) => typeof navigator !== "undefined" && "canShare" in navigator && navigator.canShare({ files: [f] });
+    if (aceita(json)) return { principal: json, reserva: aceita(txt) ? txt : null };
+    return { principal: txt, reserva: null };
   }
 
   async function prepararParaDrive() {
     setBaixando(true);
     setErro(null);
     try {
-      setPronto(await gerarArquivo());
+      const { principal, reserva: outro } = await gerarArquivos();
+      setPronto(principal);
+      setReserva(outro);
       setAviso("Arquivo pronto. Toque em Salvar no Google Drive.");
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não consegui gerar o backup.");
@@ -90,14 +96,26 @@ export default function BackupCard() {
       setErro("Este aparelho não abre o Compartilhar com arquivo. Use Baixar backup agora.");
       return;
     }
-    try {
-      await navigator.share({ files: [pronto], title: pronto.name });
-      marcarFeito();
-      setPronto(null);
-      setAviso("Feito. Confira no Drive se o arquivo chegou.");
-    } catch (e) {
-      if ((e as Error)?.name !== "AbortError") setErro("O Compartilhar não abriu. Toque de novo.");
+    // Tenta o arquivo principal e, se o Compartilhar recusar, o mesmo conteúdo como .txt.
+    const tentativas = [pronto, ...(reserva ? [reserva] : [])];
+    let ultimoErro: unknown = null;
+    for (const arquivo of tentativas) {
+      try {
+        await navigator.share({ files: [arquivo], title: arquivo.name });
+        marcarFeito();
+        setPronto(null);
+        setReserva(null);
+        setAviso("Feito. Confira no Drive se o arquivo chegou.");
+        return;
+      } catch (e) {
+        if ((e as Error)?.name === "AbortError") return;
+        ultimoErro = e;
+      }
     }
+    const motivo = ultimoErro instanceof Error ? ultimoErro.name || ultimoErro.message : "erro desconhecido";
+    setErro(
+      `O Compartilhar não abriu (${motivo}). Toque de novo ou use Baixar backup agora e envie o arquivo pelo app do Drive (+ > Fazer upload).`
+    );
   }
 
   const diasDesde = ultimo ? Math.floor((Date.now() - new Date(ultimo).getTime()) / 86400000) : null;
