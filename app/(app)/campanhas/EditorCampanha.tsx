@@ -371,6 +371,12 @@ export default function EditorCampanha({
             rotulo="Tirar quem já tem reserva marcada"
             dica="Atendimento de hoje em diante"
           />
+          <Chave
+            ligada={filtros.soNuncaAlugou}
+            onChange={(v) => setFiltros((f) => ({ ...f, soNuncaAlugou: v }))}
+            rotulo="Só quem nunca alugou"
+            dica="Para campanhas de primeira locação"
+          />
         </div>
 
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-teal-50 px-3 py-2.5 text-teal-800">

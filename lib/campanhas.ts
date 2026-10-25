@@ -41,6 +41,8 @@ export interface FiltrosCampanha {
   soHoraDeChamar: boolean;
   /** Tira quem tem atendimento marcado de hoje em diante. */
   excluirComReserva: boolean;
+  /** Só quem nunca teve locação (ultimaLocacao nula): campanha de primeira locação. */
+  soNuncaAlugou: boolean;
   /** Tirados à mão da lista (caixinha desmarcada). */
   excluidos: string[];
 }
@@ -50,6 +52,7 @@ export const FILTROS_PADRAO: FiltrosCampanha = {
   classes: [],
   soHoraDeChamar: false,
   excluirComReserva: true,
+  soNuncaAlugou: false,
   excluidos: [],
 };
 
@@ -77,6 +80,7 @@ export function lerFiltros(bruto: unknown): FiltrosCampanha {
     classes,
     soHoraDeChamar: typeof r.soHoraDeChamar === "boolean" ? r.soHoraDeChamar : FILTROS_PADRAO.soHoraDeChamar,
     excluirComReserva: typeof r.excluirComReserva === "boolean" ? r.excluirComReserva : FILTROS_PADRAO.excluirComReserva,
+    soNuncaAlugou: typeof r.soNuncaAlugou === "boolean" ? r.soNuncaAlugou : FILTROS_PADRAO.soNuncaAlugou,
     excluidos,
   };
 }
@@ -124,6 +128,7 @@ export function candidatosDaCampanha(
       if (!classes.has(p.classe)) return false;
       if (filtros.soHoraDeChamar && !p.devida) return false;
       if (filtros.excluirComReserva && p.proximaReserva) return false;
+      if (filtros.soNuncaAlugou && p.ultimaLocacao !== null) return false;
       return true;
     })
     .sort((a, b) => b.prioridade - a.prioridade || a.nome.localeCompare(b.nome, "pt-BR"));

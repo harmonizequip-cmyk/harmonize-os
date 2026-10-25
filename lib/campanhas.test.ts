@@ -102,6 +102,21 @@ describe("público", () => {
     expect(candidatosDaCampanha(pessoas, f({ excluirComReserva: false }), vazio).map((p) => p.id)).toContain("e");
   });
 
+  it("só quem nunca alugou: ligado filtra, desligado e filtros antigos não mudam nada", () => {
+    const com = [
+      pessoa("n1", { ultimaLocacao: null, prioridade: 5 }),
+      pessoa("n2", { ultimaLocacao: "2026-09-01", prioridade: 4 }),
+      pessoa("n3", { ultimaLocacao: null, classe: "fria", ehCliente: false, stage: "lead", prioridade: 3 }),
+    ];
+    expect(candidatosDaCampanha(com, f({ soNuncaAlugou: true }), vazio).map((p) => p.id)).toEqual(["n1", "n3"]);
+    expect(candidatosDaCampanha(com, f({ soNuncaAlugou: false }), vazio).map((p) => p.id)).toEqual(["n1", "n2", "n3"]);
+    const antigo = lerFiltros({ tipo: "ambos", classes: [], excluirComReserva: true });
+    expect(antigo.soNuncaAlugou).toBe(false);
+    expect(candidatosDaCampanha(com, antigo, vazio).map((p) => p.id)).toEqual(["n1", "n2", "n3"]);
+    expect(lerFiltros({ soNuncaAlugou: "sim" }).soNuncaAlugou).toBe(false);
+    expect(lerFiltros({ soNuncaAlugou: true }).soNuncaAlugou).toBe(true);
+  });
+
   it("caixinha desmarcada tira da fila e volta ao marcar", () => {
     const cand = candidatosDaCampanha(pessoas, f(), vazio);
     let filtros = alternarExcluido(f(), "b");
