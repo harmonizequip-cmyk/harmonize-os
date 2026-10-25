@@ -1,13 +1,15 @@
 "use client";
 
 // Fila de envio da campanha: uma pessoa por vez, com a mensagem já no nome
-// dela (editável só para ela), a arte e os botões. Nada sai sozinho: o
-// Compartilhar abre a lista do celular e o dono escolhe o WhatsApp e a
-// conversa. O limite diário protege o número de ser marcado como spam.
+// dela (editável só para ela), a arte e os botões. Nada sai sozinho: "Abrir
+// conversa" cai direto na conversa da pessoa com a mensagem digitada; a arte
+// o dono anexa pelo clipe (o WhatsApp não aceita imagem por link). O
+// Compartilhar da arte só serve a quem já está nos contatos. O limite diário
+// protege o número de ser marcado como spam.
 // Modelo: app/(app)/assistente/CartaoAgenda.tsx e tarefas/ModoFila.tsx.
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, CircleSlash, MessageCircle, Send, ShieldAlert, SkipForward } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleSlash, Download, MessageCircle, Send, ShieldAlert, SkipForward } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/format";
 import { avisar, confirmar } from "@/components/Dialogos";
@@ -53,6 +55,7 @@ export default function FilaCampanha({
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [arteErro, setArteErro] = useState(false);
   const [montado, setMontado] = useState(false);
+  const [arteSalva, setArteSalva] = useState(false);
   const compartilhando = useRef(false);
 
   const p = fila[pos];
@@ -87,13 +90,13 @@ export default function FilaCampanha({
     setAviso(null);
     if (!p || compartilhando.current) return;
     if (!arquivo) {
-      setAviso(arteErro ? "Não consegui carregar a arte. Use Só texto." : "A arte ainda está carregando. Espere um instante e toque de novo.");
+      setAviso(arteErro ? "Não consegui carregar a arte. Use Abrir conversa." : "A arte ainda está carregando. Espere um instante e toque de novo.");
       return;
     }
     const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
     const dados: ShareData = { files: [arquivo], text: texto };
     if (typeof nav.share !== "function" || !nav.canShare?.(dados)) {
-      setAviso("Este aparelho não compartilha imagem por aqui. Use Só texto.");
+      setAviso("Este aparelho não compartilha imagem por aqui. Use Abrir conversa.");
       return;
     }
     // Copia o texto (o WhatsApp às vezes não leva o texto junto da imagem), sem esperar.
@@ -108,7 +111,7 @@ export default function FilaCampanha({
       promessa = nav.share(dados);
     } catch {
       compartilhando.current = false;
-      setAviso("Não consegui abrir o Compartilhar. Use Só texto.");
+      setAviso("Não consegui abrir o Compartilhar. Use Abrir conversa.");
       return;
     }
     promessa
@@ -117,11 +120,37 @@ export default function FilaCampanha({
         setAviso(`Escolha o WhatsApp e a conversa de ${nomeDaPessoa(p)}. A mensagem também foi copiada, caso não vá junto. Depois toque em Marcar enviado.`);
       })
       .catch((e: unknown) => {
-        if ((e as Error)?.name !== "AbortError") setAviso("Não consegui abrir o Compartilhar. Use Só texto.");
+        if ((e as Error)?.name !== "AbortError") setAviso("Não consegui abrir o Compartilhar. Use Abrir conversa.");
       })
       .finally(() => {
         compartilhando.current = false;
       });
+  }
+
+  function abrirConversa() {
+    setMandou(true);
+    setAviso(
+      arteUrl
+        ? "A conversa abriu com a mensagem. Toque no clipe (anexar), escolha a arte (ela fica em Downloads ou nos recentes) e envie. Depois toque em Marcar enviado."
+        : null
+    );
+  }
+
+  function salvarArte() {
+    if (!arquivo) {
+      setAviso(arteErro ? "Não consegui carregar a arte." : "A arte ainda está carregando. Espere um instante e toque de novo.");
+      return;
+    }
+    const url = URL.createObjectURL(arquivo);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = arquivo.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setArteSalva(true);
+    setAviso(null);
   }
 
   async function marcar(status: StatusEnvio) {
@@ -219,6 +248,22 @@ export default function FilaCampanha({
   return (
     <div className="space-y-3">
       {contador}
+      {arteUrl && (
+        <section className="rounded-2xl border border-neutral-200 bg-white/60 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[13px] font-semibold text-neutral-700">1. Salve a arte no celular (uma vez)</p>
+            <button
+              type="button"
+              onClick={salvarArte}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[12.5px] font-semibold text-neutral-700"
+            >
+              {arteSalva ? <Check size={14} className="text-emerald-600" /> : <Download size={14} />}
+              {arteSalva ? "Arte salva" : "Salvar arte no celular"}
+            </button>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-snug text-neutral-500">Depois, para cada pessoa, toque em Abrir conversa e anexe essa arte no WhatsApp.</p>
+        </section>
+      )}
       <section className="cartao p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -262,26 +307,34 @@ export default function FilaCampanha({
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {arteUrl ? (
-            <button type="button" onClick={enviarComArte} disabled={ocupado} className={`${botao} bg-emerald-600 text-white`}>
-              <Send size={15} /> Enviar com arte
-            </button>
-          ) : null}
+        <div className="mt-3 space-y-2">
           {link ? (
             <a
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => setMandou(true)}
-              className={`${botao} ${arteUrl ? "border border-neutral-300 bg-white text-neutral-700" : "col-span-2 bg-emerald-600 text-white"}`}
+              onClick={abrirConversa}
+              className={`${botao} w-full bg-emerald-600 text-white shadow-sm`}
             >
-              <MessageCircle size={15} /> Só texto
+              <MessageCircle size={16} /> Abrir conversa
             </a>
           ) : (
-            <span className={`${botao} ${arteUrl ? "" : "col-span-2"} border border-neutral-200 text-neutral-400`}>
-              <MessageCircle size={15} /> Só texto
+            <span className={`${botao} w-full border border-neutral-200 text-neutral-400`}>
+              <MessageCircle size={16} /> Abrir conversa
             </span>
+          )}
+          {arteUrl && (
+            <div>
+              <button
+                type="button"
+                onClick={enviarComArte}
+                disabled={ocupado}
+                className={`${botao} w-full border border-neutral-300 bg-white text-neutral-700`}
+              >
+                <Send size={15} /> Compartilhar arte
+              </button>
+              <p className="mt-1 text-center text-[11px] text-neutral-400">Só funciona para quem já está nos seus contatos.</p>
+            </div>
           )}
         </div>
         {aviso && <p className="mt-2 text-[12px] leading-snug text-neutral-600">{aviso}</p>}
