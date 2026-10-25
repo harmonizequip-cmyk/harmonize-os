@@ -6,14 +6,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Mic, StickyNote } from "lucide-react";
+import { Megaphone, Mic, StickyNote } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { origemDaAnotacao } from "@/lib/anotacoes";
 import AnotacoesCliente from "@/components/AnotacoesCliente";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 
 interface Linha {
   id: string;
   texto: string;
+  origem: string | null;
   created_at: string;
 }
 
@@ -27,7 +29,7 @@ export default function AnotacoesFicha({ clienteId, nome }: { clienteId: string;
   const carregar = useCallback(async () => {
     const { data, error, count } = await createClient()
       .from("cliente_anotacoes")
-      .select("id, texto, created_at", { count: "exact" })
+      .select("id, texto, origem, created_at", { count: "exact" })
       .eq("client_id", clienteId)
       .order("created_at", { ascending: false })
       .limit(3);
@@ -66,8 +68,13 @@ export default function AnotacoesFicha({ clienteId, nome }: { clienteId: string;
         <ul className="mt-3 space-y-2">
           {linhas.map((l) => (
             <li key={l.id} className="rounded-xl bg-neutral-50 px-3 py-2">
-              <p className="text-[11px] font-semibold text-neutral-500">
+              <p className="flex items-center gap-1 text-[11px] font-semibold text-neutral-500">
                 {format(new Date(l.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                {origemDaAnotacao(l.origem) === "campanha" && (
+                  <span className="inline-flex items-center gap-1 font-normal text-neutral-400">
+                    · <Megaphone size={11} className="flex-shrink-0" /> Campanha
+                  </span>
+                )}
               </p>
               <p className="line-clamp-2 text-sm text-neutral-800">{l.texto}</p>
             </li>

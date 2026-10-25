@@ -9,8 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bot, Keyboard, Loader2, Mic, Send, Square, StickyNote, Trash2, X } from "lucide-react";
+import { Bot, Keyboard, Loader2, Megaphone, Mic, Send, Square, StickyNote, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ROTULO_ORIGEM_ANOTACAO, origemDaAnotacao, type OrigemAnotacao } from "@/lib/anotacoes";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { avisar, confirmar } from "@/components/Dialogos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
@@ -18,14 +19,17 @@ import { useSomenteLeitura } from "@/components/SomenteLeitura";
 interface Anotacao {
   id: string;
   texto: string;
-  origem: "digitada" | "voz" | "assistente";
+  origem: OrigemAnotacao;
   created_at: string;
 }
 
-const ROTULO_ORIGEM: Record<Anotacao["origem"], { texto: string; icone: typeof Mic }> = {
-  digitada: { texto: "digitada", icone: Keyboard },
-  voz: { texto: "por voz", icone: Mic },
-  assistente: { texto: "pelo assistente", icone: Bot },
+// As de campanha nascem sozinhas no banco ao marcar o envio (e o que veio
+// depois: respondeu, agendou, não quer, desfeito); apagam-se como as outras.
+const ICONE_ORIGEM: Record<OrigemAnotacao, typeof Mic> = {
+  digitada: Keyboard,
+  voz: Mic,
+  assistente: Bot,
+  campanha: Megaphone,
 };
 
 function quando(iso: string) {
@@ -260,7 +264,8 @@ export default function AnotacoesCliente({
               )}
               <ol className="space-y-2.5">
                 {lista.map((a) => {
-                  const o = ROTULO_ORIGEM[a.origem] ?? ROTULO_ORIGEM.digitada;
+                  const origem = origemDaAnotacao(a.origem);
+                  const o = { texto: ROTULO_ORIGEM_ANOTACAO[origem], icone: ICONE_ORIGEM[origem] };
                   return (
                     <li key={a.id} className="rounded-2xl border border-neutral-100 bg-neutral-50/70 p-3">
                       <div className="flex items-start gap-2">

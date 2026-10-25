@@ -130,7 +130,7 @@ export default function ResultadoCampanha({
     const ok = await confirmar({
       titulo: e.enviado_em ? "Desfazer o envio?" : "Voltar para a fila?",
       texto: e.enviado_em
-        ? "O registro do envio é apagado e a pessoa volta para a fila desta campanha. A mensagem que já foi no WhatsApp não volta."
+        ? "O registro do envio é apagado e a pessoa volta para a fila desta campanha. A mensagem que já foi no WhatsApp não volta. Nas anotações da cliente fica \"envio desfeito\"."
         : "A pessoa volta para a fila desta campanha.",
       confirmar: e.enviado_em ? "Desfazer" : "Voltar para a fila",
       perigo: !!e.enviado_em,
