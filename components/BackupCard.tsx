@@ -25,6 +25,7 @@ export default function BackupCard() {
   const [pronto, setPronto] = useState<File | null>(null);
   // Mesmo conteúdo em outro tipo de arquivo, para tentar de novo se o Compartilhar recusar o primeiro.
   const [reserva, setReserva] = useState<File | null>(null);
+  const [falhas, setFalhas] = useState<string[]>([]);
   const [aviso, setAviso] = useState<string | null>(null);
   const cartao = useRef<HTMLDivElement>(null);
 
@@ -88,34 +89,55 @@ export default function BackupCard() {
     setBaixando(false);
   }
 
+  // Quando o Compartilhar não funciona, entrega o arquivo em Downloads (mesmo caminho do "Baixar backup agora").
+  function baixarArquivo(arquivo: File, motivos: string[]) {
+    const url = URL.createObjectURL(arquivo);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = arquivo.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    marcarFeito();
+    setPronto(null);
+    setReserva(null);
+    setErro(null);
+    setAviso(
+      `O Compartilhar não funcionou neste aparelho (${motivos.join("; ")}). O arquivo ${arquivo.name} foi salvo em Downloads: abra o app do Drive, toque em + e em Fazer upload.`
+    );
+  }
+
   async function salvarNoDrive() {
     if (!pronto) return prepararParaDrive();
     const podeCompartilhar =
       typeof navigator !== "undefined" && "canShare" in navigator && navigator.canShare({ files: [pronto] });
     if (!podeCompartilhar) {
-      setErro("Este aparelho não abre o Compartilhar com arquivo. Use Baixar backup agora.");
+      baixarArquivo(pronto, ["este aparelho não abre o Compartilhar com arquivo"]);
       return;
     }
-    // Tenta o arquivo principal e, se o Compartilhar recusar, o mesmo conteúdo como .txt.
-    const tentativas = [pronto, ...(reserva ? [reserva] : [])];
-    let ultimoErro: unknown = null;
-    for (const arquivo of tentativas) {
-      try {
-        await navigator.share({ files: [arquivo], title: arquivo.name });
-        marcarFeito();
-        setPronto(null);
+    // O celular só deixa abrir o Compartilhar logo depois de um toque, e o toque vale uma vez só:
+    // uma falha NÃO tenta de novo na mesma hora. O mesmo conteúdo em outro formato fica para o próximo toque.
+    try {
+      await navigator.share({ files: [pronto], title: pronto.name });
+      marcarFeito();
+      setPronto(null);
+      setReserva(null);
+      setAviso("Feito. Confira no Drive se o arquivo chegou.");
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+      const motivo = `${pronto.name.split(".").pop()}: ${(e as Error)?.name || (e as Error)?.message || "erro desconhecido"}`;
+      if (reserva) {
+        setPronto(reserva);
         setReserva(null);
-        setAviso("Feito. Confira no Drive se o arquivo chegou.");
+        setFalhas([motivo]);
+        setAviso(null);
+        setErro(`O Compartilhar recusou o arquivo (${motivo}). Toque de novo para tentar em outro formato.`);
         return;
-      } catch (e) {
-        if ((e as Error)?.name === "AbortError") return;
-        ultimoErro = e;
       }
+      baixarArquivo(pronto, [...falhas, motivo]);
+      setFalhas([]);
     }
-    const motivo = ultimoErro instanceof Error ? ultimoErro.name || ultimoErro.message : "erro desconhecido";
-    setErro(
-      `O Compartilhar não abriu (${motivo}). Toque de novo ou use Baixar backup agora e envie o arquivo pelo app do Drive (+ > Fazer upload).`
-    );
   }
 
   const diasDesde = ultimo ? Math.floor((Date.now() - new Date(ultimo).getTime()) / 86400000) : null;
