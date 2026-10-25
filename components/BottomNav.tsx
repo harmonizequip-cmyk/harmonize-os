@@ -27,6 +27,7 @@ import {
   Sparkles,
   Brain,
   ClipboardList,
+  Megaphone,
 } from "lucide-react";
 
 // Os 4 atalhos de uso diário, nessa ordem. O 5º e último botão não é um
@@ -63,6 +64,7 @@ const MORE_ITEMS: { href: string; label: string; icon: typeof Users; module: str
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes", grupo: "Atendimento" },
   { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda", grupo: "Atendimento" },
   { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda", grupo: "Atendimento" },
+  { href: "/campanhas", label: "Campanhas", icon: Megaphone, module: "clientes", grupo: "Atendimento" },
   { href: "/locacoes", label: "Locações", icon: Receipt, module: "financeiro", grupo: "Dinheiro" },
   { href: "/pendencias", label: "Pendências", icon: HandCoins, module: "financeiro", grupo: "Dinheiro" },
   { href: "/financeiro/cartoes", label: "Cartões", icon: CreditCard, module: "financeiro", grupo: "Dinheiro" },

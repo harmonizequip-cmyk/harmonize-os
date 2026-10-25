@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ehEspacoPessoal } from "@/lib/espaco";
-import { Banknote, CalendarDays, CalendarPlus, ClipboardList, ListChecks, type LucideIcon, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, ClipboardList, ListChecks, type LucideIcon, Megaphone, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
 import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 import { createClient } from "@/lib/supabase/client";
 import dynamic from "next/dynamic";
@@ -52,7 +52,8 @@ type ActionKey =
   | "receber"
   | "despesa_voz"
   | "tabela"
-  | "planejador";
+  | "planejador"
+  | "campanha";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -69,6 +70,7 @@ const VISUAL_ACAO: Record<ActionKey, { icone: LucideIcon; cor: CorVisual }> = {
   lead: { icone: UserPlus, cor: "rosa" },
   tarefa: { icone: ListChecks, cor: "verde" },
   tabela: { icone: Tag, cor: "roxo" },
+  campanha: { icone: Megaphone, cor: "rosa" },
 };
 
 // Em grupos e em blocos de duas colunas, como o Menu (pedido do dono,
@@ -87,6 +89,7 @@ const ACTIONS: { key: ActionKey; label: string; dica: string; emoji: string; mod
   { key: "lead", label: "Novo lead", dica: "Ou cliente", emoji: "🧲", module: "clientes", grupo: "Clientes" },
   { key: "tarefa", label: "Tarefa", dica: "Lembrete com data", emoji: "🗒️", module: "clientes", grupo: "Clientes" },
   { key: "tabela", label: "Tabela de preços", dica: "Arte para mandar", emoji: "🏷️", module: "clientes", grupo: "Clientes" },
+  { key: "campanha", label: "Campanha", dica: "Arte + mensagem, um a um", emoji: "📣", module: "clientes", grupo: "Clientes" },
 ];
 
 // Botão "+" único, disponível em toda tela (fica no layout, não em cada
@@ -153,6 +156,11 @@ export default function QuickActionsButton({
     // O planejador é uma tela, não uma janela.
     if (key === "planejador") {
       router.push("/planejador/novo");
+      return;
+    }
+    // Campanhas também é tela: abre a lista (criar ou continuar enviando).
+    if (key === "campanha") {
+      router.push("/campanhas");
       return;
     }
     setActiveModal(key);

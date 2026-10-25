@@ -43,7 +43,17 @@ const TABELAS = [
   "insights",
   "assistente_memoria",
   "cliente_anotacoes",
+  "campanhas",
+  "campanha_envios",
 ];
+
+// Tabelas que podem ainda não existir no banco (SQL das campanhas não rodado):
+// sem a tabela não há dado a perder, então o backup sai sem ela em vez de falhar.
+const PODEM_FALTAR = new Set(["campanhas", "campanha_envios"]);
+
+function tabelaNaoExiste(error: { code?: string; message?: string }): boolean {
+  return error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");
+}
 
 const PAGINA = 1000;
 
@@ -66,17 +76,23 @@ export async function GET() {
 
   for (const nome of TABELAS) {
     const linhas: unknown[] = [];
+    let faltando = false;
     for (let de = 0; ; de += PAGINA) {
       let consulta = supabase.from(nome).select("*");
       for (const coluna of ORDEM[nome] ?? ["id"]) consulta = consulta.order(coluna, { ascending: true });
       const { data, error } = await consulta.range(de, de + PAGINA - 1);
       // Backup incompleto nunca pode parecer completo: se uma tabela falhar, o arquivo não sai.
+      if (error && de === 0 && PODEM_FALTAR.has(nome) && tabelaNaoExiste(error)) {
+        faltando = true;
+        break;
+      }
       if (error) {
         return NextResponse.json({ erro: `Falha ao ler a tabela ${nome}: ${error.message}` }, { status: 500 });
       }
       linhas.push(...(data ?? []));
       if (!data || data.length < PAGINA) break;
     }
+    if (faltando) continue;
     tabelas[nome] = linhas;
     contagens[nome] = linhas.length;
   }

@@ -89,7 +89,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 ## Menu do celular
 
-- O "Mais" da barra de baixo (`components/BottomNav.tsx`, título "Menu") é organizado em grupos com blocos em duas colunas: Atendimento (Relacionamento, Clientes, Tarefas, Planejador, Contratos), Dinheiro (Locações, Pendências, Cartões, Empréstimos), Inteligência (Assistente, Cérebro, Relatórios) e Sistema (Equipamentos, Movimentações, Configurações). Tudo cabe numa tela; item novo entra no grupo certo (`grupo` em `MORE_ITEMS`).
+- O "Mais" da barra de baixo (`components/BottomNav.tsx`, título "Menu") é organizado em grupos com blocos em duas colunas: Atendimento (Relacionamento, Clientes, Tarefas, Planejador, Contratos, Campanhas), Dinheiro (Locações, Pendências, Cartões, Empréstimos), Inteligência (Assistente, Cérebro, Relatórios) e Sistema (Equipamentos, Movimentações, Configurações). Tudo cabe numa tela; item novo entra no grupo certo (`grupo` em `MORE_ITEMS`).
 
 ## Configurações (central)
 
@@ -116,6 +116,16 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Contas PIX (migration `2026-10-24-contas-pix.sql`): tabela `contas_pix` (codigo = `rental_payments.pix_conta`, agora chave estrangeira no lugar da lista fixa; rótulo, titular, tipo e chave, ativa, padrão, ordem). Escrita só por `salvar_conta_pix`/`excluir_conta_pix` (conta que já recebeu não se apaga: desativa; a padrão não se apaga). Telas usam `useContasPix()` (`lib/usar-contas-pix.ts`) com `contasParaEscolha`/`codigoPadrao` (`lib/contas-pix.ts`); `buildResumoWhatsApp` recebe `contasPix`. Sem a tabela, valem as três de sempre (`CONTAS_PIX_PADRAO`). As funções do banco ainda usam 'harmonize' quando o PIX chega sem conta (create_rental e afins). Seção Configurações > Contas PIX.
 - Cidades (migration `2026-10-24-cidades-coordenadas.sql`): tabela `cidades_coordenadas` (nome normalizado por `normalizar_cidade`, igual a `normalizarCidade`), escrita por `salvar_cidade`/`excluir_cidade`. `carregarEncaixe` lê o mapa (`lib/carregar-cidades.ts`) e passa para `ancorasDoDia`/`candidatasPerto`/`oportunidadesDeEncaixe` (`mapa` opcional; sem ele, a lista fixa de `lib/cidades-coordenadas.ts`, que também é a reserva se a tabela não puder ser lida). Seção Configurações > Cidades: busca, adicionar colando "latitude, longitude" do Google Maps (`lerCoordenadas`), remover, e a lista de cidades de clientes que faltam (`cidadesSemPosicao`) com botão Cadastrar.
 - Valor novo configurável: criar o campo em `Preferencias` e em `lerPreferencias`/`DEFAULT_PREFERENCIAS`, ler no ponto de uso com o padrão como reserva, e uma seção `Prefs*` para editar. Valor usado também na Edge Function `alertas` ou no SQL precisa ser lido lá também (hoje nenhum dos valores acima é).
+
+## Campanhas (25/10/2026; migration `2026-10-25-campanhas.sql`)
+
+- Recurso permanente: uma ARTE fixa e uma MENSAGEM enviadas UM A UM pelo WhatsApp. Nada sai sozinho: o dono toca em cada contato. Menu > Atendimento > Campanhas, barra lateral e "+" > Campanha (abre a lista).
+- Tabelas: `campanhas` (nome, mensagem, `arte_path` na pasta privada `campanhas` do Storage, `filtros` jsonb do público, `limite_diario` 1 a 100 (padrão 15), `arquivada`) e `campanha_envios` (um por campanha e cliente, `status` enviado/respondeu/agendou/nao_quer/pulado, texto exato enviado, `enviado_em`). Escrita só por `salvar_campanha`, `arquivar_campanha` (alterna), `excluir_campanha` (só sem envios; com envios, arquivar), `registrar_envio_campanha` (cria ou muda; 'enviado' grava a hora; campanha arquivada não recebe envio novo) e `desfazer_envio_campanha` (apaga o envio: a pessoa volta para a fila). Pasta `campanhas` com políticas iguais às de `comprovantes`, módulo clientes.
+- Telas em `app/(app)/campanhas/`: lista (ativas e arquivadas), `/campanhas/nova` e `/campanhas/<id>` com abas Enviar (`FilaCampanha.tsx`), Resultado (`ResultadoCampanha.tsx`) e Editar (`EditorCampanha.tsx`). Sem o SQL rodado, as telas mostram "Falta rodar o SQL das campanhas". Visualização só vê o resultado.
+- Mensagem: só `{saudacao}` (sempre `saudacaoCurta`), `{nome}` e `{cidade}`; variável errada ou chave sem par bloqueia o salvar (não há padrão para voltar; o banco confere de novo). Arte reduzida no aparelho (1600 px, JPEG 0,85, `lib/campanha-arte.ts`).
+- Público (regras puras em `lib/campanhas.ts`, testadas): parte de `carregarRelacionamento` (já sem teste e desqualificado), filtra tipo (clientes, leads, ambos), classes, "só quem está na hora de chamar" e "tirar quem tem reserva marcada"; sempre fora quem não tem WhatsApp, quem já está nesta campanha (qualquer situação) e quem marcou "não quer receber" em QUALQUER campanha. Caixinha desmarcada grava em `filtros.excluidos`. Ordem: prioridade do Relacionamento.
+- Fila: uma pessoa por vez; "Enviar com arte" chama o Compartilhar direto no toque (uma tentativa por toque, a arte é baixada antes; o texto vai também para a área de transferência), "Só texto" (wa.me), "Marcar enviado", "Pular", "Não quer receber". Limite diário por campanha, contado pelo dia de Brasília (`enviadosNoDia`); ao atingir, "Limite de hoje atingido, continue amanhã" e "Passar do limite" com aviso de risco de spam.
+- A arte (Storage) não entra no backup, como os comprovantes.
 
 ## Diálogos e avisos
 
@@ -322,7 +332,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - `cancelar_agendamento` recusa locação com pagamento lançado (desfazer o pagamento antes). `update_rental` recusa valor abaixo do já recebido (pagamentos + taxa paga) e recalcula `pago`. Taxa: paga vem de pendente/nao_aplica; pendente de nao_aplica/paga; nao_aplica de pendente; perdida de paga.
 - Listas que podem passar de 1000 linhas usam `buscarTodas` (Agenda, Dashboard, Lançamentos até 3000 com aviso, Relacionamento, Locações). Erro de carga aparece na tela; nunca tratar erro como lista vazia.
 - Datas de "hoje" e do mês sempre por `hojeLocal`/`primeiroDiaDoMes`/`ultimoDiaDoMes` (`lib/period.ts`), nunca `toISOString().slice(0,10)` (UTC vira o dia seguinte depois das 21h).
-- Backup (`app/api/backup/route.ts`) só para admin ativo, com 34 tabelas; tabela nova entra lá e em `ORDEM` de `scripts/restaurar-backup.py` (semeada pelo schema.sql também em `SEMEADAS`; backup antigo sem ela mantém a semente).
+- Backup (`app/api/backup/route.ts`) só para admin ativo, com 36 tabelas (campanhas e campanha_envios são puladas se o SQL delas não tiver rodado, `PODEM_FALTAR`); tabela nova entra lá e em `ORDEM` de `scripts/restaurar-backup.py` (semeada pelo schema.sql também em `SEMEADAS`; backup antigo sem ela mantém a semente).
 - Edge Function `alertas` manda push só para perfil ativo, que não é só visualização nem cliente.
 
 ## Pendências conhecidas

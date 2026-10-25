@@ -31,7 +31,7 @@ ORDEM = [
     "contratos_emitidos", "movimentacoes", "creditos_cliente", "locacao_contagens",
     "reserva_contagens", "planejamentos", "convites_cadastro",
     "cadastros_recebidos", "agenda_envios", "orcamentos_pessoais", "insights",
-    "assistente_memoria", "cliente_anotacoes",
+    "assistente_memoria", "cliente_anotacoes", "campanhas", "campanha_envios",
 ]
 # Tabelas que o schema.sql já semeia com linhas padrão: saem antes da carga.
 SEMEADAS = ["settings", "equipments", "categories", "tags", "contas_pix", "cidades_coordenadas"]
@@ -61,7 +61,8 @@ def main() -> int:
         if nome not in tabelas:
             # Backup anterior à tabela existir (emprestimos entrou em 06/10/2026; créditos,
             # cartões, planejamentos e outras em 18/10/2026; contas_pix e
-            # cidades_coordenadas em 24/10/2026: o schema.sql já semeia as de sempre).
+            # cidades_coordenadas em 24/10/2026: o schema.sql já semeia as de sempre;
+            # campanhas e campanha_envios em 25/10/2026).
             tabelas[nome] = []
             esperado.setdefault(nome, 0)
         if esperado.get(nome) != len(tabelas[nome]):
