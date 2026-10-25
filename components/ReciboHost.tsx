@@ -12,7 +12,8 @@ import { createClient } from "@/lib/supabase/client";
 import { canvasToPngFile } from "@/lib/availability-image";
 import { drawReciboImage, reaisRecibo, type DadosRecibo } from "@/lib/recibo-image";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
-import { saudacaoCurta } from "@/lib/saudacao";
+import { variaveisDaPessoa } from "@/lib/saudacao";
+import { mensagemRecibo } from "@/lib/mensagens-modelos";
 import { usePreferencias } from "@/lib/usar-preferencias";
 
 export const EVENTO_PAGAMENTO = "harmonize:pagamento-registrado";
@@ -112,13 +113,14 @@ export default function ReciboHost() {
       const canvas = await drawReciboImage(dados, preferencias);
       setArquivo(await canvasToPngFile(canvas, `recibo-${pagamento.data}.png`));
       setPrevia(canvas.toDataURL("image/png"));
-      const saudacao = saudacaoCurta({ name: c?.name, treatment: c?.treatment, displayName: c?.display_name });
+      // Texto de Configurações > Mensagens (modelo "Recibo").
+      const pessoa = variaveisDaPessoa({ name: c?.name, treatment: c?.treatment, displayName: c?.display_name });
       setWhats({
         tel: c?.whatsapp ?? null,
-        texto:
-          `${saudacao} 😊\n\nRecebi o seu pagamento de ${reaisRecibo(pagamento.valor)}. Segue o recibo.` +
-          (dados.saldo > 0.009 ? ` Fica em aberto ${reaisRecibo(dados.saldo)}.` : " A locação está quitada.") +
-          "\n\nObrigada! 🙏",
+        texto: mensagemRecibo(
+          { ...pessoa, valorPago: pagamento.valor, saldo: dados.saldo, reais: reaisRecibo },
+          preferencias.mensagens
+        ),
       });
     } catch {
       setErro("Não consegui montar o recibo. Tente de novo.");

@@ -13,6 +13,7 @@ export const TITULOS_SECAO = {
   contasPix: "Contas PIX",
   cidades: "Cidades do encaixe",
   relacionamento: "Relacionamento",
+  mensagens: "Mensagens de WhatsApp",
   agenda: "Agenda e encaixe",
   listas: "Listas",
   dashboard: "Dashboard",

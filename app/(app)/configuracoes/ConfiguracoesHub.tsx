@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   ListChecks,
   MapPinned,
+  MessageSquareText,
   Target,
   ChevronLeft,
   ChevronRight,
@@ -58,6 +59,7 @@ import PrefsPlanejador from "./secoes/PrefsPlanejador";
 import PrefsEmpresa from "./secoes/PrefsEmpresa";
 import PrefsContrato from "./secoes/PrefsContrato";
 import PrefsTabelaPrecos from "./secoes/PrefsTabelaPrecos";
+import PrefsMensagens from "./secoes/PrefsMensagens";
 import Categorias from "./secoes/Categorias";
 import ContasPix from "./secoes/ContasPix";
 import Cidades from "./secoes/Cidades";
@@ -65,6 +67,7 @@ import Tags, { type TagRow } from "./secoes/Tags";
 import MinhaConta from "./secoes/MinhaConta";
 import Aparencia from "./secoes/Aparencia";
 import { TITULOS_SECAO as TITULOS, type SecaoId } from "./secoes-ids";
+import { modelosDiferentes } from "@/lib/mensagens-modelos";
 
 interface Dados {
   settings: AppSettings;
@@ -255,6 +258,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           </>
         )}
         {secao === "relacionamento" && <PrefsRelacionamento preferencias={settings.preferencias} />}
+        {secao === "mensagens" && <PrefsMensagens preferencias={settings.preferencias} />}
         {secao === "agenda" && <PrefsAgenda preferencias={settings.preferencias} />}
         {secao === "listas" && <PrefsListas preferencias={settings.preferencias} />}
         {secao === "dashboard" && <PrefsDashboard preferencias={settings.preferencias} />}
@@ -284,6 +288,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
     settings.tarefaTaxaAtiva,
     settings.recontatoAutomatico,
   ].filter(Boolean).length;
+  const mensagensMudadas = Object.keys(modelosDiferentes(settings.preferencias.mensagens)).length;
 
   const grupos: { titulo: string; blocos: Bloco[] }[] = [
     {
@@ -364,6 +369,13 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           resumo: `${settings.preferencias.relacionamento.limiteDiario} chamadas por dia`,
           icone: HeartHandshake,
           cor: "bg-pink-50 text-pink-600",
+        },
+        {
+          id: "mensagens",
+          titulo: "Mensagens",
+          resumo: mensagensMudadas > 0 ? `${mensagensMudadas} personalizada${mensagensMudadas > 1 ? "s" : ""}` : "Textos de sempre",
+          icone: MessageSquareText,
+          cor: "bg-green-50 text-green-700",
         },
         {
           id: "agenda",

@@ -107,11 +107,21 @@ export default function AvailabilityImageModal({
   // Mensagem padrão: saudação só com tratamento e primeiro nome (o campo
   // "Nome" costuma vir com cidade e equipamento junto) e texto de locação
   // do HIPRO. Continua editável antes de enviar.
-  const [message, setMessage] = useState(() =>
-    clientName ? mensagemDatasDisponiveis({ name: clientName, treatment, displayName }) : ""
-  );
+  const preferencias = usePreferencias();
+  const mensagemPronta = clientName
+    ? mensagemDatasDisponiveis({ name: clientName, treatment, displayName }, preferencias.mensagens)
+    : "";
+  const [message, setMessage] = useState(mensagemPronta);
+  // O texto de Configurações > Mensagens chega depois da primeira pintura:
+  // troca a mensagem só se ninguém mexeu nela ainda.
+  const ultimaPronta = useRef(mensagemPronta);
+  useEffect(() => {
+    if (mensagemPronta === ultimaPronta.current) return;
+    setMessage((atual) => (atual === ultimaPronta.current ? mensagemPronta : atual));
+    ultimaPronta.current = mensagemPronta;
+  }, [mensagemPronta]);
   const [shareNote, setShareNote] = useState<string | null>(null);
-  const cidadeBaseConfig = usePreferencias().encaixe.cidadeBase;
+  const cidadeBaseConfig = preferencias.encaixe.cidadeBase;
   // Valor digitado ou guardado no aparelho (null = nunca mexeu) vale mais que a cidade base das Configurações.
   const [cidadeDoAparelho, setCidadeDoAparelho] = useState<string | null>(null);
   const homeCity = cidadeDoAparelho ?? cidadeBaseConfig;

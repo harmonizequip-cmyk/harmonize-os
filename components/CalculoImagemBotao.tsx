@@ -4,6 +4,9 @@ import { useState } from "react";
 import { canvasToPngFile } from "@/lib/availability-image";
 import { drawCalculoImage, type DadosImagemCalculo } from "@/lib/calculo-image";
 import { buildWhatsAppLink } from "@/lib/format";
+import { renderizarModelo } from "@/lib/mensagens-modelos";
+import { variaveisDaPessoa } from "@/lib/saudacao";
+import { usePreferencias } from "@/lib/usar-preferencias";
 
 /**
  * Botão "Gerar imagem do cálculo": desenha o cálculo dos disparos numa única
@@ -26,6 +29,8 @@ export default function CalculoImagemBotao({
   const [previa, setPrevia] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [nota, setNota] = useState<string | null>(null);
+  // Texto de Configurações > Mensagens (modelo "Imagem do cálculo").
+  const modelosMensagem = usePreferencias().mensagens;
 
   if (!dados) return null;
 
@@ -67,7 +72,8 @@ export default function CalculoImagemBotao({
       }
     }
     baixar();
-    const link = buildWhatsAppLink(whatsapp ?? null, "Segue o cálculo dos disparos para conferência. 😊");
+    const texto = renderizarModelo("calculo", { nome: variaveisDaPessoa({ name: dados?.cliente }).nome }, modelosMensagem);
+    const link = buildWhatsAppLink(whatsapp ?? null, texto);
     if (link) {
       window.open(link, "_blank");
       setNota("Baixei a imagem e abri a conversa no WhatsApp. Falta só anexar a imagem que acabou de baixar.");

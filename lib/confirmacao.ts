@@ -1,5 +1,6 @@
 import { formatDate } from "./format";
-import { tratamentoEPrimeiroNome } from "./saudacao";
+import { tratamentoEPrimeiroNome, variaveisDaPessoa } from "./saudacao";
+import { renderizarModelo, type ModelosMensagem } from "./mensagens-modelos";
 
 /**
  * Monta a mensagem do botão "Pedir confirmação no WhatsApp".
@@ -23,22 +24,20 @@ export function buildPedidoConfirmacaoMessage(params: {
   treatment: string | null | undefined;
   displayName: string | null | undefined;
   dateStart: string;
+  modelos?: Partial<ModelosMensagem> | null;
 }): { message: string; cadastroIncompleto: boolean } {
-  const { tratamento, primeiroNome } = tratamentoEPrimeiroNome({
+  const { primeiroNome } = tratamentoEPrimeiroNome({
     name: params.name,
     treatment: params.treatment,
     displayName: params.displayName,
   });
 
-  const saudacao = !primeiroNome
-    ? "Olá! 😊"
-    : tratamento
-      ? `Olá, ${tratamento} ${primeiroNome}! 😊`
-      : `Olá, ${primeiroNome}! 😊`;
-
-  const message =
-    `${saudacao}\n\n` +
-    `Passando para lembrar que seu HIPRO day está chegando: ${formatDate(params.dateStart)}.\n\n` +
-    `Já estamos organizando tudo por aqui para mais um dia de sucesso. 🚀`;
+  // Texto editável em Configurações > Mensagens; sem modelo salvo, o de sempre
+  // ("Olá! 😊" quando não há nome).
+  const message = renderizarModelo(
+    "confirmacao",
+    { ...variaveisDaPessoa(params), data: formatDate(params.dateStart) },
+    params.modelos
+  );
   return { message, cadastroIncompleto: !primeiroNome };
 }

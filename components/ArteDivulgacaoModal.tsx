@@ -8,7 +8,9 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/format";
-import { saudacaoCurta } from "@/lib/saudacao";
+import { variaveisDaPessoa } from "@/lib/saudacao";
+import { renderizarModelo } from "@/lib/mensagens-modelos";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { canvasToPngFile } from "@/lib/availability-image";
 import { drawArteDivulgacao, telefoneArte, type FormatoArte } from "@/lib/arte-divulgacao";
 
@@ -38,6 +40,8 @@ export default function ArteDivulgacaoModal({
   const [chamada, setChamada] = useState("Vagas limitadas. Agende o seu horário!");
   const [contato, setContato] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // Texto de Configurações > Mensagens (modelo "Arte para a cliente divulgar").
+  const modelosMensagem = usePreferencias().mensagens;
 
   useEffect(() => {
     (async () => {
@@ -61,7 +65,11 @@ export default function ArteDivulgacaoModal({
     return drawArteDivulgacao({ titulo, subtitulo, dataInicio, dataFim, local, cidade, chamada, contato }, formato).toDataURL("image/png");
   }, [carregado, titulo, subtitulo, dataInicio, dataFim, local, cidade, chamada, contato, formato]);
 
-  const mensagem = `${saudacaoCurta({ name: cliente?.name, treatment: cliente?.treatment, displayName: cliente?.display_name })} 😊\n\nPara ajudar a lotar a sua agenda do dia do HIPRO, preparei esta arte para você postar no status e no Instagram. Quanto mais pacientes agendados, melhor aproveitamos o dia!`;
+  const mensagem = renderizarModelo(
+    "arteDivulgacao",
+    variaveisDaPessoa({ name: cliente?.name, treatment: cliente?.treatment, displayName: cliente?.display_name }),
+    modelosMensagem
+  );
 
   async function compartilhar() {
     setEnviando(true);

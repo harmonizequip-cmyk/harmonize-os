@@ -1,6 +1,7 @@
 import { buildCobrancaTaxaMessage } from "./cobranca";
 import { buildPedidoConfirmacaoMessage } from "./confirmacao";
-import { saudacaoCurta } from "./saudacao";
+import { variaveisDaPessoa } from "./saudacao";
+import { renderizarModelo, type ModelosMensagem } from "./mensagens-modelos";
 
 export type TipoTarefa =
   | "contato_inicial"
@@ -15,7 +16,9 @@ export type TipoTarefa =
  * Mensagem de WhatsApp pronta para cada tipo de tarefa automática. A pessoa
  * sempre vê o texto no WhatsApp antes de enviar. Devolve null quando a
  * tarefa não tem mensagem possível (manual, ou faltou a data da reserva
- * para cobrança de taxa e confirmação).
+ * para cobrança de taxa e confirmação). Pós-locação, contato e confirmação
+ * usam o texto de Configurações > Mensagens (`modelos`); a cobrança de taxa
+ * continua fixa (é a mesma da função alertas).
  */
 export function mensagemDaTarefa(params: {
   tipo: TipoTarefa;
@@ -24,9 +27,10 @@ export function mensagemDaTarefa(params: {
   displayName?: string | null;
   dataEvento?: string | null;
   valorTaxa?: number;
+  modelos?: Partial<ModelosMensagem> | null;
 }): string | null {
   const nome = { name: params.name, treatment: params.treatment, displayName: params.displayName };
-  const saudacao = `${saudacaoCurta(nome)} 😊`;
+  const pessoa = variaveisDaPessoa(nome);
 
   switch (params.tipo) {
     case "cobranca_taxa":
@@ -34,21 +38,14 @@ export function mensagemDaTarefa(params: {
       return buildCobrancaTaxaMessage({ ...nome, dataEvento: params.dataEvento, valor: params.valorTaxa ?? 0 });
     case "confirmacao":
       if (!params.dataEvento) return null;
-      return buildPedidoConfirmacaoMessage({ ...nome, dateStart: params.dataEvento }).message;
+      return buildPedidoConfirmacaoMessage({ ...nome, dateStart: params.dataEvento, modelos: params.modelos }).message;
     case "pos_locacao":
-      return (
-        `${saudacao}\n\n` +
-        `Passando para saber como foi a sua experiência com o HIPRO e se ficou alguma dúvida. ` +
-        `Foi um prazer atender você! Qualquer coisa, é só me chamar. 🙏`
-      );
+      return renderizarModelo("posLocacao", pessoa, params.modelos);
     case "contato_inicial":
     case "recontato":
     case "followup":
-      return (
-        `${saudacao}\n\n` +
-        `Passando para saber se você ainda tem interesse em conhecer o HIPRO. ` +
-        `Posso te passar as datas disponíveis para a sua região?`
-      );
+      // Mesmo modelo do Relacionamento para leads mornos e frios.
+      return renderizarModelo("interesse", pessoa, params.modelos);
     default:
       return null;
   }

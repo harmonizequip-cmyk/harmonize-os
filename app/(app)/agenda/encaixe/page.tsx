@@ -28,7 +28,7 @@ export default async function EncaixePage(props: { searchParams: Promise<{ data?
   const somenteDia = sp.data && /^\d{4}-\d{2}-\d{2}$/.test(sp.data) ? sp.data : null;
   const hoje = hojeLocal();
   const supabase = createClient();
-  const { encaixe, relacionamento } = await fetchPreferencias(supabase);
+  const { encaixe, relacionamento, mensagens } = await fetchPreferencias(supabase);
   const RAIO_KM = encaixe.raioKm;
   const POR_DATA = encaixe.porData;
   let erro: string | null = null;
@@ -102,7 +102,7 @@ export default async function EncaixePage(props: { searchParams: Promise<{ data?
           <ul className="mt-3 divide-y divide-neutral-100">
             {o.candidatas.slice(0, POR_DATA).map((c) => {
               const classe = ROTULO_CLASSE[c.pessoa.classe];
-              const zap = buildWhatsAppLink(c.pessoa.whatsapp, mensagemEncaixe(c.pessoa, o.data, c.perto, saudacaoCurta));
+              const zap = buildWhatsAppLink(c.pessoa.whatsapp, mensagemEncaixe(c.pessoa, o.data, c.perto, saudacaoCurta, mensagens));
               return (
                 <li key={c.pessoa.id} className="flex items-center gap-2 py-2.5">
                   <div className="min-w-0 flex-1">

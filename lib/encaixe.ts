@@ -8,6 +8,8 @@
 import { coordenadasDaCidade, distanciaKm, normalizarCidade, type MapaCidades } from "./cidades-coordenadas";
 import { somarDias } from "./period";
 import type { PessoaClassificada } from "./relacionamento";
+import { renderizarModelo, type ModelosMensagem } from "./mensagens-modelos";
+import { variaveisDaPessoa } from "./saudacao";
 
 export const RAIO_KM = 150;
 export const DIAS_A_FRENTE = 30;
@@ -119,19 +121,24 @@ export function oportunidadesDeEncaixe(params: {
   return lista;
 }
 
-/** Mensagem pronta para oferecer a data (tratamento e primeiro nome, como as outras). */
+/**
+ * Mensagem pronta para oferecer a data (tratamento e primeiro nome, como as
+ * outras). Texto editável em Configurações > Mensagens (`modelos`).
+ */
 export function mensagemEncaixe(
   p: { nome: string; treatment: string | null; displayName: string | null },
   data: string,
   cidade: string,
-  saudacao: (x: { name?: string | null; treatment?: string | null; displayName?: string | null }) => string
+  saudacao: (x: { name?: string | null; treatment?: string | null; displayName?: string | null }) => string,
+  modelos?: Partial<ModelosMensagem> | null
 ): string {
   const d = new Date(`${data}T12:00:00`);
   const dia = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   const semana = d.toLocaleDateString("pt-BR", { weekday: "long" });
-  return (
-    `${saudacao({ name: p.nome, treatment: p.treatment, displayName: p.displayName })} ` +
-    `Abriu uma data na agenda do HIPRO: ${semana}, ${dia}. Vou estar atendendo em ${cidade} nesses dias e lembrei de você. ` +
-    `Quer aproveitar esse dia?`
+  const pessoa = { name: p.nome, treatment: p.treatment, displayName: p.displayName };
+  return renderizarModelo(
+    "encaixe",
+    { saudacao: saudacao(pessoa), nome: variaveisDaPessoa(pessoa).nome, data: dia, dia_semana: semana, cidade },
+    modelos
   );
 }

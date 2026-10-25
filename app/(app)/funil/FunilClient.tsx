@@ -142,7 +142,10 @@ export default function FunilClient({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const origens = origensParaTela(usePreferencias().listas.origens);
+  const preferencias = usePreferencias();
+  const origens = origensParaTela(preferencias.listas.origens);
+  // Textos de Configurações > Mensagens (confirmação e tarefas).
+  const modelosMensagem = preferencias.mensagens;
   const [leads, setLeads] = useState(initialClients);
   const [tasks, setTasks] = useState(initialTasks);
   const [selected, setSelected] = useState<LeadRow | null>(null);
@@ -418,6 +421,7 @@ export default function FunilClient({
       treatment: lead.treatment,
       displayName: lead.display_name,
       dateStart: lead.nextEvent.date_start,
+      modelos: modelosMensagem,
     });
     setPedidoLead(lead);
     setPedidoMessage(message);
@@ -802,6 +806,7 @@ export default function FunilClient({
                           treatment: lead.treatment,
                           displayName: lead.display_name,
                           dataEvento: lead.nextEvent?.date_start ?? null,
+                          modelos: modelosMensagem,
                         });
                         const link = mensagem ? buildWhatsAppLink(lead.whatsapp, mensagem) : null;
                         const deFunil = task.type === "contato_inicial" || task.type === "followup";

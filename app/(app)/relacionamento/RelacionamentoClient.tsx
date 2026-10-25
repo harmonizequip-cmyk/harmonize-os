@@ -35,6 +35,7 @@ import HeroTela from "@/components/ui/HeroTela";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatCurrency } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import {
   ROTULO_CLASSE,
   ROTULO_VALOR,
@@ -112,6 +113,8 @@ export default function RelacionamentoClient({
   const router = useRouter();
   const supabase = createClient();
   const somenteLeitura = useSomenteLeitura();
+  // Textos de Configurações > Mensagens.
+  const modelosMensagem = usePreferencias().mensagens;
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [feitos, setFeitos] = useState<Set<string>>(new Set());
   const [pulados, setPulados] = useState<Set<string>>(new Set());
@@ -192,7 +195,7 @@ export default function RelacionamentoClient({
   }
 
   async function whatsapp(p: PessoaClassificada) {
-    const msg = mensagemRelacionamento(p, saudacaoCurta({ name: p.nome, treatment: p.treatment, displayName: p.displayName }));
+    const msg = mensagemRelacionamento(p, saudacaoCurta({ name: p.nome, treatment: p.treatment, displayName: p.displayName }), modelosMensagem);
     const link = buildWhatsAppLink(p.whatsapp, msg);
     if (!link) {
       avisar("Sem WhatsApp no cadastro. Abra a ficha para completar.", "erro");

@@ -9,7 +9,9 @@ import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import { fetchSettings } from "@/lib/settings";
 import { drawTabelaPrecos } from "@/lib/tabela-precos-arte";
-import { saudacaoCurta } from "@/lib/saudacao";
+import { variaveisDaPessoa } from "@/lib/saudacao";
+import { renderizarModelo } from "@/lib/mensagens-modelos";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { buildWhatsAppLink } from "@/lib/format";
 
 export default function TabelaPrecosModal({
@@ -30,10 +32,13 @@ export default function TabelaPrecosModal({
   const [nota, setNota] = useState<string | null>(null);
   const [montado, setMontado] = useState(false);
 
-  const mensagem =
-    `${saudacaoCurta({ name: clientName, treatment, displayName })}\n` +
-    `Segue a nossa tabela de preços do HIPRO. ✨\n\n` +
-    `Qualquer dúvida, estou à disposição para te ajudar a planejar o seu dia!`;
+  // Texto de Configurações > Mensagens (modelo "Tabela de preços").
+  const modelosMensagem = usePreferencias().mensagens;
+  const mensagem = renderizarModelo(
+    "tabelaPrecos",
+    variaveisDaPessoa({ name: clientName, treatment, displayName }),
+    modelosMensagem
+  );
 
   useEffect(() => {
     setMontado(true);

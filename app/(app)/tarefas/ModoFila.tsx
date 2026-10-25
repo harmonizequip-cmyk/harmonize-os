@@ -10,6 +10,7 @@ import MenuAtalhosCliente from "@/components/MenuAtalhosCliente";
 import { X } from "lucide-react";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { somarDias, hojeLocal } from "@/lib/period";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import { Atalho, Atalhos, LinkCliente } from "@/components/Atalhos";
@@ -47,6 +48,8 @@ export default function ModoFila({
   const [feitas, setFeitas] = useState(0);
   const [ocupado, setOcupado] = useState(false);
   const [mandou, setMandou] = useState(false);
+  // Textos de Configurações > Mensagens.
+  const modelosMensagem = usePreferencias().mensagens;
 
   const t = fila[pos];
 
@@ -107,6 +110,7 @@ export default function ModoFila({
     displayName: t.client_display_name,
     dataEvento: t.event_date,
     valorTaxa,
+    modelos: modelosMensagem,
   });
   const link = mensagem ? buildWhatsAppLink(t.client_whatsapp ?? null, mensagem) : null;
   const taxaPendente = t.type === "cobranca_taxa" && t.event_id && t.event_taxa_status === "pendente";

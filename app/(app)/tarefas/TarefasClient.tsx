@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { mensagemDaTarefa } from "@/lib/tarefa-mensagem";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import ModoFila from "./ModoFila";
 import { Atalho, Atalhos, LinkCliente } from "@/components/Atalhos";
@@ -50,6 +51,8 @@ export default function TarefasClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  // Textos de Configurações > Mensagens.
+  const modelosMensagem = usePreferencias().mensagens;
   const [pendentes, setPendentes] = useState(initialPendentes);
   const [concluidas, setConcluidas] = useState(initialConcluidas);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
@@ -310,6 +313,7 @@ export default function TarefasClient({
                           displayName: task.client_display_name,
                           dataEvento: task.event_date,
                           valorTaxa,
+                          modelos: modelosMensagem,
                         });
                         const link = mensagem ? buildWhatsAppLink(task.client_whatsapp ?? null, mensagem) : null;
                         const taxaPendente = task.type === "cobranca_taxa" && task.event_id && task.event_taxa_status === "pendente";

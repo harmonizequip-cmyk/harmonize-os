@@ -20,6 +20,7 @@ import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
+import { usePreferencias } from "@/lib/usar-preferencias";
 import { exportarTabela } from "@/lib/exportar-planilha";
 import { barras, rankingPor, soGraficos } from "@/lib/graficos-exportacao";
 import { diasDoPeriodo, duracaoEmDias, hojeLocal } from "@/lib/period";
@@ -211,6 +212,8 @@ export default function AgendaClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  // Textos de Configurações > Mensagens (pedido de confirmação).
+  const modelosMensagem = usePreferencias().mensagens;
 
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
@@ -446,6 +449,7 @@ export default function AgendaClient({
       treatment: event.clients?.treatment,
       displayName: event.clients?.display_name,
       dateStart: event.date_start,
+      modelos: modelosMensagem,
     });
     setPedidoEvent(event);
     setPedidoMessage(message);

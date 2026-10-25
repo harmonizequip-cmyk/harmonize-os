@@ -4,6 +4,8 @@
 // configuração. lerPreferencias() é a única porta de entrada: completa o que
 // falta e prende cada número na faixa válida.
 
+import { lerModelos, MODELOS_PADRAO, modelosDiferentes, type ModelosMensagem } from "./mensagens-modelos";
+
 export type ClasseCadencia = "nova" | "ativa" | "em_risco" | "sumida" | "quente" | "morna" | "fria";
 
 export interface Preferencias {
@@ -112,6 +114,12 @@ export interface Preferencias {
     /** Nota em itálico embaixo das estimativas. */
     nota: string;
   };
+  /**
+   * Textos das mensagens de WhatsApp do app (lib/mensagens-modelos.ts). Um
+   * texto por modelo; padrão = o texto de sempre. Cobrança, taxa e avisos do
+   * celular ficam de fora (duplicados na função alertas).
+   */
+  mensagens: ModelosMensagem;
 }
 
 export interface EstimativaDisparos {
@@ -218,6 +226,7 @@ export const DEFAULT_PREFERENCIAS: Preferencias = {
     ],
     nota: "Valores médios por região. Podem variar conforme a avaliação do profissional.",
   },
+  mensagens: MODELOS_PADRAO,
 };
 
 type Obj = Record<string, unknown>;
@@ -392,6 +401,8 @@ export function lerPreferencias(bruto: unknown): Preferencias {
       infos: Array.isArray(tp.infos) ? infos : d.tabelaPrecos.infos,
       nota: texto(tp.nota, d.tabelaPrecos.nota, L.nota),
     },
+    // Ausente, vazio, grande demais ou com variável errada: o texto de sempre.
+    mensagens: lerModelos(r.mensagens),
   };
 }
 
@@ -400,6 +411,12 @@ export function diferencasDoPadrao(p: Preferencias): Obj {
   const igual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const saida: Obj = {};
   for (const grupo of Object.keys(DEFAULT_PREFERENCIAS) as (keyof Preferencias)[]) {
+    if (grupo === "mensagens") {
+      // Mensagens: só os modelos mudados (o resto segue o padrão, mesmo se ele mudar no código).
+      const mudadas = modelosDiferentes(p.mensagens);
+      if (Object.keys(mudadas).length) saida.mensagens = mudadas;
+      continue;
+    }
     if (!igual(p[grupo], DEFAULT_PREFERENCIAS[grupo])) saida[grupo] = p[grupo];
   }
   return saida;

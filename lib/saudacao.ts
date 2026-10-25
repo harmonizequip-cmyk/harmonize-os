@@ -10,6 +10,8 @@
 // "Nome". Se nem assim houver um nome, a saudação vira só "Olá!".
 // ============================================================
 
+import { renderizarModelo, type ModelosMensagem } from "./mensagens-modelos";
+
 const TRATAMENTOS: Record<string, string> = {
   "dr": "Dr.",
   "dr.": "Dr.",
@@ -66,19 +68,30 @@ export function saudacaoCurta(params: {
   return tratamento ? `Olá, ${tratamento} ${primeiroNome}!` : `Olá, ${primeiroNome}!`;
 }
 
-/** Mensagem que acompanha a imagem de datas disponíveis para locação. */
-export function mensagemDatasDisponiveis(params: {
+/** Variáveis {saudacao} e {nome} dos modelos de mensagem (lib/mensagens-modelos.ts). */
+export function variaveisDaPessoa(params: {
   name?: string | null;
   treatment?: string | null;
   displayName?: string | null;
-}): string {
+}): { saudacao: string; nome: string } {
+  const { tratamento, primeiroNome } = tratamentoEPrimeiroNome(params);
+  const nome = primeiroNome ? (tratamento ? `${tratamento} ${primeiroNome}` : primeiroNome) : "";
+  return { saudacao: saudacaoCurta(params), nome };
+}
+
+/**
+ * Mensagem que acompanha a imagem de datas disponíveis para locação. Texto
+ * editável em Configurações > Mensagens (`modelos`); sem ele, o de sempre.
+ */
+export function mensagemDatasDisponiveis(
+  params: {
+    name?: string | null;
+    treatment?: string | null;
+    displayName?: string | null;
+  },
+  modelos?: Partial<ModelosMensagem> | null
+): string {
   const { tratamento } = tratamentoEPrimeiroNome(params);
   const pacientes = tratamento === "Dr." ? "seus pacientes" : "suas pacientes";
-  return (
-    `${saudacaoCurta(params)}\n` +
-    `Tudo bem? ☺️\n\n` +
-    `Passando para te atualizar sobre as datas disponíveis para a locação do HIPRO. ✨\n\n` +
-    `Se você já está planejando atender ${pacientes}, esse é um bom momento para escolher a data que melhor se encaixa na sua agenda e começar a organizar seus atendimentos com antecedência.\n\n` +
-    `Vou te enviar as datas disponíveis para você avaliar e garantir sua reserva antes que sejam preenchidas. 📅`
-  );
+  return renderizarModelo("datasDisponiveis", { ...variaveisDaPessoa(params), pacientes }, modelos);
 }

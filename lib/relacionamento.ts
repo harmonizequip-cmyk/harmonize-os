@@ -14,6 +14,8 @@
 // ============================================================
 
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
+import { renderizarModelo, type ModeloId, type ModelosMensagem } from "./mensagens-modelos";
+import { variaveisDaPessoa } from "./saudacao";
 
 export type ClasseCliente = "agendada" | "nova" | "ativa" | "em_risco" | "sumida";
 export type ClasseLead = "quente" | "morna" | "fria";
@@ -210,21 +212,26 @@ export function classificarTodas(
 /** Quantas pessoas aparecem por dia em "chamar hoje" (o resto espera, sem virar pilha). */
 export const LIMITE_DIARIO = DEFAULT_PREFERENCIAS.relacionamento.limiteDiario;
 
-export function mensagemRelacionamento(p: Pick<PessoaClassificada, "classe" | "nome" | "treatment" | "displayName">, saudacao: string): string {
-  const s = `${saudacao} 😊`;
-  switch (p.classe) {
-    case "nova":
-      return `${s}\n\nComo foram os resultados das suas pacientes com o HIPRO? Fiquei feliz em te atender! Se quiser, já te passo as próximas datas disponíveis.`;
-    case "ativa":
-      return `${s}\n\nEstou organizando a agenda dos próximos dias. Quer garantir a sua data do HIPRO? Te mando as disponíveis para a sua região.`;
-    case "em_risco":
-    case "sumida":
-      return `${s}\n\nFaz um tempinho que não fazemos um atendimento com o HIPRO! Tenho datas abertas para a sua região. Quer que eu te mande?`;
-    case "quente":
-      return `${s}\n\nConseguiu ver as informações do HIPRO? Posso reservar uma data para você? As datas desta quinzena estão saindo rápido.`;
-    case "morna":
-    case "fria":
-    default:
-      return `${s}\n\nPassando para saber se você ainda tem interesse em conhecer o HIPRO. Posso te passar as datas disponíveis para a sua região?`;
-  }
+/** Modelo de mensagem (Configurações > Mensagens) de cada classe. */
+const MODELO_DA_CLASSE: Record<Classe, ModeloId> = {
+  nova: "relacionamentoNova",
+  ativa: "relacionamentoAtiva",
+  em_risco: "relacionamentoRisco",
+  sumida: "relacionamentoRisco",
+  quente: "relacionamentoQuente",
+  // Morna, fria (e agendada, que não entra na lista) usam o mesmo texto das
+  // tarefas de contato: "ainda tem interesse em conhecer o HIPRO?".
+  morna: "interesse",
+  fria: "interesse",
+  agendada: "interesse",
+};
+
+/** `saudacao` = saudacaoCurta da pessoa. Texto editável em Configurações > Mensagens. */
+export function mensagemRelacionamento(
+  p: Pick<PessoaClassificada, "classe" | "nome" | "treatment" | "displayName">,
+  saudacao: string,
+  modelos?: Partial<ModelosMensagem> | null
+): string {
+  const { nome } = variaveisDaPessoa({ name: p.nome, treatment: p.treatment, displayName: p.displayName });
+  return renderizarModelo(MODELO_DA_CLASSE[p.classe] ?? "interesse", { saudacao, nome }, modelos);
 }
