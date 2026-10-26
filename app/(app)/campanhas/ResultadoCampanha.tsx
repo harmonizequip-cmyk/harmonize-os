@@ -5,25 +5,22 @@
 // "Agendou", "Não quer receber" ou desfaz o envio (a pessoa volta à fila).
 
 import { useMemo, useState } from "react";
-import { CalendarCheck, ChevronDown, ChevronUp, Undo2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Undo2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { avisar, confirmar } from "@/components/Dialogos";
-import { Atalho, LinkCliente } from "@/components/Atalhos";
+import { LinkCliente } from "@/components/Atalhos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { CORES } from "@/components/ui/Visual";
-import { ROTULO_STATUS, contarPorStatus, resumoDasConversoes, totalRecebidos, type Conversao, type StatusEnvio } from "@/lib/campanhas";
-import { linkEvento } from "@/lib/atalhos";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { ROTULO_STATUS, contarPorStatus, totalRecebidos, type StatusEnvio } from "@/lib/campanhas";
 import type { EnvioComCliente } from "@/lib/carregar-campanhas";
 import { SeloStatus, VISUAL_STATUS, nomeDaPessoa, quandoFoi } from "./comum";
 
-type Filtro = "recebidos" | "adquiriram" | "pulado" | "nao_quer";
+type Filtro = "recebidos" | "pulado" | "nao_quer";
 
 const MUDAR_PARA: StatusEnvio[] = ["respondeu", "agendou", "nao_quer"];
 
 function Linha({
   envio,
-  conversao,
   hoje,
   podeMexer,
   ocupado,
@@ -31,7 +28,6 @@ function Linha({
   onDesfazer,
 }: {
   envio: EnvioComCliente;
-  conversao: Conversao | null;
   hoje: string;
   podeMexer: boolean;
   ocupado: boolean;
@@ -53,18 +49,6 @@ function Linha({
             {envio.enviado_em && <span>enviada {quandoFoi(envio.enviado_em, hoje)}</span>}
             {c?.city && <span>· {c.city}</span>}
           </div>
-          {conversao && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-600">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${CORES.verde.pilula}`}>
-                <CalendarCheck size={12} strokeWidth={2.4} /> Adquiriu
-              </span>
-              <span>
-                atendimento em {formatDate(conversao.data_atendimento)}
-                {conversao.valor !== null && ` · ${formatCurrency(conversao.valor)}${conversao.locacao ? "" : " (reserva)"}`}
-              </span>
-              <Atalho href={linkEvento(conversao.evento_id)} emoji="📅">Agenda</Atalho>
-            </div>
-          )}
         </div>
         {envio.mensagem && (
           <button type="button" onClick={() => setAberta((v) => !v)} className="flex flex-shrink-0 items-center gap-0.5 text-[11px] text-neutral-500">
@@ -105,15 +89,11 @@ function Linha({
 export default function ResultadoCampanha({
   campanhaId,
   envios,
-  conversoes,
-  erroConversoes,
   hoje,
   onMudou,
 }: {
   campanhaId: string;
   envios: EnvioComCliente[];
-  conversoes: Conversao[];
-  erroConversoes: string | null;
   hoje: string;
   onMudou: () => void;
 }) {
@@ -124,17 +104,13 @@ export default function ResultadoCampanha({
 
   const contagem = contarPorStatus(envios);
   const recebidos = totalRecebidos(envios);
-  const conversaoDe = useMemo(() => new Map(conversoes.map((c) => [c.client_id, c])), [conversoes]);
-  const resumo = resumoDasConversoes(conversoes, recebidos);
   const lista = useMemo(() => {
     const l =
       filtro === "recebidos"
         ? envios.filter((e) => !!e.enviado_em)
-        : filtro === "adquiriram"
-          ? envios.filter((e) => !!e.enviado_em && conversaoDe.has(e.client_id))
-          : envios.filter((e) => e.status === filtro && (filtro === "pulado" || !e.enviado_em));
+        : envios.filter((e) => e.status === filtro && (filtro === "pulado" || !e.enviado_em));
     return [...l].sort((a, b) => (b.enviado_em ?? b.atualizado_em ?? "").localeCompare(a.enviado_em ?? a.atualizado_em ?? ""));
-  }, [envios, filtro, conversaoDe]);
+  }, [envios, filtro]);
 
   async function mudar(e: EnvioComCliente, status: StatusEnvio) {
     setOcupado(e.client_id);
@@ -179,27 +155,6 @@ export default function ResultadoCampanha({
 
   return (
     <div className="space-y-3">
-      <section className="cartao p-4">
-        <div className="flex items-center gap-3">
-          <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${CORES.verde.chip}`}>
-            <CalendarCheck size={20} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-2xl font-black leading-tight text-neutral-900 tabular-nums">
-              {resumo.total} <span className="text-sm font-semibold text-neutral-500">{resumo.total === 1 ? "adquiriu" : "adquiriram"}</span>
-            </p>
-            <p className="text-[12px] text-neutral-500">
-              {recebidos > 0 ? `${Math.round(resumo.taxa * 100)}% de quem recebeu` : "Ninguém recebeu ainda"}
-              {resumo.total > 0 && resumo.valor > 0 && ` · ${formatCurrency(resumo.valor)} em atendimentos`}
-            </p>
-          </div>
-        </div>
-        <p className="mt-2 text-[11.5px] leading-snug text-neutral-500">
-          Conta quem recebeu a mensagem e depois ganhou uma reserva ou locação na agenda. Não precisa marcar nada: o app lê a agenda. Se a pessoa já ia reservar de qualquer jeito, ela entra igual, então use como referência.
-        </p>
-        {erroConversoes && <p className="mt-2 text-[11.5px] text-red-600">Não consegui ler a agenda para contar: {erroConversoes}</p>}
-      </section>
-
       <div className="grid grid-cols-2 gap-2">
         {numeros.map((n) => {
           const v = VISUAL_STATUS[n.status];
@@ -218,11 +173,10 @@ export default function ResultadoCampanha({
         })}
       </div>
 
-      <div className="grid grid-cols-4 gap-1 rounded-2xl bg-neutral-100 p-1">
+      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-neutral-100 p-1">
         {(
           [
             ["recebidos", `Receberam · ${recebidos}`],
-            ["adquiriram", `Adquiriram · ${resumo.total}`],
             ["pulado", `Puladas · ${contagem.pulado}`],
             ["nao_quer", `Recusaram · ${naoQuerSemEnvio}`],
           ] as [Filtro, string][]
@@ -231,7 +185,7 @@ export default function ResultadoCampanha({
             key={f}
             type="button"
             onClick={() => setFiltro(f)}
-            className={`rounded-xl px-0.5 py-2 text-[11px] font-bold leading-tight transition ${filtro === f ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"}`}
+            className={`rounded-xl py-2 text-[11.5px] font-bold transition ${filtro === f ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"}`}
           >
             {r}
           </button>
@@ -249,7 +203,6 @@ export default function ResultadoCampanha({
             <Linha
               key={e.id}
               envio={e}
-              conversao={conversaoDe.get(e.client_id) ?? null}
               hoje={hoje}
               podeMexer={!somenteLeitura}
               ocupado={ocupado === e.client_id}

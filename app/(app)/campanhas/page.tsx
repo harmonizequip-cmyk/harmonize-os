@@ -80,7 +80,6 @@ export default async function CampanhasPage(props: { searchParams: Promise<{ aba
                 <p className="mt-0.5 text-[12px] text-neutral-500">
                   {c.recebidos} {c.recebidos === 1 ? "enviada" : "enviadas"}
                   {c.contagem.respondeu > 0 && ` · ${c.contagem.respondeu} ${c.contagem.respondeu === 1 ? "respondeu" : "responderam"}`}
-                  {c.adquiriram > 0 && ` · ${c.adquiriram} ${c.adquiriram === 1 ? "adquiriu" : "adquiriram"}`}
                   {c.contagem.agendou > 0 && ` · ${c.contagem.agendou} ${c.contagem.agendou === 1 ? "agendou" : "agendaram"}`}
                   {c.contagem.nao_quer > 0 && ` · ${c.contagem.nao_quer} não ${c.contagem.nao_quer === 1 ? "quer" : "querem"}`}
                   {c.contagem.pulado > 0 && ` · ${c.contagem.pulado} ${c.contagem.pulado === 1 ? "pulada" : "puladas"}`}

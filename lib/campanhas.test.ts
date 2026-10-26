@@ -6,8 +6,6 @@ import {
   candidatosDaCampanha,
   cidadeParaMensagem,
   contarPorStatus,
-  conversoesDaCampanha,
-  resumoDasConversoes,
   enviadosNoDia,
   filaDaCampanha,
   lerFiltros,
@@ -198,63 +196,5 @@ describe("limite diário", () => {
     ];
     expect(contarPorStatus(envios)).toEqual({ enviado: 1, respondeu: 1, agendou: 0, nao_quer: 1, pulado: 1 });
     expect(totalRecebidos(envios)).toBe(2);
-  });
-});
-
-describe("quem adquiriu", () => {
-  const envios = [
-    { client_id: "a", enviado_em: "2026-10-26T12:00:00Z" },
-    { client_id: "b", enviado_em: "2026-10-26T12:00:00Z" },
-    { client_id: "c", enviado_em: null },
-  ];
-  const ev = (o: Partial<Parameters<typeof conversoesDaCampanha>[1][number]>) => ({
-    id: "e1",
-    client_id: "a",
-    created_at: "2026-10-27T10:00:00Z",
-    date_start: "2026-11-28",
-    event_type: "hipro_1",
-    status: "pre_reserva",
-    is_test: false,
-    value: null,
-    rental: null,
-    ...o,
-  });
-
-  it("conta reserva criada depois do envio", () => {
-    const r = conversoesDaCampanha(envios, [ev({ value: "1500" })]);
-    expect(r).toHaveLength(1);
-    expect(r[0]).toMatchObject({ client_id: "a", valor: 1500, locacao: false, data_atendimento: "2026-11-28" });
-  });
-
-  it("usa o valor da locação quando já foi finalizada", () => {
-    const r = conversoesDaCampanha(envios, [ev({ value: 1000, rental: { calculated_value: 2200, status: "confirmada" } })]);
-    expect(r[0]).toMatchObject({ valor: 2200, locacao: true });
-  });
-
-  it("ignora reserva anterior ao envio, cancelada, de teste, de quem não recebeu e de outro tipo", () => {
-    const r = conversoesDaCampanha(envios, [
-      ev({ id: "x1", created_at: "2026-10-20T10:00:00Z" }),
-      ev({ id: "x2", status: "cancelada" }),
-      ev({ id: "x3", is_test: true }),
-      ev({ id: "x4", client_id: "c" }),
-      ev({ id: "x5", event_type: "outros" }),
-      ev({ id: "x6", rental: { calculated_value: 900, status: "cancelada" } }),
-      ev({ id: "x7", client_id: "zzz" }),
-    ]);
-    expect(r).toEqual([]);
-  });
-
-  it("fica com o primeiro atendimento depois do envio e conta a pessoa uma vez", () => {
-    const r = conversoesDaCampanha(envios, [
-      ev({ id: "tarde", created_at: "2026-11-05T10:00:00Z" }),
-      ev({ id: "cedo", created_at: "2026-10-27T10:00:00Z" }),
-    ]);
-    expect(r).toHaveLength(1);
-    expect(r[0].evento_id).toBe("cedo");
-  });
-
-  it("resume total, valor e taxa sobre quem recebeu", () => {
-    expect(resumoDasConversoes([{ valor: 1000 }, { valor: null }], 8)).toEqual({ total: 2, valor: 1000, taxa: 0.25 });
-    expect(resumoDasConversoes([], 0)).toEqual({ total: 0, valor: 0, taxa: 0 });
   });
 });

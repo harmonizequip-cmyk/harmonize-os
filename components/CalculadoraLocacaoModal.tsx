@@ -30,6 +30,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import VinculoCampanha, { vincularCampanha } from "@/components/VinculoCampanha";
 import { createClient } from "@/lib/supabase/client";
 import { paraEscolha } from "@/lib/categorias";
 import ClientPicker from "@/components/ClientPicker";
@@ -366,6 +367,7 @@ export default function CalculadoraLocacaoModal({
   ]);
   const [patientCount, setPatientCount] = useState("1");
   const [notes, setNotes] = useState("");
+  const [campanhaId, setCampanhaId] = useState("");
 
   // Trocas de ponteira feitas na reserva (antes de finalizar): as contagens
   // fechadas (reserva_contagens) entram completas e, por último, a contagem
@@ -1129,6 +1131,11 @@ export default function CalculadoraLocacaoModal({
     setSavedRentalId(rentalId);
 
     const avisos: string[] = [];
+
+    if (campanhaId && activeClientId) {
+      const erroCampanha = await vincularCampanha(supabase, campanhaId, activeClientId);
+      if (erroCampanha) avisos.push(`Não consegui ligar à campanha (${erroCampanha}). Marque "Agendou" na aba Resultado da campanha.`);
+    }
 
     if (!isMentoria) {
       const { error: eCont } = await supabase.rpc("registrar_contagens_locacao", {
@@ -2314,6 +2321,8 @@ export default function CalculadoraLocacaoModal({
               )}
             </div>
           )}
+
+          <VinculoCampanha clientId={activeClientId} valor={campanhaId} onChange={setCampanhaId} />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>

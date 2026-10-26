@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import VinculoCampanha, { vincularCampanha } from "@/components/VinculoCampanha";
 import { createClient } from "@/lib/supabase/client";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 
 import { hojeLocal } from "@/lib/period";
-import { confirmar } from "@/components/Dialogos";
+import { avisar, confirmar } from "@/components/Dialogos";
 interface EquipmentOption {
   id: string;
   code: string;
@@ -42,6 +43,7 @@ export default function ReservarHiproModal({
   const [dataFim, setDataFim] = useState("");
   const [notes, setNotes] = useState("");
   const [isMentoria, setIsMentoria] = useState(false);
+  const [campanhaId, setCampanhaId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,6 +161,12 @@ export default function ReservarHiproModal({
       return;
     }
 
+    // A reserva já está gravada; se a ligação com a campanha falhar, avisa mas não desfaz nada.
+    if (campanhaId) {
+      const erroCampanha = await vincularCampanha(supabase, campanhaId, clientId);
+      if (erroCampanha) await avisar(`Reserva criada, mas não consegui ligar à campanha: ${erroCampanha} Marque "Agendou" na aba Resultado da campanha.`, "erro");
+    }
+
     onCreated();
   }
 
@@ -231,6 +239,8 @@ export default function ReservarHiproModal({
               <p className="mt-1 text-xs text-neutral-500">Uma reserva só, com uma taxa de reserva só.</p>
             )}
           </div>
+
+          <VinculoCampanha clientId={clientId} valor={campanhaId} onChange={setCampanhaId} />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>

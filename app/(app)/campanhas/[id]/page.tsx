@@ -42,8 +42,6 @@ export default async function CampanhaPage(props: { params: Promise<{ id: string
       arteUrl={arte.data?.signedUrl ?? null}
       envios={r.envios}
       naoQuer={r.naoQuer}
-      conversoes={r.conversoes}
-      erroConversoes={r.erroConversoes}
       pessoas={pessoas}
       hoje={hoje}
       abaInicial={sp.aba}
