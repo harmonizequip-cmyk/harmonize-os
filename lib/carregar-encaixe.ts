@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { carregarMapaCidades } from "./carregar-cidades";
 import { carregarRelacionamento } from "./carregar-relacionamento";
-import { oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
+import { agendaDoEncaixe, oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
-import { diasDoPeriodo, somarDias } from "./period";
+import { somarDias } from "./period";
 import type { PessoaClassificada } from "./relacionamento";
 
 /**
@@ -33,16 +33,7 @@ export async function carregarEncaixe(
   ]);
   if (e1 || e2) throw new Error(`Não consegui carregar a agenda para o encaixe: ${(e1 ?? e2)!.message}`);
 
-  const ocupados = new Set<string>();
-  const comCidade: { data: string; ate: string | null; cidade: string | null }[] = [];
-  for (const e of (eventos ?? []) as any[]) {
-    const fim = e.date_end ?? e.date_start;
-    if (fim < de) continue;
-    if (e.event_type === "hipro_1" || e.event_type === "hipro_2") for (const d of diasDoPeriodo(e.date_start, fim)) ocupados.add(d);
-    const cli = Array.isArray(e.clients) ? e.clients[0] : e.clients;
-    comCidade.push({ data: e.date_start, ate: e.date_end, cidade: cli?.city ?? null });
-  }
-  for (const b of bloqueios ?? []) for (const d of diasDoPeriodo(b.data_inicio, b.data_fim, 400)) ocupados.add(d);
+  const { ocupados, comCidade } = agendaDoEncaixe((eventos ?? []) as any[], bloqueios ?? [], de);
 
   return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm, mapa });
 }

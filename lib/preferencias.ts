@@ -47,6 +47,8 @@ export interface Preferencias {
   };
   encaixe: {
     raioKm: number;
+    /** Melhores datas: até quantos km da cidade onde você vai estar conta como "Perto" (sempre ≤ raioKm). */
+    pertoKm: number;
     diasAFrente: number;
     /** Máximo de pessoas listadas por data livre. */
     porData: number;
@@ -175,7 +177,7 @@ export const DEFAULT_PREFERENCIAS: Preferencias = {
     vipFatia: 0.5,
     frequenteFatia: 0.8,
   },
-  encaixe: { raioKm: 150, diasAFrente: 30, porData: 12, perguntarAoCancelar: true, cidadeBase: "" },
+  encaixe: { raioKm: 150, pertoKm: 60, diasAFrente: 30, porData: 12, perguntarAoCancelar: true, cidadeBase: "" },
   listas: {
     origens: [
       { valor: "indicacao", rotulo: "Indicação" },
@@ -276,6 +278,10 @@ export function lerPreferencias(bruto: unknown): Preferencias {
   if (frequenteFatia <= vipFatia) [vipFatia, frequenteFatia] = [d.relacionamento.vipFatia, d.relacionamento.frequenteFatia];
 
   const enc = obj(r.encaixe);
+  const raioKm = num(enc.raioKm, d.encaixe.raioKm, 10, 1000);
+  // "Perto" nunca passa do raio: acima dele volta ao padrão (e o padrão, se o raio for menor, vira o raio).
+  const pertoLido = num(enc.pertoKm, d.encaixe.pertoKm, 5, 300);
+  const pertoKm = pertoLido <= raioKm ? pertoLido : Math.min(d.encaixe.pertoKm, raioKm);
 
   const lis = obj(r.listas);
   const origens: { valor: string; rotulo: string }[] = [];
@@ -357,7 +363,8 @@ export function lerPreferencias(bruto: unknown): Preferencias {
       frequenteFatia,
     },
     encaixe: {
-      raioKm: num(enc.raioKm, d.encaixe.raioKm, 10, 1000),
+      raioKm,
+      pertoKm,
       diasAFrente: num(enc.diasAFrente, d.encaixe.diasAFrente, 3, 90),
       porData: num(enc.porData, d.encaixe.porData, 1, 50),
       perguntarAoCancelar: bool(enc.perguntarAoCancelar, d.encaixe.perguntarAoCancelar),
