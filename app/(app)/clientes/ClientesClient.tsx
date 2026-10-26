@@ -48,10 +48,13 @@ export default function ClientesClient({
   initialClients,
   cidades,
   periodo,
+  podeLimparLeads = false,
 }: {
   initialClients: ClientRow[];
   cidades: string[];
   periodo: Periodo;
+  /** TEMPORÁRIO: link para /clientes/limpeza-leads, só admin. */
+  podeLimparLeads?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -143,6 +146,12 @@ export default function ClientesClient({
         </button>
         </div>
       </div>
+      {/* TEMPORÁRIO: remover junto com /clientes/limpeza-leads. */}
+      {podeLimparLeads && (
+        <Link href="/clientes/limpeza-leads" className="inline-block text-xs text-neutral-500 underline underline-offset-2 hover:text-neutral-700">
+          Limpar leads (temporário)
+        </Link>
+      )}
 
       <FiltroBarra
         periodoPadrao="ano"

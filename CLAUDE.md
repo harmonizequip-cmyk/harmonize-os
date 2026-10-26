@@ -343,6 +343,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Backup: o plano do Supabase é gratuito, então vale o backup manual semanal (Configurações > Baixar backup, guardar no Google Drive). Restauração testada em 06/10/2026 num Postgres temporário (`docs/RESTAURACAO-BACKUP.md`, `scripts/restaurar-backup.py`). Ainda não foi testada num projeto Supabase de verdade.
 - Contrato assinado e checklist: fora do escopo por decisão do dono.
 - Configurações escondidas, etapas 3 (restante) e 4: por decisão do dono (25/10/2026), tudo que mexe em coisa que roda sozinha ou em acesso fica como está: cobrança e taxa editáveis, textos e horários dos avisos do celular (função `alertas`, pg_cron em UTC), usuários e permissões, convite de usuário, regras do portal da cliente (60, 45 e 14 dias), dias de trabalho, cláusulas do contrato e modelo/limite do assistente (segredos do Supabase). Só reabrir se o dono pedir, com motivo concreto, em passos pequenos, com backup da versão no ar e teste antes de publicar.
+- Tela temporária /clientes/limpeza-leads (excluir leads em massa, reusa delete_record_forever): remover a rota, o componente, `lib/limpeza-leads.ts` e o link em /clientes quando o dono terminar a limpeza.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
