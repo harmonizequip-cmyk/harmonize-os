@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Search, X } from "lucide-react";
@@ -29,6 +30,8 @@ interface EventHit {
 // MobileHeader e Sidebar) pra não precisar navegar até Clientes, Tarefas
 // ou Agenda só pra procurar um nome. Cruza as três tabelas de uma vez e
 // manda pra tela e o item certos ao clicar num resultado.
+// A janela abre por portal no <body>: o cabeçalho do celular tem backdrop-filter,
+// que prende um "fixed" filho dentro dele e o deixava atrás do conteúdo da tela.
 export default function GlobalSearch({ compact }: { compact?: boolean }) {
   const supabase = createClient();
   const router = useRouter();
@@ -124,8 +127,9 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
         {!compact && <span>Buscar</span>}
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/40 p-4 pt-16 sm:pt-24" onClick={close}>
+      {open &&
+        createPortal(
+        <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 p-4 pt-16 sm:pt-24" onClick={close}>
           <div
             className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -200,8 +204,9 @@ export default function GlobalSearch({ compact }: { compact?: boolean }) {
               )}
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+        )}
     </>
   );
 }

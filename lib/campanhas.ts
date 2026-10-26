@@ -275,3 +275,89 @@ export function contarPorStatus(envios: Pick<EnvioCampanha, "status">[]): Record
 export function totalRecebidos(envios: Pick<EnvioCampanha, "enviado_em">[]): number {
   return envios.filter((e) => !!e.enviado_em).length;
 }
+
+// ---------- quem adquiriu ----------
+
+/**
+ * "Adquiriu" = a pessoa recebeu a campanha (tem hora de envio) e DEPOIS disso
+ * ganhou um atendimento de HIPRO ou mentoria na agenda (reserva ou locação,
+ * não cancelada, fora do modo teste). Conta o primeiro atendimento criado depois
+ * do envio; a data do atendimento pode ser qualquer uma. É uma leitura dos dados
+ * que já existem (nada para marcar à mão): a campanha não prova que foi ela quem
+ * vendeu, só que a reserva veio depois dela.
+ */
+export interface EventoParaConversao {
+  id: string;
+  client_id: string | null;
+  created_at: string;
+  date_start: string;
+  event_type: string;
+  status: string;
+  is_test?: boolean | null;
+  value: number | string | null;
+  /** Locação já finalizada deste atendimento (o valor dela vale mais que o da reserva). */
+  rental: { calculated_value: number | string | null; status?: string | null; is_test?: boolean | null } | null;
+}
+
+export interface Conversao {
+  client_id: string;
+  evento_id: string;
+  /** Quando o atendimento foi criado. */
+  criado_em: string;
+  /** Dia do atendimento (AAAA-MM-DD). */
+  data_atendimento: string;
+  /** Valor da locação ou da reserva; nulo quando ainda não há valor. */
+  valor: number | null;
+  /** true = já virou locação (valor da locação). */
+  locacao: boolean;
+}
+
+const TIPOS_QUE_CONTAM = new Set(["hipro_1", "hipro_2", "mentoria"]);
+
+export function conversoesDaCampanha(
+  envios: Pick<EnvioCampanha, "client_id" | "enviado_em">[],
+  eventos: EventoParaConversao[]
+): Conversao[] {
+  const envioDe = new Map<string, number>();
+  for (const e of envios) {
+    if (!e.enviado_em) continue;
+    const t = new Date(e.enviado_em).getTime();
+    if (Number.isFinite(t)) envioDe.set(e.client_id, t);
+  }
+  const primeiro = new Map<string, EventoParaConversao>();
+  for (const ev of eventos) {
+    if (!ev.client_id) continue;
+    const enviadoEm = envioDe.get(ev.client_id);
+    if (enviadoEm === undefined) continue;
+    if (ev.status === "cancelada" || ev.is_test) continue;
+    if (!TIPOS_QUE_CONTAM.has(ev.event_type)) continue;
+    if (ev.rental && (ev.rental.status === "cancelada" || ev.rental.is_test)) continue;
+    const criado = new Date(ev.created_at).getTime();
+    if (!Number.isFinite(criado) || criado < enviadoEm) continue;
+    const atual = primeiro.get(ev.client_id);
+    if (!atual || criado < new Date(atual.created_at).getTime()) primeiro.set(ev.client_id, ev);
+  }
+  const numero = (v: number | string | null | undefined) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  return Array.from(primeiro.values())
+    .map((ev) => {
+      const daLocacao = numero(ev.rental?.calculated_value);
+      return {
+        client_id: ev.client_id as string,
+        evento_id: ev.id,
+        criado_em: ev.created_at,
+        data_atendimento: ev.date_start.slice(0, 10),
+        valor: daLocacao ?? numero(ev.value),
+        locacao: !!ev.rental,
+      };
+    })
+    .sort((a, b) => b.criado_em.localeCompare(a.criado_em));
+}
+
+export function resumoDasConversoes(conversoes: Pick<Conversao, "valor">[], recebidos: number): { total: number; valor: number; taxa: number } {
+  const valor = conversoes.reduce((s, c) => s + (c.valor ?? 0), 0);
+  return { total: conversoes.length, valor, taxa: recebidos > 0 ? conversoes.length / recebidos : 0 };
+}

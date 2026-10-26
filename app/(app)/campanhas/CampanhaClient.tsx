@@ -15,6 +15,7 @@ import { IconeChip, Pilula } from "@/components/ui/Visual";
 import { candidatosDaCampanha, enviadosNoDia, filaDaCampanha, lerFiltros, previaDaMensagem } from "@/lib/campanhas";
 import { apagarArte } from "@/lib/campanha-arte";
 import type { CampanhaRow, EnvioComCliente } from "@/lib/carregar-campanhas";
+import type { Conversao } from "@/lib/campanhas";
 import type { PessoaClassificada } from "@/lib/relacionamento";
 import EditorCampanha from "./EditorCampanha";
 import FilaCampanha from "./FilaCampanha";
@@ -27,6 +28,8 @@ export default function CampanhaClient({
   arteUrl,
   envios,
   naoQuer,
+  conversoes,
+  erroConversoes,
   pessoas,
   hoje,
   abaInicial,
@@ -35,6 +38,8 @@ export default function CampanhaClient({
   arteUrl: string | null;
   envios: EnvioComCliente[];
   naoQuer: string[];
+  conversoes: Conversao[];
+  erroConversoes: string | null;
   pessoas: PessoaClassificada[];
   hoje: string;
   abaInicial: string | undefined;
@@ -190,7 +195,7 @@ export default function CampanhaClient({
           />
         ))}
 
-      {aba === "resultado" && <ResultadoCampanha campanhaId={campanha.id} envios={envios} hoje={hoje} onMudou={() => router.refresh()} />}
+      {aba === "resultado" && <ResultadoCampanha campanhaId={campanha.id} envios={envios} conversoes={conversoes} erroConversoes={erroConversoes} hoje={hoje} onMudou={() => router.refresh()} />}
 
       {aba === "editar" && !somenteLeitura && (
         <EditorCampanha campanha={campanha} arteUrl={arteUrl} pessoas={pessoas} jaNaCampanha={jaNaCampanha} naoQuer={naoQuer} />

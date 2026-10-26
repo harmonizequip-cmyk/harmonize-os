@@ -1,7 +1,7 @@
 "use client";
 
 // Menu de atalhos dos cartões de lead/cliente (Funil, Agenda, Clientes, Relacionamento,
-// Tarefas, Pendências, Agenda de hoje). Cada opção leva a uma tela ou ação que já existe:
+// Tarefas, Pendências, Agenda de hoje). "Abrir cadastro" entra na ficha da pessoa (some quando já está nela). Cada opção leva a uma tela ou ação que já existe:
 // Melhores datas abre a janela das datas livres por logística (MelhoresDatasModal),
 // WhatsApp e Waze pelo cadastro, Agendar sem disparos e Nova locação abrem a ficha já com a
 // janela certa (?acao=), e o resto são as listas filtradas pela cliente.
@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   CalendarClock,
   CalendarPlus,
@@ -23,6 +24,7 @@ import {
   Package,
   PlusCircle,
   StickyNote,
+  UserRound,
   Wallet,
   X,
   type LucideIcon,
@@ -32,6 +34,7 @@ import { buildWazeLink, buildWhatsAppLink } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
 import {
   linkAgendarCliente,
+  linkCliente,
   linkLancamentosCliente,
   linkLocacoesCliente,
   linkNovaLocacaoCliente,
@@ -90,6 +93,7 @@ export default function MenuAtalhosCliente({
   comTexto?: boolean;
 }) {
   const somenteLeitura = useSomenteLeitura();
+  const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
   const [anotacoes, setAnotacoes] = useState(false);
   const [melhoresDatas, setMelhoresDatas] = useState(false);
@@ -217,6 +221,8 @@ export default function MenuAtalhosCliente({
     {
       titulo: "Contato",
       itens: [
+        // Na própria ficha o atalho não leva a lugar nenhum, então some.
+        ...(pathname === linkCliente(clienteId) ? [] : [{ chave: "cadastro", rotulo: "Abrir cadastro", icone: UserRound, href: linkCliente(clienteId) }]),
         {
           chave: "anotacoes",
           rotulo: "Anotações",
