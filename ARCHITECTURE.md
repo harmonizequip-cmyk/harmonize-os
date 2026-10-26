@@ -9,6 +9,7 @@
 - 1.3 Mapa de funcionalidades e regras de negócio
 - 1.4 Matriz de rastreabilidade (funcionalidade x tabela)
 - 1.5 Integrações, eventos e automações
+- Anexo A: schema das funções (código completo)
 
 ## 1.1 Visão geral e arquitetura
 
@@ -5136,4 +5137,6586 @@ Tabelas acessadas direto: `cadastros_recebidos` (CU), `push_inscricoes` (RD). RP
 
 - `harmonize:pagamento-registrado`: disparado por `ReceberPagamentoBotao`; `components/ReciboHost.tsx` escuta e oferece a imagem do recibo.
 - Mensagens do service worker para a página (compartilhamento recebido, atualização) em `public/sw.js` e `components/RegistrarServiceWorker.tsx`.
+
+
+## Anexo A: schema das funções (código completo)
+
+O código abaixo é a definição atual de cada uma das 141 funções do esquema `public`, extraída do banco com `pg_get_functiondef` (igual ao banco real do Supabase, conferido por soma de verificação). Está como no banco, sem edição. Junto com a seção 1.2 (tabelas, colunas, chaves, índices, políticas, gatilhos e views), este anexo cobre o schema inteiro. O arquivo `schema.sql` na raiz continua sendo o que recria o banco do zero e guarda também o histórico comentado de cada mudança; permissões de execução (`grant`/`revoke`) estão na coluna Executam da tabela de funções.
+
+### `adiar_previsao_manutencao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.adiar_previsao_manutencao(p_equipment_id uuid, p_nova_previsao date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+  v_status_atual text;
+  v_hoje date := public.hoje_local();
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar a previsão de manutenção.';
+  end if;
+
+  if p_nova_previsao < current_date then
+    raise exception 'A nova previsão não pode ser uma data no passado.';
+  end if;
+
+  select name, status into v_nome, v_status_atual from equipments where id = p_equipment_id;
+  if v_nome is null then
+    raise exception 'Equipamento não encontrado (id %).', p_equipment_id;
+  end if;
+  if v_status_atual <> 'manutencao' then
+    raise exception 'Este equipamento não está em manutenção no momento.';
+  end if;
+
+  update bloqueios_equipamento set data_fim = greatest(p_nova_previsao - 1, data_inicio)
+   where equipment_id = p_equipment_id and tipo = 'manutencao'
+     and data_inicio <= v_hoje and data_fim >= v_hoje;
+
+  update equipments set status_previsto_fim = p_nova_previsao where id = p_equipment_id;
+
+  perform public.registrar_movimentacao(
+    'editado', 'equipments', p_equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object('acao_detalhada', 'Previsão de retorno adiada para ' || to_char(p_nova_previsao, 'DD/MM/YYYY'))
+  );
+end;
+$function$
+```
+
+### `agendamentos_do_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.agendamentos_do_cliente(p_client_id uuid)
+ RETURNS TABLE(event_id uuid, rental_id uuid, equipamento text, data date, status text, confirmado boolean, valor numeric, disparos integer, situacao text, taxa_status text, taxa_valor numeric, pago boolean, pago_em date, cancellation_reason text, no_show boolean, reagendado boolean)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select
+    ev.id,
+    ev.rental_id,
+    coalesce(eq.name, ev.title),
+    ev.date_start,
+    ev.status::text,
+    ev.confirmed,
+    coalesce(r.calculated_value, ev.value),
+    r.shots,
+    case
+      when ev.status = 'cancelada'  then 'cancelado'
+      when ev.status = 'realizada'  then 'realizado'
+      when ev.confirmed             then 'confirmado'
+      else 'agendado'
+    end,
+    ev.taxa_status,
+    ev.taxa_valor,
+    coalesce(r.pago, false),
+    r.pago_em,
+    ev.cancellation_reason,
+    ev.no_show,
+    coalesce(ev.rescheduled, false) or coalesce(r.rescheduled, false)
+  from calendar_events ev
+  left join equipments eq on eq.id = ev.equipment_id
+  left join rentals r on r.id = ev.rental_id
+  where public.has_module_permission('clientes')
+    and ev.client_id = p_client_id
+  order by ev.date_start desc;
+$function$
+```
+
+### `alertas_segredos`
+
+```sql
+CREATE OR REPLACE FUNCTION public.alertas_segredos()
+ RETURNS TABLE(vapid_private text, segredo text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  return query
+    select
+      (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_vapid_private'),
+      (select decrypted_secret from vault.decrypted_secrets where name = 'harmonize_alertas_segredo');
+end;
+$function$
+```
+
+### `alterar_fim_bloqueio_equipamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.alterar_fim_bloqueio_equipamento(p_bloqueio_id uuid, p_fim date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_bl record;
+  v_nome text;
+  v_choque record;
+  v_hoje date := public.hoje_local();
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para mudar o bloqueio.';
+  end if;
+  select * into v_bl from bloqueios_equipamento where id = p_bloqueio_id;
+  if v_bl.id is null then
+    raise exception 'Bloqueio não encontrado.';
+  end if;
+  if p_fim is null or p_fim < v_bl.data_inicio then
+    raise exception 'O último dia não pode ser antes do primeiro (%).', to_char(v_bl.data_inicio, 'DD/MM/YYYY');
+  end if;
+  if p_fim < v_hoje - 1 then
+    raise exception 'O último dia não pode ficar no passado.';
+  end if;
+
+  select * into v_choque from bloqueios_equipamento
+   where equipment_id = v_bl.equipment_id and id <> v_bl.id
+     and data_inicio <= p_fim and data_fim >= v_bl.data_inicio
+   limit 1;
+  if v_choque.id is not null then
+    raise exception 'Esse novo prazo encosta em outro bloqueio (% a %).',
+      to_char(v_choque.data_inicio, 'DD/MM'), to_char(v_choque.data_fim, 'DD/MM');
+  end if;
+
+  update bloqueios_equipamento set data_fim = p_fim where id = p_bloqueio_id;
+  select name into v_nome from equipments where id = v_bl.equipment_id;
+
+  -- Manutenção em curso deste bloqueio: acompanha o novo prazo, ou termina
+  -- se o bloqueio deixou de cobrir hoje.
+  if v_bl.tipo = 'manutencao' then
+    update equipments
+       set status_previsto_fim = p_fim + 1
+     where id = v_bl.equipment_id and status = 'manutencao' and status_previsto_fim = v_bl.data_fim + 1;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'equipments', v_bl.equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object('acao_detalhada',
+      'Bloqueio (' || rotulo_bloqueio(v_bl.tipo) || ') agora vai até ' || to_char(p_fim, 'DD/MM/YYYY'))
+  );
+
+  perform public.aplicar_previsoes_manutencao_vencidas();
+end;
+$function$
+```
+
+### `aplicar_previsoes_manutencao_vencidas`
+
+```sql
+CREATE OR REPLACE FUNCTION public.aplicar_previsoes_manutencao_vencidas()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_equip record;
+begin
+  if not (public.has_module_permission('equipamentos') or public.has_module_permission('agenda')) then
+    return;
+  end if;
+
+  for v_equip in
+    select id, name from equipments
+     where status = 'manutencao'
+       and status_previsto_fim is not null
+       and status_previsto_fim <= public.hoje_local()
+  loop
+    update equipments
+       set status = 'ativo',
+           status_motivo = null,
+           status_desde = now(),
+           status_previsto_fim = null
+     where id = v_equip.id;
+
+    perform public.registrar_movimentacao(
+      'manutencao_finalizada', 'equipments', v_equip.id, 'Equipamento ' || v_equip.name,
+      jsonb_build_object('motivo', 'retorno automático: a previsão de volta foi atingida')
+    );
+  end loop;
+
+  for v_equip in select id from equipments loop
+    perform public.sincronizar_manutencao_por_bloqueio(v_equip.id);
+  end loop;
+end;
+$function$
+```
+
+### `apply_test_mode`
+
+```sql
+CREATE OR REPLACE FUNCTION public.apply_test_mode()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.is_test is not true then
+    new.is_test := coalesce((select s.test_mode from public.settings s limit 1), false);
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `arquivar_campanha`
+
+```sql
+CREATE OR REPLACE FUNCTION public.arquivar_campanha(p_id uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_c campanhas%rowtype;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para mexer em campanhas.';
+  end if;
+  select * into v_c from campanhas where id = p_id for update;
+  if not found then
+    raise exception 'Campanha não encontrada.';
+  end if;
+  update campanhas set arquivada = not v_c.arquivada, updated_at = now() where id = p_id;
+  perform registrar_movimentacao('editado', 'campanha', p_id,
+    case when v_c.arquivada then 'Campanha desarquivada: ' else 'Campanha arquivada: ' end || v_c.nome,
+    jsonb_build_object('arquivada', not v_c.arquivada));
+  return not v_c.arquivada;
+end;
+$function$
+```
+
+### `arquivar_categoria`
+
+```sql
+CREATE OR REPLACE FUNCTION public.arquivar_categoria(p_id uuid, p_arquivar boolean DEFAULT true)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cat categories%rowtype;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas categorias.';
+  end if;
+  select * into v_cat from categories where id = p_id for update;
+  if not found then
+    raise exception 'Categoria não encontrada.';
+  end if;
+  if v_cat.scope = 'pessoal' and not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para o Pessoal.';
+  end if;
+  if v_cat.sistema and coalesce(p_arquivar, true) then
+    raise exception 'A categoria "%" é do sistema e não pode ser arquivada.', v_cat.name;
+  end if;
+  if v_cat.arquivada = coalesce(p_arquivar, true) then
+    return;
+  end if;
+  update categories set arquivada = coalesce(p_arquivar, true) where id = p_id;
+  perform registrar_movimentacao('editado', 'categories', p_id,
+    case when coalesce(p_arquivar, true) then 'Categoria arquivada: ' else 'Categoria reativada: ' end || v_cat.name,
+    jsonb_build_object('arquivada', coalesce(p_arquivar, true)));
+end;
+$function$
+```
+
+### `assistente_consultar`
+
+```sql
+CREATE OR REPLACE FUNCTION public.assistente_consultar(p_sql text, p_limite integer DEFAULT 200)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_sql text := btrim(regexp_replace(coalesce(p_sql, ''), ';\s*$', ''));
+  v_limite integer := least(greatest(coalesce(p_limite, 200), 1), 5000);
+  v_res jsonb;
+begin
+  if not exists (
+    select 1 from profiles where id = auth.uid() and active and not somente_leitura and cliente_id is null
+  ) then
+    raise exception 'Sem acesso ao assistente.';
+  end if;
+  if v_sql !~* '^(select|with)\s' then
+    raise exception 'Só consultas SELECT.';
+  end if;
+  if position(';' in v_sql) > 0 then
+    raise exception 'Uma consulta por vez, sem ";".';
+  end if;
+  if v_sql ~* '(\mvault\M|\mauth\M|\mpg_|\mset_config\M|\mdblink|\mlo_|\mcurrent_setting\M|push_inscricoes|webauthn|alertas_segredos|formulario_segredo|\mcopy\M|\mquery_to_|\mtable_to_|\mxpath\M|\mdatabase_to_|\mschema_to_)' then
+    raise exception 'Essa consulta usa algo que o assistente não pode ler.';
+  end if;
+
+  perform set_config('transaction_read_only', 'on', true);
+
+  execute format(
+    'select coalesce(jsonb_agg(t), ''[]''::jsonb) from (select * from (%s) q limit %s) t',
+    v_sql, v_limite + 1
+  ) into v_res;
+  return v_res;
+end;
+$function$
+```
+
+### `bloquear_somente_leitura`
+
+```sql
+CREATE OR REPLACE FUNCTION public.bloquear_somente_leitura()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if public.eh_somente_leitura() then
+    raise exception 'Acesso só de visualização: este usuário não pode alterar dados.';
+  end if;
+  return null;
+end;
+$function$
+```
+
+### `cancelar_agendamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.cancelar_agendamento(p_event_id uuid, p_motivo text DEFAULT NULL::text, p_no_show boolean DEFAULT false)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_status event_status_type;
+  v_taxa text;
+  v_descricao text;
+  v_pago boolean;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para cancelar agendamentos.';
+  end if;
+
+  select rental_id, status, taxa_status into v_rental_id, v_status, v_taxa
+    from calendar_events where id = p_event_id;
+
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento já está cancelado.';
+  end if;
+
+  if v_rental_id is not null then
+    select pago into v_pago from rentals where id = v_rental_id;
+    if v_pago then
+      raise exception 'Esta locação já foi paga. Desfaça o pagamento antes de cancelar, para o caixa não ficar com receita de algo cancelado.';
+    end if;
+    if exists (select 1 from rental_payments where rental_id = v_rental_id) then
+      raise exception 'Esta locação tem pagamento registrado. Remova os pagamentos antes de cancelar, senão o dinheiro recebido some do caixa.';
+    end if;
+  end if;
+
+  v_descricao := public.descrever_registro('calendar_events', p_event_id);
+
+  update calendar_events
+     set status = 'cancelada',
+         cancellation_reason = nullif(trim(p_motivo), ''),
+         no_show = coalesce(p_no_show, false)
+   where id = p_event_id;
+  -- rentals.status/cancellation_reason/no_show são sincronizados sozinhos
+  -- pelo trigger trg_sync_rental_from_calendar_event (leva R + S).
+
+  if v_taxa = 'paga' then
+    update calendar_events set taxa_status = 'perdida' where id = p_event_id;
+    perform public.registrar_movimentacao(
+      'taxa_perdida', 'calendar_events', p_event_id, v_descricao,
+      jsonb_build_object('motivo', 'agendamento cancelado após a taxa ter sido paga')
+    );
+  end if;
+
+  -- Leva O: taxa perdida deixa de contar como crédito, então o saldo da
+  -- locação (se houver) precisa ser recalculado.
+  if v_rental_id is not null then
+    perform public.recalcular_pagamento_locacao(v_rental_id);
+  end if;
+
+  perform public.registrar_movimentacao(
+    'cancelado', 'calendar_events', p_event_id, v_descricao,
+    jsonb_build_object(
+      'motivo', coalesce(nullif(trim(p_motivo), ''), 'não informado'),
+      'no_show', coalesce(p_no_show, false),
+      'taxa', coalesce(v_taxa, 'nao_aplica'),
+      'status_anterior', v_status
+    )
+  );
+end;
+$function$
+```
+
+### `cancelar_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.cancelar_locacao(p_rental_id uuid, p_motivo text DEFAULT NULL::text, p_no_show boolean DEFAULT false)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_event_id uuid;
+begin
+  select id into v_event_id from calendar_events where rental_id = p_rental_id;
+  if v_event_id is null then
+    raise exception 'Locação sem evento de agenda vinculado (id %).', p_rental_id;
+  end if;
+  perform public.cancelar_agendamento(v_event_id, p_motivo, p_no_show);
+end;
+$function$
+```
+
+### `categoria_nome_reservado`
+
+```sql
+CREATE OR REPLACE FUNCTION public.categoria_nome_reservado(p_scope scope_type, p_type entry_type, p_nome text, p_id uuid DEFAULT NULL::uuid)
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when p_type = 'entrada' and lower(btrim(p_nome)) ~ '^(taxa|loca|mentoria|deslocamento)'
+      then 'Nome reservado: entradas começando com Taxa, Loca, Mentoria ou Deslocamento são do sistema.'
+    when exists (
+      select 1 from categories c
+       where c.sistema and c.scope = p_scope and c.id is distinct from p_id
+         and lower(btrim(c.name)) = lower(btrim(p_nome))
+    ) then 'Já existe uma categoria do sistema com esse nome.'
+    else null
+  end;
+$function$
+```
+
+### `cliente_do_usuario`
+
+```sql
+CREATE OR REPLACE FUNCTION public.cliente_do_usuario()
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select p.cliente_id from profiles p
+   where p.id = auth.uid() and p.active and p.cliente_id is not null
+     and coalesce(portal_valido_ate(p.cliente_id) >= hoje_local(), false);
+$function$
+```
+
+### `confirmar_agendamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.confirmar_agendamento(p_event_id uuid, p_confirmado boolean DEFAULT true)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status event_status_type;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+
+  select status into v_status from calendar_events where id = p_event_id;
+
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado. Reative-o antes de confirmar.';
+  end if;
+
+  update calendar_events set confirmed = p_confirmado where id = p_event_id;
+
+  perform public.registrar_movimentacao(
+    case when p_confirmado then 'confirmado' else 'desconfirmado' end,
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    '{}'::jsonb
+  );
+end;
+$function$
+```
+
+### `confirmar_cadastro_recebido`
+
+```sql
+CREATE OR REPLACE FUNCTION public.confirmar_cadastro_recebido(p_id uuid, p_client_id uuid, p_campos jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cad cadastros_recebidos%rowtype;
+  v_cliente uuid := p_client_id;
+  v_c jsonb := coalesce(p_campos, '{}'::jsonb);
+  v_nota text := nullif(btrim(v_c ->> 'notes_add'), '');
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para cadastrar clientes.';
+  end if;
+
+  select * into v_cad from cadastros_recebidos where id = p_id for update;
+  if not found then raise exception 'Cadastro não encontrado.'; end if;
+  if v_cad.status <> 'pendente' then raise exception 'Este cadastro já foi resolvido.'; end if;
+
+  if v_cliente is null then
+    if nullif(btrim(v_c ->> 'name'), '') is null then
+      raise exception 'Informe o nome.';
+    end if;
+    insert into clients (name, treatment, display_name, whatsapp, email, clinic_name, city, state, notes, origem, stage, created_by)
+    values (
+      upper(btrim(v_c ->> 'name')),
+      nullif(v_c ->> 'treatment', ''),
+      nullif(btrim(v_c ->> 'display_name'), ''),
+      nullif(btrim(v_c ->> 'whatsapp'), ''),
+      nullif(lower(btrim(v_c ->> 'email')), ''),
+      nullif(upper(btrim(v_c ->> 'clinic_name')), ''),
+      nullif(upper(btrim(v_c ->> 'city')), ''),
+      nullif(upper(btrim(v_c ->> 'state')), ''),
+      v_nota,
+      'formulario',
+      'lead',
+      auth.uid()
+    )
+    returning id into v_cliente;
+    perform registrar_movimentacao('criado', 'cliente', v_cliente,
+      'Lead criado pelo formulário de cadastro: ' || upper(btrim(v_c ->> 'name')), jsonb_build_object('cadastro_id', p_id));
+  else
+    if not exists (select 1 from clients where id = v_cliente) then
+      raise exception 'Cliente não encontrado.';
+    end if;
+    update clients set
+      name         = case when v_c ? 'name' and nullif(btrim(v_c ->> 'name'), '') is not null then upper(btrim(v_c ->> 'name')) else name end,
+      treatment    = case when v_c ? 'treatment' then nullif(v_c ->> 'treatment', '') else treatment end,
+      display_name = case when v_c ? 'display_name' then nullif(btrim(v_c ->> 'display_name'), '') else display_name end,
+      whatsapp     = case when v_c ? 'whatsapp' then nullif(btrim(v_c ->> 'whatsapp'), '') else whatsapp end,
+      email        = case when v_c ? 'email' then nullif(lower(btrim(v_c ->> 'email')), '') else email end,
+      clinic_name  = case when v_c ? 'clinic_name' then nullif(upper(btrim(v_c ->> 'clinic_name')), '') else clinic_name end,
+      city         = case when v_c ? 'city' then nullif(upper(btrim(v_c ->> 'city')), '') else city end,
+      state        = case when v_c ? 'state' then nullif(upper(btrim(v_c ->> 'state')), '') else state end,
+      notes        = case when v_nota is null then notes
+                          when nullif(btrim(notes), '') is null then v_nota
+                          else notes || E'\n' || v_nota end
+    where id = v_cliente;
+    perform registrar_movimentacao('editado', 'cliente', v_cliente,
+      'Dados atualizados pelo formulário de cadastro', jsonb_build_object('cadastro_id', p_id, 'campos', v_c));
+  end if;
+
+  update cadastros_recebidos
+     set status = 'importado', client_id = v_cliente, resolvido_em = now(), resolvido_por = auth.uid()
+   where id = p_id;
+  return v_cliente;
+end;
+$function$
+```
+
+### `convite_cadastro_abrir`
+
+```sql
+CREATE OR REPLACE FUNCTION public.convite_cadastro_abrir(p_token text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when cv.id is null then jsonb_build_object('valido', false, 'motivo', 'Link inválido.')
+    when cv.preenchido_em is not null then jsonb_build_object('valido', false, 'motivo', 'Este cadastro já foi enviado. Fale com a Harmonize se precisar mudar algo.')
+    when cv.expira_em <= now() then jsonb_build_object('valido', false, 'motivo', 'Este link venceu. Peça um novo para a Harmonize.')
+    else jsonb_build_object('valido', true,
+           'tratamento', c.treatment, 'nome_exibicao', c.display_name, 'whatsapp', c.whatsapp, 'email', c.email)
+  end
+  from (select 1) x
+  left join convites_cadastro cv on cv.token = p_token
+  left join clients c on c.id = cv.client_id;
+$function$
+```
+
+### `convite_cadastro_receber`
+
+```sql
+CREATE OR REPLACE FUNCTION public.convite_cadastro_receber(p_token text, p_dados jsonb, p_email_login text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cv convites_cadastro%rowtype;
+  v_nome text := upper(nullif(btrim(p_dados ->> 'nome_completo'), ''));
+  v_trat text := nullif(btrim(p_dados ->> 'tratamento'), '');
+  v_exib text := nullif(btrim(p_dados ->> 'nome_exibicao'), '');
+  v_whats text := regexp_replace(coalesce(p_dados ->> 'whatsapp', ''), '\D', '', 'g');
+  v_email text := lower(nullif(btrim(p_dados ->> 'email'), ''));
+  v_doc text := nullif(btrim(p_dados ->> 'documento'), '');
+  v_clinica text := upper(nullif(btrim(p_dados ->> 'clinica'), ''));
+  v_end text := upper(nullif(btrim(p_dados ->> 'endereco'), ''));
+  v_cidade text := upper(nullif(btrim(p_dados ->> 'cidade'), ''));
+  v_uf text := upper(nullif(btrim(p_dados ->> 'uf'), ''));
+  v_client uuid;
+  v_antes jsonb;
+  v_novo boolean := false;
+  v_qtd int;
+begin
+  select * into v_cv from convites_cadastro where token = p_token for update;
+  if v_cv.id is null then raise exception 'Link inválido.'; end if;
+  if v_cv.preenchido_em is not null then raise exception 'Este cadastro já foi enviado.'; end if;
+  if v_cv.expira_em <= now() then raise exception 'Este link venceu.'; end if;
+  if v_nome is null or length(v_whats) < 10 or v_email is null then
+    raise exception 'Preencha nome completo, WhatsApp com DDD e e-mail.';
+  end if;
+  if v_trat is not null and v_trat not in ('Dr.', 'Dra.') then v_trat := null; end if;
+
+  -- Quem é: a cliente do link; senão, o mesmo WhatsApp (11 ou 10 dígitos finais; 8 se só um bater).
+  v_client := v_cv.client_id;
+  if v_client is null then
+    select id into v_client from clients
+     where not is_test and right(regexp_replace(coalesce(whatsapp, ''), '\D', '', 'g'), 10) = right(v_whats, 10)
+     order by became_client_at desc nulls last, created_at limit 1;
+  end if;
+  if v_client is null then
+    select count(*), min(id::text)::uuid into v_qtd, v_client from clients
+     where not is_test and length(regexp_replace(coalesce(whatsapp, ''), '\D', '', 'g')) >= 8
+       and right(regexp_replace(coalesce(whatsapp, ''), '\D', '', 'g'), 8) = right(v_whats, 8);
+    if v_qtd <> 1 then v_client := null; end if;
+  end if;
+
+  if v_client is not null then
+    select jsonb_build_object('name', name, 'treatment', treatment, 'display_name', display_name, 'whatsapp', whatsapp,
+                              'email', email, 'document', document, 'clinic_name', clinic_name, 'address', address,
+                              'city', city, 'state', state)
+      into v_antes from clients where id = v_client;
+    update clients set
+      name = v_nome,
+      treatment = coalesce(v_trat, treatment),
+      display_name = coalesce(v_exib, display_name),
+      whatsapp = v_whats,
+      email = v_email,
+      document = coalesce(v_doc, document),
+      clinic_name = coalesce(v_clinica, clinic_name),
+      address = coalesce(v_end, address),
+      city = coalesce(v_cidade, city),
+      state = coalesce(v_uf, state)
+    where id = v_client;
+  else
+    v_novo := true;
+    insert into clients (name, treatment, display_name, whatsapp, email, document, clinic_name, address, city, state, origem, stage)
+    values (v_nome, v_trat, v_exib, v_whats, v_email, v_doc, v_clinica, v_end, v_cidade, v_uf, 'formulario', 'lead')
+    returning id into v_client;
+  end if;
+
+  update convites_cadastro set
+    preenchido_em = now(), dados = p_dados, antes = v_antes, resultado_client_id = v_client,
+    cadastro_novo = v_novo, email_login = lower(nullif(btrim(p_email_login), ''))
+  where id = v_cv.id;
+
+  perform registrar_movimentacao(case when v_novo then 'criado' else 'editado' end, 'cliente', v_client,
+    'Cadastro preenchido pela cliente (formulário do Planejador)',
+    jsonb_build_object('antes', v_antes, 'depois', p_dados - 'senha', 'convite_id', v_cv.id));
+
+  return jsonb_build_object('client_id', v_client, 'nome', coalesce(v_exib, v_nome), 'tratamento', v_trat, 'novo', v_novo);
+end;
+$function$
+```
+
+### `corrigir_contagens_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.corrigir_contagens_locacao(p_rental_id uuid, p_contagens jsonb, p_credito_usado integer DEFAULT 0)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client uuid;
+  v_status text;
+begin
+  if not (has_module_permission('agenda') or has_module_permission('financeiro')) then
+    raise exception 'Sem permissão para corrigir contagens.';
+  end if;
+  select client_id, status::text into v_client, v_status from rentals where id = p_rental_id;
+  if v_client is null then raise exception 'Locação não encontrada.'; end if;
+  if v_status = 'cancelada' then raise exception 'Locação cancelada.'; end if;
+
+  delete from locacao_contagens where rental_id = p_rental_id;
+  delete from creditos_cliente where rental_id = p_rental_id and tipo = 'disparos' and origem in ('contagem', 'uso');
+  perform gravar_contagens_locacao(p_rental_id, p_contagens, p_credito_usado);
+
+  -- O crédito gerado aqui pode já ter sido usado em outra locação.
+  if exists (
+    select 1 from creditos_cliente c left join rentals r on r.id = c.rental_id
+     where c.client_id = v_client and c.tipo = 'disparos'
+       and credito_conta(c.quantidade, c.origem, r.pago, r.status::text) <> 'fora'
+     having sum(c.quantidade) < 0
+  ) then
+    raise exception 'O crédito desta locação já foi usado em outra e ficaria faltando. Corrija a outra locação primeiro.';
+  end if;
+
+  perform registrar_movimentacao('editado', 'rentals', p_rental_id, descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('acao_detalhada', 'Contagens corrigidas', 'contagens', jsonb_array_length(coalesce(p_contagens, '[]'::jsonb)),
+                       'credito_usado', coalesce(p_credito_usado, 0), 'client_id', v_client));
+end;
+$function$
+```
+
+### `count_test_data`
+
+```sql
+CREATE OR REPLACE FUNCTION public.count_test_data()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  perform public.require_admin();
+  return jsonb_build_object(
+    'clients',          (select count(*) from public.clients          where is_test),
+    'transactions',     (select count(*) from public.transactions     where is_test),
+    'rentals',          (select count(*) from public.rentals          where is_test),
+    'calendar_events',  (select count(*) from public.calendar_events  where is_test),
+    'mentoring_events', (select count(*) from public.mentoring_events where is_test),
+    'tasks',            (select count(*) from public.tasks            where is_test),
+    'rental_payments',  (select count(*) from public.rental_payments  where is_test)
+  );
+end;
+$function$
+```
+
+### `create_rental`
+
+```sql
+CREATE OR REPLACE FUNCTION public.create_rental(p_client_id uuid, p_equipment_id uuid, p_event_date date, p_shots integer, p_calculated_value numeric, p_payment_method payment_method_type, p_notes text DEFAULT NULL::text, p_pago boolean DEFAULT true, p_pix_conta text DEFAULT NULL::text, p_event_date_end date DEFAULT NULL::date)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_category_id uuid;
+  v_equipment_code equipment_code_type;
+  v_client_name text;
+  v_created_by uuid := auth.uid();
+  v_isenta boolean;
+  v_taxa_status text;
+  v_taxa_valor numeric;
+  v_pix_conta text;
+  v_date_end date;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para criar locações';
+  end if;
+
+  if p_event_date_end is not null and p_event_date_end < p_event_date then
+    raise exception 'A data final do período não pode ser antes da data inicial.';
+  end if;
+  v_date_end := coalesce(p_event_date_end, p_event_date);
+
+  select code into v_equipment_code from equipments where id = p_equipment_id;
+  select name, (parceiro or isento_taxa) into v_client_name, v_isenta from clients where id = p_client_id;
+  select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
+
+  if v_category_id is null then
+    raise exception 'Categoria "Locação" não encontrada (foi renomeada ou removida?). Ajuste o cadastro de categorias antes de criar a locação.';
+  end if;
+
+  insert into rentals (client_id, equipment_id, event_date, event_date_end, shots, calculated_value, payment_method, notes, created_by)
+  values (p_client_id, p_equipment_id, p_event_date, p_event_date_end, p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by)
+  returning id into v_rental_id;
+
+  if p_pago then
+    v_pix_conta := case when p_payment_method = 'pix' then coalesce(p_pix_conta, 'harmonize') else null end;
+
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, created_by)
+    values ('entrada', v_category_id, 'Locação HIPRO - ' || coalesce(v_client_name, ''), p_calculated_value, p_payment_method, p_event_date, 'harmonize', p_client_id, v_rental_id, v_created_by)
+    returning id into v_transaction_id;
+
+    insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
+    values (v_rental_id, p_payment_method, p_calculated_value, p_event_date, v_pix_conta, v_transaction_id, v_created_by);
+
+    update rentals set transaction_id = v_transaction_id where id = v_rental_id;
+    -- pago / pago_em: preenchidos automaticamente pelo trigger de rental_payments.
+  end if;
+
+  -- Taxa de compromisso inicial: pendente só quando há data futura a
+  -- garantir e o cliente não é parceiro. definir_taxa_agendamento muda o
+  -- estado depois.
+  if coalesce(v_isenta, false) or p_event_date <= public.hoje_local() then
+    v_taxa_status := 'nao_aplica';
+    v_taxa_valor  := null;
+  else
+    v_taxa_status := 'pendente';
+    v_taxa_valor  := public.valor_taxa_atual();
+  end if;
+
+  insert into calendar_events (event_type, title, client_id, equipment_id, date_start, date_end, status, value, rental_id, created_by, taxa_status, taxa_valor)
+  values (v_equipment_code::text::calendar_event_type, 'Locação - ' || coalesce(v_client_name, ''), p_client_id, p_equipment_id, p_event_date, v_date_end, 'confirmada', p_calculated_value, v_rental_id, v_created_by,
+          v_taxa_status, v_taxa_valor);
+
+  update clients set stage = 'cliente' where id = p_client_id and stage <> 'cliente';
+
+  return v_rental_id;
+end;
+$function$
+```
+
+### `credito_conta`
+
+```sql
+CREATE OR REPLACE FUNCTION public.credito_conta(p_quantidade numeric, p_origem text, p_pago boolean, p_status text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when p_status = 'cancelada' then 'fora'
+    when p_origem = 'contagem' and not coalesce(p_pago, false) then 'aguardando'
+    else 'disponivel'
+  end;
+$function$
+```
+
+### `creditos_apagar_gasto_pessoal`
+
+```sql
+CREATE OR REPLACE FUNCTION public.creditos_apagar_gasto_pessoal()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if old.transaction_extra_id is not null then
+    delete from transactions where id = old.transaction_extra_id;
+  end if;
+  return null;
+end;
+$function$
+```
+
+### `criar_bloqueio_equipamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.criar_bloqueio_equipamento(p_equipment_id uuid, p_tipo text, p_inicio date, p_fim date, p_motivo text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+  v_id uuid;
+  v_choque record;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para bloquear a agenda.';
+  end if;
+  if p_tipo not in ('manutencao', 'recesso', 'outro') then
+    raise exception 'Tipo de bloqueio inválido.';
+  end if;
+  if p_inicio is null or p_fim is null then
+    raise exception 'Informe o primeiro e o último dia do bloqueio.';
+  end if;
+  if p_fim < p_inicio then
+    raise exception 'O último dia não pode ser antes do primeiro.';
+  end if;
+  if p_fim < public.hoje_local() then
+    raise exception 'O período já passou.';
+  end if;
+
+  select name into v_nome from equipments where id = p_equipment_id;
+  if v_nome is null then
+    raise exception 'Equipamento não encontrado.';
+  end if;
+
+  select * into v_choque from bloqueios_equipamento
+   where equipment_id = p_equipment_id and data_inicio <= p_fim and data_fim >= p_inicio
+   limit 1;
+  if v_choque.id is not null then
+    raise exception 'O % já tem um bloqueio (%) de % a % que encosta nesse período. Mude ou exclua aquele antes.',
+      v_nome, rotulo_bloqueio(v_choque.tipo), to_char(v_choque.data_inicio, 'DD/MM'), to_char(v_choque.data_fim, 'DD/MM');
+  end if;
+
+  insert into bloqueios_equipamento (equipment_id, tipo, motivo, data_inicio, data_fim)
+  values (p_equipment_id, p_tipo, nullif(trim(p_motivo), ''), p_inicio, p_fim)
+  returning id into v_id;
+
+  perform public.registrar_movimentacao(
+    'criado', 'equipments', p_equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object('acao_detalhada',
+      'Agenda bloqueada (' || rotulo_bloqueio(p_tipo) || ') de ' || to_char(p_inicio, 'DD/MM/YYYY') || ' a ' || to_char(p_fim, 'DD/MM/YYYY'),
+      'motivo', coalesce(nullif(trim(p_motivo), ''), 'não informado'))
+  );
+
+  perform public.sincronizar_manutencao_por_bloqueio(p_equipment_id);
+  return v_id;
+end;
+$function$
+```
+
+### `criar_convite_cadastro`
+
+```sql
+CREATE OR REPLACE FUNCTION public.criar_convite_cadastro(p_client_id uuid DEFAULT NULL::uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_token text;
+begin
+  if not has_module_permission('clientes') then raise exception 'Sem permissão.'; end if;
+  if p_client_id is not null then
+    if not exists (select 1 from clients where id = p_client_id) then raise exception 'Cliente não encontrada.'; end if;
+    select token into v_token from convites_cadastro
+     where client_id = p_client_id and preenchido_em is null and expira_em > now()
+     order by created_at desc limit 1;
+    if v_token is not null then return v_token; end if;
+  end if;
+  insert into convites_cadastro (client_id) values (p_client_id) returning token into v_token;
+  return v_token;
+end;
+$function$
+```
+
+### `definir_contagem_inicial_reserva`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_contagem_inicial_reserva(p_event_id uuid, p_contagem bigint)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status event_status_type;
+  v_rental uuid;
+  v_equip uuid;
+  v_antes bigint;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+  if p_contagem is not null and p_contagem < 0 then
+    raise exception 'A contagem não pode ser negativa.';
+  end if;
+
+  select status, rental_id, equipment_id, contagem_inicial
+    into v_status, v_rental, v_equip, v_antes
+    from calendar_events where id = p_event_id;
+
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_equip is null then
+    raise exception 'Só reservas de equipamento têm contagem.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado.';
+  end if;
+  if v_rental is not null then
+    raise exception 'Esta reserva já foi finalizada: a contagem ficou registrada na locação.';
+  end if;
+
+  update calendar_events
+     set contagem_inicial = p_contagem,
+         contagem_inicial_em = case when p_contagem is null then null else now() end
+   where id = p_event_id;
+
+  -- A tabela movimentacoes só aceita as ações listadas no seu CHECK; usa
+  -- "editado" e diz o que mudou em acao_detalhada, como editar_pagamento_locacao.
+  perform public.registrar_movimentacao(
+    'editado',
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object(
+      'acao_detalhada', 'contagem inicial do equipamento',
+      'antes', v_antes,
+      'depois', p_contagem
+    )
+  );
+end;
+$function$
+```
+
+### `definir_custo_disparo_manual_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_custo_disparo_manual_locacao(p_rental_id uuid, p_custo_disparo_manual numeric)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+  if p_custo_disparo_manual is not null and p_custo_disparo_manual <= 0 then
+    raise exception 'O custo por disparo precisa ser maior que zero.';
+  end if;
+
+  update rentals set custo_disparo_manual = p_custo_disparo_manual where id = p_rental_id;
+
+  if not found then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('acao_detalhada', 'custo por disparo negociado definido', 'custo_disparo_manual', p_custo_disparo_manual)
+  );
+end;
+$function$
+```
+
+### `definir_deslocamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_deslocamento_locacao(p_rental_id uuid, p_km_ida numeric, p_valor_deslocamento numeric, p_incluso_no_valor boolean DEFAULT NULL::boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_valor numeric := round(coalesce(p_valor_deslocamento, 0), 2);
+  v_incluso boolean;
+  v_calculado numeric;
+  v_tx_id uuid;
+  v_recebido numeric;
+  v_devido numeric;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+  if p_valor_deslocamento is not null and p_valor_deslocamento < 0 then
+    raise exception 'O valor de deslocamento não pode ser negativo.';
+  end if;
+
+  select deslocamento_incluso_no_valor, calculated_value, deslocamento_transaction_id
+    into v_incluso, v_calculado, v_tx_id
+    from rentals where id = p_rental_id;
+
+  if not found then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  if p_incluso_no_valor is not null then
+    v_incluso := p_incluso_no_valor;
+  end if;
+
+  v_devido := v_calculado + case when v_incluso then 0 else v_valor end;
+  select coalesce((select sum(valor) from rental_payments where rental_id = p_rental_id), 0)
+       + coalesce((select sum(taxa_valor) from calendar_events where rental_id = p_rental_id and taxa_status = 'paga'), 0)
+    into v_recebido;
+  if round(v_devido, 2) < round(v_recebido, 2) then
+    raise exception 'Com esse deslocamento a locação fica em R$ %, abaixo do que já foi recebido (R$ %). Remova ou corrija o pagamento antes.',
+      to_char(v_devido, 'FM999G990D00'), to_char(v_recebido, 'FM999G990D00');
+  end if;
+
+  -- Lançamento antigo de ajuda de custo (de antes desta regra): sai, porque o
+  -- deslocamento agora entra pelo pagamento da locação.
+  if v_tx_id is not null then
+    update rentals set deslocamento_transaction_id = null where id = p_rental_id;
+    if not exists (select 1 from rental_payments where transaction_id = v_tx_id) then
+      delete from transactions where id = v_tx_id;
+    end if;
+  end if;
+
+  update rentals
+     set km_ida = p_km_ida,
+         valor_deslocamento = v_valor,
+         deslocamento_incluso_no_valor = v_incluso
+   where id = p_rental_id;
+
+  perform public.recalcular_pagamento_locacao(p_rental_id);
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object(
+      'acao_detalhada', 'deslocamento definido',
+      'km_ida', p_km_ida,
+      'valor_deslocamento', v_valor,
+      'incluso_no_valor', v_incluso
+    )
+  );
+end;
+$function$
+```
+
+### `definir_deslocamento_reserva`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_deslocamento_reserva(p_event_id uuid, p_km_ida numeric, p_valor_deslocamento numeric)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+  if p_valor_deslocamento is not null and p_valor_deslocamento < 0 then
+    raise exception 'O valor de deslocamento não pode ser negativo.';
+  end if;
+
+  update calendar_events
+     set km_ida = p_km_ida,
+         valor_deslocamento = coalesce(p_valor_deslocamento, 0)
+   where id = p_event_id
+     and rental_id is null
+     and status = 'pre_reserva';
+
+  if not found then
+    raise exception 'Pré-reserva não encontrada (já pode ter sido finalizada ou cancelada).';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('acao_detalhada', 'deslocamento definido (pré-reserva)', 'km_ida', p_km_ida, 'valor_deslocamento', p_valor_deslocamento)
+  );
+end;
+$function$
+```
+
+### `definir_status_equipamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_status_equipamento(p_equipment_id uuid, p_status text, p_motivo text DEFAULT NULL::text, p_previsto_fim date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+  v_status_atual text;
+  v_detalhes jsonb;
+  v_hoje date := public.hoje_local();
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar o status de equipamentos.';
+  end if;
+
+  if p_status not in ('ativo', 'manutencao') then
+    raise exception 'Status inválido: %. Use ''ativo'' ou ''manutencao''.', p_status;
+  end if;
+
+  if p_status = 'manutencao' and p_previsto_fim is not null and p_previsto_fim < current_date then
+    raise exception 'A previsão de retorno não pode ser uma data no passado.';
+  end if;
+
+  select name, status into v_nome, v_status_atual from equipments where id = p_equipment_id;
+  if v_nome is null then
+    raise exception 'Equipamento não encontrado (id %).', p_equipment_id;
+  end if;
+
+  if p_status = 'ativo' then
+    delete from bloqueios_equipamento
+     where equipment_id = p_equipment_id and tipo = 'manutencao'
+       and data_inicio = v_hoje;
+    update bloqueios_equipamento set data_fim = v_hoje - 1
+     where equipment_id = p_equipment_id and tipo = 'manutencao'
+       and data_inicio < v_hoje and data_fim >= v_hoje;
+  end if;
+
+  if v_status_atual = p_status then
+    return;
+  end if;
+
+  update equipments
+     set status = p_status,
+         status_motivo = case when p_status = 'manutencao' then nullif(trim(p_motivo), '') else null end,
+         status_desde = now(),
+         status_previsto_fim = case when p_status = 'manutencao' then p_previsto_fim else null end
+   where id = p_equipment_id;
+
+  v_detalhes := jsonb_build_object('motivo', coalesce(nullif(trim(p_motivo), ''), 'não informado'));
+  if p_status = 'manutencao' and p_previsto_fim is not null then
+    v_detalhes := v_detalhes || jsonb_build_object('previsto_fim', to_char(p_previsto_fim, 'DD/MM/YYYY'));
+  end if;
+
+  perform public.registrar_movimentacao(
+    case p_status when 'manutencao' then 'manutencao_iniciada' else 'manutencao_finalizada' end,
+    'equipments', p_equipment_id, 'Equipamento ' || v_nome,
+    v_detalhes
+  );
+end;
+$function$
+```
+
+### `definir_taxa_agendamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_taxa_agendamento(p_event_id uuid, p_status text, p_payment_method payment_method_type DEFAULT 'pix'::payment_method_type, p_data date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status_atual text;
+  v_transacao_id uuid;
+  v_client_id uuid;
+  v_client_name text;
+  v_data_evento date;
+  v_data_pagamento date := coalesce(p_data, public.hoje_local());
+  v_categoria uuid;
+  v_valor numeric;
+  v_rental_id uuid;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar a taxa.';
+  end if;
+
+  if p_status not in ('nao_aplica', 'pendente', 'paga', 'perdida') then
+    raise exception 'Estado de taxa inválido: %', p_status;
+  end if;
+
+  select ev.taxa_status, ev.taxa_transaction_id, ev.client_id, ev.date_start, c.name, ev.rental_id
+    into v_status_atual, v_transacao_id, v_client_id, v_data_evento, v_client_name, v_rental_id
+    from calendar_events ev
+    left join clients c on c.id = ev.client_id
+   where ev.id = p_event_id;
+
+  if v_data_evento is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if p_status = 'perdida' and v_status_atual <> 'paga' then
+    raise exception 'Só faz sentido marcar como perdida uma taxa que estava paga.';
+  end if;
+  if p_status = 'paga' and v_status_atual = 'paga' then
+    raise exception 'Esta taxa já está recebida.';
+  end if;
+  if p_status = 'paga' and v_status_atual = 'perdida' then
+    raise exception 'Esta taxa ficou com a Harmonize no cancelamento; não dá para receber de novo.';
+  end if;
+  if p_status = 'nao_aplica' and v_status_atual in ('paga', 'perdida') then
+    raise exception 'A taxa já foi recebida. Desfaça o recebimento antes de isentar.';
+  end if;
+  if p_status = 'pendente' and v_status_atual = 'perdida' then
+    raise exception 'Esta taxa ficou com a Harmonize no cancelamento.';
+  end if;
+
+  v_valor := public.valor_taxa_atual();
+
+  if p_status = 'paga' and v_transacao_id is null then
+    select id into v_categoria
+      from categories
+     where type = 'entrada' and name ilike 'Taxa%'
+     limit 1;
+
+    insert into transactions (
+      type, category_id, description, amount, payment_method, date, scope, client_id, created_by
+    )
+    values (
+      'entrada', v_categoria,
+      'Taxa de compromisso - ' || coalesce(v_client_name, 'cliente'),
+      v_valor, p_payment_method, v_data_pagamento, 'harmonize', v_client_id, auth.uid()
+    )
+    returning id into v_transacao_id;
+
+  elsif p_status in ('nao_aplica', 'pendente') and v_transacao_id is not null then
+    update calendar_events set taxa_transaction_id = null where id = p_event_id;
+    delete from transactions where id = v_transacao_id;
+    v_transacao_id := null;
+  end if;
+
+  update calendar_events
+     set taxa_status = p_status,
+         taxa_valor = case when p_status in ('paga', 'perdida', 'pendente') then v_valor else null end,
+         taxa_transaction_id = v_transacao_id
+   where id = p_event_id;
+
+  if v_rental_id is not null then
+    perform public.recalcular_pagamento_locacao(v_rental_id);
+  end if;
+
+  perform public.registrar_movimentacao(
+    case p_status
+      when 'paga'     then 'taxa_paga'
+      when 'perdida'  then 'taxa_perdida'
+      when 'pendente' then 'taxa_pendente'
+      else 'taxa_isenta'
+    end,
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('taxa_status', p_status, 'taxa_valor', v_valor, 'data_recebimento', v_data_pagamento)
+  );
+end;
+$function$
+```
+
+### `definir_taxa_ao_criar_evento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_taxa_ao_criar_evento()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_isenta boolean;
+begin
+  if new.taxa_status is distinct from 'nao_aplica' then
+    return new;
+  end if;
+
+  if new.equipment_id is null then
+    return new;
+  end if;
+
+  if new.date_start <= public.hoje_local() then
+    return new;
+  end if;
+
+  select (parceiro or isento_taxa) into v_isenta from clients where id = new.client_id;
+  if coalesce(v_isenta, false) then
+    return new;
+  end if;
+
+  new.taxa_status := 'pendente';
+  new.taxa_valor := public.valor_taxa_atual();
+  return new;
+end;
+$function$
+```
+
+### `delete_record_forever`
+
+```sql
+CREATE OR REPLACE FUNCTION public.delete_record_forever(p_table text, p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_descricao text;
+  v_detalhes jsonb;
+  v_rental_id uuid;
+  v_mentoria_id uuid;
+  v_tipo entry_type;
+  v_evento_taxa uuid;
+  v_taxas uuid[];
+  v_cliente_teste boolean;
+  v_n_locacoes int;
+  v_n_lancamentos int;
+  v_n_agendamentos int;
+  v_n_mentorias int;
+  v_n_creditos int;
+  v_n_contratos int;
+  v_n_planejamentos int;
+  v_n_logins int;
+  v_partes text[] := '{}';
+begin
+  perform public.require_admin();
+
+  v_descricao := public.descrever_registro(p_table, p_id);
+  v_detalhes  := public.preview_exclusao(p_table, p_id);
+
+  if p_table = 'rentals' then
+    perform public.excluir_locacao_cascata(p_id);
+
+  elsif p_table = 'transactions' then
+    select rental_id, mentoring_id, type into v_rental_id, v_mentoria_id, v_tipo
+      from transactions where id = p_id;
+
+    -- Despesa (saída) ligada a uma locação sai sozinha; só a entrada da
+    -- locação leva a locação inteira junto (mesma regra do preview).
+    if v_rental_id is not null and v_tipo <> 'saida' then
+      perform public.excluir_locacao_cascata(v_rental_id);
+    elsif v_mentoria_id is not null then
+      perform public.excluir_mentoria_cascata(v_mentoria_id);
+    else
+      select id into v_evento_taxa from calendar_events where taxa_transaction_id = p_id limit 1;
+      if v_evento_taxa is not null then
+        update calendar_events
+           set taxa_transaction_id = null,
+               taxa_status = 'pendente',
+               taxa_valor = coalesce(taxa_valor, public.valor_taxa_atual())
+         where id = v_evento_taxa;
+      end if;
+
+      update rentals          set transaction_id = null where transaction_id = p_id;
+      update mentoring_events set transaction_id = null where transaction_id = p_id;
+      delete from transactions where id = p_id;
+    end if;
+
+  elsif p_table = 'calendar_events' then
+    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+      from calendar_events where id = p_id;
+
+    if v_rental_id is not null then
+      perform public.excluir_locacao_cascata(v_rental_id);
+    elsif v_mentoria_id is not null then
+      perform public.excluir_mentoria_cascata(v_mentoria_id);
+    else
+      update mentoring_events set calendar_event_id = null where calendar_event_id = p_id;
+      select taxa_transaction_id into v_evento_taxa from calendar_events where id = p_id;
+      update calendar_events set taxa_transaction_id = null where id = p_id;
+      delete from calendar_events where id = p_id;
+      if v_evento_taxa is not null then
+        delete from transactions where id = v_evento_taxa;
+      end if;
+    end if;
+
+  elsif p_table = 'mentoring_events' then
+    perform public.excluir_mentoria_cascata(p_id);
+
+  elsif p_table = 'tasks' then
+    delete from tasks where id = p_id;
+
+  elsif p_table = 'clients' then
+    -- Trava (decisão do dono, 26/10/2026): cliente com movimentos não se
+    -- exclui. Cliente real: conta tudo. Cliente de teste: conta só o que
+    -- for real (o de teste sai junto, como sempre saiu).
+    select coalesce(is_test, false) into v_cliente_teste from clients where id = p_id;
+    v_cliente_teste := coalesce(v_cliente_teste, false);
+
+    select count(*) into v_n_locacoes
+      from rentals r
+     where r.client_id = p_id
+       and (not v_cliente_teste or not r.is_test);
+
+    select count(*) into v_n_lancamentos
+      from transactions t
+     where (t.client_id = p_id
+            or t.rental_id in (select id from rentals where client_id = p_id)
+            or t.id in (select taxa_transaction_id from calendar_events
+                         where client_id = p_id and taxa_transaction_id is not null))
+       and (not v_cliente_teste or not t.is_test);
+
+    select count(*) into v_n_agendamentos
+      from calendar_events e
+     where e.client_id = p_id
+       and (not v_cliente_teste or not e.is_test);
+
+    select count(*) into v_n_mentorias
+      from mentoring_events m
+     where (m.calendar_event_id in (select id from calendar_events where client_id = p_id)
+            or m.id in (select mentoring_id from calendar_events
+                         where client_id = p_id and mentoring_id is not null)
+            or m.transaction_id in (select id from transactions where client_id = p_id)
+            or m.id in (select mentoring_id from transactions
+                         where client_id = p_id and mentoring_id is not null))
+       and (not v_cliente_teste or not m.is_test);
+
+    select count(*) into v_n_creditos
+      from creditos_cliente c
+     where c.client_id = p_id
+       and (not v_cliente_teste
+            or not (exists (select 1 from rentals r where r.id = c.rental_id and r.is_test)
+                    or exists (select 1 from transactions t where t.id = c.transaction_id and t.is_test)));
+
+    select count(*) into v_n_contratos
+      from contratos_emitidos ce
+     where ce.client_id = p_id
+       and (not v_cliente_teste or not ce.is_test);
+
+    select count(*) into v_n_planejamentos
+      from planejamentos pl
+     where pl.client_id = p_id
+       and (not v_cliente_teste
+            or not exists (select 1 from calendar_events e
+                            where e.id = pl.calendar_event_id and e.is_test));
+
+    select count(*) into v_n_logins
+      from profiles pr
+     where pr.cliente_id = p_id;
+
+    if v_n_locacoes > 0 then
+      v_partes := v_partes || format('%s %s', v_n_locacoes, case when v_n_locacoes = 1 then 'locação' else 'locações' end);
+    end if;
+    if v_n_lancamentos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_lancamentos, case when v_n_lancamentos = 1 then 'lançamento' else 'lançamentos' end);
+    end if;
+    if v_n_agendamentos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_agendamentos, case when v_n_agendamentos = 1 then 'agendamento' else 'agendamentos' end);
+    end if;
+    if v_n_mentorias > 0 then
+      v_partes := v_partes || format('%s %s', v_n_mentorias, case when v_n_mentorias = 1 then 'mentoria' else 'mentorias' end);
+    end if;
+    if v_n_creditos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_creditos, case when v_n_creditos = 1 then 'movimento de crédito' else 'movimentos de crédito' end);
+    end if;
+    if v_n_contratos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_contratos, case when v_n_contratos = 1 then 'contrato emitido' else 'contratos emitidos' end);
+    end if;
+    if v_n_planejamentos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_planejamentos, case when v_n_planejamentos = 1 then 'planejamento' else 'planejamentos' end);
+    end if;
+    if v_n_logins > 0 then
+      v_partes := v_partes || 'login de acesso ao Planejador'::text;
+    end if;
+
+    if cardinality(v_partes) > 0 then
+      if v_cliente_teste then
+        raise exception 'Este cliente de teste tem movimentos reais (%) e não pode ser excluído. Resolva os movimentos reais antes, ou deixe o cadastro como está.',
+          array_to_string(v_partes, ', ');
+      else
+        raise exception 'Este cliente tem movimentos (%) e não pode ser excluído. Cancele ou resolva os movimentos antes, ou deixe o cadastro como está.',
+          array_to_string(v_partes, ', ');
+      end if;
+    end if;
+
+    -- Daqui para baixo só chega lead puro ou cliente de teste com
+    -- movimentos só de teste. Contrato e planejamento (de teste) saem
+    -- antes: o contrato prende a locação e o cliente.
+    delete from contratos_emitidos where client_id = p_id;
+    delete from planejamentos      where client_id = p_id;
+
+    update rentals set transaction_id = null where client_id = p_id;
+
+    update mentoring_events set calendar_event_id = null
+     where calendar_event_id in (select id from calendar_events where client_id = p_id);
+    update mentoring_events set transaction_id = null
+     where transaction_id in (
+       select id from transactions
+        where client_id = p_id
+           or rental_id in (select id from rentals where client_id = p_id)
+     );
+
+    select array_agg(taxa_transaction_id) into v_taxas
+      from calendar_events
+     where client_id = p_id and taxa_transaction_id is not null;
+
+    update calendar_events set taxa_transaction_id = null where client_id = p_id;
+
+    delete from calendar_events where client_id = p_id;
+    delete from transactions
+     where client_id = p_id
+        or rental_id in (select id from rentals where client_id = p_id)
+        or id = any(coalesce(v_taxas, '{}'::uuid[]));
+    delete from rentals     where client_id = p_id;
+    delete from client_tags where client_id = p_id;
+    delete from tasks       where client_id = p_id;
+    delete from clients     where id = p_id;
+
+  else
+    raise exception 'Tabela não permitida: %', p_table;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'excluido', p_table, p_id, v_descricao, v_detalhes
+  );
+end;
+$function$
+```
+
+### `descartar_cadastro_recebido`
+
+```sql
+CREATE OR REPLACE FUNCTION public.descartar_cadastro_recebido(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para cadastrar clientes.';
+  end if;
+  update cadastros_recebidos
+     set status = 'descartado', resolvido_em = now(), resolvido_por = auth.uid()
+   where id = p_id and status = 'pendente';
+  if not found then raise exception 'Cadastro não encontrado ou já resolvido.'; end if;
+end;
+$function$
+```
+
+### `descrever_registro`
+
+```sql
+CREATE OR REPLACE FUNCTION public.descrever_registro(p_table text, p_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_texto text;
+begin
+  if p_table = 'rentals' then
+    select 'Locação ' || coalesce(e.name, 'equipamento') ||
+           ' de ' || coalesce(c.name, 'cliente') ||
+           ' em ' || to_char(r.event_date, 'DD/MM/YYYY') ||
+           ', ' || public.formatar_reais(r.calculated_value) ||
+           ' (' || r.shots || ' disparos)'
+      into v_texto
+      from rentals r
+      left join clients c on c.id = r.client_id
+      left join equipments e on e.id = r.equipment_id
+     where r.id = p_id;
+
+  elsif p_table = 'transactions' then
+    select 'Lançamento ' || t.type || ' "' || coalesce(t.description, 'sem descrição') || '"' ||
+           ', ' || public.formatar_reais(t.amount) ||
+           ' em ' || to_char(t.date, 'DD/MM/YYYY')
+      into v_texto
+      from transactions t
+     where t.id = p_id;
+
+  elsif p_table = 'calendar_events' then
+    select 'Evento "' || coalesce(ev.title, 'sem título') || '"' ||
+           coalesce(' de ' || c.name, '') ||
+           ' em ' || to_char(ev.date_start, 'DD/MM/YYYY')
+      into v_texto
+      from calendar_events ev
+      left join clients c on c.id = ev.client_id
+     where ev.id = p_id;
+
+  elsif p_table = 'clients' then
+    select 'Cliente ' || coalesce(c.name, 'sem nome') ||
+           coalesce(' (' || c.clinic_name || ')', '')
+      into v_texto
+      from clients c
+     where c.id = p_id;
+
+  elsif p_table = 'tasks' then
+    select 'Tarefa "' || coalesce(tk.title, 'sem título') || '"' ||
+           coalesce(' de ' || c.name, '')
+      into v_texto
+      from tasks tk
+      left join clients c on c.id = tk.client_id
+     where tk.id = p_id;
+
+  elsif p_table = 'mentoring_events' then
+    select 'Mentoria de ' || coalesce(m.mentee_name, 'sem nome') ||
+           ' em ' || to_char(m.date, 'DD/MM/YYYY') ||
+           ', ' || public.formatar_reais(m.value)
+      into v_texto
+      from mentoring_events m
+     where m.id = p_id;
+  end if;
+
+  return coalesce(v_texto, p_table || ' ' || coalesce(p_id::text, '?'));
+end;
+$function$
+```
+
+### `desfazer_conclusao_tarefa`
+
+```sql
+CREATE OR REPLACE FUNCTION public.desfazer_conclusao_tarefa(p_task_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_type text;
+  v_follow_up_number integer;
+  v_status text;
+  v_next_task_id uuid;
+  v_next_task_status text;
+  v_tag_id uuid;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para alterar tarefas.';
+  end if;
+
+  select client_id, type, follow_up_number, status
+    into v_client_id, v_type, v_follow_up_number, v_status
+    from tasks where id = p_task_id;
+
+  if not found then
+    raise exception 'Tarefa não encontrada.';
+  end if;
+
+  if v_status <> 'concluida' then
+    raise exception 'Esta tarefa não está concluída.';
+  end if;
+
+  if v_type in ('contato_inicial', 'followup') and v_client_id is not null then
+    select id, status into v_next_task_id, v_next_task_status
+      from tasks
+     where client_id = v_client_id
+       and type = 'followup'
+       and follow_up_number = coalesce(v_follow_up_number, 0) + 1
+     order by created_at desc
+     limit 1;
+
+    if v_next_task_id is not null then
+      if v_next_task_status <> 'pendente' then
+        raise exception 'Não dá para desfazer: já existe uma tarefa de follow-up seguinte que já foi mexida. Desfaça essa primeiro.';
+      end if;
+      delete from tasks where id = v_next_task_id;
+    end if;
+
+    if v_follow_up_number is not null then
+      select id into v_tag_id from tags where name = 'Follow-up ' || v_follow_up_number;
+      if v_tag_id is not null then
+        insert into client_tags (client_id, tag_id) values (v_client_id, v_tag_id)
+        on conflict do nothing;
+      end if;
+    end if;
+  end if;
+
+  -- Recontato automático: só pode haver uma pendente por cliente. Se a
+  -- rotina já gerou a próxima, a reaberta toma o lugar dela.
+  if v_type = 'recontato' and v_client_id is not null then
+    delete from tasks
+     where client_id = v_client_id and type = 'recontato' and status = 'pendente' and id <> p_task_id;
+  end if;
+
+  update tasks set status = 'pendente', completed_at = null where id = p_task_id;
+
+  perform public.registrar_movimentacao(
+    'editado', 'tasks', p_task_id, public.descrever_registro('tasks', p_task_id),
+    jsonb_build_object('acao_detalhada', 'Conclusão da tarefa desfeita (reaberta por engano)')
+  );
+end;
+$function$
+```
+
+### `desfazer_envio_campanha`
+
+```sql
+CREATE OR REPLACE FUNCTION public.desfazer_envio_campanha(p_campanha uuid, p_client uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_e campanha_envios%rowtype;
+  v_nome_campanha text;
+  v_cliente text;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para mexer em envios de campanha.';
+  end if;
+  select * into v_e from campanha_envios where campanha_id = p_campanha and client_id = p_client for update;
+  if not found then
+    raise exception 'Envio não encontrado.';
+  end if;
+  select nome into v_nome_campanha from campanhas where id = p_campanha;
+  select name into v_cliente from clients where id = p_client;
+  delete from campanha_envios where id = v_e.id;
+  perform registrar_movimentacao('excluido', 'envio_campanha', v_e.id,
+    'Envio desfeito: campanha "' || coalesce(v_nome_campanha, '') || '" para ' || coalesce(v_cliente, 'cliente'),
+    jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'status', v_e.status,
+                       'mensagem', v_e.mensagem, 'enviado_em', v_e.enviado_em));
+  if v_e.status <> 'pulado' or v_e.enviado_em is not null then
+    insert into cliente_anotacoes (client_id, texto, origem, created_by)
+    values (p_client, 'Campanha «' || coalesce(v_nome_campanha, '') || '»: envio desfeito (voltou para a fila).',
+            'campanha', auth.uid());
+  end if;
+end;
+$function$
+```
+
+### `desfazer_importacao_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.desfazer_importacao_cartao(p_cartao_id uuid, p_desde timestamp with time zone DEFAULT NULL::timestamp with time zone, p_ate timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cartao record;
+  v_qtd int;
+  v_total numeric;
+begin
+  select * into v_cartao from cartoes where id = p_cartao_id;
+  if v_cartao.id is null then
+    raise exception 'Cartão não encontrado.';
+  end if;
+  if (v_cartao.scope = 'harmonize' and not has_module_permission('financeiro'))
+     or (v_cartao.scope = 'pessoal' and not has_module_permission('pessoal')) then
+    raise exception 'Sem permissão para mexer neste cartão.';
+  end if;
+
+  with apagadas as (
+    delete from transactions
+    where cartao_id = p_cartao_id
+      and importacao_chave is not null
+      and (p_desde is null or created_at >= p_desde)
+      and (p_ate is null or created_at <= p_ate)
+    returning amount
+  )
+  select count(*), coalesce(sum(amount), 0) into v_qtd, v_total from apagadas;
+
+  perform public.registrar_movimentacao(
+    'excluido', 'cartoes', p_cartao_id, 'Importação de fatura desfeita no cartão ' || v_cartao.nome,
+    jsonb_build_object('lancamentos', v_qtd, 'total', v_total)
+  );
+  return jsonb_build_object('removidos', v_qtd, 'total', v_total);
+end;
+$function$
+```
+
+### `desfazer_pagamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.desfazer_pagamento_locacao(p_rental_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_pago boolean;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para alterar pagamentos.';
+  end if;
+
+  select pago into v_pago from rentals where id = p_rental_id;
+  if v_pago is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if not v_pago then
+    raise exception 'Esta locação não está marcada como paga.';
+  end if;
+
+  -- rentals.transaction_id precisa ser zerado ANTES de apagar as
+  -- transações: ele referencia uma delas, e a FK rentals_transaction_id_fkey
+  -- não tem on delete cascade (de propósito — só rental_payments tem).
+  update rentals set transaction_id = null where id = p_rental_id;
+
+  delete from transactions
+   where id in (select transaction_id from rental_payments where rental_id = p_rental_id and transaction_id is not null);
+  delete from rental_payments where rental_id = p_rental_id;
+  -- pago / pago_em voltam sozinhos a false/null: a soma zerou.
+
+  perform public.registrar_movimentacao(
+    'pagamento_desfeito', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    '{}'::jsonb
+  );
+end;
+$function$
+```
+
+### `desfazer_troca_ponteira_reserva`
+
+```sql
+CREATE OR REPLACE FUNCTION public.desfazer_troca_ponteira_reserva(p_event_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_ult record;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+  if exists (select 1 from calendar_events where id = p_event_id and rental_id is not null) then
+    raise exception 'Esta reserva já foi finalizada.';
+  end if;
+  select * into v_ult from reserva_contagens where calendar_event_id = p_event_id order by ordem desc limit 1;
+  if v_ult.id is null then raise exception 'Não há troca de ponteira para desfazer.'; end if;
+  delete from reserva_contagens where id = v_ult.id;
+  update calendar_events
+     set contagem_inicial = v_ult.inicial, contagem_inicial_em = now(), contagem_aplicador_id = v_ult.aplicador_id
+   where id = p_event_id;
+  perform registrar_movimentacao('editado', 'calendar_events', p_event_id, descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('acao_detalhada', 'Troca de ponteira desfeita (contagem ' || v_ult.ordem || ')'));
+end;
+$function$
+```
+
+### `dia_no_mes`
+
+```sql
+CREATE OR REPLACE FUNCTION public.dia_no_mes(p_ano integer, p_mes integer, p_dia integer)
+ RETURNS date
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select make_date(p_ano, p_mes, least(p_dia, extract(day from (make_date(p_ano, p_mes, 1) + interval '1 month - 1 day'))::int));
+$function$
+```
+
+### `disponibilidade_publica`
+
+```sql
+CREATE OR REPLACE FUNCTION public.disponibilidade_publica(p_inicio date, p_fim date)
+ RETURNS TABLE(data date, equipamento text, situacao text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select d::date,
+         e.code::text,
+         case when ce.taxa_status = 'pendente' then 'pre_reserva'
+              else 'agendado' end
+    from calendar_events ce
+    join equipments e on e.id = ce.equipment_id
+    cross join lateral generate_series(ce.date_start::timestamp, ce.date_end::timestamp, interval '1 day') d
+   where d::date between p_inicio and p_fim
+     and ce.status <> 'cancelada'
+   order by d::date, e.code;
+$function$
+```
+
+### `dossie_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.dossie_cliente(p_client_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+with
+cli as (select * from clients where id = p_client_id),
+loc as (
+  select r.*, e.name as equipamento, s.saldo, s.total_pago, s.valor_devido, s.situacao, s.credito_taxa
+    from rentals r
+    left join equipments e on e.id = r.equipment_id
+    left join rentals_situacao_pagamento s on s.rental_id = r.id
+   where r.client_id = p_client_id and not r.is_test
+),
+loc_ok as (select * from loc where status::text <> 'cancelada'),
+ev as (
+  select ce.*, e.name as equipamento
+    from calendar_events ce
+    left join equipments e on e.id = ce.equipment_id
+   where ce.client_id = p_client_id and not ce.is_test
+),
+datas as (select event_date, lag(event_date) over (order by event_date) as anterior from loc_ok)
+select jsonb_build_object(
+  'gerado_em', now(),
+  'cadastro', (select to_jsonb(c) - 'is_test' from cli c),
+  'indicada_por', (select i.name from clients i join cli c on i.id = c.indicado_por),
+  'indicou', coalesce((select jsonb_agg(x.name order by x.created_at) from clients x where x.indicado_por = p_client_id), '[]'::jsonb),
+  'resumo', jsonb_build_object(
+    'locacoes', (select count(*) from loc_ok),
+    'canceladas', (select count(*) from loc where status::text = 'cancelada'),
+    'faturado_total', (select coalesce(sum(valor_devido), 0) from loc_ok),
+    'recebido_total', (select coalesce(sum(total_pago + credito_taxa), 0) from loc_ok),
+    'deve_hoje', (select coalesce(sum(saldo), 0) from loc_ok where event_date <= current_date),
+    'disparos_total', (select coalesce(sum(shots), 0) from loc_ok),
+    'disparos_media', (select round(avg(shots)) from loc_ok where shots > 0),
+    'ticket_medio', (select round(avg(valor_devido), 2) from loc_ok),
+    'primeira_locacao', (select min(event_date) from loc_ok),
+    'ultima_locacao', (select max(event_date) from loc_ok where event_date <= current_date),
+    'dias_desde_ultima', (select current_date - max(event_date) from loc_ok where event_date <= current_date),
+    'intervalo_medio_dias', (select round(avg(event_date - anterior)) from datas where anterior is not null),
+    'proxima_reserva', (select min(date_start) from ev where date_start >= current_date and status::text <> 'cancelada'),
+    'reagendamentos', (select count(*) from ev where rescheduled),
+    'faltas', (select count(*) from ev where no_show),
+    'taxas_pagas', (select count(*) from ev where taxa_status = 'paga'),
+    'taxas_pendentes', (select count(*) from ev where taxa_status = 'pendente' and status::text <> 'cancelada')
+  ),
+  'anotacoes', coalesce((
+    select jsonb_agg(jsonb_build_object('em', a.created_at, 'origem', a.origem, 'texto', a.texto) order by a.created_at desc)
+      from (select * from cliente_anotacoes where client_id = p_client_id order by created_at desc limit 40) a
+  ), '[]'::jsonb),
+  'memorias_do_assistente', coalesce((
+    select jsonb_agg(jsonb_build_object('em', m.created_at, 'texto', m.texto) order by m.created_at desc)
+      from (select * from assistente_memoria where client_id = p_client_id order by created_at desc limit 30) m
+  ), '[]'::jsonb),
+  'agendamentos', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', x.id, 'data', x.date_start, 'ate', x.date_end, 'tipo', x.event_type, 'titulo', x.title,
+             'equipamento', x.equipamento, 'status', x.status, 'confirmado', x.confirmed,
+             'taxa', x.taxa_status, 'taxa_valor', x.taxa_valor, 'deslocamento', x.valor_deslocamento,
+             'virou_locacao', x.rental_id is not null, 'reagendado', x.rescheduled, 'faltou', x.no_show,
+             'motivo_cancelamento', x.cancellation_reason, 'pedido_confirmacao_em', x.confirmation_message_sent_at,
+             'obs', left(x.notes, 300)) order by x.date_start desc)
+      from (select * from ev order by date_start desc limit 30) x
+  ), '[]'::jsonb),
+  'locacoes', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', x.id, 'data', x.event_date, 'ate', x.event_date_end, 'equipamento', x.equipamento,
+             'disparos', x.shots, 'valor', x.calculated_value, 'deslocamento', x.valor_deslocamento,
+             'devido', x.valor_devido, 'pago', x.total_pago, 'saldo', x.saldo, 'situacao', x.situacao,
+             'status', x.status, 'lucro', (select l.lucro_liquido from rentals_lucro l where l.rental_id = x.id),
+             'motivo_cancelamento', x.cancellation_reason, 'obs', left(x.notes, 300)) order by x.event_date desc)
+      from (select * from loc order by event_date desc limit 30) x
+  ), '[]'::jsonb),
+  'pagamentos', coalesce((
+    select jsonb_agg(jsonb_build_object('data', p.data, 'valor', p.valor, 'forma', p.forma, 'locacao_id', p.rental_id) order by p.data desc)
+      from (select rp.* from rental_payments rp join loc on loc.id = rp.rental_id
+             where not rp.is_test order by rp.data desc limit 30) p
+  ), '[]'::jsonb),
+  'creditos', jsonb_build_object(
+    'saldo', (select to_jsonb(s) - 'client_id' from creditos_saldo s where s.client_id = p_client_id),
+    'extrato', coalesce((
+      select jsonb_agg(jsonb_build_object('data', k.data, 'tipo', k.tipo, 'quantidade', k.quantidade, 'origem', k.origem, 'descricao', k.descricao) order by k.data desc)
+        from (select * from creditos_cliente where client_id = p_client_id order by data desc, created_at desc limit 20) k
+    ), '[]'::jsonb)
+  ),
+  'lancamentos', coalesce((
+    select jsonb_agg(jsonb_build_object('data', t.date, 'tipo', t.type, 'valor', t.amount, 'categoria', t.categoria,
+             'descricao', t.description, 'forma', t.payment_method, 'espaco', t.scope) order by t.date desc)
+      from (select tr.*, cat.name as categoria from transactions tr left join categories cat on cat.id = tr.category_id
+             where tr.client_id = p_client_id and not tr.is_test order by tr.date desc limit 25) t
+  ), '[]'::jsonb),
+  'tarefas', coalesce((
+    select jsonb_agg(jsonb_build_object('tipo', t.type, 'titulo', t.title, 'para', t.due_date, 'status', t.status, 'concluida_em', t.completed_at) order by t.due_date desc)
+      from (select * from tasks where client_id = p_client_id and not is_test order by due_date desc limit 20) t
+  ), '[]'::jsonb),
+  'agendas_enviadas', coalesce((
+    select jsonb_agg(jsonb_build_object('em', a.enviado_em, 'de', a.periodo_inicio, 'ate', a.periodo_fim, 'mensagem', left(a.mensagem, 300)) order by a.enviado_em desc)
+      from (select * from agenda_envios where client_id = p_client_id order by enviado_em desc limit 10) a
+  ), '[]'::jsonb),
+  'planejamentos', coalesce((
+    select jsonb_agg(jsonb_build_object('paciente', p.paciente, 'data', p.data, 'retorno', p.data_retorno, 'procedimento', p.procedimento,
+             'pacote', p.saldo_total, 'disparos', p.total_disparos) order by p.data desc nulls last)
+      from (select * from planejamentos where client_id = p_client_id order by data desc nulls last limit 20) p
+  ), '[]'::jsonb),
+  'mentorias', coalesce((
+    select jsonb_agg(jsonb_build_object('data', m.date, 'mentorada', m.mentee_name, 'valor', m.value, 'obs', left(m.notes, 300)) order by m.date desc)
+      from (select me.* from mentoring_events me join ev on ev.id = me.calendar_event_id
+             where not me.is_test order by me.date desc limit 20) m
+  ), '[]'::jsonb),
+  'historico', coalesce((
+    select jsonb_agg(jsonb_build_object('em', h.ocorrido_em, 'acao', h.acao, 'o_que', h.entidade, 'descricao', h.descricao) order by h.ocorrido_em desc)
+      from (select * from movimentacoes
+             where (entidade_id = p_client_id
+                    or entidade_id in (select id from loc)
+                    or entidade_id in (select id from ev))
+               and not detalhes ? 'anotacao_id'
+             order by ocorrido_em desc limit 25) h
+  ), '[]'::jsonb)
+)
+where exists (select 1 from cli);
+$function$
+```
+
+### `editar_emprestimo`
+
+```sql
+CREATE OR REPLACE FUNCTION public.editar_emprestimo(p_id uuid, p_devedor text, p_valor numeric, p_forma payment_method_type, p_data date, p_descricao text DEFAULT NULL::text, p_sem_caixa boolean DEFAULT NULL::boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_antes emprestimos%rowtype;
+  v_devedor text := upper(trim(coalesce(p_devedor, '')));
+  v_saldo numeric;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para alterar empréstimos.';
+  end if;
+  select * into v_antes from emprestimos where id = p_id;
+  if not found then
+    raise exception 'Lançamento de empréstimo não encontrado.';
+  end if;
+  if v_devedor = '' then
+    raise exception 'Informe para quem foi o empréstimo.';
+  end if;
+  if p_valor is null or p_valor <= 0 then
+    raise exception 'O valor precisa ser maior que zero.';
+  end if;
+  if p_data is null then
+    raise exception 'Informe a data.';
+  end if;
+
+  update emprestimos
+     set devedor = v_devedor, valor = p_valor, data = p_data, descricao = nullif(trim(p_descricao), '')
+   where id = p_id;
+
+  -- Nenhum devedor pode ficar devolvendo mais do que pegou.
+  select coalesce(sum(case when tipo = 'concedido' then valor else -valor end), 0) into v_saldo
+    from emprestimos where devedor = v_devedor;
+  if round(v_saldo, 2) < 0 then
+    raise exception 'Com essa mudança, % teria devolvido mais do que pegou emprestado.', v_devedor;
+  end if;
+  if v_antes.devedor <> v_devedor then
+    select coalesce(sum(case when tipo = 'concedido' then valor else -valor end), 0) into v_saldo
+      from emprestimos where devedor = v_antes.devedor;
+    if round(v_saldo, 2) < 0 then
+      raise exception 'Com essa mudança, % teria devolvido mais do que pegou emprestado.', v_antes.devedor;
+    end if;
+  end if;
+
+  -- Só a pendência: tira o lançamento do caixa.
+  if coalesce(p_sem_caixa, false) and v_antes.transaction_id is not null then
+    update emprestimos set transaction_id = null where id = p_id;
+    delete from transactions where id = v_antes.transaction_id;
+    v_antes.transaction_id := null;
+  end if;
+  -- Voltou a mexer no caixa: cria o lançamento.
+  if p_sem_caixa is false and v_antes.transaction_id is null then
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, notes, created_by)
+    values (
+      case when v_antes.tipo = 'concedido' then 'saida' else 'entrada' end::entry_type,
+      (select id from categories where scope = 'harmonize'
+          and name = case when v_antes.tipo = 'concedido' then 'Empréstimo concedido' else 'Devolução de empréstimo' end limit 1),
+      case when v_antes.tipo = 'concedido' then 'Empréstimo para ' else 'Devolução de empréstimo - ' end || v_devedor,
+      p_valor, p_forma, p_data, 'harmonize', nullif(trim(p_descricao), ''), auth.uid()
+    )
+    returning id into v_antes.transaction_id;
+    update emprestimos set transaction_id = v_antes.transaction_id where id = p_id;
+  elsif v_antes.transaction_id is not null then
+    update transactions
+       set amount = p_valor, date = p_data, payment_method = p_forma, notes = nullif(trim(p_descricao), ''),
+           description = case when v_antes.tipo = 'concedido' then 'Empréstimo para ' else 'Devolução de empréstimo - ' end || v_devedor
+     where id = v_antes.transaction_id;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'emprestimos', p_id,
+    case when v_antes.tipo = 'concedido' then 'Empréstimo para ' else 'Devolução de ' end || v_devedor
+      || ' (' || public.formatar_reais(p_valor) || ')',
+    jsonb_build_object('antes', jsonb_build_object('devedor', v_antes.devedor, 'valor', v_antes.valor, 'data', v_antes.data),
+                       'depois', jsonb_build_object('devedor', v_devedor, 'valor', round(p_valor, 2), 'data', p_data))
+  );
+end;
+$function$
+```
+
+### `editar_pagamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.editar_pagamento_locacao(p_payment_id uuid, p_forma payment_method_type DEFAULT NULL::payment_method_type, p_valor numeric DEFAULT NULL::numeric, p_data date DEFAULT NULL::date, p_pix_conta text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_old jsonb;
+  v_forma payment_method_type;
+  v_valor numeric;
+  v_data date;
+  v_pix_conta text;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para editar pagamentos.';
+  end if;
+
+  select rental_id, transaction_id, forma, valor, data, pix_conta
+    into v_rental_id, v_transaction_id, v_forma, v_valor, v_data, v_pix_conta
+    from rental_payments where id = p_payment_id;
+
+  if v_rental_id is null then
+    raise exception 'Pagamento não encontrado.';
+  end if;
+
+  v_old := jsonb_build_object('forma', v_forma, 'valor', v_valor, 'data', v_data, 'pix_conta', v_pix_conta);
+
+  v_forma := coalesce(p_forma, v_forma);
+  v_valor := coalesce(p_valor, v_valor);
+  v_data := coalesce(p_data, v_data);
+  v_pix_conta := case when v_forma = 'pix' then coalesce(p_pix_conta, v_pix_conta) else null end;
+
+  if v_valor <= 0 then
+    raise exception 'O valor do pagamento precisa ser maior que zero.';
+  end if;
+  if v_forma = 'pix' and v_pix_conta is null then
+    raise exception 'Informe em qual conta o PIX caiu.';
+  end if;
+
+  update rental_payments
+     set forma = v_forma, valor = v_valor, data = v_data, pix_conta = v_pix_conta
+   where id = p_payment_id;
+
+  if v_transaction_id is not null then
+    update transactions
+       set amount = v_valor, payment_method = v_forma, date = v_data
+     where id = v_transaction_id;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', v_rental_id,
+    public.descrever_registro('rentals', v_rental_id),
+    jsonb_build_object(
+      'acao_detalhada', 'pagamento corrigido',
+      'pagamento_id', p_payment_id,
+      'antes', v_old,
+      'depois', jsonb_build_object('forma', v_forma, 'valor', v_valor, 'data', v_data, 'pix_conta', v_pix_conta)
+    )
+  );
+end;
+$function$
+```
+
+### `editar_transacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.editar_transacao(p_transaction_id uuid, p_description text DEFAULT NULL::text, p_amount numeric DEFAULT NULL::numeric, p_payment_method payment_method_type DEFAULT NULL::payment_method_type, p_date date DEFAULT NULL::date, p_category_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_scope scope_type;
+  v_created_by uuid;
+  v_old jsonb;
+begin
+  select scope, created_by into v_scope, v_created_by from transactions where id = p_transaction_id;
+  if v_scope is null then
+    raise exception 'Lançamento não encontrado.';
+  end if;
+
+  if exists (select 1 from rental_payments where transaction_id = p_transaction_id) then
+    raise exception 'Este lançamento é um pagamento de locação. Use a correção de pagamento, para o valor e o saldo da locação não desencontrarem.';
+  end if;
+
+  if v_scope = 'harmonize' and not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para editar lançamentos.';
+  end if;
+  if v_scope = 'pessoal' and v_created_by is distinct from auth.uid() then
+    raise exception 'Sem permissão para editar este lançamento pessoal.';
+  end if;
+  if p_amount is not null and p_amount <= 0 then
+    raise exception 'O valor precisa ser maior que zero.';
+  end if;
+
+  select to_jsonb(t) into v_old from transactions t where t.id = p_transaction_id;
+
+  update transactions
+     set description = coalesce(p_description, description),
+         amount = coalesce(p_amount, amount),
+         payment_method = coalesce(p_payment_method, payment_method),
+         date = coalesce(p_date, date),
+         category_id = coalesce(p_category_id, category_id),
+         notes = coalesce(p_notes, notes)
+   where id = p_transaction_id;
+
+  perform public.registrar_movimentacao(
+    'editado', 'transactions', p_transaction_id,
+    public.descrever_registro('transactions', p_transaction_id),
+    jsonb_build_object('antes', v_old)
+  );
+end;
+$function$
+```
+
+### `eh_somente_leitura`
+
+```sql
+CREATE OR REPLACE FUNCTION public.eh_somente_leitura()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce((select somente_leitura from profiles where id = auth.uid()), false);
+$function$
+```
+
+### `espelhar_retirada`
+
+```sql
+CREATE OR REPLACE FUNCTION public.espelhar_retirada()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_eh_retirada boolean;
+  v_cat_pessoal uuid;
+  v_espelho uuid;
+begin
+  if new.scope <> 'harmonize' then
+    return null;
+  end if;
+  select (c.name = 'Retiradas' and new.type = 'saida') into v_eh_retirada from categories c where c.id = new.category_id;
+  v_eh_retirada := coalesce(v_eh_retirada, false);
+  select id into v_espelho from transactions where vinculo_id = new.id limit 1;
+
+  if v_eh_retirada and v_espelho is null then
+    select id into v_cat_pessoal from categories where scope = 'pessoal' and type = 'entrada' and name = 'Retirada da Harmonize' limit 1;
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, created_by, is_test, vinculo_id)
+    values ('entrada', v_cat_pessoal, 'Retirada da Harmonize' || coalesce(': ' || nullif(trim(new.description), ''), ''),
+            new.amount, new.payment_method, new.date, 'pessoal', new.created_by, new.is_test, new.id);
+  elsif v_eh_retirada then
+    update transactions
+       set amount = new.amount, date = new.date, payment_method = new.payment_method, is_test = new.is_test,
+           description = 'Retirada da Harmonize' || coalesce(': ' || nullif(trim(new.description), ''), '')
+     where id = v_espelho;
+  elsif v_espelho is not null then
+    delete from transactions where id = v_espelho;
+  end if;
+  return null;
+end;
+$function$
+```
+
+### `excluir_anotacao_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_anotacao_cliente(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_a cliente_anotacoes%rowtype;
+  v_nome text;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para apagar anotações.';
+  end if;
+  select * into v_a from cliente_anotacoes where id = p_id;
+  if not found then
+    raise exception 'Anotação não encontrada.';
+  end if;
+  select name into v_nome from clients where id = v_a.client_id;
+
+  delete from cliente_anotacoes where id = p_id;
+
+  perform registrar_movimentacao('excluido', 'cliente', v_a.client_id,
+    'Anotação apagada de ' || coalesce(v_nome, 'cliente') || ': ' || left(v_a.texto, 120),
+    jsonb_build_object('anotacao_id', p_id, 'texto', v_a.texto, 'criada_em', v_a.created_at));
+end;
+$function$
+```
+
+### `excluir_bloqueio_equipamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_bloqueio_equipamento(p_bloqueio_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_bl record;
+  v_nome text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para excluir o bloqueio.';
+  end if;
+  select * into v_bl from bloqueios_equipamento where id = p_bloqueio_id;
+  if v_bl.id is null then
+    raise exception 'Bloqueio não encontrado.';
+  end if;
+  select name into v_nome from equipments where id = v_bl.equipment_id;
+
+  delete from bloqueios_equipamento where id = p_bloqueio_id;
+
+  -- Se era a manutenção em curso que este bloqueio abriu, devolve o equipamento.
+  if v_bl.tipo = 'manutencao' then
+    update equipments
+       set status = 'ativo', status_motivo = null, status_desde = now(), status_previsto_fim = null
+     where id = v_bl.equipment_id and status = 'manutencao' and status_previsto_fim = v_bl.data_fim + 1;
+    if found then
+      perform public.registrar_movimentacao(
+        'manutencao_finalizada', 'equipments', v_bl.equipment_id, 'Equipamento ' || v_nome,
+        jsonb_build_object('motivo', 'bloqueio de manutenção excluído')
+      );
+    end if;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'excluido', 'equipments', v_bl.equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object('acao_detalhada',
+      'Bloqueio (' || rotulo_bloqueio(v_bl.tipo) || ') de ' || to_char(v_bl.data_inicio, 'DD/MM/YYYY') || ' a ' || to_char(v_bl.data_fim, 'DD/MM/YYYY') || ' excluído')
+  );
+end;
+$function$
+```
+
+### `excluir_campanha`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_campanha(p_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_c campanhas%rowtype;
+  v_qtd int;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para mexer em campanhas.';
+  end if;
+  select * into v_c from campanhas where id = p_id for update;
+  if not found then
+    raise exception 'Campanha não encontrada.';
+  end if;
+  select count(*) into v_qtd from campanha_envios where campanha_id = p_id;
+  if v_qtd > 0 then
+    raise exception 'A campanha "%" já tem % envio(s) registrado(s): arquive em vez de apagar.', v_c.nome, v_qtd;
+  end if;
+  delete from campanhas where id = p_id;
+  perform registrar_movimentacao('excluido', 'campanha', p_id,
+    'Campanha apagada: ' || v_c.nome,
+    jsonb_build_object('mensagem', v_c.mensagem, 'arte_path', v_c.arte_path));
+  return v_c.arte_path;
+end;
+$function$
+```
+
+### `excluir_categoria`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_categoria(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cat categories%rowtype;
+  v_qtd int;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas categorias.';
+  end if;
+  select * into v_cat from categories where id = p_id for update;
+  if not found then
+    raise exception 'Categoria não encontrada.';
+  end if;
+  if v_cat.scope = 'pessoal' and not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para o Pessoal.';
+  end if;
+  if v_cat.sistema then
+    raise exception 'A categoria "%" é do sistema e não pode ser apagada.', v_cat.name;
+  end if;
+  select count(*) into v_qtd from transactions where category_id = p_id;
+  if v_qtd > 0 then
+    raise exception 'A categoria "%" tem % lançamento(s): arquive em vez de apagar.', v_cat.name, v_qtd;
+  end if;
+  if exists (select 1 from expense_limits where category_id = p_id) then
+    raise exception 'A categoria "%" tem limite de gasto: tire o limite antes.', v_cat.name;
+  end if;
+  if v_cat.scope = 'pessoal' and exists (
+    select 1 from orcamentos_pessoais where lower(btrim(categoria)) = lower(btrim(v_cat.name))
+  ) then
+    raise exception 'A categoria "%" tem orçamento no Pessoal: tire o orçamento antes.', v_cat.name;
+  end if;
+
+  delete from categories where id = p_id;
+  perform registrar_movimentacao('excluido', 'categories', p_id,
+    'Categoria apagada: ' || v_cat.name,
+    jsonb_build_object('nome', v_cat.name, 'escopo', v_cat.scope, 'tipo', v_cat.type));
+end;
+$function$
+```
+
+### `excluir_cidade`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_cidade(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_c cidades_coordenadas%rowtype;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas cidades.';
+  end if;
+  select * into v_c from cidades_coordenadas where id = p_id for update;
+  if not found then
+    raise exception 'Cidade não encontrada.';
+  end if;
+  delete from cidades_coordenadas where id = p_id;
+  perform registrar_movimentacao('excluido', 'cidades_coordenadas', p_id,
+    'Cidade removida: ' || v_c.nome_exibicao,
+    jsonb_build_object('nome', v_c.nome, 'lat', v_c.latitude, 'lon', v_c.longitude, 'uf', v_c.uf));
+end;
+$function$
+```
+
+### `excluir_compra_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_compra_cartao(p_compra_grupo uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_scope scope_type;
+  v_desc text;
+begin
+  select scope, description into v_scope, v_desc from transactions where compra_grupo = p_compra_grupo and cartao_mov = 'compra' limit 1;
+  if v_scope is null then
+    raise exception 'Compra não encontrada.';
+  end if;
+  if (v_scope = 'harmonize' and not has_module_permission('financeiro'))
+     or (v_scope = 'pessoal' and not has_module_permission('pessoal')) then
+    raise exception 'Sem permissão para apagar esta compra.';
+  end if;
+  delete from transactions where compra_grupo = p_compra_grupo and cartao_mov = 'compra';
+  perform public.registrar_movimentacao('excluido', 'transactions', null, 'Compra no cartão: ' || v_desc, '{}'::jsonb);
+end;
+$function$
+```
+
+### `excluir_conta_pix`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_conta_pix(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_c contas_pix%rowtype;
+  v_qtd int;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas contas PIX.';
+  end if;
+  select * into v_c from contas_pix where id = p_id for update;
+  if not found then
+    raise exception 'Conta PIX não encontrada.';
+  end if;
+  if v_c.padrao then
+    raise exception 'A conta padrão não pode ser apagada: escolha outra como padrão antes.';
+  end if;
+  select count(*) into v_qtd from rental_payments where pix_conta = v_c.codigo;
+  if v_qtd > 0 then
+    raise exception 'A conta "%" já recebeu % pagamento(s): desative em vez de apagar.', v_c.rotulo, v_qtd;
+  end if;
+  delete from contas_pix where id = p_id;
+  perform registrar_movimentacao('excluido', 'contas_pix', p_id,
+    'Conta PIX apagada: ' || v_c.rotulo,
+    jsonb_build_object('codigo', v_c.codigo, 'titular', v_c.titular, 'chave', v_c.chave));
+end;
+$function$
+```
+
+### `excluir_locacao_cascata`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_locacao_cascata(p_rental_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_taxas uuid[];
+begin
+  perform public.require_admin();
+
+  update rentals set transaction_id = null where id = p_rental_id;
+
+  select array_agg(taxa_transaction_id) into v_taxas
+    from calendar_events
+   where rental_id = p_rental_id and taxa_transaction_id is not null;
+
+  update calendar_events set taxa_transaction_id = null where rental_id = p_rental_id;
+
+  update mentoring_events set calendar_event_id = null
+   where calendar_event_id in (select id from calendar_events where rental_id = p_rental_id);
+  update mentoring_events set transaction_id = null
+   where transaction_id in (select id from transactions where rental_id = p_rental_id);
+
+  delete from calendar_events where rental_id = p_rental_id;
+  delete from transactions    where rental_id = p_rental_id;
+  if v_taxas is not null then
+    delete from transactions where id = any(v_taxas);
+  end if;
+  delete from rentals where id = p_rental_id;
+end;
+$function$
+```
+
+### `excluir_mentoria_cascata`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_mentoria_cascata(p_mentoria_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_evento_id uuid;
+  v_transacao_id uuid;
+begin
+  perform public.require_admin();
+
+  select calendar_event_id, transaction_id into v_evento_id, v_transacao_id
+    from mentoring_events where id = p_mentoria_id;
+
+  -- Quebra os dois ciclos da mentoria antes de apagar qualquer coisa.
+  update mentoring_events set calendar_event_id = null, transaction_id = null
+   where id = p_mentoria_id;
+  update calendar_events set mentoring_id = null where mentoring_id = p_mentoria_id;
+  update transactions    set mentoring_id = null where mentoring_id = p_mentoria_id;
+
+  delete from calendar_events where id = v_evento_id;
+  delete from transactions    where id = v_transacao_id;
+  delete from mentoring_events where id = p_mentoria_id;
+end;
+$function$
+```
+
+### `excluir_planejamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_planejamento(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_paciente text;
+  v_cliente uuid := cliente_do_usuario();
+begin
+  if v_cliente is null and not has_module_permission('agenda') then
+    raise exception 'Sem permissão para excluir planejamentos.';
+  end if;
+  delete from planejamentos where id = p_id and (v_cliente is null or client_id = v_cliente) returning paciente into v_paciente;
+  if not found then raise exception 'Planejamento não encontrado.'; end if;
+  perform registrar_movimentacao('excluido', 'planejamento', p_id,
+    'Planejamento HIPRO excluído' || coalesce(' (' || v_paciente || ')', '')
+      || case when v_cliente is not null then ' pela cliente' else '' end, '{}'::jsonb);
+end;
+$function$
+```
+
+### `fatura_da_compra`
+
+```sql
+CREATE OR REPLACE FUNCTION public.fatura_da_compra(p_data date, p_fechamento integer, p_vencimento integer)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_fecha date := public.dia_no_mes(extract(year from p_data)::int, extract(month from p_data)::int, p_fechamento);
+  v_mes_fecha date;
+begin
+  -- Compra depois do fechamento entra na fatura que fecha no mês seguinte.
+  v_mes_fecha := date_trunc('month', p_data)::date + case when p_data > v_fecha then interval '1 month' else interval '0' end;
+  -- Vencimento depois do fechamento no mesmo mês; senão, no mês seguinte.
+  if p_vencimento <= p_fechamento then
+    v_mes_fecha := v_mes_fecha + interval '1 month';
+  end if;
+  return to_char(v_mes_fecha, 'YYYY-MM');
+end;
+$function$
+```
+
+### `finalize_rental_reservation`
+
+```sql
+CREATE OR REPLACE FUNCTION public.finalize_rental_reservation(p_calendar_event_id uuid, p_shots integer, p_calculated_value numeric, p_payment_method payment_method_type, p_notes text DEFAULT NULL::text, p_pix_conta text DEFAULT NULL::text, p_pago boolean DEFAULT true)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+  v_category_id uuid;
+  v_client_id uuid;
+  v_equipment_id uuid;
+  v_event_date date;
+  v_event_date_end date;
+  v_client_name text;
+  v_is_mentoria boolean;
+  v_km_ida numeric;
+  v_valor_deslocamento numeric;
+  v_created_by uuid := auth.uid();
+  v_pix_conta text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para finalizar locações';
+  end if;
+
+  select client_id, equipment_id, date_start, date_end, is_mentoria, km_ida, valor_deslocamento
+    into v_client_id, v_equipment_id, v_event_date, v_event_date_end, v_is_mentoria, v_km_ida, v_valor_deslocamento
+  from calendar_events
+  where id = p_calendar_event_id and rental_id is null and status = 'pre_reserva';
+
+  if v_client_id is null then
+    raise exception 'Reserva não encontrada, já finalizada, ou sem cliente vinculado.';
+  end if;
+  if v_equipment_id is null then
+    raise exception 'Esta reserva não está vinculada a um equipamento HIPRO.';
+  end if;
+
+  select name into v_client_name from clients where id = v_client_id;
+
+  if coalesce(v_is_mentoria, false) then
+    select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Mentoria%' limit 1;
+    if v_category_id is null then
+      raise exception 'Categoria "Mentoria" não encontrada (foi renomeada ou removida?). Ajuste o cadastro de categorias antes de finalizar a mentoria.';
+    end if;
+  else
+    select id into v_category_id from categories where type = 'entrada' and is_default = true and name ilike 'Loca%' limit 1;
+    if v_category_id is null then
+      raise exception 'Categoria "Locação" não encontrada (foi renomeada ou removida?). Ajuste o cadastro de categorias antes de finalizar a reserva.';
+    end if;
+  end if;
+
+  -- A data final da reserva vai para a locação (nula quando é de um dia só,
+  -- igual a create_rental). O deslocamento da reserva fica cobrado à parte
+  -- (deslocamento_incluso_no_valor = false): soma no saldo a receber.
+  insert into rentals (client_id, equipment_id, event_date, event_date_end, shots, calculated_value, payment_method, notes, created_by, km_ida, valor_deslocamento)
+  values (
+    v_client_id, v_equipment_id, v_event_date,
+    case when v_event_date_end > v_event_date then v_event_date_end else null end,
+    p_shots, p_calculated_value, p_payment_method, p_notes, v_created_by, v_km_ida, coalesce(v_valor_deslocamento, 0)
+  )
+  returning id into v_rental_id;
+
+  if p_pago then
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, created_by)
+    values (
+      'entrada',
+      v_category_id,
+      (case when coalesce(v_is_mentoria, false) then 'Mentoria HIPRO - ' else 'Locação HIPRO - ' end) || coalesce(v_client_name, ''),
+      p_calculated_value, p_payment_method, v_event_date, 'harmonize', v_client_id, v_rental_id, v_created_by
+    )
+    returning id into v_transaction_id;
+
+    v_pix_conta := case when p_payment_method = 'pix' then coalesce(p_pix_conta, 'harmonize') else null end;
+
+    insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
+    values (v_rental_id, p_payment_method, p_calculated_value, v_event_date, v_pix_conta, v_transaction_id, v_created_by);
+
+    update rentals set transaction_id = v_transaction_id where id = v_rental_id;
+  end if;
+
+  perform public.recalcular_pagamento_locacao(v_rental_id);
+
+  update calendar_events
+  set status = 'confirmada',
+      value = p_calculated_value,
+      rental_id = v_rental_id,
+      notes = coalesce(p_notes, notes)
+  where id = p_calendar_event_id;
+
+  update clients set stage = 'cliente' where id = v_client_id and stage <> 'cliente';
+
+  return v_rental_id;
+end;
+$function$
+```
+
+### `formatar_reais`
+
+```sql
+CREATE OR REPLACE FUNCTION public.formatar_reais(p_valor numeric)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select 'R$ ' || replace(replace(replace(
+           to_char(coalesce(p_valor, 0), 'FM999,999,990.00'),
+           ',', '#'), '.', ','), '#', '.');
+$function$
+```
+
+### `formulario_segredo`
+
+```sql
+CREATE OR REPLACE FUNCTION public.formulario_segredo()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  return (select decrypted_secret from vault.decrypted_secrets where name = 'formulario_cadastro_segredo');
+end;
+$function$
+```
+
+### `gerar_tarefas_agenda`
+
+```sql
+CREATE OR REPLACE FUNCTION public.gerar_tarefas_agenda()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  s settings%rowtype;
+  v_hoje date := public.hoje_local();
+  v_total integer := 0;
+  v_n integer;
+begin
+  if auth.uid() is null or not has_module_permission('clientes') then
+    return 0;
+  end if;
+
+  select * into s from settings where id;
+  if not found or coalesce(s.test_mode, false) then
+    return 0;
+  end if;
+
+  -- 1) Confirmar presença: X dias antes de agendamento não confirmado.
+  if s.tarefa_confirmacao_ativa then
+    delete from tasks t
+     using calendar_events ev
+     where t.event_id = ev.id and t.type = 'confirmacao' and t.status = 'pendente'
+       and (ev.confirmed or ev.status = 'cancelada' or ev.date_start < v_hoje
+            or ev.date_start - s.dias_antes_confirmacao > v_hoje);
+
+    insert into tasks (client_id, type, title, due_date, event_id)
+    select ev.client_id, 'confirmacao',
+           'Confirmar presença de ' || to_char(ev.date_start, 'DD/MM'),
+           greatest(ev.date_start - s.dias_antes_confirmacao, v_hoje), ev.id
+      from calendar_events ev
+      join clients c on c.id = ev.client_id
+     where ev.equipment_id is not null
+       and ev.status <> 'cancelada'
+       and not ev.confirmed
+       and not ev.is_test and not c.is_test
+       and ev.date_start >= v_hoje
+       and ev.date_start - s.dias_antes_confirmacao <= v_hoje
+    on conflict do nothing;
+    get diagnostics v_n = row_count;
+    v_total := v_total + v_n;
+  end if;
+
+  -- 2) Pós-locação: X dias depois da locação (janela de 14 dias para trás,
+  --    para a primeira execução não despejar o histórico antigo).
+  if s.tarefa_pos_locacao_ativa then
+    delete from tasks t
+     using calendar_events ev
+     where t.event_id = ev.id and t.type = 'pos_locacao' and t.status = 'pendente'
+       and (ev.status = 'cancelada' or ev.no_show);
+
+    insert into tasks (client_id, type, title, due_date, event_id)
+    select ev.client_id, 'pos_locacao',
+           'Pós-locação de ' || to_char(ev.date_start, 'DD/MM'),
+           ev.date_start + s.dias_pos_locacao, ev.id
+      from calendar_events ev
+      join clients c on c.id = ev.client_id
+     where ev.rental_id is not null
+       and not ev.is_mentoria
+       and ev.status <> 'cancelada'
+       and not ev.no_show
+       and not ev.is_test and not c.is_test
+       and ev.date_start + s.dias_pos_locacao <= v_hoje
+       and ev.date_start >= v_hoje - 14
+    on conflict do nothing;
+    get diagnostics v_n = row_count;
+    v_total := v_total + v_n;
+  end if;
+
+  -- 3) Cobrar taxa de reserva: pendente há X dias desde que a reserva foi criada.
+  if s.tarefa_taxa_ativa then
+    delete from tasks t
+     using calendar_events ev
+     where t.event_id = ev.id and t.type = 'cobranca_taxa' and t.status = 'pendente'
+       and (ev.taxa_status <> 'pendente' or ev.status = 'cancelada' or ev.date_start < v_hoje);
+
+    insert into tasks (client_id, type, title, due_date, event_id)
+    select ev.client_id, 'cobranca_taxa',
+           'Cobrar taxa de reserva (' || to_char(ev.date_start, 'DD/MM') || ')',
+           (ev.created_at at time zone 'America/Sao_Paulo')::date + s.dias_cobranca_taxa, ev.id
+      from calendar_events ev
+      join clients c on c.id = ev.client_id
+     where ev.taxa_status = 'pendente'
+       and ev.status <> 'cancelada'
+       and not ev.is_test and not c.is_test
+       and ev.date_start >= v_hoje
+       and (ev.created_at at time zone 'America/Sao_Paulo')::date + s.dias_cobranca_taxa <= v_hoje
+    on conflict do nothing;
+    get diagnostics v_n = row_count;
+    v_total := v_total + v_n;
+  end if;
+
+  return v_total;
+end;
+$function$
+```
+
+### `gerar_tarefas_recontato`
+
+```sql
+CREATE OR REPLACE FUNCTION public.gerar_tarefas_recontato()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_ativo boolean;
+  v_intervalo integer;
+  v_teste boolean;
+  v_hoje date := public.hoje_local();
+  v_criadas integer := 0;
+begin
+  if auth.uid() is null or not has_module_permission('clientes') then
+    return 0;
+  end if;
+
+  select recontato_automatico, recontato_intervalo_dias, test_mode
+    into v_ativo, v_intervalo, v_teste
+    from settings where id;
+
+  if not coalesce(v_ativo, false) or coalesce(v_teste, false) then
+    return 0;
+  end if;
+
+  delete from tasks t
+   where t.type = 'recontato' and t.status = 'pendente'
+     and exists (
+       select 1 from calendar_events ev
+        where ev.client_id = t.client_id
+          and ev.status <> 'cancelada'
+          and ev.equipment_id is not null
+          and not ev.is_mentoria
+          and ev.date_start >= v_hoje
+     );
+
+  insert into tasks (client_id, type, title, due_date)
+  select c.id, 'recontato', 'Recontato com o cliente',
+         greatest(
+           coalesce((select max(r.event_date) from rentals r
+                      where r.client_id = c.id and r.status <> 'cancelada' and r.event_date <= v_hoje),
+                    date '0001-01-01'),
+           coalesce((select max((t.completed_at at time zone 'America/Sao_Paulo')::date) from tasks t
+                      where t.client_id = c.id and t.type = 'recontato' and t.status = 'concluida'),
+                    date '0001-01-01'),
+           (c.created_at at time zone 'America/Sao_Paulo')::date
+         ) + v_intervalo
+    from clients c
+   where c.is_client
+     and not c.is_test
+     and not exists (
+       select 1 from calendar_events ev
+        where ev.client_id = c.id
+          and ev.status <> 'cancelada'
+          and ev.equipment_id is not null
+          and not ev.is_mentoria
+          and ev.date_start >= v_hoje
+     )
+     and not exists (
+       select 1 from tasks t where t.client_id = c.id and t.type = 'recontato' and t.status = 'pendente'
+     )
+  on conflict do nothing;
+
+  get diagnostics v_criadas = row_count;
+  return v_criadas;
+end;
+$function$
+```
+
+### `gravar_contagens_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.gravar_contagens_locacao(p_rental_id uuid, p_contagens jsonb, p_credito_usado integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client uuid;
+  v_data date;
+  v_item jsonb;
+  v_ordem int := 0;
+  v_ini bigint;
+  v_fim bigint;
+  v_ap uuid;
+  v_credito bigint := 0;
+  v_partes text := '';
+  v_disp numeric;
+begin
+  select client_id, event_date into v_client, v_data from rentals where id = p_rental_id;
+  if jsonb_typeof(coalesce(p_contagens, '[]'::jsonb)) <> 'array' then raise exception 'Contagens inválidas.'; end if;
+
+  for v_item in select * from jsonb_array_elements(coalesce(p_contagens, '[]'::jsonb)) loop
+    v_ordem := v_ordem + 1;
+    v_ini := least((v_item ->> 'inicial')::bigint, (v_item ->> 'final')::bigint);
+    v_fim := greatest((v_item ->> 'inicial')::bigint, (v_item ->> 'final')::bigint);
+    if v_ini is null or v_fim is null or v_fim = v_ini then raise exception 'Contagem % incompleta.', v_ordem; end if;
+    v_ap := nullif(v_item ->> 'aplicador_id', '')::uuid;
+    if v_ap is not null and not exists (select 1 from aplicadores where id = v_ap) then
+      raise exception 'Ponteira da contagem % não encontrada.', v_ordem;
+    end if;
+    insert into locacao_contagens (rental_id, ordem, inicial, final, gera_credito, aplicador_id)
+    values (p_rental_id, v_ordem, v_ini, v_fim, coalesce((v_item ->> 'gera_credito')::boolean, false), v_ap);
+    if coalesce((v_item ->> 'gera_credito')::boolean, false) then
+      v_credito := v_credito + (v_fim - v_ini);
+      v_partes := v_partes || case when v_partes = '' then '' else ', ' end || 'contagem ' || v_ordem || ': ' || v_ini || ' a ' || v_fim;
+    end if;
+  end loop;
+
+  if v_credito > 0 then
+    insert into creditos_cliente (client_id, tipo, quantidade, origem, rental_id, descricao, data)
+    values (v_client, 'disparos', v_credito, 'contagem', p_rental_id, 'Crédito de disparos (' || v_partes || ')', v_data);
+  end if;
+
+  if coalesce(p_credito_usado, 0) > 0 then
+    v_disp := saldo_credito_cliente(v_client, 'disparos');
+    if p_credito_usado > v_disp then
+      raise exception 'A cliente tem % disparos de crédito disponíveis, menos que os % usados.', v_disp::int, p_credito_usado;
+    end if;
+    insert into creditos_cliente (client_id, tipo, quantidade, origem, rental_id, descricao, data)
+    values (v_client, 'disparos', -p_credito_usado, 'uso', p_rental_id, 'Usado na locação de ' || to_char(v_data, 'DD/MM/YYYY'), v_data);
+  end if;
+end;
+$function$
+```
+
+### `handle_client_enter_contato`
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_client_enter_contato()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.stage = 'contato' and (tg_op = 'INSERT' or old.stage is distinct from new.stage) then
+    if not exists (
+      select 1 from tasks
+      where client_id = new.id and status = 'pendente' and type = 'contato_inicial'
+    ) then
+      insert into tasks (client_id, type, title, due_date)
+      values (new.id, 'contato_inicial', 'Fazer o primeiro contato com ' || new.name, public.hoje_local());
+    end if;
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `handle_locacao_agendada`
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_locacao_agendada()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.equipment_id is not null and new.client_id is not null then
+    update clients
+    set stage = 'agendado'
+    where id = new.client_id
+      and stage not in ('agendado', 'cliente');
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `has_module_permission`
+
+```sql
+CREATE OR REPLACE FUNCTION public.has_module_permission(module text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce(
+    (select active and cliente_id is null and (is_admin or coalesce((permissions ->> module)::boolean, false))
+       from profiles where id = auth.uid()),
+    false
+  );
+$function$
+```
+
+### `hoje_local`
+
+```sql
+CREATE OR REPLACE FUNCTION public.hoje_local()
+ RETURNS date
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  select (now() at time zone 'America/Sao_Paulo')::date;
+$function$
+```
+
+### `importar_compras_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.importar_compras_cartao(p_cartao_id uuid, p_itens jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cartao record;
+  v_item jsonb;
+  v_ins int := 0;
+  v_rep int := 0;
+  v_mov int := 0;
+  v_novo boolean;
+  v_cat uuid;
+  v_valor numeric;
+  v_data date;
+  v_desc text;
+  v_pn int;
+  v_pt int;
+  v_pag boolean;
+  v_cat_pag uuid;
+begin
+  select * into v_cartao from cartoes where id = p_cartao_id;
+  if v_cartao.id is null then
+    raise exception 'Cartão não encontrado.';
+  end if;
+  if (v_cartao.scope = 'harmonize' and not has_module_permission('financeiro'))
+     or (v_cartao.scope = 'pessoal' and not has_module_permission('pessoal')) then
+    raise exception 'Sem permissão para lançar neste cartão.';
+  end if;
+  select id into v_cat_pag from categories where name = 'Pagamento de fatura' and scope = v_cartao.scope and type = 'saida' limit 1;
+  if p_itens is null or jsonb_typeof(p_itens) <> 'array' or jsonb_array_length(p_itens) = 0 then
+    raise exception 'Nada para importar.';
+  end if;
+  if jsonb_array_length(p_itens) > 800 then
+    raise exception 'Muitas linhas de uma vez (máximo 800).';
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_itens) loop
+    v_valor := (v_item->>'valor')::numeric;
+    v_data := (v_item->>'data')::date;
+    v_desc := left(nullif(trim(v_item->>'descricao'), ''), 200);
+    v_cat := nullif(v_item->>'category_id', '')::uuid;
+    v_pn := nullif(v_item->>'parcela_num', '')::int;
+    v_pt := nullif(v_item->>'parcelas_total', '')::int;
+    v_pag := coalesce(v_item->>'tipo', 'compra') = 'pagamento';
+    if v_pag then
+      -- Pagamento de fatura feito no banco: igual ao "Pagar fatura" (sai do saldo, fora do resultado).
+      v_desc := 'Fatura ' || v_cartao.nome || ' ' || substr(coalesce(v_item->>'fatura_ref', ''), 6, 2) || '/' || substr(coalesce(v_item->>'fatura_ref', ''), 1, 4);
+      v_cat := v_cat_pag;
+    end if;
+
+    if v_valor is null or v_valor <= 0 then
+      raise exception 'Valor inválido na linha %.', coalesce(v_desc, '?');
+    end if;
+    if v_desc is null then
+      raise exception 'Linha sem descrição.';
+    end if;
+    if coalesce(v_item->>'fatura_ref', '') !~ '^\d{4}-\d{2}$' then
+      raise exception 'Fatura inválida na linha %.', v_desc;
+    end if;
+    if nullif(v_item->>'chave', '') is null or nullif(v_item->>'grupo', '') is null then
+      raise exception 'Linha sem chave: %.', v_desc;
+    end if;
+    if not v_pag and v_cat is not null and not exists (select 1 from categories c where c.id = v_cat and c.scope = v_cartao.scope) then
+      raise exception 'Categoria que não é deste lado, na linha %.', v_desc;
+    end if;
+
+    insert into transactions (
+      type, category_id, description, amount, payment_method, date, scope, notes, created_by,
+      cartao_id, cartao_mov, fatura_ref, parcela_num, parcelas_total, compra_grupo, importacao_chave
+    ) values (
+      'saida', v_cat, v_desc, v_valor, case when v_pag then 'pix'::payment_method_type else 'credito'::payment_method_type end,
+      v_data, v_cartao.scope, 'Importado da fatura', auth.uid(),
+      p_cartao_id, case when v_pag then 'pagamento' else 'compra' end, v_item->>'fatura_ref', v_pn, v_pt,
+      case when v_pag then null else md5(p_cartao_id::text || '|' || (v_item->>'grupo'))::uuid end, v_item->>'chave'
+    )
+    on conflict (cartao_id, importacao_chave) where importacao_chave is not null do update
+      set fatura_ref = excluded.fatura_ref, amount = excluded.amount, data_compra = excluded.data_compra
+      where excluded.fatura_ref < transactions.fatura_ref
+    returning (xmax = 0) into v_novo;
+    if v_novo is null then
+      v_rep := v_rep + 1;
+    elsif v_novo then
+      v_ins := v_ins + 1;
+    else
+      v_mov := v_mov + 1;
+    end if;
+  end loop;
+
+  perform public.registrar_movimentacao(
+    'criado', 'cartoes', p_cartao_id, 'Importação de fatura no cartão ' || v_cartao.nome,
+    jsonb_build_object('inseridos', v_ins, 'repetidos', v_rep, 'movidos', v_mov)
+  );
+  return jsonb_build_object('inseridos', v_ins, 'repetidos', v_rep, 'movidos', v_mov);
+end;
+$function$
+```
+
+### `isentar_taxa_ao_trocar_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.isentar_taxa_ao_trocar_cliente()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.taxa_status = 'pendente'
+     and new.client_id is distinct from old.client_id
+     and exists (select 1 from clients where id = new.client_id and (parceiro or isento_taxa)) then
+    new.taxa_status := 'nao_aplica';
+    delete from tasks where event_id = new.id and type = 'cobranca_taxa' and status = 'pendente';
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `isentar_taxa_de_parceiro`
+
+```sql
+CREATE OR REPLACE FUNCTION public.isentar_taxa_de_parceiro()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if (new.parceiro and not coalesce(old.parceiro, false))
+     or (new.isento_taxa and not coalesce(old.isento_taxa, false)) then
+    update calendar_events
+       set taxa_status = 'nao_aplica'
+     where client_id = new.id
+       and taxa_status = 'pendente';
+    delete from tasks
+     where client_id = new.id
+       and type = 'cobranca_taxa'
+       and status = 'pendente';
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `keep_client_forever`
+
+```sql
+CREATE OR REPLACE FUNCTION public.keep_client_forever()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  -- Marca como cliente ao entrar na etapa "cliente"
+  if new.stage = 'cliente' and not coalesce(old.is_client, false) then
+    new.is_client := true;
+    new.became_client_at := coalesce(new.became_client_at, now());
+  end if;
+
+  -- Impede que alguém tire a marca de cliente e mantém a data original
+  if tg_op = 'UPDATE' and old.is_client = true then
+    new.is_client := true;
+    new.became_client_at := coalesce(old.became_client_at, new.became_client_at, now());
+  end if;
+
+  return new;
+end;
+$function$
+```
+
+### `lancar_credito_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.lancar_credito_cliente(p_client_id uuid, p_tipo text, p_quantidade numeric, p_descricao text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+begin
+  if not has_module_permission('financeiro') then raise exception 'Sem permissão para lançar crédito.'; end if;
+  if p_tipo not in ('disparos', 'valor') then raise exception 'Tipo de crédito inválido.'; end if;
+  if coalesce(p_quantidade, 0) = 0 then raise exception 'Informe a quantidade.'; end if;
+  if p_tipo = 'disparos' and p_quantidade <> round(p_quantidade) then raise exception 'Disparos são números inteiros.'; end if;
+  if nullif(btrim(p_descricao), '') is null then raise exception 'Escreva o motivo do crédito.'; end if;
+  if not exists (select 1 from clients where id = p_client_id) then raise exception 'Cliente não encontrada.'; end if;
+  if p_quantidade < 0 and saldo_credito_cliente(p_client_id, p_tipo) + p_quantidade < 0 then
+    raise exception 'O crédito disponível não cobre essa retirada.';
+  end if;
+  insert into creditos_cliente (client_id, tipo, quantidade, origem, descricao)
+  values (p_client_id, p_tipo, p_quantidade, 'manual', btrim(p_descricao))
+  returning id into v_id;
+  perform registrar_movimentacao('editado', 'cliente', p_client_id, descrever_registro('clients', p_client_id),
+    jsonb_build_object('acao_detalhada', 'Crédito lançado à mão', 'tipo', p_tipo, 'quantidade', p_quantidade, 'motivo', btrim(p_descricao)));
+  return v_id;
+end;
+$function$
+```
+
+### `liberar_acesso_planejador`
+
+```sql
+CREATE OR REPLACE FUNCTION public.liberar_acesso_planejador(p_email text, p_client_id uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+  v_email text := lower(trim(p_email));
+  v_nome text;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Só o administrador libera acessos.';
+  end if;
+  select coalesce(nullif(btrim(display_name), ''), name) into v_nome from clients where id = p_client_id;
+  if v_nome is null then
+    raise exception 'Cliente não encontrada.';
+  end if;
+  select id into v_id from auth.users where lower(email) = v_email;
+  if v_id is null then
+    raise exception 'Não achei um login com o e-mail %. Crie o login primeiro.', v_email;
+  end if;
+  if v_id = auth.uid() then
+    raise exception 'Esse é o seu próprio login.';
+  end if;
+  if exists (select 1 from profiles where id = v_id and cliente_id is null and active) then
+    raise exception 'Esse login já tem acesso ao sistema da Harmonize. Use outro e-mail para a cliente.';
+  end if;
+  if exists (select 1 from profiles where id = v_id and cliente_id is not null and cliente_id <> p_client_id) then
+    raise exception 'Esse e-mail já é o login de outra cliente. Confira o e-mail com ela antes de liberar.';
+  end if;
+
+  insert into profiles (id, name, email, is_admin, active, somente_leitura, permissions, cliente_id)
+  values (v_id, v_nome, v_email, false, true, false, '{}'::jsonb, p_client_id)
+  on conflict (id) do update
+    set name = excluded.name, email = excluded.email, is_admin = false, active = true,
+        somente_leitura = false, permissions = '{}'::jsonb, cliente_id = excluded.cliente_id;
+
+  -- Primeiros 60 dias contados da liberação (depois, cada agendamento prorroga 45).
+  update clients set portal_liberado_ate = greatest(coalesce(portal_liberado_ate, hoje_local()), hoje_local() + 60) where id = p_client_id;
+
+  perform registrar_movimentacao('editado', 'cliente', p_client_id, 'Acesso ao Planejador liberado (' || v_email || ')',
+    jsonb_build_object('usuario_id', v_id));
+  return v_id;
+end;
+$function$
+```
+
+### `liberar_acesso_visualizacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.liberar_acesso_visualizacao(p_email text, p_nome text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+  v_email text := lower(trim(p_email));
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Só o administrador libera acessos.';
+  end if;
+  select id into v_id from auth.users where lower(email) = v_email;
+  if v_id is null then
+    raise exception 'Não achei um login com o e-mail %. Crie o login primeiro.', v_email;
+  end if;
+  if v_id = auth.uid() then
+    raise exception 'Esse é o seu próprio login.';
+  end if;
+  if exists (select 1 from profiles where id = v_id and not somente_leitura and active) then
+    raise exception 'Esse login já tem acesso completo. Não vou rebaixar por aqui.';
+  end if;
+
+  insert into profiles (id, name, email, is_admin, active, somente_leitura, permissions)
+  values (
+    v_id, coalesce(nullif(trim(p_nome), ''), v_email), v_email, false, true, true,
+    '{"dashboard": true, "financeiro": true, "clientes": true, "agenda": true, "equipamentos": true,
+      "relatorios": true, "exportacao": true, "configuracoes": false, "pessoal": true}'::jsonb
+  )
+  on conflict (id) do update
+    set name = excluded.name, email = excluded.email, is_admin = false, active = true,
+        somente_leitura = true, permissions = excluded.permissions;
+
+  perform public.registrar_movimentacao(
+    'editado', 'profiles', v_id, 'Usuário ' || v_email,
+    jsonb_build_object('acao_detalhada', 'Acesso só de visualização liberado')
+  );
+  return v_id;
+end;
+$function$
+```
+
+### `liberar_portal_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.liberar_portal_cliente(p_client_id uuid, p_dias integer DEFAULT 60)
+ RETURNS date
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_ate date := hoje_local() + greatest(1, least(coalesce(p_dias, 60), 365));
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Só o administrador libera acessos.';
+  end if;
+  update clients set portal_liberado_ate = v_ate where id = p_client_id;
+  if not found then raise exception 'Cliente não encontrada.'; end if;
+  perform registrar_movimentacao('editado', 'cliente', p_client_id, descrever_registro('clients', p_client_id),
+    jsonb_build_object('acao_detalhada', 'Acesso ao Planejador liberado até ' || to_char(v_ate, 'DD/MM/YYYY')));
+  return v_ate;
+end;
+$function$
+```
+
+### `marcar_is_client`
+
+```sql
+CREATE OR REPLACE FUNCTION public.marcar_is_client()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.stage = 'cliente' then
+    new.is_client := true;
+  elsif tg_op = 'UPDATE' then
+    new.is_client := old.is_client;
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `marcar_locacao_paga`
+
+```sql
+CREATE OR REPLACE FUNCTION public.marcar_locacao_paga(p_rental_id uuid, p_payment_method payment_method_type DEFAULT NULL::payment_method_type, p_data date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_pago boolean;
+  v_valor numeric;
+  v_client_id uuid;
+  v_client_name text;
+  v_event_date date;
+  v_forma payment_method_type;
+  v_status event_status_type;
+  v_categoria uuid;
+  v_credito numeric := 0;
+  v_valor_lancamento numeric;
+  v_transacao_id uuid;
+  v_pix_conta text;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para registrar pagamentos.';
+  end if;
+
+  select r.pago, r.calculated_value, r.client_id, r.event_date, r.payment_method, r.status, c.name
+    into v_pago, v_valor, v_client_id, v_event_date, v_forma, v_status, v_client_name
+    from rentals r
+    left join clients c on c.id = r.client_id
+   where r.id = p_rental_id;
+
+  if v_valor is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if v_pago then
+    raise exception 'Esta locação já está marcada como paga.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta locação está cancelada. Reative o agendamento antes de registrar o pagamento, para o caixa não receber dinheiro de algo cancelado.';
+  end if;
+
+  select coalesce(sum(ev.taxa_valor), 0) into v_credito
+    from calendar_events ev
+   where ev.rental_id = p_rental_id and ev.taxa_status = 'paga';
+
+  v_valor_lancamento := greatest(v_valor - v_credito, 0);
+  v_forma := coalesce(p_payment_method, v_forma);
+  v_pix_conta := case when v_forma = 'pix' then 'harmonize' else null end;
+
+  select id into v_categoria
+    from categories
+   where type = 'entrada' and is_default = true and name ilike 'Loca%'
+   limit 1;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, created_by
+  )
+  values (
+    'entrada', v_categoria,
+    'Locação HIPRO - ' || coalesce(v_client_name, ''),
+    v_valor_lancamento, v_forma, coalesce(p_data, public.hoje_local()), 'harmonize',
+    v_client_id, p_rental_id, auth.uid()
+  )
+  returning id into v_transacao_id;
+
+  insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, created_by)
+  values (p_rental_id, v_forma, v_valor_lancamento, coalesce(p_data, public.hoje_local()), v_pix_conta, v_transacao_id, auth.uid());
+
+  update rentals
+     set payment_method = v_forma,
+         transaction_id = v_transacao_id
+   where id = p_rental_id;
+  -- pago / pago_em: recalculados sozinhos pelo trigger de rental_payments.
+
+  perform public.registrar_movimentacao(
+    'pago', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object(
+      'valor_locacao',  round(v_valor, 2),
+      'credito_taxa',   round(v_credito, 2),
+      'valor_recebido', round(v_valor_lancamento, 2),
+      'forma',          v_forma::text
+    )
+  );
+end;
+$function$
+```
+
+### `marcar_realizada`
+
+```sql
+CREATE OR REPLACE FUNCTION public.marcar_realizada(p_rental_id uuid, p_realizada boolean DEFAULT true)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status event_status_type;
+  v_data date;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+
+  select status, event_date into v_status, v_data from rentals where id = p_rental_id;
+
+  if v_status is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta locação está cancelada.';
+  end if;
+
+  if p_realizada and v_data > public.hoje_local() then
+    raise exception 'Esta locação é do dia %. Não dá para marcar como realizada antes de acontecer.',
+      to_char(v_data, 'DD/MM/YYYY');
+  end if;
+
+  update rentals
+     set status = case when p_realizada then 'realizada' else 'confirmada' end::event_status_type
+   where id = p_rental_id;
+
+  update calendar_events
+     set status = case when p_realizada then 'realizada' else 'confirmada' end::event_status_type
+   where rental_id = p_rental_id;
+
+  perform public.registrar_movimentacao(
+    case when p_realizada then 'realizado' else 'realizacao_desfeita' end,
+    'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('status_novo', case when p_realizada then 'realizada' else 'confirmada' end)
+  );
+end;
+$function$
+```
+
+### `montar_aplicador`
+
+```sql
+CREATE OR REPLACE FUNCTION public.montar_aplicador(p_aplicador_id uuid, p_equipment_id uuid, p_desde date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_desde date := coalesce(p_desde, public.hoje_local());
+  v_ap record;
+  v_eq_nome text;
+  v_ultima date;
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos aplicadores.';
+  end if;
+  select id, nome, ativo into v_ap from aplicadores where id = p_aplicador_id;
+  if v_ap.id is null then
+    raise exception 'Aplicador não encontrado.';
+  end if;
+  if p_equipment_id is not null and not v_ap.ativo then
+    raise exception 'Esse aplicador está desativado.';
+  end if;
+  if v_desde > public.hoje_local() then
+    raise exception 'A troca não pode ser numa data futura.';
+  end if;
+
+  -- A data não pode voltar antes de uma montagem já registrada dos dois lados.
+  select max(desde) into v_ultima from aplicador_montagens
+   where aplicador_id = p_aplicador_id
+      or (p_equipment_id is not null and equipment_id = p_equipment_id and ate is null);
+  if v_ultima is not null and v_desde < v_ultima then
+    raise exception 'Já existe uma troca registrada em %. Use uma data igual ou depois dela.', to_char(v_ultima, 'DD/MM/YYYY');
+  end if;
+
+  update aplicador_montagens set ate = v_desde
+   where aplicador_id = p_aplicador_id and ate is null;
+
+  if p_equipment_id is not null then
+    select name into v_eq_nome from equipments where id = p_equipment_id;
+    if v_eq_nome is null then
+      raise exception 'Equipamento não encontrado.';
+    end if;
+    update aplicador_montagens set ate = v_desde
+     where equipment_id = p_equipment_id and ate is null;
+    -- Montagem que abriu e fechou no mesmo dia não conta nada: some.
+    delete from aplicador_montagens where ate = desde;
+    insert into aplicador_montagens (aplicador_id, equipment_id, desde)
+    values (p_aplicador_id, p_equipment_id, v_desde);
+  else
+    delete from aplicador_montagens where ate = desde;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'aplicadores', p_aplicador_id, 'Aplicador ' || v_ap.nome,
+    jsonb_build_object('acao_detalhada',
+      case when p_equipment_id is null then 'Guardado na reserva'
+           else 'Montado no ' || v_eq_nome end || ' a partir de ' || to_char(v_desde, 'DD/MM/YYYY'))
+  );
+end;
+$function$
+```
+
+### `normalizar_cidade`
+
+```sql
+CREATE OR REPLACE FUNCTION public.normalizar_cidade(p_nome text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select btrim(regexp_replace(regexp_replace(
+    lower(translate(coalesce(p_nome, ''),
+      'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ',
+      'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN')),
+    '\s*[-/,(].*$', ''), '\s+', ' ', 'g'));
+$function$
+```
+
+### `pagar_fatura_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.pagar_fatura_cartao(p_cartao_id uuid, p_fatura_ref text, p_valor numeric, p_data date DEFAULT hoje_local(), p_forma payment_method_type DEFAULT 'pix'::payment_method_type)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cartao record;
+  v_cat uuid;
+  v_id uuid;
+begin
+  select * into v_cartao from cartoes where id = p_cartao_id;
+  if v_cartao.id is null then
+    raise exception 'Cartão não encontrado.';
+  end if;
+  if (v_cartao.scope = 'harmonize' and not has_module_permission('financeiro'))
+     or (v_cartao.scope = 'pessoal' and not has_module_permission('pessoal')) then
+    raise exception 'Sem permissão para pagar esta fatura.';
+  end if;
+  if p_valor is null or p_valor <= 0 then
+    raise exception 'O valor precisa ser maior que zero.';
+  end if;
+  if p_fatura_ref !~ '^\d{4}-\d{2}$' then
+    raise exception 'Fatura inválida.';
+  end if;
+  select id into v_cat from categories where name = 'Pagamento de fatura' and scope = v_cartao.scope and type = 'saida' limit 1;
+
+  insert into transactions (type, category_id, description, amount, payment_method, date, scope, created_by, cartao_id, cartao_mov, fatura_ref)
+  values ('saida', v_cat, 'Fatura ' || v_cartao.nome || ' ' || substr(p_fatura_ref, 6, 2) || '/' || substr(p_fatura_ref, 1, 4),
+          p_valor, p_forma, p_data, v_cartao.scope, auth.uid(), p_cartao_id, 'pagamento', p_fatura_ref)
+  returning id into v_id;
+
+  perform public.registrar_movimentacao(
+    'pago', 'cartoes', p_cartao_id, 'Fatura ' || v_cartao.nome || ' ' || p_fatura_ref,
+    jsonb_build_object('valor', p_valor)
+  );
+  return v_id;
+end;
+$function$
+```
+
+### `portal_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.portal_cliente()
+ RETURNS TABLE(client_id uuid, nome text, profissional text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select c.id,
+         coalesce(nullif(btrim(c.display_name), ''), c.name),
+         btrim(concat_ws(' ', nullif(btrim(c.treatment), ''), coalesce(nullif(btrim(c.display_name), ''), c.name)))
+    from clients c
+   where c.id = public.cliente_do_usuario();
+$function$
+```
+
+### `portal_situacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.portal_situacao()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select jsonb_build_object(
+           'ativo', p.active and coalesce(portal_valido_ate(p.cliente_id) >= hoje_local(), false),
+           'desligado', not p.active,
+           'ultimo_atendimento', portal_ultimo_atendimento(p.cliente_id),
+           'valido_ate', portal_valido_ate(p.cliente_id))
+    from profiles p
+   where p.id = auth.uid() and p.cliente_id is not null;
+$function$
+```
+
+### `portal_ultimo_atendimento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.portal_ultimo_atendimento(p_client_id uuid)
+ RETURNS date
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select max(d) from (
+    select coalesce(r.event_date_end, r.event_date) as d
+      from rentals r
+     where r.client_id = p_client_id and r.status::text <> 'cancelada' and not coalesce(r.is_test, false)
+    union all
+    select coalesce(ce.date_end, ce.date_start)
+      from calendar_events ce
+     where ce.client_id = p_client_id and ce.status::text <> 'cancelada' and not coalesce(ce.is_test, false)
+       and ce.event_type::text in ('hipro_1', 'hipro_2')
+  ) x;
+$function$
+```
+
+### `portal_validade_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.portal_validade_cliente(p_client_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão.';
+  end if;
+  return jsonb_build_object(
+    'ultimo_atendimento', portal_ultimo_atendimento(p_client_id),
+    'liberado_ate', (select portal_liberado_ate from clients where id = p_client_id),
+    'valido_ate', portal_valido_ate(p_client_id),
+    'ativo', coalesce(portal_valido_ate(p_client_id) >= hoje_local(), false));
+end;
+$function$
+```
+
+### `portal_valido_ate`
+
+```sql
+CREATE OR REPLACE FUNCTION public.portal_valido_ate(p_client_id uuid)
+ RETURNS date
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select nullif(greatest(
+    coalesce(portal_ultimo_atendimento(p_client_id) + 45, '-infinity'::date),
+    coalesce((select portal_liberado_ate from clients where id = p_client_id), '-infinity'::date)
+  ), '-infinity'::date);
+$function$
+```
+
+### `preview_exclusao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.preview_exclusao(p_table text, p_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_mentoria_id uuid;
+  v_tipo entry_type;
+  v_evento_taxa uuid;
+  v_locacoes int := 0;
+  v_lancamentos int := 0;
+  v_eventos int := 0;
+  v_tarefas int := 0;
+  v_taxas int := 0;
+  v_valor_taxas numeric := 0;
+  v_valor_locacoes numeric := 0;
+  v_valor_lancamentos numeric := 0;
+  v_itens text[] := '{}';
+  v_aviso text := null;
+  v_alvo text;
+begin
+  perform public.require_admin();
+
+  v_alvo := public.descrever_registro(p_table, p_id);
+
+  if p_table = 'rentals' then
+    v_locacoes := 1;
+    select coalesce(calculated_value, 0) into v_valor_locacoes
+      from rentals where id = p_id;
+    select count(*), coalesce(sum(amount), 0) into v_lancamentos, v_valor_lancamentos
+      from transactions where rental_id = p_id;
+    select count(*) into v_eventos from calendar_events where rental_id = p_id;
+    select count(*), coalesce(sum(t.amount), 0) into v_taxas, v_valor_taxas
+      from calendar_events ev
+      join transactions t on t.id = ev.taxa_transaction_id
+     where ev.rental_id = p_id;
+
+  elsif p_table = 'transactions' then
+    select rental_id, mentoring_id, type into v_rental_id, v_mentoria_id, v_tipo
+      from transactions where id = p_id;
+
+    -- Despesa (saída) ligada a uma locação é um lançamento próprio: sai
+    -- sozinha, sem levar a locação junto. Só a ENTRADA da locação (o
+    -- valor cobrado e seus pagamentos) faz a exclusão subir para ela.
+    if v_rental_id is not null and v_tipo <> 'saida' then
+      return public.preview_exclusao('rentals', v_rental_id)
+             || jsonb_build_object('aviso',
+                'Este lançamento pertence a uma locação. Apagar vai apagar a locação inteira, junto com o evento da agenda.');
+    elsif v_mentoria_id is not null then
+      return public.preview_exclusao('mentoring_events', v_mentoria_id)
+             || jsonb_build_object('aviso',
+                'Este lançamento pertence a uma mentoria. Apagar vai apagar a mentoria inteira.');
+    end if;
+
+    select id into v_evento_taxa from calendar_events where taxa_transaction_id = p_id limit 1;
+
+    v_lancamentos := 1;
+    select coalesce(amount, 0) into v_valor_lancamentos from transactions where id = p_id;
+
+    if v_evento_taxa is not null then
+      v_aviso := 'Este lançamento é a taxa de compromisso de um agendamento. Apagar vai deixar a taxa daquele agendamento como pendente de novo.';
+    end if;
+    if v_rental_id is not null and v_tipo = 'saida' then
+      v_aviso := 'Esta despesa está ligada a uma locação. Apagar remove só a despesa; a locação continua como está.';
+    end if;
+
+  elsif p_table = 'calendar_events' then
+    select rental_id, mentoring_id into v_rental_id, v_mentoria_id
+      from calendar_events where id = p_id;
+
+    if v_rental_id is not null then
+      return public.preview_exclusao('rentals', v_rental_id)
+             || jsonb_build_object('aviso',
+                'Este evento pertence a uma locação. Apagar vai apagar a locação inteira, junto com o lançamento financeiro.');
+    elsif v_mentoria_id is not null then
+      return public.preview_exclusao('mentoring_events', v_mentoria_id)
+             || jsonb_build_object('aviso',
+                'Este evento pertence a uma mentoria. Apagar vai apagar a mentoria inteira.');
+    end if;
+
+    v_eventos := 1;
+    select count(*), coalesce(sum(t.amount), 0) into v_taxas, v_valor_taxas
+      from calendar_events ev
+      join transactions t on t.id = ev.taxa_transaction_id
+     where ev.id = p_id;
+
+  elsif p_table = 'mentoring_events' then
+    select count(*), coalesce(sum(amount), 0) into v_lancamentos, v_valor_lancamentos
+      from transactions
+     where mentoring_id = p_id
+        or id = (select transaction_id from mentoring_events where id = p_id);
+    select count(*) into v_eventos
+      from calendar_events
+     where mentoring_id = p_id
+        or id = (select calendar_event_id from mentoring_events where id = p_id);
+
+  elsif p_table = 'clients' then
+    select count(*), coalesce(sum(calculated_value), 0) into v_locacoes, v_valor_locacoes
+      from rentals where client_id = p_id;
+    select count(*) into v_eventos from calendar_events where client_id = p_id;
+    select count(*) into v_tarefas from tasks where client_id = p_id;
+    select count(*), coalesce(sum(amount), 0) into v_lancamentos, v_valor_lancamentos
+      from transactions
+     where client_id = p_id
+        or rental_id in (select id from rentals where client_id = p_id);
+    select count(*), coalesce(sum(t.amount), 0) into v_taxas, v_valor_taxas
+      from calendar_events ev
+      join transactions t on t.id = ev.taxa_transaction_id
+     where ev.client_id = p_id
+       and coalesce(t.client_id, '00000000-0000-0000-0000-000000000000'::uuid) <> p_id
+       and t.rental_id is null;
+
+  elsif p_table = 'tasks' then
+    v_tarefas := 1;
+
+  else
+    raise exception 'Tabela não permitida: %', p_table;
+  end if;
+
+  v_lancamentos := v_lancamentos + coalesce(v_taxas, 0);
+  v_valor_lancamentos := coalesce(v_valor_lancamentos, 0) + coalesce(v_valor_taxas, 0);
+
+  if v_locacoes > 0 then
+    v_itens := v_itens || (v_locacoes || (case when v_locacoes = 1 then ' locação' else ' locações' end));
+  end if;
+  if v_eventos > 0 then
+    v_itens := v_itens || (v_eventos || (case when v_eventos = 1 then ' evento da agenda' else ' eventos da agenda' end));
+  end if;
+  if v_lancamentos > 0 then
+    v_itens := v_itens || (v_lancamentos || (case when v_lancamentos = 1 then ' lançamento financeiro' else ' lançamentos financeiros' end));
+  end if;
+  if v_taxas > 0 then
+    v_itens := v_itens || ('incluindo ' || public.formatar_reais(v_valor_taxas) || ' de taxa de compromisso');
+  end if;
+  if v_tarefas > 0 then
+    v_itens := v_itens || (v_tarefas || (case when v_tarefas = 1 then ' tarefa' else ' tarefas' end));
+  end if;
+
+  return jsonb_build_object(
+    'tabela', p_table,
+    'id', p_id,
+    'alvo', v_alvo,
+    'locacoes', v_locacoes,
+    'eventos', v_eventos,
+    'lancamentos', v_lancamentos,
+    'tarefas', v_tarefas,
+    'taxas', v_taxas,
+    'valor_taxas', round(coalesce(v_valor_taxas, 0), 2),
+    'valor_locacoes', round(coalesce(v_valor_locacoes, 0), 2),
+    'valor_lancamentos', round(coalesce(v_valor_lancamentos, 0), 2),
+    'itens', to_jsonb(v_itens),
+    'aviso', v_aviso
+  );
+end;
+$function$
+```
+
+### `profiles_lock_privileged_fields`
+
+```sql
+CREATE OR REPLACE FUNCTION public.profiles_lock_privileged_fields()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not has_module_permission('configuracoes') then
+    new.is_admin := old.is_admin;
+    new.active := old.active;
+    new.permissions := old.permissions;
+    new.somente_leitura := old.somente_leitura;
+    new.cliente_id := old.cliente_id;
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `purge_test_data`
+
+```sql
+CREATE OR REPLACE FUNCTION public.purge_test_data()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_result jsonb;
+  v_clients_kept int;
+  v_deleted jsonb;
+begin
+  perform public.require_admin();
+
+  update public.rentals          set transaction_id = null
+    where transaction_id in (select id from public.transactions where is_test);
+  update public.mentoring_events set transaction_id = null
+    where transaction_id in (select id from public.transactions where is_test);
+  update public.calendar_events  set taxa_transaction_id = null
+    where taxa_transaction_id in (select id from public.transactions where is_test);
+  update public.calendar_events  set rental_id = null
+    where rental_id in (select id from public.rentals where is_test);
+  update public.calendar_events  set mentoring_id = null
+    where mentoring_id in (select id from public.mentoring_events where is_test);
+  update public.transactions     set rental_id = null
+    where rental_id in (select id from public.rentals where is_test);
+  update public.transactions     set mentoring_id = null
+    where mentoring_id in (select id from public.mentoring_events where is_test);
+  update public.mentoring_events set calendar_event_id = null
+    where calendar_event_id in (select id from public.calendar_events where is_test);
+
+  with
+    d_tasks as (
+      delete from public.tasks where is_test returning 1
+    ),
+    d_transactions as (
+      delete from public.transactions where is_test returning 1
+    ),
+    d_calendar as (
+      delete from public.calendar_events where is_test returning 1
+    ),
+    d_mentoring as (
+      delete from public.mentoring_events where is_test returning 1
+    ),
+    d_rentals as (
+      delete from public.rentals where is_test returning 1
+    )
+  select jsonb_build_object(
+    'tasks',            (select count(*) from d_tasks),
+    'transactions',     (select count(*) from d_transactions),
+    'calendar_events',  (select count(*) from d_calendar),
+    'mentoring_events', (select count(*) from d_mentoring),
+    'rentals',          (select count(*) from d_rentals)
+  ) into v_deleted;
+
+  select count(*) into v_clients_kept
+  from public.clients c
+  where c.is_test
+    and (
+      exists (select 1 from public.transactions    t where t.client_id = c.id)
+      or exists (select 1 from public.rentals      r where r.client_id = c.id)
+      or exists (select 1 from public.calendar_events e where e.client_id = c.id)
+    );
+
+  delete from public.client_tags
+  where client_id in (
+    select c.id from public.clients c
+    where c.is_test
+      and not exists (select 1 from public.transactions    t where t.client_id = c.id)
+      and not exists (select 1 from public.rentals         r where r.client_id = c.id)
+      and not exists (select 1 from public.calendar_events e where e.client_id = c.id)
+  );
+
+  with d_clients as (
+    delete from public.clients c
+    where c.is_test
+      and not exists (select 1 from public.transactions    t where t.client_id = c.id)
+      and not exists (select 1 from public.rentals         r where r.client_id = c.id)
+      and not exists (select 1 from public.calendar_events e where e.client_id = c.id)
+    returning 1
+  )
+  select v_deleted || jsonb_build_object(
+    'clients',              (select count(*) from d_clients),
+    'clientes_preservados', v_clients_kept
+  ) into v_result;
+
+  return v_result;
+end;
+$function$
+```
+
+### `reagendar_agendamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.reagendar_agendamento(p_event_id uuid, p_nova_data date, p_nova_data_fim date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_data_antiga date;
+  v_fim_antigo date;
+  v_nova_fim date;
+  v_equipment_id uuid;
+  v_rental_id uuid;
+  v_status event_status_type;
+  v_ocupante text;
+  v_ocupante_de date;
+  v_ocupante_ate date;
+  v_mudou_inicio boolean;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para reagendar.';
+  end if;
+
+  select date_start, date_end, equipment_id, rental_id, status
+    into v_data_antiga, v_fim_antigo, v_equipment_id, v_rental_id, v_status
+    from calendar_events where id = p_event_id;
+
+  if v_data_antiga is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado e não pode ser reagendado.';
+  end if;
+
+  -- Sem data final informada, o período se mantém com a mesma duração.
+  v_nova_fim := coalesce(p_nova_data_fim, p_nova_data + (v_fim_antigo - v_data_antiga));
+  if v_nova_fim < p_nova_data then
+    raise exception 'A data final do período não pode ser antes da data inicial.';
+  end if;
+  if p_nova_data = v_data_antiga and v_nova_fim = v_fim_antigo then
+    raise exception 'A data nova é igual à atual.';
+  end if;
+  v_mudou_inicio := p_nova_data <> v_data_antiga;
+
+  if v_equipment_id is not null then
+    select coalesce(c.name, ev.title), ev.date_start, ev.date_end
+      into v_ocupante, v_ocupante_de, v_ocupante_ate
+      from calendar_events ev
+      left join clients c on c.id = ev.client_id
+     where ev.equipment_id = v_equipment_id
+       and ev.status <> 'cancelada'
+       and ev.id <> p_event_id
+       and daterange(ev.date_start, ev.date_end, '[]') && daterange(p_nova_data, v_nova_fim, '[]')
+     limit 1;
+
+    if v_ocupante is not null then
+      raise exception 'O equipamento já está reservado de % a % para %.',
+        to_char(v_ocupante_de, 'DD/MM/YYYY'), to_char(v_ocupante_ate, 'DD/MM/YYYY'), v_ocupante;
+    end if;
+  end if;
+
+  -- A locação é atualizada ANTES do evento: o gatilho que copia a data do
+  -- evento para a locação rodaria com a data final antiga e a restrição
+  -- (data final >= data inicial) barraria o reagendamento de um período.
+  -- A marca de reagendado só vale quando o início mudou (mudar só a data
+  -- final é ajustar o período, não reagendar).
+  if v_rental_id is not null then
+    update rentals
+       set event_date = p_nova_data,
+           event_date_end = case when v_nova_fim > p_nova_data then v_nova_fim else null end,
+           rescheduled = rescheduled or v_mudou_inicio,
+           rescheduled_at = case when v_mudou_inicio then now() else rescheduled_at end
+     where id = v_rental_id;
+
+    -- Só o lançamento de deslocamento acompanha a data do evento. Pagamentos
+    -- guardam o dia em que o dinheiro entrou e despesas têm a própria data:
+    -- reagendar não mexe nelas.
+    if v_mudou_inicio then
+      update transactions
+         set date = p_nova_data
+       where id = (select deslocamento_transaction_id from rentals where id = v_rental_id);
+    end if;
+  end if;
+
+  update calendar_events
+     set date_start = p_nova_data,
+         date_end   = v_nova_fim,
+         rescheduled = rescheduled or v_mudou_inicio,
+         rescheduled_at = case when v_mudou_inicio then now() else rescheduled_at end
+   where id = p_event_id;
+
+  perform public.registrar_movimentacao(
+    case when v_mudou_inicio then 'reagendado' else 'editado' end,
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object(
+      'acao_detalhada', case when v_mudou_inicio then 'reagendado' else 'período alterado' end,
+      'data_antiga', to_char(v_data_antiga, 'DD/MM/YYYY'),
+      'data_nova',   to_char(p_nova_data, 'DD/MM/YYYY'),
+      'fim_antigo',  to_char(v_fim_antigo, 'DD/MM/YYYY'),
+      'fim_novo',    to_char(v_nova_fim, 'DD/MM/YYYY')
+    )
+  );
+
+exception
+  when exclusion_violation then
+    raise exception 'O equipamento já está reservado no período de % a %.',
+      to_char(p_nova_data, 'DD/MM/YYYY'), to_char(v_nova_fim, 'DD/MM/YYYY');
+end;
+$function$
+```
+
+### `reativar_agendamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.reativar_agendamento(p_event_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_equipment_id uuid;
+  v_equipment_status text;
+  v_data date;
+  v_ocupante text;
+  v_taxa text;
+  v_taxa_transacao uuid;
+  v_status_anterior event_status_type;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para reativar agendamentos.';
+  end if;
+
+  select rental_id, equipment_id, date_start, taxa_status, taxa_transaction_id
+    into v_rental_id, v_equipment_id, v_data, v_taxa, v_taxa_transacao
+    from calendar_events where id = p_event_id and status = 'cancelada';
+
+  if v_data is null then
+    raise exception 'Agendamento não encontrado ou não está cancelado.';
+  end if;
+
+  if v_equipment_id is not null then
+    -- Leva T: o equipamento podia estar ativo quando foi cancelado e
+    -- ter ido para manutenção depois — não deixa reativar nesse caso.
+    select status into v_equipment_status from equipments where id = v_equipment_id;
+    if v_equipment_status = 'manutencao' then
+      raise exception 'Não dá para reativar: o equipamento está em manutenção no momento.';
+    end if;
+
+    select coalesce(c.name, ev.title) into v_ocupante
+      from calendar_events ev
+      left join clients c on c.id = ev.client_id
+     where ev.equipment_id = v_equipment_id
+       and ev.status <> 'cancelada'
+       and ev.id <> p_event_id
+       and daterange(ev.date_start, ev.date_end, '[]') && daterange(v_data, v_data, '[]')
+     limit 1;
+
+    if v_ocupante is not null then
+      raise exception 'Não dá para reativar: o equipamento já foi reservado em % para %. Reagende para outra data.',
+        to_char(v_data, 'DD/MM/YYYY'), v_ocupante;
+    end if;
+  end if;
+
+  select (detalhes->>'status_anterior')::event_status_type
+    into v_status_anterior
+    from movimentacoes
+   where entidade = 'calendar_events' and entidade_id = p_event_id and acao = 'cancelado'
+   order by ocorrido_em desc
+   limit 1;
+
+  if v_status_anterior is null or v_status_anterior = 'cancelada' then
+    v_status_anterior := 'confirmada';
+  end if;
+
+  update calendar_events
+     set status = v_status_anterior,
+         confirmed = false,
+         cancellation_reason = null,
+         no_show = false
+   where id = p_event_id;
+  if v_rental_id is not null then
+    update rentals
+       set status = v_status_anterior,
+           cancellation_reason = null,
+           no_show = false
+     where id = v_rental_id;
+  end if;
+
+  if v_taxa = 'perdida' and v_taxa_transacao is not null then
+    update calendar_events set taxa_status = 'paga' where id = p_event_id;
+    perform public.registrar_movimentacao(
+      'taxa_paga', 'calendar_events', p_event_id,
+      public.descrever_registro('calendar_events', p_event_id),
+      jsonb_build_object('motivo', 'agendamento reativado; a taxa paga volta a valer como crédito')
+    );
+  end if;
+
+  -- Leva O: taxa que voltou a valer como crédito muda o saldo da locação.
+  if v_rental_id is not null then
+    perform public.recalcular_pagamento_locacao(v_rental_id);
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('acao_detalhada', 'agendamento reativado', 'status_restaurado', v_status_anterior)
+  );
+end;
+$function$
+```
+
+### `recalcular_pagamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.recalcular_pagamento_locacao(p_rental_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_valor numeric;
+  v_credito numeric;
+  v_pago_total numeric;
+  v_saldo numeric;
+  v_ultima_data date;
+begin
+  select calculated_value + case when deslocamento_incluso_no_valor then 0 else coalesce(valor_deslocamento, 0) end
+    into v_valor
+    from rentals where id = p_rental_id;
+  if v_valor is null then
+    return; -- locação já não existe mais (apagada em cascata); nada a fazer.
+  end if;
+
+  select coalesce(sum(ev.taxa_valor), 0) into v_credito
+    from calendar_events ev
+   where ev.rental_id = p_rental_id and ev.taxa_status = 'paga';
+
+  select coalesce(sum(valor), 0), max(data) into v_pago_total, v_ultima_data
+    from rental_payments where rental_id = p_rental_id;
+
+  v_saldo := round(v_valor - v_credito - v_pago_total, 2);
+
+  update rentals
+     set pago = (v_saldo <= 0),
+         pago_em = case when v_saldo <= 0 then v_ultima_data else null end
+   where id = p_rental_id;
+end;
+$function$
+```
+
+### `register_contact_attempt`
+
+```sql
+CREATE OR REPLACE FUNCTION public.register_contact_attempt(p_task_id uuid, p_responded boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_client_name text;
+  v_current_followup integer;
+  v_next_followup integer;
+  v_tag_id uuid;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para atualizar tarefas de contato';
+  end if;
+
+  select client_id, follow_up_number into v_client_id, v_current_followup
+  from tasks
+  where id = p_task_id and status = 'pendente';
+
+  if v_client_id is null then
+    raise exception 'Tarefa não encontrada ou já concluída.';
+  end if;
+
+  update tasks
+  set status = 'concluida', completed_at = now()
+  where id = p_task_id;
+
+  delete from client_tags
+  where client_id = v_client_id
+    and tag_id in (select id from tags where name like 'Follow-up %');
+
+  -- Respondeu: o lead passa para "Em contato" (conversa em andamento no
+  -- WhatsApp), a não ser que já esteja mais adiante no funil.
+  if p_responded then
+    update clients set stage = 'em_contato'
+     where id = v_client_id and stage in ('lead', 'contato', 'nutricao');
+    return;
+  end if;
+
+  select name into v_client_name from clients where id = v_client_id;
+  v_next_followup := coalesce(v_current_followup, 0) + 1;
+
+  if v_next_followup > 5 then
+    update clients set stage = 'nutricao' where id = v_client_id;
+    return;
+  end if;
+
+  select id into v_tag_id from tags where name = 'Follow-up ' || v_next_followup;
+  if v_tag_id is not null then
+    insert into client_tags (client_id, tag_id) values (v_client_id, v_tag_id)
+    on conflict do nothing;
+  end if;
+
+  insert into tasks (client_id, type, follow_up_number, title, due_date)
+  values (
+    v_client_id,
+    'followup',
+    v_next_followup,
+    'Confirmar se ' || coalesce(v_client_name, 'o cliente') || ' respondeu (Follow-up ' || v_next_followup || ')',
+    public.hoje_local() + 2
+  );
+end;
+$function$
+```
+
+### `registrar_compra_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_compra_cartao(p_cartao_id uuid, p_category_id uuid, p_valor_total numeric, p_parcelas integer, p_data date, p_descricao text, p_client_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_calendar_event_id uuid DEFAULT NULL::uuid, p_conta_no_lucro boolean DEFAULT false, p_notes text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cartao record;
+  v_grupo uuid := gen_random_uuid();
+  v_parcela numeric;
+  v_ultima numeric;
+  v_data date;
+  v_desc text := coalesce(nullif(trim(p_descricao), ''), 'Compra no cartão');
+  i int;
+begin
+  select * into v_cartao from cartoes where id = p_cartao_id;
+  if v_cartao.id is null then
+    raise exception 'Cartão não encontrado.';
+  end if;
+  if (v_cartao.scope = 'harmonize' and not has_module_permission('financeiro'))
+     or (v_cartao.scope = 'pessoal' and not has_module_permission('pessoal')) then
+    raise exception 'Sem permissão para lançar neste cartão.';
+  end if;
+  if p_valor_total is null or p_valor_total <= 0 then
+    raise exception 'O valor precisa ser maior que zero.';
+  end if;
+  if p_parcelas is null or p_parcelas < 1 or p_parcelas > 48 then
+    raise exception 'Parcelas de 1 a 48.';
+  end if;
+
+  v_parcela := round(p_valor_total / p_parcelas, 2);
+  v_ultima := p_valor_total - v_parcela * (p_parcelas - 1);
+
+  for i in 1..p_parcelas loop
+    v_data := (p_data + make_interval(months => i - 1))::date;
+    insert into transactions (
+      type, category_id, description, amount, payment_method, date, scope, client_id, rental_id,
+      calendar_event_id, notes, created_by, conta_no_lucro,
+      cartao_id, cartao_mov, fatura_ref, parcela_num, parcelas_total, compra_grupo
+    ) values (
+      'saida', p_category_id,
+      v_desc || case when p_parcelas > 1 then ' (' || i || '/' || p_parcelas || ')' else '' end,
+      case when i = p_parcelas then v_ultima else v_parcela end,
+      'credito', v_data, v_cartao.scope, p_client_id,
+      -- Todas as parcelas ficam presas à locação/reserva: o custo dela é o valor cheio.
+      p_rental_id, p_calendar_event_id,
+      p_notes, auth.uid(), coalesce(p_conta_no_lucro, false) and v_cartao.scope = 'pessoal',
+      p_cartao_id, 'compra', public.fatura_da_compra(v_data, v_cartao.dia_fechamento, v_cartao.dia_vencimento),
+      case when p_parcelas > 1 then i end, case when p_parcelas > 1 then p_parcelas end, v_grupo
+    );
+  end loop;
+
+  perform public.registrar_movimentacao(
+    'criado', 'cartoes', p_cartao_id, 'Compra no cartão ' || v_cartao.nome,
+    jsonb_build_object('descricao', v_desc, 'valor', p_valor_total, 'parcelas', p_parcelas)
+  );
+  return v_grupo;
+end;
+$function$
+```
+
+### `registrar_contagens_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_contagens_locacao(p_rental_id uuid, p_contagens jsonb, p_credito_usado integer DEFAULT 0)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client uuid;
+  v_status text;
+begin
+  if not (has_module_permission('agenda') or has_module_permission('financeiro')) then
+    raise exception 'Sem permissão para registrar contagens.';
+  end if;
+  select client_id, status::text into v_client, v_status from rentals where id = p_rental_id;
+  if v_client is null then raise exception 'Locação não encontrada.'; end if;
+  if v_status = 'cancelada' then raise exception 'Locação cancelada.'; end if;
+  if exists (select 1 from locacao_contagens where rental_id = p_rental_id)
+     or exists (select 1 from creditos_cliente where rental_id = p_rental_id and origem in ('contagem', 'uso') and tipo = 'disparos') then
+    raise exception 'As contagens desta locação já foram registradas.';
+  end if;
+  perform gravar_contagens_locacao(p_rental_id, p_contagens, p_credito_usado);
+  if jsonb_array_length(coalesce(p_contagens, '[]'::jsonb)) > 1 or coalesce(p_credito_usado, 0) > 0
+     or exists (select 1 from locacao_contagens where rental_id = p_rental_id and gera_credito) then
+    perform registrar_movimentacao('editado', 'rentals', p_rental_id, descrever_registro('rentals', p_rental_id),
+      jsonb_build_object('acao_detalhada', 'Contagens registradas', 'contagens', jsonb_array_length(coalesce(p_contagens, '[]'::jsonb)),
+                         'credito_usado', coalesce(p_credito_usado, 0), 'client_id', v_client));
+  end if;
+end;
+$function$
+```
+
+### `registrar_contrato_emitido`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_contrato_emitido(p_dados jsonb, p_rental_id uuid DEFAULT NULL::uuid, p_reservation_id uuid DEFAULT NULL::uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_id uuid;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para gerar contratos.';
+  end if;
+
+  if p_rental_id is not null then
+    select client_id into v_client_id from rentals where id = p_rental_id;
+    if v_client_id is null then
+      raise exception 'Locação não encontrada (id %).', p_rental_id;
+    end if;
+  elsif p_reservation_id is not null then
+    select client_id into v_client_id from calendar_events where id = p_reservation_id;
+    if v_client_id is null then
+      raise exception 'Agendamento não encontrado (id %).', p_reservation_id;
+    end if;
+  else
+    raise exception 'Informe a locação ou a pré-reserva de origem do contrato.';
+  end if;
+
+  insert into contratos_emitidos (rental_id, reservation_id, client_id, gerado_por, dados)
+  values (p_rental_id, p_reservation_id, v_client_id, auth.uid(), p_dados)
+  returning id into v_id;
+
+  return v_id;
+end;
+$function$
+```
+
+### `registrar_despesa_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_despesa_locacao(p_rental_id uuid, p_category_id uuid, p_amount numeric, p_payment_method payment_method_type, p_date date DEFAULT hoje_local(), p_description text DEFAULT NULL::text, p_notes text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_transaction_id uuid;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para lançar despesas.';
+  end if;
+  if p_amount <= 0 then
+    raise exception 'O valor da despesa precisa ser maior que zero.';
+  end if;
+
+  select client_id into v_client_id from rentals where id = p_rental_id;
+  if v_client_id is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, notes, created_by
+  )
+  values (
+    'saida', p_category_id, coalesce(nullif(trim(p_description), ''), 'Despesa da locação'),
+    p_amount, p_payment_method, p_date, 'harmonize', v_client_id, p_rental_id, p_notes, auth.uid()
+  )
+  returning id into v_transaction_id;
+
+  perform public.registrar_movimentacao(
+    'criado', 'transactions', v_transaction_id,
+    public.descrever_registro('transactions', v_transaction_id),
+    jsonb_build_object('acao_detalhada', 'despesa ligada à locação', 'rental_id', p_rental_id)
+  );
+
+  return v_transaction_id;
+end;
+$function$
+```
+
+### `registrar_despesa_reserva`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_despesa_reserva(p_event_id uuid, p_category_id uuid, p_amount numeric, p_payment_method payment_method_type, p_date date DEFAULT hoje_local(), p_description text DEFAULT NULL::text, p_notes text DEFAULT NULL::text, p_pessoal text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_rental_id uuid;
+  v_status event_status_type;
+  v_achou boolean;
+  v_transaction_id uuid;
+  v_scope scope_type := 'harmonize';
+begin
+  if p_pessoal is not null and p_pessoal not in ('custo', 'meu') then
+    raise exception 'Tipo de despesa pessoal inválido.';
+  end if;
+  if p_pessoal is null and not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para lançar despesas.';
+  end if;
+  if p_pessoal is not null then
+    if not has_module_permission('pessoal') then
+      raise exception 'Sem permissão para lançar no financeiro pessoal.';
+    end if;
+    v_scope := 'pessoal';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'O valor da despesa precisa ser maior que zero.';
+  end if;
+
+  select true, client_id, rental_id, status
+    into v_achou, v_client_id, v_rental_id, v_status
+    from calendar_events where id = p_event_id;
+  if v_achou is not true then
+    raise exception 'Reserva não encontrada.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta reserva está cancelada. Reative-a antes de lançar despesa.';
+  end if;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, calendar_event_id, notes, created_by, conta_no_lucro
+  )
+  values (
+    'saida', p_category_id, coalesce(nullif(trim(p_description), ''), 'Despesa da reserva'),
+    p_amount, p_payment_method, p_date, v_scope, v_client_id, v_rental_id, p_event_id, p_notes, auth.uid(),
+    coalesce(p_pessoal = 'custo', false)
+  )
+  returning id into v_transaction_id;
+
+  perform public.registrar_movimentacao(
+    'criado', 'transactions', v_transaction_id,
+    public.descrever_registro('transactions', v_transaction_id),
+    jsonb_build_object('acao_detalhada',
+      case p_pessoal when 'custo' then 'despesa da reserva paga com dinheiro pessoal'
+                     when 'meu' then 'gasto pessoal durante o atendimento'
+                     else 'despesa lançada na reserva' end,
+      'calendar_event_id', p_event_id)
+  );
+
+  return v_transaction_id;
+end;
+$function$
+```
+
+### `registrar_emprestimo`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_emprestimo(p_devedor text, p_tipo text, p_valor numeric, p_forma payment_method_type, p_data date DEFAULT hoje_local(), p_descricao text DEFAULT NULL::text, p_sem_caixa boolean DEFAULT false)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_devedor text := upper(trim(coalesce(p_devedor, '')));
+  v_categoria uuid;
+  v_transacao uuid;
+  v_id uuid;
+  v_saldo numeric;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para lançar empréstimos.';
+  end if;
+  if v_devedor = '' then
+    raise exception 'Informe para quem foi o empréstimo.';
+  end if;
+  if p_tipo not in ('concedido', 'devolucao') then
+    raise exception 'Tipo inválido.';
+  end if;
+  if p_valor is null or p_valor <= 0 then
+    raise exception 'O valor precisa ser maior que zero.';
+  end if;
+
+  if p_tipo = 'devolucao' then
+    select coalesce(sum(case when tipo = 'concedido' then valor else -valor end), 0)
+      into v_saldo
+      from emprestimos where devedor = v_devedor;
+    if round(p_valor, 2) > round(v_saldo, 2) then
+      raise exception 'A devolução (%) é maior que o saldo devido por % (%).',
+        public.formatar_reais(p_valor), v_devedor, public.formatar_reais(v_saldo);
+    end if;
+  end if;
+
+  select id into v_categoria
+    from categories
+   where scope = 'harmonize'
+     and name = case when p_tipo = 'concedido' then 'Empréstimo concedido' else 'Devolução de empréstimo' end
+   limit 1;
+
+  -- Só a pendência: empréstimo antigo, registra quem deve sem mexer no caixa.
+  if not coalesce(p_sem_caixa, false) then
+  insert into transactions (type, category_id, description, amount, payment_method, date, scope, notes, created_by)
+  values (
+    case when p_tipo = 'concedido' then 'saida' else 'entrada' end::entry_type,
+    v_categoria,
+    case when p_tipo = 'concedido' then 'Empréstimo para ' else 'Devolução de empréstimo - ' end || v_devedor,
+    p_valor, p_forma, coalesce(p_data, hoje_local()), 'harmonize', nullif(trim(p_descricao), ''), auth.uid()
+  )
+  returning id into v_transacao;
+  end if;
+
+  insert into emprestimos (devedor, tipo, valor, data, descricao, transaction_id, created_by)
+  values (v_devedor, p_tipo, p_valor, coalesce(p_data, hoje_local()), nullif(trim(p_descricao), ''), v_transacao, auth.uid())
+  returning id into v_id;
+
+  perform public.registrar_movimentacao(
+    'criado', 'emprestimos', v_id,
+    case when p_tipo = 'concedido' then 'Empréstimo para ' else 'Devolução de ' end || v_devedor
+      || ' (' || public.formatar_reais(p_valor) || ')',
+    jsonb_build_object('tipo', p_tipo, 'valor', round(p_valor, 2), 'devedor', v_devedor)
+  );
+
+  return v_id;
+end;
+$function$
+```
+
+### `registrar_envio_agenda`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_envio_agenda(p_client_id uuid, p_mensagem text, p_inicio date, p_fim date)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+  v_nome text;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para registrar envios.';
+  end if;
+  if nullif(btrim(p_mensagem), '') is null then
+    raise exception 'Mensagem vazia.';
+  end if;
+  select name into v_nome from clients where id = p_client_id;
+  if v_nome is null then raise exception 'Cliente não encontrada.'; end if;
+
+  insert into agenda_envios (client_id, mensagem, periodo_inicio, periodo_fim)
+  values (p_client_id, left(btrim(p_mensagem), 2000), p_inicio, p_fim)
+  returning id into v_id;
+
+  perform registrar_movimentacao('criado', 'envio_agenda', v_id,
+    'Agenda enviada para ' || v_nome, jsonb_build_object('client_id', p_client_id, 'inicio', p_inicio, 'fim', p_fim));
+  return v_id;
+end;
+$function$
+```
+
+### `registrar_envio_campanha`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_envio_campanha(p_campanha uuid, p_client uuid, p_status text, p_mensagem text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status text := lower(btrim(coalesce(p_status, '')));
+  v_msg text := nullif(btrim(coalesce(p_mensagem, '')), '');
+  v_c campanhas%rowtype;
+  v_cliente text;
+  v_antes campanha_envios%rowtype;
+  v_id uuid;
+  v_rotulo text;
+  v_enviado_em timestamptz;
+  v_texto_enviado text;
+  v_anotacao text;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para registrar envios de campanha.';
+  end if;
+  if v_status not in ('enviado', 'respondeu', 'agendou', 'nao_quer', 'pulado') then
+    raise exception 'Situação inválida.';
+  end if;
+  if v_msg is not null and length(v_msg) > 4000 then
+    raise exception 'Mensagem longa demais.';
+  end if;
+  select * into v_c from campanhas where id = p_campanha;
+  if not found then
+    raise exception 'Campanha não encontrada.';
+  end if;
+  select name into v_cliente from clients where id = p_client;
+  if v_cliente is null then
+    raise exception 'Cliente não encontrada.';
+  end if;
+  if v_status = 'enviado' and v_msg is null then
+    raise exception 'Mensagem vazia.';
+  end if;
+
+  v_rotulo := case v_status
+    when 'enviado' then 'enviada para '
+    when 'respondeu' then 'respondida por '
+    when 'agendou' then 'virou agendamento de '
+    when 'nao_quer' then 'recusada (não quer receber) por '
+    else 'pulada para ' end;
+
+  select * into v_antes from campanha_envios where campanha_id = p_campanha and client_id = p_client for update;
+  if not found then
+    if v_c.arquivada then
+      raise exception 'Campanha arquivada: desarquive para continuar enviando.';
+    end if;
+    insert into campanha_envios (campanha_id, client_id, status, mensagem, enviado_em, atualizado_em)
+    values (p_campanha, p_client, v_status, v_msg,
+            case when v_status = 'enviado' then now() end, now())
+    returning id, enviado_em, mensagem into v_id, v_enviado_em, v_texto_enviado;
+    perform registrar_movimentacao('criado', 'envio_campanha', v_id,
+      'Campanha "' || v_c.nome || '" ' || v_rotulo || v_cliente,
+      jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'status', v_status));
+  else
+    update campanha_envios
+       set status = v_status,
+           mensagem = coalesce(v_msg, mensagem),
+           enviado_em = case when v_status = 'enviado' then coalesce(enviado_em, now()) else enviado_em end,
+           atualizado_em = now()
+     where id = v_antes.id
+    returning id, enviado_em, mensagem into v_id, v_enviado_em, v_texto_enviado;
+    perform registrar_movimentacao('editado', 'envio_campanha', v_antes.id,
+      'Campanha "' || v_c.nome || '" ' || v_rotulo || v_cliente,
+      jsonb_build_object('client_id', p_client, 'campanha_id', p_campanha, 'antes', v_antes.status, 'depois', v_status));
+  end if;
+
+  -- Anotação na cliente: só quando o status muda (v_antes.status é nulo se o
+  -- envio é novo) e nunca para 'pulado'.
+  if v_status <> 'pulado' and v_status is distinct from v_antes.status then
+    v_anotacao := 'Campanha «' || v_c.nome || '»: ' || case v_status
+      when 'enviado' then
+        'mensagem enviada em '
+        || to_char(v_enviado_em at time zone 'America/Sao_Paulo', 'DD/MM/YYYY')
+        || ' às ' || to_char(v_enviado_em at time zone 'America/Sao_Paulo', 'HH24:MI')
+        || ' (horário de Brasília). Texto enviado: ' || coalesce(v_texto_enviado, '')
+      when 'respondeu' then 'respondeu.'
+      when 'agendou' then 'agendou.'
+      else 'pediu para não receber campanhas.' end;
+    if length(v_anotacao) > 2000 then
+      v_anotacao := left(v_anotacao, 1999) || '…';
+    end if;
+    insert into cliente_anotacoes (client_id, texto, origem, created_by)
+    values (p_client, v_anotacao, 'campanha', auth.uid());
+  end if;
+
+  return v_id;
+end;
+$function$
+```
+
+### `registrar_leitura_aplicador`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_leitura_aplicador(p_aplicador_id uuid, p_contador integer, p_data date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_data date := coalesce(p_data, public.hoje_local());
+  v_nome text;
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos aplicadores.';
+  end if;
+  if p_contador is null or p_contador < 0 then
+    raise exception 'Informe o número do contador.';
+  end if;
+  if v_data > public.hoje_local() then
+    raise exception 'A leitura não pode ser numa data futura.';
+  end if;
+
+  update aplicadores set contador_base = p_contador, contador_base_em = v_data
+   where id = p_aplicador_id
+   returning nome into v_nome;
+  if v_nome is null then
+    raise exception 'Aplicador não encontrado.';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'aplicadores', p_aplicador_id, 'Aplicador ' || v_nome,
+    jsonb_build_object('acao_detalhada', 'Contador lido: ' || p_contador || ' em ' || to_char(v_data, 'DD/MM/YYYY'))
+  );
+end;
+$function$
+```
+
+### `registrar_movimentacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_movimentacao(p_acao text, p_entidade text, p_entidade_id uuid, p_descricao text, p_detalhes jsonb DEFAULT '{}'::jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+begin
+  select name into v_nome from public.profiles where id = auth.uid();
+
+  insert into public.movimentacoes (
+    usuario_id, usuario_nome, acao, entidade, entidade_id, descricao, detalhes
+  )
+  values (
+    auth.uid(),
+    coalesce(nullif(trim(v_nome), ''), 'Usuário desconhecido'),
+    p_acao,
+    p_entidade,
+    p_entidade_id,
+    p_descricao,
+    coalesce(p_detalhes, '{}'::jsonb)
+  );
+end;
+$function$
+```
+
+### `registrar_pagamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_pagamento_locacao(p_rental_id uuid, p_forma payment_method_type, p_valor numeric, p_data date DEFAULT hoje_local(), p_pix_conta text DEFAULT NULL::text, p_notes text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_client_name text;
+  v_status event_status_type;
+  v_categoria uuid;
+  v_transacao_id uuid;
+  v_payment_id uuid;
+  v_saldo numeric;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para registrar pagamentos.';
+  end if;
+  if p_valor <= 0 then
+    raise exception 'O valor do pagamento precisa ser maior que zero.';
+  end if;
+  if p_forma = 'pix' and p_pix_conta is null then
+    raise exception 'Informe em qual conta o PIX caiu.';
+  end if;
+
+  select r.client_id, r.status, c.name into v_client_id, v_status, v_client_name
+    from rentals r
+    left join clients c on c.id = r.client_id
+   where r.id = p_rental_id;
+
+  if v_client_id is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Esta locação está cancelada. Reative o agendamento antes de registrar o pagamento.';
+  end if;
+
+  -- Leva AD: não aceita pagamento acima do que falta receber. O saldo já
+  -- desconta a taxa de reserva paga. Se o cliente realmente pagou a mais,
+  -- corrija antes o valor da locação em "Editar locação".
+  select saldo into v_saldo from rentals_situacao_pagamento where rental_id = p_rental_id;
+  if round(p_valor, 2) > round(coalesce(v_saldo, 0), 2) then
+    raise exception 'O pagamento (R$ %) é maior que o saldo em aberto (R$ %). Ajuste o valor da locação antes, se o cliente pagou a mais.',
+      to_char(round(p_valor, 2), 'FM999G990D00'), to_char(round(coalesce(v_saldo, 0), 2), 'FM999G990D00');
+  end if;
+
+  select id into v_categoria
+    from categories
+   where type = 'entrada' and is_default = true and name ilike 'Loca%'
+   limit 1;
+
+  insert into transactions (
+    type, category_id, description, amount, payment_method, date, scope,
+    client_id, rental_id, notes, created_by
+  )
+  values (
+    'entrada', v_categoria,
+    'Locação HIPRO - ' || coalesce(v_client_name, ''),
+    p_valor, p_forma, p_data, 'harmonize', v_client_id, p_rental_id, p_notes, auth.uid()
+  )
+  returning id into v_transacao_id;
+
+  insert into rental_payments (rental_id, forma, valor, data, pix_conta, transaction_id, notes, created_by)
+  values (p_rental_id, p_forma, p_valor, p_data, p_pix_conta, v_transacao_id, p_notes, auth.uid())
+  returning id into v_payment_id;
+
+  perform public.registrar_movimentacao(
+    'pago', 'rentals', p_rental_id,
+    public.descrever_registro('rentals', p_rental_id),
+    jsonb_build_object('valor_pago', round(p_valor, 2), 'forma', p_forma::text, 'pix_conta', p_pix_conta)
+  );
+
+  return v_payment_id;
+end;
+$function$
+```
+
+### `registrar_pedido_confirmacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_pedido_confirmacao(p_event_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_status event_status_type;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+
+  select status into v_status from calendar_events where id = p_event_id;
+  if v_status is null then
+    raise exception 'Agendamento não encontrado.';
+  end if;
+  if v_status = 'cancelada' then
+    raise exception 'Este agendamento está cancelado.';
+  end if;
+
+  update calendar_events set confirmation_message_sent_at = now() where id = p_event_id;
+
+  perform public.registrar_movimentacao(
+    'pedido_confirmacao_enviado',
+    'calendar_events', p_event_id,
+    public.descrever_registro('calendar_events', p_event_id),
+    '{}'::jsonb
+  );
+end;
+$function$
+```
+
+### `registrar_permuta`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_permuta(p_client_id uuid, p_valor numeric, p_descricao text, p_destino text, p_categoria_pessoal uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_data date DEFAULT hoje_local())
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+  v_desc text := nullif(btrim(p_descricao), '');
+  v_valor numeric := round(coalesce(p_valor, 0), 2);
+  v_cat uuid;
+  v_tx uuid;
+  v_tx_pessoal uuid;
+  v_saldo numeric := 0;
+  v_usar numeric := 0;
+begin
+  if not has_module_permission('financeiro') then raise exception 'Sem permissão para registrar permuta.'; end if;
+  if v_valor <= 0 then raise exception 'Informe o valor da permuta.'; end if;
+  if v_desc is null then raise exception 'Escreva o que veio na permuta.'; end if;
+  if p_destino not in ('empresa', 'pessoal') then raise exception 'Diga se a permuta é da empresa ou pessoal.'; end if;
+  select coalesce(nullif(btrim(display_name), ''), name) into v_nome from clients where id = p_client_id;
+  if v_nome is null then raise exception 'Cliente não encontrada.'; end if;
+  if p_rental_id is not null and not exists (select 1 from rentals where id = p_rental_id and client_id = p_client_id) then
+    raise exception 'A locação não é desta cliente.';
+  end if;
+
+  if p_destino = 'empresa' then
+    select id into v_cat from categories where scope = 'harmonize' and type = 'saida' and name = 'Outros' limit 1;
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, rental_id, notes, created_by)
+    values ('saida', v_cat, 'Permuta: ' || v_desc || ' (' || v_nome || ')', v_valor, 'permuta', p_data, 'harmonize', p_client_id, p_rental_id,
+            'Permuta da empresa', auth.uid())
+    returning id into v_tx;
+  else
+    if not exists (select 1 from categories where id = p_categoria_pessoal and scope = 'pessoal' and type = 'saida') then
+      raise exception 'Escolha a categoria do gasto pessoal.';
+    end if;
+    select id into v_cat from categories where scope = 'harmonize' and type = 'saida' and name = 'Retiradas' limit 1;
+    -- A retirada já cria a entrada "Retirada da Harmonize" no Pessoal (gatilho espelhar_retirada).
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, client_id, notes, created_by)
+    values ('saida', v_cat, 'Permuta: ' || v_desc || ' (' || v_nome || ')', v_valor, 'permuta', p_data, 'harmonize', p_client_id,
+            'Permuta pessoal', auth.uid())
+    returning id into v_tx;
+    insert into transactions (type, category_id, description, amount, payment_method, date, scope, notes, created_by)
+    values ('saida', p_categoria_pessoal, v_desc || ' (permuta com ' || v_nome || ')', v_valor, 'permuta', p_data, 'pessoal',
+            'Permuta pessoal', auth.uid())
+    returning id into v_tx_pessoal;
+  end if;
+
+  insert into creditos_cliente (client_id, tipo, quantidade, origem, transaction_id, transaction_extra_id, descricao, data)
+  values (p_client_id, 'valor', v_valor, 'permuta', v_tx, v_tx_pessoal, 'Permuta: ' || v_desc, p_data);
+
+  if p_rental_id is not null then
+    select coalesce(saldo, 0) into v_saldo from rentals_situacao_pagamento where rental_id = p_rental_id;
+    v_usar := least(v_valor, greatest(coalesce(v_saldo, 0), 0));
+    if v_usar > 0 then
+      perform usar_credito_valor(p_rental_id, v_usar, p_data);
+    end if;
+  end if;
+
+  perform registrar_movimentacao('criado', 'transactions', v_tx, 'Permuta: ' || v_desc || ' (' || v_nome || ')',
+    jsonb_build_object('client_id', p_client_id, 'valor', v_valor, 'destino', p_destino, 'usado_na_locacao', v_usar));
+
+  return jsonb_build_object('transacao_id', v_tx, 'usado', v_usar, 'credito', v_valor - v_usar);
+end;
+$function$
+```
+
+### `registrar_revisao_equipamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_revisao_equipamento(p_equipment_id uuid, p_data date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos equipamentos.';
+  end if;
+  if p_data is null then
+    raise exception 'Informe a data da revisão.';
+  end if;
+  if p_data > public.hoje_local() then
+    raise exception 'A revisão não pode ser numa data futura.';
+  end if;
+
+  update equipments set ultima_revisao = p_data where id = p_equipment_id returning name into v_nome;
+  if v_nome is null then
+    raise exception 'Equipamento não encontrado.';
+  end if;
+
+  perform public.registrar_movimentacao(
+    'editado', 'equipments', p_equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object('acao_detalhada', 'Revisão anual feita em ' || to_char(p_data, 'DD/MM/YYYY')
+      || '; próxima em ' || to_char(p_data + interval '1 year', 'DD/MM/YYYY'))
+  );
+end;
+$function$
+```
+
+### `remover_acesso_planejador`
+
+```sql
+CREATE OR REPLACE FUNCTION public.remover_acesso_planejador(p_user_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_email text;
+  v_cliente uuid;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Só o administrador remove acessos.';
+  end if;
+  update profiles set active = false where id = p_user_id and cliente_id is not null returning email, cliente_id into v_email, v_cliente;
+  if v_email is null then
+    raise exception 'Acesso de cliente não encontrado.';
+  end if;
+  perform registrar_movimentacao('editado', 'cliente', v_cliente, 'Acesso ao Planejador removido (' || v_email || ')',
+    jsonb_build_object('usuario_id', p_user_id));
+end;
+$function$
+```
+
+### `remover_acesso_visualizacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.remover_acesso_visualizacao(p_user_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_email text;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Só o administrador remove acessos.';
+  end if;
+  update profiles set active = false where id = p_user_id and somente_leitura returning email into v_email;
+  if v_email is null then
+    raise exception 'Acesso de visualização não encontrado.';
+  end if;
+  perform public.registrar_movimentacao(
+    'editado', 'profiles', p_user_id, 'Usuário ' || v_email,
+    jsonb_build_object('acao_detalhada', 'Acesso só de visualização removido')
+  );
+end;
+$function$
+```
+
+### `remover_emprestimo`
+
+```sql
+CREATE OR REPLACE FUNCTION public.remover_emprestimo(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_linha emprestimos%rowtype;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para alterar empréstimos.';
+  end if;
+
+  select * into v_linha from emprestimos where id = p_id;
+  if not found then
+    raise exception 'Lançamento de empréstimo não encontrado.';
+  end if;
+
+  delete from emprestimos where id = p_id;
+  if v_linha.transaction_id is not null then
+    delete from transactions where id = v_linha.transaction_id;
+  end if;
+
+  perform public.registrar_movimentacao(
+    'excluido', 'emprestimos', p_id,
+    case when v_linha.tipo = 'concedido' then 'Empréstimo para ' else 'Devolução de ' end || v_linha.devedor
+      || ' (' || public.formatar_reais(v_linha.valor) || ')',
+    jsonb_build_object('tipo', v_linha.tipo, 'valor', v_linha.valor, 'data', v_linha.data)
+  );
+end;
+$function$
+```
+
+### `remover_pagamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.remover_pagamento_locacao(p_payment_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rental_id uuid;
+  v_transaction_id uuid;
+begin
+  if not has_module_permission('financeiro') then
+    raise exception 'Sem permissão para alterar pagamentos.';
+  end if;
+
+  select rental_id, transaction_id into v_rental_id, v_transaction_id
+    from rental_payments where id = p_payment_id;
+
+  if v_rental_id is null then
+    raise exception 'Pagamento não encontrado.';
+  end if;
+
+  -- rentals.transaction_id é só um atalho para o lançamento principal
+  -- (caminho de tela única, herdado de antes desta leva); se for
+  -- justamente este pagamento, zera ANTES de apagar a transação — senão
+  -- a FK rentals_transaction_id_fkey barra o delete (ela não tem on
+  -- delete cascade, de propósito, para nunca sumir uma transação por
+  -- engano só por causa de outro caminho de exclusão).
+  update rentals set transaction_id = null
+   where id = v_rental_id and transaction_id = v_transaction_id;
+
+-- Apagar a transação já casca-deleta esta linha de rental_payments
+  -- (transaction_id on delete cascade); o delete abaixo cobre o caso
+  -- raro de um pagamento sem transaction_id.
+  if v_transaction_id is not null then
+    delete from transactions where id = v_transaction_id;
+  end if;
+  delete from rental_payments where id = p_payment_id;
+
+  perform public.registrar_movimentacao(
+    'pagamento_desfeito', 'rentals', v_rental_id,
+    public.descrever_registro('rentals', v_rental_id),
+    jsonb_build_object('pagamento_removido', p_payment_id)
+  );
+end;
+$function$
+```
+
+### `require_admin`
+
+```sql
+CREATE OR REPLACE FUNCTION public.require_admin()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not exists (
+    select 1 from public.profiles
+    where id = auth.uid() and is_admin and active
+  ) then
+    raise exception 'Apenas administradores ativos podem executar esta ação.';
+  end if;
+end;
+$function$
+```
+
+### `rotulo_bloqueio`
+
+```sql
+CREATE OR REPLACE FUNCTION public.rotulo_bloqueio(p_tipo text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select case p_tipo when 'manutencao' then 'manutenção' when 'recesso' then 'recesso' else 'bloqueio' end;
+$function$
+```
+
+### `saldo_credito_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.saldo_credito_cliente(p_client_id uuid, p_tipo text)
+ RETURNS numeric
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce(sum(c.quantidade), 0)
+    from creditos_cliente c
+    left join rentals r on r.id = c.rental_id
+   where has_module_permission('agenda')
+     and c.client_id = p_client_id and c.tipo = p_tipo
+     and credito_conta(c.quantidade, c.origem, r.pago, r.status::text) = 'disponivel';
+$function$
+```
+
+### `salvar_anotacao_cliente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_anotacao_cliente(p_client_id uuid, p_texto text, p_origem text DEFAULT 'digitada'::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_texto text := trim(coalesce(p_texto, ''));
+  v_origem text := coalesce(nullif(trim(p_origem), ''), 'digitada');
+  v_nome text;
+  v_id uuid;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para anotar em clientes.';
+  end if;
+  if v_texto = '' then
+    raise exception 'Escreva ou fale a anotação.';
+  end if;
+  if length(v_texto) > 2000 then
+    raise exception 'Anotação longa demais (máximo 2.000 caracteres).';
+  end if;
+  if v_origem not in ('digitada', 'voz', 'assistente') then
+    raise exception 'Origem inválida.';
+  end if;
+  select name into v_nome from clients where id = p_client_id;
+  if v_nome is null then
+    raise exception 'Cliente não encontrada.';
+  end if;
+
+  insert into cliente_anotacoes (client_id, texto, origem, created_by)
+  values (p_client_id, v_texto, v_origem, auth.uid())
+  returning id into v_id;
+
+  perform registrar_movimentacao('criado', 'cliente', p_client_id,
+    'Anotação em ' || v_nome || ': ' || left(v_texto, 120),
+    jsonb_build_object('anotacao_id', v_id, 'origem', v_origem));
+  return v_id;
+end;
+$function$
+```
+
+### `salvar_aplicador`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_aplicador(p_id uuid, p_nome text, p_numero_serie text DEFAULT NULL::text, p_garantia_disparos integer DEFAULT NULL::integer, p_ativo boolean DEFAULT true, p_contador_inicial integer DEFAULT NULL::integer)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+  v_nome text := nullif(trim(p_nome), '');
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos aplicadores.';
+  end if;
+  if v_nome is null then
+    raise exception 'Dê um nome ao aplicador.';
+  end if;
+  if p_garantia_disparos is not null and p_garantia_disparos <= 0 then
+    raise exception 'A garantia em disparos precisa ser maior que zero.';
+  end if;
+  if p_contador_inicial is not null and p_contador_inicial < 0 then
+    raise exception 'O contador não pode ser negativo.';
+  end if;
+
+  if p_id is null then
+    insert into aplicadores (nome, numero_serie, garantia_disparos, contador_base, contador_base_em, ativo)
+    values (v_nome, nullif(trim(p_numero_serie), ''), p_garantia_disparos, coalesce(p_contador_inicial, 0), public.hoje_local(), coalesce(p_ativo, true))
+    returning id into v_id;
+    perform public.registrar_movimentacao(
+      'criado', 'aplicadores', v_id, 'Aplicador ' || v_nome,
+      jsonb_build_object('contador', coalesce(p_contador_inicial, 0), 'garantia', p_garantia_disparos)
+    );
+  else
+    update aplicadores
+       set nome = v_nome,
+           numero_serie = nullif(trim(p_numero_serie), ''),
+           garantia_disparos = p_garantia_disparos,
+           ativo = coalesce(p_ativo, true)
+     where id = p_id
+     returning id into v_id;
+    if v_id is null then
+      raise exception 'Aplicador não encontrado.';
+    end if;
+    if not coalesce(p_ativo, true) then
+      update aplicador_montagens set ate = greatest(desde, public.hoje_local())
+       where aplicador_id = v_id and ate is null;
+    end if;
+    perform public.registrar_movimentacao(
+      'editado', 'aplicadores', v_id, 'Aplicador ' || v_nome,
+      jsonb_build_object('garantia', p_garantia_disparos, 'ativo', coalesce(p_ativo, true))
+    );
+  end if;
+  return v_id;
+end;
+$function$
+```
+
+### `salvar_campanha`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_campanha(p_id uuid, p_nome text, p_mensagem text, p_arte_path text DEFAULT NULL::text, p_arte_nome text DEFAULT NULL::text, p_filtros jsonb DEFAULT '{}'::jsonb, p_limite_diario integer DEFAULT 15)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text := btrim(coalesce(p_nome, ''));
+  v_msg text := btrim(replace(coalesce(p_mensagem, ''), E'\r', ''));
+  v_arte text := nullif(btrim(coalesce(p_arte_path, '')), '');
+  v_arte_nome text := left(nullif(btrim(coalesce(p_arte_nome, '')), ''), 200);
+  v_filtros jsonb := coalesce(p_filtros, '{}'::jsonb);
+  v_limite integer := coalesce(p_limite_diario, 15);
+  v_antes campanhas%rowtype;
+  v_id uuid;
+begin
+  if not has_module_permission('clientes') then
+    raise exception 'Sem permissão para mexer em campanhas.';
+  end if;
+  if v_nome = '' or length(v_nome) > 80 then
+    raise exception 'Dê um nome curto à campanha (até 80 caracteres).';
+  end if;
+  if v_msg = '' then
+    raise exception 'Escreva a mensagem da campanha.';
+  end if;
+  if length(v_msg) > 2000 then
+    raise exception 'Mensagem longa demais (máximo 2.000 caracteres).';
+  end if;
+  if regexp_replace(v_msg, '\{(saudacao|nome|cidade)\}', '', 'g') ~ '[{}]' then
+    raise exception 'A mensagem tem variável desconhecida ou chave sem par. Use só {saudacao}, {nome} e {cidade}.';
+  end if;
+  if v_arte is not null and v_arte !~ '^arte/[A-Za-z0-9_-]{1,80}\.(jpg|jpeg|png|webp)$' then
+    raise exception 'Caminho da arte inválido.';
+  end if;
+  if jsonb_typeof(v_filtros) <> 'object' then
+    raise exception 'Filtros do público inválidos.';
+  end if;
+  if v_limite not between 1 and 100 then
+    raise exception 'O limite diário vai de 1 a 100 envios.';
+  end if;
+  if v_arte is null then
+    v_arte_nome := null;
+  end if;
+
+  if p_id is null then
+    insert into campanhas (nome, mensagem, arte_path, arte_nome, filtros, limite_diario, created_by)
+    values (v_nome, v_msg, v_arte, v_arte_nome, v_filtros, v_limite, auth.uid())
+    returning id into v_id;
+    perform registrar_movimentacao('criado', 'campanha', v_id,
+      'Campanha criada: ' || v_nome,
+      jsonb_build_object('limite_diario', v_limite, 'com_arte', v_arte is not null));
+    return v_id;
+  end if;
+
+  select * into v_antes from campanhas where id = p_id for update;
+  if not found then
+    raise exception 'Campanha não encontrada.';
+  end if;
+  update campanhas
+     set nome = v_nome, mensagem = v_msg, arte_path = v_arte, arte_nome = v_arte_nome,
+         filtros = v_filtros, limite_diario = v_limite, updated_at = now()
+   where id = p_id;
+  perform registrar_movimentacao('editado', 'campanha', p_id,
+    'Campanha alterada: ' || v_nome,
+    jsonb_build_object(
+      'antes', jsonb_build_object('nome', v_antes.nome, 'mensagem', v_antes.mensagem, 'arte_path', v_antes.arte_path,
+                                  'limite_diario', v_antes.limite_diario, 'filtros', v_antes.filtros),
+      'depois', jsonb_build_object('nome', v_nome, 'mensagem', v_msg, 'arte_path', v_arte,
+                                   'limite_diario', v_limite, 'filtros', v_filtros)));
+  return p_id;
+end;
+$function$
+```
+
+### `salvar_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_cartao(p_id uuid, p_nome text, p_scope scope_type, p_dia_fechamento integer, p_dia_vencimento integer, p_limite numeric DEFAULT NULL::numeric, p_ativo boolean DEFAULT true)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+  v_venc_antes int;
+begin
+  if (p_scope = 'harmonize' and not has_module_permission('financeiro'))
+     or (p_scope = 'pessoal' and not has_module_permission('pessoal')) then
+    raise exception 'Sem permissão para mexer nos cartões.';
+  end if;
+  if nullif(trim(p_nome), '') is null then
+    raise exception 'Dê um nome ao cartão.';
+  end if;
+  if p_dia_fechamento not between 1 and 31 or p_dia_vencimento not between 1 and 31 then
+    raise exception 'Dia de fechamento e de vencimento vão de 1 a 31.';
+  end if;
+
+  if p_id is null then
+    insert into cartoes (nome, scope, dia_fechamento, dia_vencimento, limite, ativo)
+    values (trim(p_nome), p_scope, p_dia_fechamento, p_dia_vencimento, p_limite, coalesce(p_ativo, true))
+    returning id into v_id;
+    perform public.registrar_movimentacao('criado', 'cartoes', v_id, 'Cartão ' || trim(p_nome), '{}'::jsonb);
+  else
+    select dia_vencimento into v_venc_antes from cartoes where id = p_id;
+    update cartoes
+       set nome = trim(p_nome), dia_fechamento = p_dia_fechamento, dia_vencimento = p_dia_vencimento,
+           limite = p_limite, ativo = coalesce(p_ativo, true)
+     where id = p_id
+     returning id into v_id;
+    if v_id is null then
+      raise exception 'Cartão não encontrado.';
+    end if;
+    if v_venc_antes is distinct from p_dia_vencimento then
+      -- O gatilho trg_transactions_data_do_cartao refaz a data de cada compra.
+      update transactions set fatura_ref = fatura_ref where cartao_id = v_id and cartao_mov = 'compra';
+    end if;
+    perform public.registrar_movimentacao('editado', 'cartoes', v_id, 'Cartão ' || trim(p_nome), '{}'::jsonb);
+  end if;
+  return v_id;
+end;
+$function$
+```
+
+### `salvar_categoria`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_categoria(p_id uuid, p_nome text, p_scope scope_type DEFAULT 'harmonize'::scope_type, p_type entry_type DEFAULT 'saida'::entry_type)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text := regexp_replace(btrim(coalesce(p_nome, '')), '\s+', ' ', 'g');
+  v_cat categories%rowtype;
+  v_motivo text;
+  v_id uuid;
+  v_ordem int;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas categorias.';
+  end if;
+  if v_nome = '' then
+    raise exception 'Escreva o nome da categoria.';
+  end if;
+  if length(v_nome) > 60 then
+    raise exception 'Nome longo demais (máximo 60 caracteres).';
+  end if;
+
+  if p_id is null then
+    if p_scope = 'pessoal' and not has_module_permission('pessoal') then
+      raise exception 'Sem permissão para o Pessoal.';
+    end if;
+    v_motivo := categoria_nome_reservado(p_scope, p_type, v_nome, null);
+    if v_motivo is not null then raise exception '%', v_motivo; end if;
+    if exists (select 1 from categories where scope = p_scope and type = p_type and lower(btrim(name)) = lower(v_nome)) then
+      raise exception 'Já existe a categoria "%" nesta lista.', v_nome;
+    end if;
+    select coalesce(max(ordem), 0) into v_ordem from categories where scope = p_scope and type = p_type;
+    insert into categories (name, type, scope, is_default, sistema, arquivada, ordem)
+    values (v_nome, p_type, p_scope, false, false, false, case when v_ordem > 0 then v_ordem + 1 else 0 end)
+    returning id into v_id;
+    perform registrar_movimentacao('criado', 'categories', v_id,
+      'Categoria criada: ' || v_nome || ' (' || p_scope::text || ', ' || p_type::text || ')',
+      jsonb_build_object('nome', v_nome, 'escopo', p_scope, 'tipo', p_type));
+    return v_id;
+  end if;
+
+  select * into v_cat from categories where id = p_id for update;
+  if not found then
+    raise exception 'Categoria não encontrada.';
+  end if;
+  if v_cat.scope = 'pessoal' and not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para o Pessoal.';
+  end if;
+  if v_cat.sistema then
+    raise exception 'A categoria "%" é do sistema e não pode ser renomeada.', v_cat.name;
+  end if;
+  if v_cat.name = v_nome then
+    return v_cat.id;
+  end if;
+  v_motivo := categoria_nome_reservado(v_cat.scope, v_cat.type, v_nome, v_cat.id);
+  if v_motivo is not null then raise exception '%', v_motivo; end if;
+  if exists (select 1 from categories where scope = v_cat.scope and type = v_cat.type and id <> v_cat.id
+                and lower(btrim(name)) = lower(v_nome)) then
+    raise exception 'Já existe a categoria "%" nesta lista.', v_nome;
+  end if;
+
+  update categories set name = v_nome where id = v_cat.id;
+  if v_cat.scope = 'pessoal' and v_cat.type = 'saida' then
+    update orcamentos_pessoais set categoria = v_nome
+     where lower(btrim(categoria)) = lower(btrim(v_cat.name));
+  end if;
+
+  perform registrar_movimentacao('editado', 'categories', v_cat.id,
+    'Categoria renomeada: ' || v_cat.name || ' → ' || v_nome,
+    jsonb_build_object('antes', v_cat.name, 'depois', v_nome,
+      'lancamentos', (select count(*) from transactions where category_id = v_cat.id)));
+  return v_cat.id;
+end;
+$function$
+```
+
+### `salvar_cidade`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_cidade(p_nome text, p_latitude numeric, p_longitude numeric, p_uf text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_exibir text := regexp_replace(btrim(regexp_replace(coalesce(p_nome, ''), '\s*[-/,(].*$', '')), '\s+', ' ', 'g');
+  v_nome text := normalizar_cidade(p_nome);
+  v_uf text := nullif(upper(btrim(coalesce(p_uf, ''))), '');
+  v_antes cidades_coordenadas%rowtype;
+  v_id uuid;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas cidades.';
+  end if;
+  if v_nome = '' or length(v_exibir) > 80 then
+    raise exception 'Escreva o nome da cidade.';
+  end if;
+  if p_latitude is null or p_longitude is null
+     or p_latitude not between -90 and 90 or p_longitude not between -180 and 180 then
+    raise exception 'Latitude ou longitude inválida.';
+  end if;
+  if v_uf is not null and v_uf !~ '^[A-Z]{2}$' then
+    raise exception 'UF deve ter duas letras (ex.: PE).';
+  end if;
+
+  select * into v_antes from cidades_coordenadas where nome = v_nome for update;
+  if found then
+    update cidades_coordenadas
+       set nome_exibicao = v_exibir, uf = coalesce(v_uf, uf), latitude = round(p_latitude, 6), longitude = round(p_longitude, 6)
+     where id = v_antes.id;
+    perform registrar_movimentacao('editado', 'cidades_coordenadas', v_antes.id,
+      'Cidade alterada: ' || v_exibir,
+      jsonb_build_object('antes', jsonb_build_object('lat', v_antes.latitude, 'lon', v_antes.longitude, 'uf', v_antes.uf),
+                         'depois', jsonb_build_object('lat', round(p_latitude, 6), 'lon', round(p_longitude, 6), 'uf', coalesce(v_uf, v_antes.uf))));
+    return v_antes.id;
+  end if;
+
+  insert into cidades_coordenadas (nome, nome_exibicao, uf, latitude, longitude)
+  values (v_nome, v_exibir, v_uf, round(p_latitude, 6), round(p_longitude, 6))
+  returning id into v_id;
+  perform registrar_movimentacao('criado', 'cidades_coordenadas', v_id,
+    'Cidade cadastrada: ' || v_exibir,
+    jsonb_build_object('nome', v_nome, 'lat', round(p_latitude, 6), 'lon', round(p_longitude, 6), 'uf', v_uf));
+  return v_id;
+end;
+$function$
+```
+
+### `salvar_conta_pix`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_conta_pix(p_id uuid, p_rotulo text, p_titular text, p_tipo_chave text, p_chave text, p_ativa boolean DEFAULT true, p_padrao boolean DEFAULT false, p_ordem integer DEFAULT NULL::integer)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rotulo text := btrim(coalesce(p_rotulo, ''));
+  v_titular text := btrim(coalesce(p_titular, ''));
+  v_tipo text := lower(btrim(coalesce(p_tipo_chave, '')));
+  v_chave text := btrim(coalesce(p_chave, ''));
+  v_antes contas_pix%rowtype;
+  v_codigo text;
+  v_base text;
+  v_n int := 1;
+  v_id uuid;
+begin
+  if not has_module_permission('configuracoes') then
+    raise exception 'Sem permissão para mexer nas contas PIX.';
+  end if;
+  if v_rotulo = '' or length(v_rotulo) > 40 then
+    raise exception 'Escreva um nome curto para a conta (até 40 caracteres).';
+  end if;
+  if v_titular = '' or length(v_titular) > 120 then
+    raise exception 'Escreva o nome do titular (favorecido).';
+  end if;
+  if v_tipo not in ('cpf', 'cnpj', 'email', 'telefone', 'aleatoria') then
+    raise exception 'Tipo de chave inválido.';
+  end if;
+  if v_chave = '' or length(v_chave) > 120 then
+    raise exception 'Escreva a chave PIX.';
+  end if;
+  if v_tipo in ('cpf', 'cnpj', 'telefone') then
+    v_chave := regexp_replace(v_chave, '[^0-9+]', '', 'g');
+    if v_tipo = 'cpf' and length(v_chave) <> 11 then raise exception 'CPF precisa ter 11 números.'; end if;
+    if v_tipo = 'cnpj' and length(v_chave) <> 14 then raise exception 'CNPJ precisa ter 14 números.'; end if;
+    if v_tipo = 'telefone' and length(regexp_replace(v_chave, '\D', '', 'g')) < 10 then raise exception 'Telefone incompleto.'; end if;
+  end if;
+  if v_tipo = 'email' and v_chave !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'E-mail inválido.';
+  end if;
+  if coalesce(p_padrao, false) and not coalesce(p_ativa, true) then
+    raise exception 'A conta padrão precisa estar ativa.';
+  end if;
+
+  if p_id is null then
+    v_base := left(regexp_replace(lower(translate(v_rotulo,
+      'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+      'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')), '[^a-z0-9]+', '_', 'g'), 30);
+    v_base := btrim(v_base, '_');
+    if length(v_base) < 2 then v_base := 'conta'; end if;
+    v_codigo := v_base;
+    while exists (select 1 from contas_pix where codigo = v_codigo) loop
+      v_n := v_n + 1;
+      v_codigo := v_base || '_' || v_n;
+    end loop;
+    if coalesce(p_padrao, false) then
+      update contas_pix set padrao = false where padrao;
+    end if;
+    insert into contas_pix (codigo, rotulo, titular, tipo_chave, chave, ordem, ativa, padrao)
+    values (v_codigo, v_rotulo, v_titular, v_tipo, v_chave,
+            coalesce(p_ordem, (select coalesce(max(ordem), 0) + 1 from contas_pix)),
+            coalesce(p_ativa, true), coalesce(p_padrao, false))
+    returning id into v_id;
+    perform registrar_movimentacao('criado', 'contas_pix', v_id,
+      'Conta PIX criada: ' || v_rotulo || ' (' || v_titular || ')',
+      jsonb_build_object('codigo', v_codigo, 'tipo_chave', v_tipo, 'chave', v_chave));
+    return v_id;
+  end if;
+
+  select * into v_antes from contas_pix where id = p_id for update;
+  if not found then
+    raise exception 'Conta PIX não encontrada.';
+  end if;
+  if v_antes.padrao and not coalesce(p_padrao, false) then
+    raise exception 'Escolha outra conta como padrão antes de tirar o padrão desta.';
+  end if;
+  if coalesce(p_padrao, false) and not v_antes.padrao then
+    update contas_pix set padrao = false where padrao;
+  end if;
+  update contas_pix
+     set rotulo = v_rotulo, titular = v_titular, tipo_chave = v_tipo, chave = v_chave,
+         ativa = coalesce(p_ativa, true), padrao = coalesce(p_padrao, false),
+         ordem = coalesce(p_ordem, ordem), updated_at = now()
+   where id = p_id;
+  perform registrar_movimentacao('editado', 'contas_pix', p_id,
+    'Conta PIX alterada: ' || v_rotulo,
+    jsonb_build_object(
+      'antes', jsonb_build_object('rotulo', v_antes.rotulo, 'titular', v_antes.titular, 'tipo_chave', v_antes.tipo_chave,
+                                  'chave', v_antes.chave, 'ativa', v_antes.ativa, 'padrao', v_antes.padrao),
+      'depois', jsonb_build_object('rotulo', v_rotulo, 'titular', v_titular, 'tipo_chave', v_tipo,
+                                   'chave', v_chave, 'ativa', coalesce(p_ativa, true), 'padrao', coalesce(p_padrao, false))));
+  return p_id;
+end;
+$function$
+```
+
+### `salvar_orcamento_pessoal`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_orcamento_pessoal(p_categoria text, p_limite numeric)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cat text := trim(coalesce(p_categoria, ''));
+  v_id uuid;
+begin
+  if not has_module_permission('pessoal') then
+    raise exception 'Sem permissão para mexer no orçamento pessoal.';
+  end if;
+  if v_cat = '' then
+    raise exception 'Informe a categoria.';
+  end if;
+
+  if p_limite is null or p_limite <= 0 then
+    delete from orcamentos_pessoais where lower(trim(categoria)) = lower(v_cat) returning id into v_id;
+    if v_id is not null then
+      perform public.registrar_movimentacao('excluido', 'orcamentos_pessoais', v_id, 'Orçamento pessoal: ' || v_cat, '{}'::jsonb);
+    end if;
+    return;
+  end if;
+
+  update orcamentos_pessoais set limite = p_limite, categoria = v_cat
+   where lower(trim(categoria)) = lower(v_cat)
+   returning id into v_id;
+  if v_id is null then
+    insert into orcamentos_pessoais (categoria, limite) values (v_cat, p_limite) returning id into v_id;
+    perform public.registrar_movimentacao('criado', 'orcamentos_pessoais', v_id, 'Orçamento pessoal: ' || v_cat, jsonb_build_object('limite', p_limite));
+  else
+    perform public.registrar_movimentacao('editado', 'orcamentos_pessoais', v_id, 'Orçamento pessoal: ' || v_cat, jsonb_build_object('limite', p_limite));
+  end if;
+end;
+$function$
+```
+
+### `salvar_planejamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.salvar_planejamento(p_id uuid, p_client_id uuid, p_calendar_event_id uuid, p_estado jsonb, p_total integer DEFAULT 0)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid := p_id;
+  v_e jsonb := coalesce(p_estado, '{}'::jsonb);
+  v_data date;
+  v_retorno date;
+  v_saldo integer;
+  v_cliente uuid := cliente_do_usuario();
+  v_client_id uuid := p_client_id;
+  v_evento uuid := p_calendar_event_id;
+begin
+  if v_cliente is null and not has_module_permission('agenda') then
+    raise exception 'Sem permissão para salvar planejamentos.';
+  end if;
+  if v_cliente is not null then
+    v_client_id := v_cliente;
+    if v_id is null then
+      v_evento := null;
+    else
+      select calendar_event_id into v_evento from planejamentos where id = v_id and client_id = v_cliente;
+      if not found then raise exception 'Planejamento não encontrado.'; end if;
+    end if;
+  end if;
+  if jsonb_typeof(v_e) <> 'object' then
+    raise exception 'Planejamento inválido.';
+  end if;
+  if pg_column_size(v_e) > 2000000 then
+    raise exception 'Planejamento grande demais.';
+  end if;
+  begin v_data := nullif(v_e ->> 'data', '')::date; exception when others then v_data := null; end;
+  begin v_retorno := nullif(v_e ->> 'dataRetorno', '')::date; exception when others then v_retorno := null; end;
+  begin v_saldo := coalesce(nullif(v_e ->> 'saldoTotal', '')::integer, 0); exception when others then v_saldo := 0; end;
+
+  if v_id is null then
+    insert into planejamentos (client_id, calendar_event_id, paciente, data, data_retorno, procedimento, saldo_total, total_disparos, estado)
+    values (v_client_id, v_evento, nullif(btrim(v_e ->> 'paciente'), ''), coalesce(v_data, hoje_local()), v_retorno,
+            nullif(btrim(v_e ->> 'procNome'), ''), v_saldo, greatest(coalesce(p_total, 0), 0), v_e)
+    returning id into v_id;
+    perform registrar_movimentacao('criado', 'planejamento', v_id,
+      'Planejamento HIPRO criado' || coalesce(' para ' || nullif(btrim(v_e ->> 'paciente'), ''), '')
+        || case when v_cliente is not null then ' (pela cliente)' else '' end,
+      jsonb_build_object('client_id', v_client_id, 'calendar_event_id', v_evento));
+  else
+    update planejamentos set
+      client_id = v_client_id,
+      calendar_event_id = v_evento,
+      paciente = nullif(btrim(v_e ->> 'paciente'), ''),
+      data = coalesce(v_data, data),
+      data_retorno = v_retorno,
+      procedimento = nullif(btrim(v_e ->> 'procNome'), ''),
+      saldo_total = v_saldo,
+      total_disparos = greatest(coalesce(p_total, 0), 0),
+      estado = v_e,
+      updated_at = now()
+    where id = v_id and (v_cliente is null or client_id = v_cliente);
+    if not found then raise exception 'Planejamento não encontrado.'; end if;
+  end if;
+  return v_id;
+end;
+$function$
+```
+
+### `set_became_client_at`
+
+```sql
+CREATE OR REPLACE FUNCTION public.set_became_client_at()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.is_client = true and new.became_client_at is null then
+    new.became_client_at := now();
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `set_client_test_flag_cascade`
+
+```sql
+CREATE OR REPLACE FUNCTION public.set_client_test_flag_cascade(p_client_id uuid, p_is_test boolean)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_transactions int;
+  v_rentals int;
+  v_events int;
+  v_tasks int;
+  v_mentoring int;
+  v_rental_payments int;
+begin
+  perform public.require_admin();
+
+  update public.clients set is_test = p_is_test where id = p_client_id;
+
+  with u as (update public.transactions set is_test = p_is_test where client_id = p_client_id returning 1)
+    select count(*) into v_transactions from u;
+  with u as (update public.rentals set is_test = p_is_test where client_id = p_client_id returning 1)
+    select count(*) into v_rentals from u;
+  with u as (update public.calendar_events set is_test = p_is_test where client_id = p_client_id returning 1)
+    select count(*) into v_events from u;
+  with u as (update public.tasks set is_test = p_is_test where client_id = p_client_id returning 1)
+    select count(*) into v_tasks from u;
+  -- rental_payments não tem client_id direto: chega pela locação do cliente.
+  with u as (
+    update public.rental_payments set is_test = p_is_test
+    where rental_id in (select id from public.rentals where client_id = p_client_id)
+    returning 1
+  )
+    select count(*) into v_rental_payments from u;
+
+  -- Mentorias não têm client_id: chegam pelo evento de agenda do cliente.
+  with u as (
+    update public.mentoring_events m set is_test = p_is_test
+    where exists (
+      select 1 from public.calendar_events e
+      where e.id = m.calendar_event_id and e.client_id = p_client_id
+    )
+    returning 1
+  )
+  select count(*) into v_mentoring from u;
+
+return jsonb_build_object(
+    'transactions',     v_transactions,
+    'rentals',          v_rentals,
+    'calendar_events',  v_events,
+    'tasks',            v_tasks,
+    'mentoring_events', v_mentoring,
+    'rental_payments',  v_rental_payments
+  );
+end;
+$function$
+```
+
+### `set_record_test_flag`
+
+```sql
+CREATE OR REPLACE FUNCTION public.set_record_test_flag(p_table text, p_id uuid, p_is_test boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  perform public.require_admin();
+
+  if p_table not in ('clients','transactions','rentals','calendar_events','mentoring_events','tasks','rental_payments') then
+    raise exception 'Tabela não permitida: %', p_table;
+  end if;
+
+  execute format('update public.%I set is_test = $1 where id = $2', p_table)
+    using p_is_test, p_id;
+end;
+$function$
+```
+
+### `sincronizar_manutencao_por_bloqueio`
+
+```sql
+CREATE OR REPLACE FUNCTION public.sincronizar_manutencao_por_bloqueio(p_equipment_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_hoje date := public.hoje_local();
+  v_eq record;
+  v_bl record;
+begin
+  select id, name, status, status_previsto_fim into v_eq from equipments where id = p_equipment_id;
+  if v_eq.id is null then
+    return;
+  end if;
+
+  select * into v_bl from bloqueios_equipamento
+   where equipment_id = p_equipment_id and tipo = 'manutencao'
+     and data_inicio <= v_hoje and data_fim >= v_hoje
+   order by data_fim desc
+   limit 1;
+
+  if v_bl.id is not null then
+    if v_eq.status <> 'manutencao' then
+      update equipments
+         set status = 'manutencao',
+             status_motivo = coalesce(nullif(trim(v_bl.motivo), ''), 'Manutenção programada'),
+             status_desde = now(),
+             status_previsto_fim = v_bl.data_fim + 1
+       where id = p_equipment_id;
+      perform public.registrar_movimentacao(
+        'manutencao_iniciada', 'equipments', p_equipment_id, 'Equipamento ' || v_eq.name,
+        jsonb_build_object('motivo', coalesce(nullif(trim(v_bl.motivo), ''), 'manutenção programada'),
+                           'previsto_fim', to_char(v_bl.data_fim + 1, 'DD/MM/YYYY'))
+      );
+    elsif v_eq.status_previsto_fim is distinct from v_bl.data_fim + 1 then
+      update equipments set status_previsto_fim = v_bl.data_fim + 1 where id = p_equipment_id;
+    end if;
+  end if;
+end;
+$function$
+```
+
+### `sync_rental_from_calendar_event`
+
+```sql
+CREATE OR REPLACE FUNCTION public.sync_rental_from_calendar_event()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.rental_id is not null
+     and (new.date_start is distinct from old.date_start
+          or new.status is distinct from old.status
+          or new.cancellation_reason is distinct from old.cancellation_reason
+          or new.no_show is distinct from old.no_show) then
+    update rentals
+       set event_date = new.date_start,
+           status = new.status,
+           cancellation_reason = new.cancellation_reason,
+           no_show = new.no_show
+     where id = new.rental_id;
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `transactions_data_do_cartao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.transactions_data_do_cartao()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_venc int;
+begin
+  if new.cartao_mov is distinct from 'compra' or new.cartao_id is null
+     or coalesce(new.fatura_ref, '') !~ '^\d{4}-\d{2}$' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.data_compra := coalesce(new.data_compra, new.date);
+  elsif new.data_compra is not distinct from old.data_compra and new.date is distinct from old.date then
+    new.data_compra := new.date;
+  end if;
+  new.data_compra := coalesce(new.data_compra, new.date);
+  select dia_vencimento into v_venc from cartoes where id = new.cartao_id;
+  if v_venc is not null then
+    new.date := public.dia_no_mes(split_part(new.fatura_ref, '-', 1)::int, split_part(new.fatura_ref, '-', 2)::int, v_venc);
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `transferir_cliente_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.transferir_cliente_locacao(p_rental_id uuid, p_novo_client_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_old_client_id uuid;
+  v_old_client_name text;
+  v_new_client_name text;
+  v_descricao text;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar locações.';
+  end if;
+
+  select client_id into v_old_client_id from rentals where id = p_rental_id;
+  if v_old_client_id is null then
+    raise exception 'Locação não encontrada.';
+  end if;
+
+  select name into v_new_client_name from clients where id = p_novo_client_id;
+  if v_new_client_name is null then
+    raise exception 'Cliente novo não encontrado.';
+  end if;
+
+  if v_old_client_id = p_novo_client_id then
+    return; -- já é o mesmo cliente, nada a fazer
+  end if;
+
+  select name into v_old_client_name from clients where id = v_old_client_id;
+  v_descricao := public.descrever_registro('rentals', p_rental_id);
+
+  update rentals set client_id = p_novo_client_id where id = p_rental_id;
+  update calendar_events set client_id = p_novo_client_id where rental_id = p_rental_id;
+  update transactions set client_id = p_novo_client_id where rental_id = p_rental_id;
+
+  -- Promove o cliente novo pra etapa "Cliente" do funil, mesma regra de
+  -- create_rental/finalize_rental_reservation; não mexe na etapa do
+  -- cliente antigo (ele pode ter outras locações legítimas).
+  update clients set stage = 'cliente' where id = p_novo_client_id and stage <> 'cliente';
+
+  perform public.registrar_movimentacao(
+    'editado', 'rentals', p_rental_id, v_descricao,
+    jsonb_build_object(
+      'acao_detalhada', 'cliente da locação corrigido',
+      'cliente_antigo', coalesce(v_old_client_name, v_old_client_id::text),
+      'cliente_novo', v_new_client_name
+    )
+  );
+end;
+$function$
+```
+
+### `trg_amarrar_despesas_da_reserva`
+
+```sql
+CREATE OR REPLACE FUNCTION public.trg_amarrar_despesas_da_reserva()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.rental_id is not null and new.rental_id is distinct from old.rental_id then
+    update transactions
+       set rental_id = new.rental_id
+     where calendar_event_id = new.id
+       and type = 'saida'
+       and rental_id is null;
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `trg_recalcular_pagamento_locacao`
+
+```sql
+CREATE OR REPLACE FUNCTION public.trg_recalcular_pagamento_locacao()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  perform public.recalcular_pagamento_locacao(coalesce(new.rental_id, old.rental_id));
+  return coalesce(new, old);
+end;
+$function$
+```
+
+### `trg_rentals_marca_reagendamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.trg_rentals_marca_reagendamento()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.event_date is distinct from old.event_date
+     and new.rescheduled_at is not distinct from old.rescheduled_at then
+    new.rescheduled := true;
+    new.rescheduled_at := now();
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `trocar_ponteira_reserva`
+
+```sql
+CREATE OR REPLACE FUNCTION public.trocar_ponteira_reserva(p_event_id uuid, p_final_atual bigint, p_gera_credito boolean, p_inicial_nova bigint, p_aplicador_novo uuid DEFAULT NULL::uuid, p_registrar_troca boolean DEFAULT true)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_ev record;
+  v_ini bigint;
+  v_fim bigint;
+  v_ordem int;
+  v_montado uuid;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para alterar agendamentos.';
+  end if;
+  select id, status::text as status, rental_id, equipment_id, contagem_inicial, contagem_aplicador_id, date_start
+    into v_ev from calendar_events where id = p_event_id;
+  if v_ev.id is null then raise exception 'Agendamento não encontrado.'; end if;
+  if v_ev.equipment_id is null then raise exception 'Só reservas de equipamento têm contagem.'; end if;
+  if v_ev.status = 'cancelada' then raise exception 'Este agendamento está cancelado.'; end if;
+  if v_ev.rental_id is not null then raise exception 'Esta reserva já foi finalizada.'; end if;
+  if v_ev.contagem_inicial is null then raise exception 'Grave antes a contagem inicial da ponteira atual.'; end if;
+  if p_final_atual is null or p_final_atual < 0 or p_inicial_nova is null or p_inicial_nova < 0 then
+    raise exception 'Preencha o disparo final da ponteira atual e a contagem inicial da nova.';
+  end if;
+  v_ini := least(v_ev.contagem_inicial, p_final_atual);
+  v_fim := greatest(v_ev.contagem_inicial, p_final_atual);
+  if v_fim = v_ini then raise exception 'O disparo final é igual à contagem inicial.'; end if;
+  if p_aplicador_novo is not null and not exists (select 1 from aplicadores where id = p_aplicador_novo and ativo) then
+    raise exception 'Ponteira nova não encontrada.';
+  end if;
+
+  select coalesce(max(ordem), 0) + 1 into v_ordem from reserva_contagens where calendar_event_id = p_event_id;
+  if v_ordem > 9 then raise exception 'Limite de trocas de ponteira atingido.'; end if;
+  insert into reserva_contagens (calendar_event_id, ordem, inicial, final, gera_credito, aplicador_id)
+  values (p_event_id, v_ordem, v_ini, v_fim, coalesce(p_gera_credito, false), v_ev.contagem_aplicador_id);
+
+  update calendar_events
+     set contagem_inicial = p_inicial_nova,
+         contagem_inicial_em = now(),
+         contagem_aplicador_id = p_aplicador_novo
+   where id = p_event_id;
+
+  -- A ponteira nova passa a ficar montada no HIPRO (desgaste por aplicador).
+  if p_aplicador_novo is not null and coalesce(p_registrar_troca, true) then
+    select aplicador_id into v_montado from aplicador_montagens where equipment_id = v_ev.equipment_id and ate is null;
+    if v_montado is distinct from p_aplicador_novo then
+      perform montar_aplicador(p_aplicador_novo, v_ev.equipment_id, least(hoje_local(), v_ev.date_start));
+    end if;
+  end if;
+
+  perform registrar_movimentacao('editado', 'calendar_events', p_event_id, descrever_registro('calendar_events', p_event_id),
+    jsonb_build_object('acao_detalhada', 'Troca de ponteira: contagem ' || v_ordem || ' fechada (' || v_ini || ' a ' || v_fim || ')'
+                         || case when p_gera_credito then ', vira crédito' else '' end,
+                       'inicial_nova', p_inicial_nova));
+end;
+$function$
+```
+
+### `update_rental`
+
+```sql
+CREATE OR REPLACE FUNCTION public.update_rental(p_rental_id uuid, p_equipment_id uuid, p_event_date date, p_shots integer, p_calculated_value numeric, p_payment_method payment_method_type, p_status event_status_type, p_notes text DEFAULT NULL::text, p_event_date_end date DEFAULT NULL::date)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client_id uuid;
+  v_old_date date;
+  v_old_status event_status_type;
+  v_old_value numeric;
+  v_desloc_extra numeric;
+  v_descricao text;
+  v_equipment_code equipment_code_type;
+  v_date_end date;
+  v_recebido numeric;
+begin
+  if not has_module_permission('agenda') then
+    raise exception 'Sem permissão para editar locações';
+  end if;
+
+  if p_event_date_end is not null and p_event_date_end < p_event_date then
+    raise exception 'A data final do período não pode ser antes da data inicial.';
+  end if;
+  v_date_end := coalesce(p_event_date_end, p_event_date);
+
+  select client_id, event_date, status, calculated_value,
+         case when deslocamento_incluso_no_valor then 0 else coalesce(valor_deslocamento, 0) end
+    into v_client_id, v_old_date, v_old_status, v_old_value, v_desloc_extra
+    from rentals where id = p_rental_id;
+
+  if v_client_id is null then
+    raise exception 'Locação não encontrada (id %).', p_rental_id;
+  end if;
+
+  if p_status = 'cancelada' and v_old_status is distinct from 'cancelada' then
+    raise exception 'Para cancelar uma locação, use o botão "Cancelar locação" (motivo e não comparecimento ficam registrados). Não é possível cancelar por aqui.';
+  end if;
+
+  -- Valor novo (mais o deslocamento cobrado à parte) abaixo do que já entrou
+  -- deixaria saldo negativo. Só vale quando o valor muda.
+  if p_calculated_value is distinct from v_old_value then
+    select coalesce((select sum(valor) from rental_payments where rental_id = p_rental_id), 0)
+         + coalesce((select sum(taxa_valor) from calendar_events where rental_id = p_rental_id and taxa_status = 'paga'), 0)
+      into v_recebido;
+    if round(p_calculated_value + v_desloc_extra, 2) < round(v_recebido, 2) then
+      raise exception 'O valor novo (R$ %) fica abaixo do que já foi recebido (R$ %). Remova ou corrija o pagamento antes.',
+        to_char(p_calculated_value + v_desloc_extra, 'FM999G990D00'), to_char(v_recebido, 'FM999G990D00');
+    end if;
+  end if;
+
+  select code into v_equipment_code from equipments where id = p_equipment_id;
+  if v_equipment_code is null then
+    raise exception 'Equipamento não encontrado (id %).', p_equipment_id;
+  end if;
+
+  update rentals
+  set equipment_id = p_equipment_id,
+      event_date = p_event_date,
+      event_date_end = p_event_date_end,
+      shots = p_shots,
+      calculated_value = p_calculated_value,
+      payment_method = p_payment_method,
+      status = p_status,
+      notes = p_notes,
+      rescheduled = rescheduled or (v_old_date is not null and v_old_date <> p_event_date)
+  where id = p_rental_id;
+
+  update calendar_events
+  set event_type = v_equipment_code::text::calendar_event_type,
+      equipment_id = p_equipment_id,
+      date_start = p_event_date,
+      date_end = v_date_end,
+      value = p_calculated_value,
+      status = p_status
+  where rental_id = p_rental_id;
+
+  perform public.recalcular_pagamento_locacao(p_rental_id);
+
+  v_descricao := public.descrever_registro('rentals', p_rental_id);
+
+  if v_old_date is distinct from p_event_date then
+    perform public.registrar_movimentacao(
+      'reagendado', 'rentals', p_rental_id, v_descricao,
+      jsonb_build_object(
+        'data_antiga', to_char(v_old_date, 'DD/MM/YYYY'),
+        'data_nova',   to_char(p_event_date, 'DD/MM/YYYY')
+      )
+    );
+  elsif v_old_status is distinct from p_status then
+    perform public.registrar_movimentacao(
+      case p_status
+        when 'cancelada' then 'cancelado'
+        when 'confirmada' then 'confirmado'
+        else 'editado'
+      end,
+      'rentals', p_rental_id, v_descricao,
+      jsonb_build_object(
+        'status_antigo', v_old_status::text,
+        'status_novo',   p_status::text
+      )
+    );
+  elsif v_old_value is distinct from p_calculated_value then
+    perform public.registrar_movimentacao(
+      'editado', 'rentals', p_rental_id, v_descricao,
+      jsonb_build_object(
+        'valor_antigo', round(coalesce(v_old_value, 0), 2),
+        'valor_novo',   round(coalesce(p_calculated_value, 0), 2)
+      )
+    );
+  end if;
+end;
+$function$
+```
+
+### `usar_credito_valor`
+
+```sql
+CREATE OR REPLACE FUNCTION public.usar_credito_valor(p_rental_id uuid, p_valor numeric, p_data date DEFAULT hoje_local())
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_client uuid;
+  v_pag uuid;
+begin
+  if not has_module_permission('financeiro') then raise exception 'Sem permissão para usar crédito.'; end if;
+  if coalesce(p_valor, 0) <= 0 then raise exception 'Informe o valor.'; end if;
+  select client_id into v_client from rentals where id = p_rental_id;
+  if v_client is null then raise exception 'Locação não encontrada.'; end if;
+  if round(p_valor, 2) > round(saldo_credito_cliente(v_client, 'valor'), 2) then
+    raise exception 'A cliente tem R$ % de crédito, menos que R$ %.',
+      to_char(saldo_credito_cliente(v_client, 'valor'), 'FM999G990D00'), to_char(p_valor, 'FM999G990D00');
+  end if;
+  v_pag := registrar_pagamento_locacao(p_rental_id, 'permuta', round(p_valor, 2), p_data, null, 'Crédito da cliente');
+  insert into creditos_cliente (client_id, tipo, quantidade, origem, rental_id, rental_payment_id, descricao, data)
+  values (v_client, 'valor', -round(p_valor, 2), 'uso', p_rental_id, v_pag, 'Usado na locação', p_data);
+  return v_pag;
+end;
+$function$
+```
+
+### `validar_bloqueio_equipamento`
+
+```sql
+CREATE OR REPLACE FUNCTION public.validar_bloqueio_equipamento()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_bl record;
+  v_nome text;
+begin
+  if new.equipment_id is null or new.status = 'cancelada' then
+    return new;
+  end if;
+  if tg_op = 'UPDATE'
+     and new.date_start = old.date_start
+     and new.date_end = old.date_end
+     and new.equipment_id is not distinct from old.equipment_id
+     and old.status <> 'cancelada' then
+    return new;
+  end if;
+
+  select * into v_bl from bloqueios_equipamento
+   where equipment_id = new.equipment_id
+     and data_inicio <= new.date_end and data_fim >= new.date_start
+   order by data_inicio
+   limit 1;
+  if v_bl.id is not null then
+    select name into v_nome from equipments where id = new.equipment_id;
+    raise exception '%', format(
+      'O %s está bloqueado (%s) de %s a %s%s. Escolha outra data ou mude o bloqueio em Equipamentos.',
+      v_nome, rotulo_bloqueio(v_bl.tipo), to_char(v_bl.data_inicio, 'DD/MM'), to_char(v_bl.data_fim, 'DD/MM'),
+      case when nullif(trim(v_bl.motivo), '') is not null then ': ' || trim(v_bl.motivo) else '' end);
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `validar_equipamento_coerente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.validar_equipamento_coerente()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_equipment_code equipment_code_type;
+  v_equipment_status text;
+  v_previsto_fim date;
+begin
+  perform public.aplicar_previsoes_manutencao_vencidas();
+
+  if new.event_type in ('hipro_1', 'hipro_2') then
+    if new.equipment_id is null then
+      raise exception 'Evento do tipo % precisa de um equipamento vinculado.', new.event_type;
+    end if;
+    select code, status, status_previsto_fim into v_equipment_code, v_equipment_status, v_previsto_fim
+      from equipments where id = new.equipment_id;
+    if v_equipment_code::text is distinct from new.event_type::text then
+      raise exception 'Evento do tipo % não pode apontar para o equipamento %.', new.event_type, v_equipment_code;
+    end if;
+    if v_equipment_status = 'manutencao'
+       and new.status <> 'cancelada'
+       and new.equipment_id is distinct from old.equipment_id
+       and (v_previsto_fim is null or new.date_start < v_previsto_fim) then
+      raise exception 'Este equipamento está em manutenção%. Escolha uma data a partir da volta ou outro equipamento.',
+        case when v_previsto_fim is not null then ' até ' || to_char(v_previsto_fim - 1, 'DD/MM') else '' end;
+    end if;
+  elsif new.equipment_id is not null then
+    raise exception 'Evento do tipo % não pode ter equipamento vinculado.', new.event_type;
+  end if;
+  return new;
+end;
+$function$
+```
+
+### `valor_taxa_atual`
+
+```sql
+CREATE OR REPLACE FUNCTION public.valor_taxa_atual()
+ RETURNS numeric
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce((select reservation_fee from settings where id = true), 250.00);
+$function$
+```
 
