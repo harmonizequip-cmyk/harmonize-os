@@ -1,6 +1,108 @@
 # Harmonize OS
 
-Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e mentorias). Um operador só, que usa quase sempre pelo celular.
+> **REGRA DE OURO: Sempre consulte o arquivo ARCHITECTURE.md antes de criar ou alterar qualquer código, e atualize tanto o ARCHITECTURE.md quanto o CLAUDE.md sempre que uma tabela ou funcionalidade for criada, editada ou removida.**
+
+Sistema interno da Harmonize (locação dos equipamentos HIPRO 1 e HIPRO 2 e mentorias). Um operador só, que usa quase sempre pelo celular. A documentação mestre (stack, árvore de arquivos, dicionário completo de dados, ERD, mapa de funcionalidades, matriz funcionalidade x tabela e integrações) está em `ARCHITECTURE.md`. Este arquivo é a memória operacional: comandos, padrões, resumo das tabelas e as regras e decisões do dono.
+
+## Comandos principais
+
+| Para quê | Comando |
+|---|---|
+| Instalar dependências (o `package-lock.json` não vai para o git; versões de next/react são fixas no `package.json`) | `npm install` |
+| Rodar local | `npm run dev` (precisa de `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, ver `.env.example`) |
+| Checar tipos | `npx tsc --noEmit` (se acusar rota apagada, `rm -rf .next` e rodar de novo) |
+| Testes | `npx vitest run` (ou `npm test`); um arquivo: `npx vitest run lib/campanhas.test.ts` |
+| Build | `npx next build`; sem as variáveis do Supabase a pré-renderização de `/login` falha, então localmente use `NEXT_PUBLIC_SUPABASE_URL=https://vidnlzbxaxjlmzncqhxw.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=x npx next build` |
+| Publicar o app | `git push origin HEAD:main` (a Vercel publica sozinha cada push em `main` do repositório `harmonizequip-cmyk/harmonize-os`); depois conferir o deploy na Vercel |
+| Publicar Edge Function | pelo Supabase (ferramenta `deploy_edge_function` ou `supabase functions deploy <nome>`), guardando antes uma cópia da versão no ar e comparando byte a byte depois |
+| Página de SQL para o dono rodar | `python3 scripts/gerar-pagina-sql.py saida.html migrations/a.sql --conferencia "select ..."` e publicar com a ferramenta Artifact |
+| Testar SQL antes de entregar | Postgres local (`initdb` como `nobody`, `stub` com os esquemas auth, storage, vault, cron e net) com o `schema.sql` carregado, depois rodar a migration |
+| Restaurar backup em banco novo | `python3 scripts/restaurar-backup.py backup-harmonize-AAAA-MM-DD.json saida.sql` (ver `docs/RESTAURACAO-BACKUP.md`) |
+| Regenerar a parte automática do ARCHITECTURE.md | carregar o `schema.sql` num Postgres local, extrair colunas, constraints, índices, políticas, gatilhos e funções e varrer `.from()` e `.rpc()` do código; conferir contra o banco real por soma de verificação das colunas |
+
+Antes de publicar, sempre: `npx tsc --noEmit`, `npx vitest run` e `npx next build`.
+
+## Padrões de código, nomenclatura e arquitetura
+
+- Idioma: nomes de domínio novos em português (`carregarRelacionamento`, `montarPlanoMeta`, `salvar_campanha`), sem acento em identificadores; tabelas antigas em inglês continuam como estão (`clients`, `rentals`, `calendar_events`, `transactions`). Comentários e textos de tela em português do Brasil.
+- Banco: funções RPC em `snake_case` com verbo (`registrar_*`, `salvar_*`, `excluir_*`, `definir_*`, `desfazer_*`), `security definer`, `set search_path = public`, checagem `has_module_permission`, `registrar_movimentacao` quando alteram dados, `revoke execute ... from public, anon` e `grant execute ... to authenticated, service_role`. Tabela nova ganha RLS, políticas e o gatilho `trg_somente_leitura`.
+- Migrations em `migrations/AAAA-MM-DD-descricao.sql`, refletidas no mesmo commit em `schema.sql` (que recria o banco do zero). SQL que altera dados ou estrutura só roda com o aval do dono, por página de SQL.
+- Regras puras (sem banco, testáveis) em `lib/<assunto>.ts` com teste `lib/<assunto>.test.ts`; carregadores em `lib/carregar-<assunto>.ts`; telas em `app/(app)/<rota>/page.tsx` (servidor) + `<Nome>Client.tsx` (navegador, `"use client"`); componentes compartilhados em `components/` em PascalCase.
+- Next 16: `params`, `searchParams` e `cookies()` são Promises; controle de login em `proxy.ts`; nada de `require`/`module` em código de navegador (o Turbopack recusa).
+- Supabase: no servidor `createClient()` de `lib/supabase/server.ts`, no navegador `createClient()` de `lib/supabase/client.ts`. Listas que podem passar de 1000 linhas usam `buscarTodas` (`lib/buscar-todas.ts`). Erro de carga aparece na tela, nunca vira lista vazia.
+- Datas: sempre `hojeLocal`, `primeiroDiaDoMes`, `ultimoDiaDoMes`, `somarDias` de `lib/period.ts` (fuso de Brasília); nunca `toISOString().slice(0,10)`.
+- Dinheiro: somas leem de `rentals_contabilizaveis`, `transactions_contabilizaveis`, `rentals_situacao_pagamento` e `rentals_lucro`. `rentals.pago` nunca é gravado à mão.
+- Valores configuráveis: campo em `Preferencias` + `DEFAULT_PREFERENCIAS` + `lerPreferencias` (`lib/preferencias.ts`), lidos por `usePreferencias()` (navegador) ou `fetchPreferencias` (servidor), editados numa seção `Prefs*` de Configurações.
+- Interface: padrão visual do Dashboard (classe `.cartao`, `IconeChip`, `Pilula`, `OndaMarca` em `components/ui/Visual.tsx`), ícones `lucide-react`, sem emoji como ícone em tela nova, sem classes `dark:`. Diálogos só por `confirmar`, `avisar` e `pedirTexto` de `components/Dialogos.tsx`. Janela dentro de algo com `backdrop-filter` abre por portal no `<body>`.
+- Atalhos entre telas: endereços em `lib/atalhos.ts`, peças em `components/Atalhos.tsx` e o menu ⋮ `components/MenuAtalhosCliente.tsx` em todo cartão de cliente ou lead.
+- WhatsApp sempre por link montado (`buildWhatsAppLink`); nada é enviado sozinho. Mensagens ao cliente com `saudacaoCurta` (`lib/saudacao.ts`).
+- Texto para o dono: português, direto, sem travessão, sem "etc.", resposta curta com o que mudou e o que ele precisa fazer.
+- Commits só na branch de trabalho e em `main` quando o dono pede para publicar; nunca na cópia antiga `edercampos1985-svg/harmonize-os`.
+
+## Resumo rápido das tabelas
+
+Todos os campos, tipos, padrões, chaves, índices, políticas e gatilhos estão em `ARCHITECTURE.md`, seção 1.2. Aqui, cada tabela com a finalidade e os nomes exatos dos campos.
+
+| Tabela | Finalidade | Campos |
+|---|---|---|
+| `agenda_envios` | Histórico das agendas (imagem de datas livres mais mensagem) enviadas a cada cliente. | `id`, `client_id`, `enviado_em`, `mensagem`, `periodo_inicio`, `periodo_fim`, `created_by` |
+| `aplicador_montagens` | Histórico de onde cada aplicador (ponteira) esteve montado. | `id`, `aplicador_id`, `equipment_id`, `desde`, `ate`, `created_at` |
+| `aplicadores` | Aplicadores (ponteiras) do HIPRO: são 4, dois montados e dois de reserva, e a contagem de disparos e o desgaste são por aplicador. | `id`, `nome`, `numero_serie`, `garantia_disparos`, `contador_base`, `contador_base_em`, `ativo`, `created_at` |
+| `assistente_conversas` | Histórico das conversas com o Assistente (IA, `/assistente` e `/pessoal/assistente`), no formato completo da API da Anthropic, para a IA lembrar do contexto. | `id`, `user_id`, `client_id`, `titulo`, `mensagens`, `created_at`, `updated_at`, `escopo` |
+| `assistente_memoria` | Memórias que o dono ensina ao assistente de IA (Edge Function `assistente`): fatos gerais, regras e, quando há `client_id`, notas sobre uma cliente. | `id`, `user_id`, `client_id`, `texto`, `created_at`, `escopo` |
+| `assistente_uso` | Registro de consumo de IA do Assistente: uma linha por resposta com modelo, tokens e custo estimado em dólar. | `id`, `user_id`, `conversa_id`, `modelo`, `tokens_entrada`, `tokens_saida`, `tokens_cache_leitura`, `tokens_cache_escrita`, `custo_usd`, `created_at` |
+| `bloqueios_equipamento` | Períodos em que um HIPRO não pode ser reservado (manutenção programada, recesso ou outro), com datas inclusivas. | `id`, `equipment_id`, `tipo`, `motivo`, `data_inicio`, `data_fim`, `created_by`, `created_at` |
+| `cadastros_recebidos` | Respostas do formulário Google "CADASTRO CONTOURLINE ACADEMY" esperando o dono revisar. | `id`, `chave`, `respondido_em`, `recebido_em`, `nome`, `profissao`, `whatsapp`, `email`, `empresa`, `estabelecimento`, `cidade_estado`, `dados`, `status`, `client_id`, `resolvido_em`, `resolvido_por` |
+| `calendar_events` | Agenda do negócio: uma linha por compromisso, seja reserva de HIPRO 1 ou HIPRO 2 (pré-reserva ou locação), mentoria ou compromisso avulso. | `id`, `event_type`, `title`, `client_id`, `equipment_id`, `date_start`, `date_end`, `time_start`, `time_end`, `status`, `confirmed`, `value`, `notes`, `rental_id`, `mentoring_id`, `created_by`, `created_at`, `is_test`, `taxa_status`, `taxa_valor`, `taxa_transaction_id`, `is_mentoria`, `confirmation_message_sent_at`, `cancellation_reason`, `no_show`, `km_ida`, `valor_deslocamento`, `rescheduled`, `rescheduled_at`, `contagem_inicial`, `contagem_inicial_em`, `contagem_aplicador_id` |
+| `campanha_envios` | Um registro por campanha e cliente (chave única `campanha_id` + `client_id`) com a situação do envio individual pelo WhatsApp. | `id`, `campanha_id`, `client_id`, `status`, `mensagem`, `enviado_em`, `atualizado_em` |
+| `campanhas` | Campanhas de WhatsApp (menu Atendimento > Campanhas): uma arte fixa e uma mensagem enviadas uma a uma, sem envio automático. | `id`, `nome`, `mensagem`, `arte_path`, `arte_nome`, `filtros`, `limite_diario`, `arquivada`, `created_at`, `updated_at`, `created_by` |
+| `cartoes` | Cartões de crédito, cada um da Harmonize ou pessoal (campo `scope`). | `id`, `nome`, `scope`, `dia_fechamento`, `dia_vencimento`, `limite`, `ativo`, `created_at` |
+| `categories` | Categorias de lançamentos financeiros, separadas por tipo (entrada ou saída) e por espaço (`harmonize` ou `pessoal`). | `id`, `name`, `type`, `scope`, `is_default`, `created_at`, `sistema`, `arquivada`, `ordem` |
+| `cidades_coordenadas` | Posição geográfica (latitude e longitude) das cidades, usada para calcular distância em linha reta no encaixe de datas livres (`lib/encaixe.ts`) e nas Melhores datas. | `id`, `nome`, `nome_exibicao`, `uf`, `latitude`, `longitude`, `created_at` |
+| `client_tags` | Tabela de ligação muitos-para-muitos entre clientes e etiquetas (`tags`); a chave primária é composta (`client_id`, `tag_id`), por isso o backup ordena por esses dois campos. | `client_id`, `tag_id`, `created_at` |
+| `cliente_anotacoes` | Anotações curtas da cliente (ou lead), com data e hora, faladas ou digitadas; não se editam, só se apagam. | `id`, `client_id`, `texto`, `origem`, `created_by`, `created_at` |
+| `clients` | Cadastro único de leads e clientes (consultórios e profissionais que alugam o HIPRO). | `id`, `name`, `clinic_name`, `whatsapp`, `email`, `city`, `address`, `notes`, `stage`, `data_evento`, `origem`, `created_by`, `created_at`, `is_test`, `parceiro`, `isento_taxa`, `indicado_por`, `excluir_financeiro`, `treatment`, `display_name`, `is_client`, `state`, `tags_legacy`, `became_client_at`, `document`, `contrato_nome`, `contrato_endereco`, `portal_liberado_ate` |
+| `contas_pix` | Contas PIX que recebem pagamentos de locação e taxa. | `id`, `codigo`, `rotulo`, `titular`, `tipo_chave`, `chave`, `ordem`, `ativa`, `padrao`, `created_at`, `updated_at` |
+| `contratos_emitidos` | Registro de cada contrato de locação gerado. | `id`, `rental_id`, `client_id`, `gerado_em`, `gerado_por`, `dados`, `is_test`, `reservation_id` |
+| `convites_cadastro` | Links de cadastro que a cliente preenche sozinha em `/cadastro/<token>` (página pública liberada no `proxy.ts`). | `id`, `token`, `client_id`, `criado_por`, `created_at`, `expira_em`, `preenchido_em`, `dados`, `antes`, `resultado_client_id`, `cadastro_novo`, `email_login` |
+| `creditos_cliente` | Extrato de crédito da cliente: cada linha é uma entrada (positiva) ou uso (negativa), em disparos ou em reais. | `id`, `client_id`, `tipo`, `quantidade`, `origem`, `rental_id`, `rental_payment_id`, `transaction_id`, `descricao`, `data`, `created_by`, `created_at`, `transaction_extra_id` |
+| `emprestimos` | Empréstimos que o dono faz a terceiros e as devoluções. | `id`, `devedor`, `tipo`, `valor`, `data`, `descricao`, `transaction_id`, `is_test`, `created_by`, `created_at` |
+| `equipments` | Os dois equipamentos HIPRO (HIPRO 1 e HIPRO 2) da locação. | `id`, `code`, `name`, `status`, `status_motivo`, `status_desde`, `status_previsto_fim`, `created_at`, `serial_number`, `anvisa_registro`, `ultima_revisao` |
+| `expense_limits` | Limites mensais de gasto por categoria, separados por espaço (`harmonize` ou `pessoal`). | `id`, `category_id`, `scope`, `month_limit`, `created_at`, `created_by` |
+| `insights` | Insights do Cérebro (`/insights`): sugestões geradas pela IA a partir de consultas agregadas ao banco. | `id`, `user_id`, `categoria`, `titulo`, `texto`, `acao`, `evidencia`, `impacto`, `client_ids`, `status`, `util`, `created_at`, `resolvido_em` |
+| `locacao_contagens` | Contagens de disparos do equipamento numa locação, uma linha por ponteira (a finalização aceita várias contagens). | `id`, `rental_id`, `ordem`, `inicial`, `final`, `gera_credito`, `created_at`, `aplicador_id` |
+| `mentoring_events` | Registro de mentoria avulsa (mentorada, data, horário, valor e forma de pagamento), ligado opcionalmente a um evento da agenda e a um lançamento financeiro. | `id`, `calendar_event_id`, `mentee_name`, `date`, `time_start`, `value`, `payment_method`, `notes`, `transaction_id`, `created_by`, `created_at`, `is_test` |
+| `movimentacoes` | Histórico de movimentações (auditoria): quem fez o quê e quando. | `id`, `ocorrido_em`, `usuario_id`, `usuario_nome`, `acao`, `entidade`, `entidade_id`, `descricao`, `detalhes` |
+| `orcamentos_pessoais` | Limite mensal de gasto por categoria do espaço Pessoal. | `id`, `categoria`, `limite`, `created_at` |
+| `planejamentos` | Planos do Planejador HIPRO (distribuição de disparos por área para cada paciente da cliente). | `id`, `client_id`, `calendar_event_id`, `paciente`, `data`, `data_retorno`, `procedimento`, `saldo_total`, `total_disparos`, `estado`, `created_by`, `created_at`, `updated_at` |
+| `profiles` | Perfil de cada login do sistema, com o mesmo id do usuário de `auth.users`: nome, e-mail, se é administrador, se está ativo e quais módulos pode abrir. | `id`, `name`, `email`, `is_admin`, `active`, `permissions`, `created_at`, `somente_leitura`, `cliente_id` |
+| `push_inscricoes` | Aparelhos inscritos para receber os avisos do celular (web push): uma linha por navegador ou celular de cada usuário. | `id`, `user_id`, `endpoint`, `p256dh`, `auth`, `aparelho`, `created_at`, `ultimo_envio` |
+| `rental_payments` | Pagamentos de uma locação, um por linha: permite dividir entre formas, registrar parcial e acompanhar saldo. | `id`, `rental_id`, `forma`, `valor`, `data`, `pix_conta`, `transaction_id`, `notes`, `created_by`, `created_at`, `is_test` |
+| `rentals` | Locação (ou mentoria, que também vira linha aqui) de um HIPRO para um cliente: valor, disparos, deslocamento, situação de pagamento e cancelamento. | `id`, `client_id`, `equipment_id`, `event_date`, `shots`, `calculated_value`, `payment_method`, `status`, `rescheduled`, `rescheduled_at`, `transaction_id`, `notes`, `created_by`, `created_at`, `is_test`, `pago`, `pago_em`, `km_ida`, `valor_deslocamento`, `custo_disparo_manual`, `cancellation_reason`, `no_show`, `event_date_end`, `deslocamento_transaction_id`, `deslocamento_incluso_no_valor` |
+| `reserva_contagens` | Contagens de disparos já fechadas de uma reserva, geradas quando a ponteira (aplicador) é trocada durante o atendimento, antes de finalizar a locação. | `id`, `calendar_event_id`, `ordem`, `inicial`, `final`, `gera_credito`, `aplicador_id`, `created_at` |
+| `settings` | Linha única de configuração do sistema (a chave `id boolean` com check garante uma linha só). | `id`, `flat_package_limit`, `flat_package_value`, `tier2_limit`, `tier2_rate`, `tier3_rate`, `reservation_fee`, `inactive_days_threshold`, `updated_at`, `updated_by`, `test_mode`, `mentoria_valor_avista`, `mentoria_valor_parcelado`, `dias_ate_reativar`, `recontato_intervalo_dias`, `recontato_automatico`, `tarefa_confirmacao_ativa`, `dias_antes_confirmacao`, `tarefa_pos_locacao_ativa`, `dias_pos_locacao`, `tarefa_taxa_ativa`, `dias_cobranca_taxa`, `despesas_fixas`, `preferencias` |
+| `tags` | Etiquetas coloridas dos clientes e leads, ligadas pela tabela `client_tags`. | `id`, `name`, `color`, `is_automatic`, `created_at` |
+| `tasks` | Tarefas do operador (tela Tarefas, fila "Atacar a fila" e avisos do Dashboard). | `id`, `client_id`, `type`, `follow_up_number`, `title`, `due_date`, `status`, `created_at`, `completed_at`, `is_test`, `event_id` |
+| `transactions` | Lançamentos do caixa: toda entrada e saída de dinheiro, tanto da Harmonize quanto do espaço Pessoal (campo `scope`). | `id`, `type`, `category_id`, `description`, `amount`, `payment_method`, `date`, `notes`, `scope`, `client_id`, `rental_id`, `mentoring_id`, `created_by`, `created_at`, `is_test`, `calendar_event_id`, `vinculo_id`, `conta_no_lucro`, `cartao_id`, `cartao_mov`, `fatura_ref`, `parcela_num`, `parcelas_total`, `compra_grupo`, `importacao_chave`, `data_compra` |
+| `webauthn_credentials` | Tabela antiga de chaves de biometria (passkey) por aparelho, criada na leva O para liberar edição de lançamento sem senha. | `id`, `user_id`, `credential_id`, `public_key`, `counter`, `device_label`, `created_at`, `last_used_at` |
+
+Views (somente leitura):
+
+| View | Finalidade | Campos |
+|---|---|---|
+| `aplicadores_uso` | Mostra, por aplicador, o total de disparos acumulado e onde ele está montado hoje. | `id`, `nome`, `numero_serie`, `garantia_disparos`, `contador_base`, `contador_base_em`, `ativo`, `equipment_id`, `montado_desde`, `disparos` |
+| `categorias_uso` | Conta quantos lançamentos usam cada categoria. | `category_id`, `lancamentos` |
+| `clientes_lucro` | Resumo de resultado por cliente. | `client_id`, `cliente`, `locacoes`, `faturado`, `recebido`, `despesas`, `lucro_liquido` |
+| `clientes_taxas` | Resume as taxas de reserva por cliente. | `client_id`, `taxas_pendentes`, `taxas_pagas`, `valor_pendente`, `valor_pago`, `proxima_pendente` |
+| `clientes_ultima_locacao` | Data da última locação de cada cliente. | `client_id`, `ultima_locacao` |
+| `creditos_saldo` | Saldo de créditos por cliente, a partir do extrato `creditos_cliente` com `left join` em `rentals` pela locação de origem. | `client_id`, `disparos_disponiveis`, `disparos_aguardando`, `valor_disponivel`, `atualizado_em` |
+| `faturas_cartao` | Uma linha por cartão e por fatura que tenha movimento. | `cartao_id`, `nome`, `scope`, `fatura_ref`, `vencimento`, `fechamento`, `total_compras`, `total_pago` |
+| `rentals_contabilizaveis` | Locações que contam para dinheiro e relatórios. | `id`, `client_id`, `equipment_id`, `event_date`, `shots`, `calculated_value`, `payment_method`, `status`, `rescheduled`, `rescheduled_at`, `transaction_id`, `notes`, `created_by`, `created_at`, `is_test`, `pago`, `pago_em`, `km_ida`, `valor_deslocamento`, `custo_disparo_manual`, `cancellation_reason`, `no_show`, `event_date_end`, `deslocamento_transaction_id`, `deslocamento_incluso_no_valor` |
+| `rentals_lucro` | Lucro por locação. | `rental_id`, `client_id`, `cliente`, `event_date`, `calculated_value`, `valor_deslocamento`, `total_pago`, `total_despesas`, `lucro_liquido`, `valor_total` |
+| `rentals_situacao_pagamento` | Situação de pagamento de cada locação, com saldo. | `rental_id`, `calculated_value`, `credito_taxa`, `total_pago`, `saldo`, `situacao`, `valor_devido` |
+| `transactions_contabilizaveis` | Lançamentos que contam para o dinheiro. | `id`, `type`, `category_id`, `description`, `amount`, `payment_method`, `date`, `notes`, `scope`, `client_id`, `rental_id`, `mentoring_id`, `created_by`, `created_at`, `is_test`, `calendar_event_id`, `vinculo_id`, `conta_no_lucro`, `cartao_id`, `cartao_mov`, `fatura_ref`, `parcela_num`, `parcelas_total`, `compra_grupo`, `importacao_chave`, `data_compra` |
+
+Fora do banco: Storage (`comprovantes`, `campanhas`, `fotos-contador`), Vault (`harmonize_vapid_private`, `harmonize_alertas_segredo`, `formulario_cadastro_segredo`), pg_cron (`harmonize-alerta-manha`, `harmonize-alerta-vespera`, `harmonize-alerta-domingo`) e as chaves de navegador listadas no fim da seção 1.2 do `ARCHITECTURE.md`.
 
 ## Onde as coisas estão
 
