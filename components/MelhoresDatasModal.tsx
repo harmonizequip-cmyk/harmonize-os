@@ -167,7 +167,12 @@ export default function MelhoresDatasModal({
       .finally(() => pedidos.current.delete(mes));
   }, [mes, agendas, tentativa]);
 
-  const fechar = useCallback(() => onClose(), [onClose]);
+  // onClose do pai muda a cada render; o ref evita refazer o efeito do Esc (e roubar o foco).
+  const aoFechar = useRef(onClose);
+  useEffect(() => {
+    aoFechar.current = onClose;
+  }, [onClose]);
+  const fechar = useCallback(() => aoFechar.current(), []);
   const trocarMes = (n: number) => {
     setErro(null);
     setMes((m) => somarMeses(m, n));
