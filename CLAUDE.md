@@ -335,6 +335,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Datas de "hoje" e do mês sempre por `hojeLocal`/`primeiroDiaDoMes`/`ultimoDiaDoMes` (`lib/period.ts`), nunca `toISOString().slice(0,10)` (UTC vira o dia seguinte depois das 21h).
 - Backup (`app/api/backup/route.ts`) só para admin ativo, com 36 tabelas (campanhas e campanha_envios são puladas se o SQL delas não tiver rodado, `PODEM_FALTAR`); tabela nova entra lá e em `ORDEM` de `scripts/restaurar-backup.py` (semeada pelo schema.sql também em `SEMEADAS`; backup antigo sem ela mantém a semente).
 - Edge Function `alertas` manda push só para perfil ativo, que não é só visualização nem cliente.
+- Excluir cliente (delete_record_forever, ramo clients) recusa quem tem locação, lançamento, agendamento, crédito, contrato, planejamento, mentoria ou login de cliente (decisão do dono, 26/10/2026; migration 2026-10-26-bloquear-exclusao-cliente-com-movimentos.sql); lead puro continua excluível; cliente de modo teste só com movimentos de teste.
 
 ## Pendências conhecidas
 

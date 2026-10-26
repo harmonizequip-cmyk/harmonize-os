@@ -1553,6 +1553,10 @@ $$;
 -- apagar o lançamento dela sozinho (volta a pendente), apagar o
 -- agendamento (o lançamento vai junto), ou apagar o cliente (idem, em
 -- lote).
+-- Cliente com movimentos (locação, lançamento, agendamento, mentoria,
+-- crédito, contrato, planejamento ou login de cliente) não se exclui;
+-- cliente de modo teste só com movimentos de teste (decisão do dono,
+-- 26/10/2026; migration 2026-10-26-bloquear-exclusao-cliente-com-movimentos.sql).
 create or replace function public.delete_record_forever(
   p_table text,
   p_id uuid
@@ -1570,6 +1574,16 @@ declare
   v_tipo entry_type;
   v_evento_taxa uuid;
   v_taxas uuid[];
+  v_cliente_teste boolean;
+  v_n_locacoes int;
+  v_n_lancamentos int;
+  v_n_agendamentos int;
+  v_n_mentorias int;
+  v_n_creditos int;
+  v_n_contratos int;
+  v_n_planejamentos int;
+  v_n_logins int;
+  v_partes text[] := '{}';
 begin
   perform public.require_admin();
 
@@ -1629,6 +1643,104 @@ begin
     delete from tasks where id = p_id;
 
   elsif p_table = 'clients' then
+    -- Trava (decisão do dono, 26/10/2026): cliente com movimentos não se
+    -- exclui. Cliente real: conta tudo. Cliente de teste: conta só o que
+    -- for real (o de teste sai junto, como sempre saiu).
+    select coalesce(is_test, false) into v_cliente_teste from clients where id = p_id;
+    v_cliente_teste := coalesce(v_cliente_teste, false);
+
+    select count(*) into v_n_locacoes
+      from rentals r
+     where r.client_id = p_id
+       and (not v_cliente_teste or not r.is_test);
+
+    select count(*) into v_n_lancamentos
+      from transactions t
+     where (t.client_id = p_id
+            or t.rental_id in (select id from rentals where client_id = p_id)
+            or t.id in (select taxa_transaction_id from calendar_events
+                         where client_id = p_id and taxa_transaction_id is not null))
+       and (not v_cliente_teste or not t.is_test);
+
+    select count(*) into v_n_agendamentos
+      from calendar_events e
+     where e.client_id = p_id
+       and (not v_cliente_teste or not e.is_test);
+
+    select count(*) into v_n_mentorias
+      from mentoring_events m
+     where (m.calendar_event_id in (select id from calendar_events where client_id = p_id)
+            or m.id in (select mentoring_id from calendar_events
+                         where client_id = p_id and mentoring_id is not null)
+            or m.transaction_id in (select id from transactions where client_id = p_id)
+            or m.id in (select mentoring_id from transactions
+                         where client_id = p_id and mentoring_id is not null))
+       and (not v_cliente_teste or not m.is_test);
+
+    select count(*) into v_n_creditos
+      from creditos_cliente c
+     where c.client_id = p_id
+       and (not v_cliente_teste
+            or not (exists (select 1 from rentals r where r.id = c.rental_id and r.is_test)
+                    or exists (select 1 from transactions t where t.id = c.transaction_id and t.is_test)));
+
+    select count(*) into v_n_contratos
+      from contratos_emitidos ce
+     where ce.client_id = p_id
+       and (not v_cliente_teste or not ce.is_test);
+
+    select count(*) into v_n_planejamentos
+      from planejamentos pl
+     where pl.client_id = p_id
+       and (not v_cliente_teste
+            or not exists (select 1 from calendar_events e
+                            where e.id = pl.calendar_event_id and e.is_test));
+
+    select count(*) into v_n_logins
+      from profiles pr
+     where pr.cliente_id = p_id;
+
+    if v_n_locacoes > 0 then
+      v_partes := v_partes || format('%s %s', v_n_locacoes, case when v_n_locacoes = 1 then 'locação' else 'locações' end);
+    end if;
+    if v_n_lancamentos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_lancamentos, case when v_n_lancamentos = 1 then 'lançamento' else 'lançamentos' end);
+    end if;
+    if v_n_agendamentos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_agendamentos, case when v_n_agendamentos = 1 then 'agendamento' else 'agendamentos' end);
+    end if;
+    if v_n_mentorias > 0 then
+      v_partes := v_partes || format('%s %s', v_n_mentorias, case when v_n_mentorias = 1 then 'mentoria' else 'mentorias' end);
+    end if;
+    if v_n_creditos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_creditos, case when v_n_creditos = 1 then 'movimento de crédito' else 'movimentos de crédito' end);
+    end if;
+    if v_n_contratos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_contratos, case when v_n_contratos = 1 then 'contrato emitido' else 'contratos emitidos' end);
+    end if;
+    if v_n_planejamentos > 0 then
+      v_partes := v_partes || format('%s %s', v_n_planejamentos, case when v_n_planejamentos = 1 then 'planejamento' else 'planejamentos' end);
+    end if;
+    if v_n_logins > 0 then
+      v_partes := v_partes || 'login de acesso ao Planejador'::text;
+    end if;
+
+    if cardinality(v_partes) > 0 then
+      if v_cliente_teste then
+        raise exception 'Este cliente de teste tem movimentos reais (%) e não pode ser excluído. Resolva os movimentos reais antes, ou deixe o cadastro como está.',
+          array_to_string(v_partes, ', ');
+      else
+        raise exception 'Este cliente tem movimentos (%) e não pode ser excluído. Cancele ou resolva os movimentos antes, ou deixe o cadastro como está.',
+          array_to_string(v_partes, ', ');
+      end if;
+    end if;
+
+    -- Daqui para baixo só chega lead puro ou cliente de teste com
+    -- movimentos só de teste. Contrato e planejamento (de teste) saem
+    -- antes: o contrato prende a locação e o cliente.
+    delete from contratos_emitidos where client_id = p_id;
+    delete from planejamentos      where client_id = p_id;
+
     update rentals set transaction_id = null where client_id = p_id;
 
     update mentoring_events set calendar_event_id = null
@@ -1665,6 +1777,9 @@ begin
   );
 end;
 $$;
+
+revoke execute on function public.delete_record_forever(text, uuid) from public, anon;
+grant execute on function public.delete_record_forever(text, uuid) to authenticated, service_role;
 
 -- ============================================================
 -- CICLO DE STATUS DO AGENDAMENTO

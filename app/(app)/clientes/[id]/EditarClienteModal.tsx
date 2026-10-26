@@ -33,11 +33,15 @@ interface Client {
 
 export default function EditarClienteModal({
   client,
+  bloqueioExclusao = null,
   onClose,
   onSaved,
   onDeleted,
 }: {
   client: Client;
+  // Motivo já conhecido pela ficha para não deixar excluir (locações ou
+  // agendamentos). Nulo = mostra o botão; o banco ainda confere o resto.
+  bloqueioExclusao?: string | null;
   onClose: () => void;
   onSaved: () => void;
   // Leva P.3: exclusão de lead/cliente. onDeleted navega pra fora desta
@@ -304,17 +308,25 @@ export default function EditarClienteModal({
           </button>
         </div>
 
-        <button
-          onClick={() => setConfirmarExclusao(true)}
-          className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600"
-        >
-          Excluir lead/cliente
-        </button>
+        {bloqueioExclusao ? (
+          <p className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+            {bloqueioExclusao}
+          </p>
+        ) : (
+          <button
+            onClick={() => setConfirmarExclusao(true)}
+            className="mt-3 w-full rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-600"
+          >
+            Excluir lead/cliente
+          </button>
+        )}
 
-        {/* Leva P.3: delete_record_forever bloqueia sozinho (com uma
-            mensagem clara) se este lead/cliente já tiver locação,
-            pagamento ou lançamento financeiro no histórico — nunca
-            cascateia sobre dinheiro de verdade. */}
+        {/* delete_record_forever (ramo clients) recusa, com a mensagem do
+            banco, cliente com locação, lançamento, agendamento, crédito,
+            contrato, planejamento, mentoria ou login de cliente (decisão do
+            dono, 26/10/2026). Lead puro sai com tarefas, anotações,
+            etiquetas e envios de campanha. Cliente de modo teste só sai se
+            todos os movimentos forem de teste. */}
         {confirmarExclusao && (
           <ConfirmarExclusaoModal
             table="clients"

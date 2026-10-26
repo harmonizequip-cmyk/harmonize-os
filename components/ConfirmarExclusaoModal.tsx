@@ -163,7 +163,11 @@ export default function ConfirmarExclusaoModal({
               />
             </div>
 
-            {erro && <p className="mt-2 text-xs text-red-600">{erro}</p>}
+            {erro && (
+              <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {erro}
+              </div>
+            )}
 
             <div className="mt-4 flex gap-2">
               <button

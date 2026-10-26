@@ -55,6 +55,7 @@ interface Client {
   document?: string | null;
   contrato_nome?: string | null;
   contrato_endereco?: string | null;
+  is_test?: boolean;
 }
 
 interface RentalRow {
@@ -729,6 +730,7 @@ export default function ClienteDetailClient({
       {editClientOpen && (
         <EditarClienteModal
           client={client}
+          bloqueioExclusao={bloqueioExclusaoCliente(client, rentals.length, preReservas.length)}
           onClose={() => setEditClientOpen(false)}
           onSaved={() => {
             setEditClientOpen(false);
@@ -769,4 +771,19 @@ export default function ClienteDetailClient({
       )}
     </div>
   );
+}
+
+// Excluir cliente (delete_record_forever, ramo clients) recusa quem tem
+// movimentos (decisão do dono, 26/10/2026). Com o que a ficha já carrega
+// (locações e agendamentos sem disparos) dá para avisar antes; o resto
+// (lançamento, crédito, contrato, planejamento, login) o banco recusa ao
+// tentar, com a mensagem dele. Cliente de modo teste fica de fora: os
+// movimentos de teste saem junto, e só o banco sabe se há algum real.
+function bloqueioExclusaoCliente(client: Client, locacoes: number, agendamentos: number): string | null {
+  if (client.is_test) return null;
+  const partes: string[] = [];
+  if (locacoes > 0) partes.push(`${locacoes} ${locacoes === 1 ? "locação" : "locações"}`);
+  if (agendamentos > 0) partes.push(`${agendamentos} ${agendamentos === 1 ? "agendamento" : "agendamentos"}`);
+  if (partes.length === 0) return null;
+  return `Este cliente tem movimentos (${partes.join(", ")}) e não pode ser excluído. Cancele ou resolva os movimentos antes, ou deixe o cadastro como está.`;
 }
