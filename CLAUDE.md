@@ -151,6 +151,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 ## Dashboard (17/10/2026)
 
 - Abre no mês (período padrão "Este mês"; `PeriodFilter padrao="mes"`). Ordem: destaque do mês (`components/dashboard/MesCard.tsx`: saudação, locações contra a meta 25 a 30, faturado, contas fixas), "Precisa de você" (`components/dashboard/PrecisaDeVoce.tsx`: todos os avisos num cartão, urgentes primeiro, 4 visíveis; cada um leva à sua lista; tarefas levam a `/tarefas?fila=1`), Saldo e A receber, Previsão de caixa, Radar, Próximos dias (3 dias com atendimento, hoje incluso) e "Números do período" (locações, ticket médio, concluídas/canceladas/reagendadas, HIPROs e gráficos). Aviso novo entra na lista `avisos` de `dashboard/page.tsx`.
+- Plano para a meta (26/10/2026, sem migration): cartão `components/dashboard/PlanoDaMeta.tsx` logo abaixo do destaque do mês (bloco `plano-meta`, dá para esconder em Configurações > Dashboard). Aparece só enquanto a meta mínima não foi batida: "Faltam N para a meta (R já reservadas)", datas livres até o fim do mês (`carregarDiasLivresDoMes`), quantas têm gente perto (datas do Encaixe dentro do mês), quantas pessoas estão na hora de chamar, ritmo por semana e dois botões: "Ver quem encaixar" (`/agenda/encaixe`) e "Chamar quem está na hora" (`/relacionamento`). Conta pura em `lib/plano-meta.ts` (testada); reservas abatem do que falta.
 - `settings.inactive_days_threshold` não tem efeito em nenhuma tela; saiu de Configurações.
 
 ## Relacionamento (17/10/2026)

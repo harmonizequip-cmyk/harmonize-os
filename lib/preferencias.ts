@@ -155,6 +155,7 @@ export const AVISOS_DASHBOARD: { id: string; rotulo: string; dica: string }[] = 
 
 /** Blocos do Dashboard que podem ser escondidos (o destaque do mês e "Precisa de você" ficam sempre). */
 export const BLOCOS_DASHBOARD: { id: string; rotulo: string }[] = [
+  { id: "plano-meta", rotulo: "Plano para bater a meta" },
   { id: "dinheiro", rotulo: "Saldo em caixa e A receber" },
   { id: "previsao", rotulo: "Previsão de caixa" },
   { id: "radar", rotulo: "Radar de oportunidades" },

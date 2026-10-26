@@ -25,7 +25,9 @@ import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
 import { CalendarDays, HandCoins, Wallet } from "lucide-react";
 import { IconeChip } from "@/components/ui/Visual";
 import { carregarRelacionamento } from "@/lib/carregar-relacionamento";
-import { carregarEncaixe } from "@/lib/carregar-encaixe";
+import { carregarDiasLivresDoMes, carregarEncaixe } from "@/lib/carregar-encaixe";
+import { montarPlanoMeta } from "@/lib/plano-meta";
+import PlanoDaMeta from "@/components/dashboard/PlanoDaMeta";
 import { filtrarAvisosOcultos } from "@/lib/avisos-dashboard";
 
 function formatWeekdayDate(dateStr: string) {
@@ -630,6 +632,22 @@ export default async function DashboardPage(
   } catch {
     // aviso opcional: sem ele o Dashboard segue
   }
+  // Plano para a meta: só lê dados que as telas já usam; sem ele o Dashboard segue.
+  let planoMeta: ReturnType<typeof montarPlanoMeta> = null;
+  try {
+    const diasLivres = await carregarDiasLivresDoMes(supabase, todayStr);
+    planoMeta = montarPlanoMeta({
+      hoje: todayStr,
+      metaMin: preferencias.metas.min,
+      locacoes: locMes,
+      reservadas: preMes,
+      diasLivres,
+      datasComGente: encaixes.map((o) => ({ data: o.data, pessoas: o.candidatas.length })),
+      paraChamar,
+    });
+  } catch {
+    planoMeta = null;
+  }
   if (encaixes.length > 0)
     avisos.push({
       id: "encaixe",
@@ -699,6 +717,8 @@ export default async function DashboardPage(
         meta={metaDoMes}
         faturamento={faturamentoMes}
       />
+
+      {planoMeta && blocoVisivel("plano-meta") && <PlanoDaMeta plano={planoMeta} />}
 
       <PrecisaDeVoce avisos={avisosMostrados} visiveis={preferencias.dashboard.avisosVisiveis} />
 

@@ -3,7 +3,8 @@ import { carregarMapaCidades } from "./carregar-cidades";
 import { carregarRelacionamento } from "./carregar-relacionamento";
 import { agendaDoEncaixe, oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
-import { somarDias } from "./period";
+import { somarDias, ultimoDiaDoMes } from "./period";
+import { diasLivresAte } from "./plano-meta";
 import type { PessoaClassificada } from "./relacionamento";
 
 /**
@@ -36,4 +37,26 @@ export async function carregarEncaixe(
   const { ocupados, comCidade } = agendaDoEncaixe((eventos ?? []) as any[], bloqueios ?? [], de);
 
   return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm, mapa });
+}
+
+/**
+ * Dias livres de amanhã até o fim do mês (os dois HIPROs sem reserva nem bloqueio,
+ * fora domingo): base do plano da meta no Dashboard. Erro de leitura sobe como exceção.
+ */
+export async function carregarDiasLivresDoMes(supabase: SupabaseClient, hoje: string): Promise<string[]> {
+  const fim = ultimoDiaDoMes(hoje);
+  const [{ data: eventos, error: e1 }, { data: bloqueios, error: e2 }] = await Promise.all([
+    supabase
+      .from("calendar_events")
+      .select("date_start, date_end, event_type")
+      .neq("status", "cancelada")
+      .eq("is_test", false)
+      // Locação de vários dias que começou antes ainda pode cobrir o mês.
+      .gte("date_start", somarDias(hoje, -62))
+      .lte("date_start", fim),
+    supabase.from("bloqueios_equipamento").select("data_inicio, data_fim").lte("data_inicio", fim).gte("data_fim", hoje),
+  ]);
+  if (e1 || e2) throw new Error(`Não consegui carregar a agenda do mês: ${(e1 ?? e2)!.message}`);
+  const { ocupados } = agendaDoEncaixe((eventos ?? []) as any[], bloqueios ?? [], hoje);
+  return diasLivresAte(hoje, fim, ocupados);
 }
