@@ -2,6 +2,7 @@
 
 // Menu de atalhos dos cartões de lead/cliente (Funil, Agenda, Clientes, Relacionamento,
 // Tarefas, Pendências, Agenda de hoje). Cada opção leva a uma tela ou ação que já existe:
+// Melhores datas abre a janela das datas livres por logística (MelhoresDatasModal),
 // WhatsApp e Waze pelo cadastro, Agendar sem disparos e Nova locação abrem a ficha já com a
 // janela certa (?acao=), e o resto são as listas filtradas pela cliente.
 // No celular abre como folha de baixo; no computador, como menu ao lado do botão.
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
+  CalendarClock,
   CalendarPlus,
   ClipboardList,
   FilePlus2,
@@ -39,6 +41,7 @@ import {
 } from "@/lib/atalhos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import AnotacoesCliente from "@/components/AnotacoesCliente";
+import MelhoresDatasModal from "@/components/MelhoresDatasModal";
 
 interface DadosCliente {
   nome: string | null;
@@ -89,6 +92,7 @@ export default function MenuAtalhosCliente({
   const somenteLeitura = useSomenteLeitura();
   const [aberto, setAberto] = useState(false);
   const [anotacoes, setAnotacoes] = useState(false);
+  const [melhoresDatas, setMelhoresDatas] = useState(false);
   const [celular, setCelular] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [dados, setDados] = useState<DadosCliente>({
@@ -227,17 +231,28 @@ export default function MenuAtalhosCliente({
         { chave: "waze", rotulo: "Waze", icone: Navigation, href: waze, externo: true, motivo: esperando ? "carregando..." : "sem endereço no cadastro" },
       ],
     },
-    ...(somenteLeitura
-      ? []
-      : [
-          {
-            titulo: "Agendar",
-            itens: [
+    {
+      // Melhores datas só lê a agenda: visualização também vê.
+      titulo: "Agenda",
+      itens: [
+        {
+          chave: "melhores-datas",
+          rotulo: "Melhores datas",
+          icone: CalendarClock,
+          href: null,
+          acao: () => {
+            fechar(false);
+            setMelhoresDatas(true);
+          },
+        },
+        ...(somenteLeitura
+          ? []
+          : [
               { chave: "agendar", rotulo: "Agendar sem disparos", icone: CalendarPlus, href: linkAgendarCliente(clienteId) },
               { chave: "locacao", rotulo: "Nova locação", icone: PlusCircle, href: linkNovaLocacaoCliente(clienteId) },
-            ],
-          },
-        ]),
+            ]),
+      ],
+    },
     {
       titulo: "Da cliente",
       itens: [
@@ -363,6 +378,16 @@ export default function MenuAtalhosCliente({
           ),
           document.body
         )}
+      {melhoresDatas && (
+        <MelhoresDatasModal
+          clienteId={clienteId}
+          nome={dados.nome || nome}
+          onClose={() => {
+            setMelhoresDatas(false);
+            requestAnimationFrame(() => botao.current?.focus());
+          }}
+        />
+      )}
       {anotacoes && <AnotacoesCliente clienteId={clienteId} nome={dados.nome || nome} onClose={() => setAnotacoes(false)} />}
     </span>
   );

@@ -174,10 +174,15 @@ export function melhoresDatas(params: {
   );
 }
 
-/** "atendo em Caruaru no dia 11" / "nos dias 11 e 13". */
-export function textoReferencia(r: Referencia): string {
+/** "no dia 11" / "nos dias 11 e 13". */
+export function textoDias(r: Referencia): string {
   const dias = r.dias.map((d) => String(Number(d.slice(8, 10))));
-  return dias.length > 1 ? `atendo em ${r.cidade} nos dias ${juntar(dias)}` : `atendo em ${r.cidade} no dia ${dias[0]}`;
+  return dias.length > 1 ? `nos dias ${juntar(dias)}` : `no dia ${dias[0] ?? ""}`;
+}
+
+/** "atendo em Caruaru no dia 11" / "atendo em Caruaru nos dias 11 e 13". */
+export function textoReferencia(r: Referencia): string {
+  return `atendo em ${r.cidade} ${textoDias(r)}`;
 }
 
 /** "a", "a e b", "a, b e c". */
@@ -200,4 +205,64 @@ export function mensagemMelhoresDatas(saudacao: string, mes: string, datas: stri
       ? `Tenho esta data livre em ${nomeDoMes(mes)}: ${lista}. Funciona para você?`
       : `Tenho estas datas livres em ${nomeDoMes(mes)}: ${lista}. Qual funciona melhor para você?`;
   return `${saudacao}\n\n${frase}`;
+}
+
+// ---------- Termômetro (pedido do dono, 26/10/2026) ----------
+// Escala linear de 0 até um teto visual de 2x o raio: Perto (0 a pertoKm),
+// Mais ou menos (pertoKm a raioKm) e Longe (raioKm ao teto).
+
+function faixaValida(pertoKm: number, raioKm: number): boolean {
+  return Number.isFinite(pertoKm) && Number.isFinite(raioKm) && raioKm > 0 && pertoKm >= 0 && pertoKm <= raioKm;
+}
+
+/** Posição (0 a 1) da distância na escala do termômetro; acima do teto fica em 1. null se inválido. */
+export function posicaoNaEscala(km: number, pertoKm: number, raioKm: number): number | null {
+  if (!Number.isFinite(km) || km < 0 || !faixaValida(pertoKm, raioKm)) return null;
+  return Math.min(1, km / (2 * raioKm));
+}
+
+/** Larguras (0 a 1, somam 1) das zonas Perto, Mais ou menos e Longe na escala. */
+export function larguraDasZonas(pertoKm: number, raioKm: number): { perto: number; medio: number; longe: number } {
+  if (!faixaValida(pertoKm, raioKm)) return { perto: 0, medio: 0, longe: 1 };
+  const teto = 2 * raioKm;
+  return { perto: pertoKm / teto, medio: (raioKm - pertoKm) / teto, longe: 0.5 };
+}
+
+export const PROXIMIDADE_MINIMA = 0.05;
+
+/**
+ * Preenchimento da mini barra: cheia (1) na mesma cidade, quase vazia
+ * (PROXIMIDADE_MINIMA) no teto ou além. Valor inválido = 0 (barra vazia).
+ */
+export function proximidade(km: number, pertoKm: number, raioKm: number): number {
+  const pos = posicaoNaEscala(km, pertoKm, raioKm);
+  if (pos === null) return 0;
+  return Math.max(PROXIMIDADE_MINIMA, 1 - pos);
+}
+
+/**
+ * Marcadores do termômetro, um por data medida, na ordem da posição. Datas
+ * próximas demais (menos que `folga` da escala) sobem um nível para não se sobrepor.
+ */
+export function marcadoresDoTermometro(
+  datas: DataLogistica[],
+  pertoKm: number,
+  raioKm: number,
+  folga = 0.035
+): { data: string; grupo: GrupoLogistica; posicao: number; nivel: number }[] {
+  const itens = datas
+    .flatMap((d) => {
+      if (!d.referencia) return [];
+      const posicao = posicaoNaEscala(d.referencia.km, pertoKm, raioKm);
+      return posicao === null ? [] : [{ data: d.data, grupo: d.grupo, posicao }];
+    })
+    .sort((a, b) => a.posicao - b.posicao || a.data.localeCompare(b.data));
+  // Último marcador em cada nível; entra no primeiro nível onde cabe.
+  const ultimos: number[] = [];
+  return itens.map((it) => {
+    let nivel = ultimos.findIndex((p) => it.posicao - p >= folga);
+    if (nivel === -1) nivel = ultimos.length;
+    ultimos[nivel] = it.posicao;
+    return { ...it, nivel };
+  });
 }

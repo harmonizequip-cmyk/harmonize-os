@@ -17,6 +17,19 @@ describe("lerPreferencias", () => {
     expect(p.encaixe.raioKm).toBe(DEFAULT_PREFERENCIAS.encaixe.raioKm);
   });
 
+  it("encaixe.pertoKm: faixa de 5 a 300 e nunca acima do raio", () => {
+    expect(DEFAULT_PREFERENCIAS.encaixe.pertoKm).toBe(60);
+    expect(lerPreferencias({ encaixe: { pertoKm: 40 } }).encaixe.pertoKm).toBe(40);
+    expect(lerPreferencias({ encaixe: { pertoKm: "80" } }).encaixe.pertoKm).toBe(80);
+    expect(lerPreferencias({ encaixe: { pertoKm: 4 } }).encaixe.pertoKm).toBe(60);
+    expect(lerPreferencias({ encaixe: { pertoKm: 301 } }).encaixe.pertoKm).toBe(60);
+    expect(lerPreferencias({ encaixe: { pertoKm: 200 } }).encaixe.pertoKm).toBe(60); // acima do raio 150
+    expect(lerPreferencias({ encaixe: { pertoKm: 200, raioKm: 250 } }).encaixe.pertoKm).toBe(200);
+    expect(lerPreferencias({ encaixe: { pertoKm: 100, raioKm: 50 } }).encaixe.pertoKm).toBe(50); // padrão 60 também passa do raio
+    expect(lerPreferencias({ encaixe: { raioKm: 150, pertoKm: 150 } }).encaixe.pertoKm).toBe(150);
+    expect(diferencasDoPadrao(lerPreferencias({ encaixe: { pertoKm: 45 } }))).toEqual({ encaixe: { ...DEFAULT_PREFERENCIAS.encaixe, pertoKm: 45 } });
+  });
+
   it("meta máxima menor que a mínima volta às duas padrão", () => {
     const p = lerPreferencias({ metas: { min: 30, max: 10 } });
     expect(p.metas).toMatchObject({ min: 25, max: 30 });

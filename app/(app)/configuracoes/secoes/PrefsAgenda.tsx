@@ -1,6 +1,6 @@
 "use client";
 
-// Agenda: encaixe de datas livres (raio, janela, pessoas por data, pergunta ao
+// Agenda: encaixe de datas livres (raio, "perto" das Melhores datas, janela, pessoas por data, pergunta ao
 // cancelar) e a cidade base da imagem de datas. Grava o grupo `encaixe`.
 
 import { useMemo, useState } from "react";
@@ -17,6 +17,7 @@ const PADRAO = DEFAULT_PREFERENCIAS.encaixe;
 function estado(c: Cfg) {
   return {
     raioKm: String(c.raioKm),
+    pertoKm: String(c.pertoKm),
     diasAFrente: String(c.diasAFrente),
     porData: String(c.porData),
     perguntar: c.perguntarAoCancelar,
@@ -55,12 +56,16 @@ export default function PrefsAgenda({ preferencias }: { preferencias: Preferenci
     };
     const raioKm = inteiro(e.raioKm, 10, 1000);
     if (raioKm === null) return setErro("Raio: de 10 a 1000 km.");
+    const pertoKm = inteiro(e.pertoKm, 5, 300);
+    if (pertoKm === null) return setErro("\"Perto\": de 5 a 300 km.");
+    if (pertoKm > raioKm) return setErro("\"Perto\" não pode passar do raio de busca.");
     const diasAFrente = inteiro(e.diasAFrente, 3, 90);
     if (diasAFrente === null) return setErro("Janela: de 3 a 90 dias.");
     const porData = inteiro(e.porData, 1, 50);
     if (porData === null) return setErro("Pessoas por data: de 1 a 50.");
     const novo: Cfg = {
       raioKm,
+      pertoKm,
       diasAFrente,
       porData,
       perguntarAoCancelar: e.perguntar,
@@ -92,6 +97,12 @@ export default function PrefsAgenda({ preferencias }: { preferencias: Preferenci
             <Padrao>Padrão {padrao.raioKm} km.</Padrao>
           </div>
           <div>
+            <Campo rotulo="Melhores datas: conta como perto até" valor={e.pertoKm} onChange={muda("pertoKm")} sufixo="km" />
+            <Padrao>
+              Padrão {padrao.pertoKm} km. No menu ⋮ da cliente, &quot;Melhores datas&quot; separa as datas livres em Perto (até este valor), Mais ou menos (até o raio) e Longe.
+            </Padrao>
+          </div>
+          <div>
             <Campo rotulo="Janela: quantos dias à frente olhar" valor={e.diasAFrente} onChange={muda("diasAFrente")} sufixo="dias" />
             <Padrao>Padrão {padrao.diasAFrente} dias.</Padrao>
           </div>
@@ -107,7 +118,7 @@ export default function PrefsAgenda({ preferencias }: { preferencias: Preferenci
         <button
           type="button"
           className="mt-3 min-h-[44px] text-xs font-semibold text-brand-teal-dark"
-          onClick={() => setE((x) => ({ ...x, raioKm: padrao.raioKm, diasAFrente: padrao.diasAFrente, porData: padrao.porData, perguntar: padrao.perguntar }))}
+          onClick={() => setE((x) => ({ ...x, raioKm: padrao.raioKm, pertoKm: padrao.pertoKm, diasAFrente: padrao.diasAFrente, porData: padrao.porData, perguntar: padrao.perguntar }))}
         >
           Voltar ao padrão
         </button>
