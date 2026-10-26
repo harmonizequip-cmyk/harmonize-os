@@ -10,6 +10,7 @@ import { CLIENT_STAGES } from "@/lib/funil-clientes";
 import { buildMapsLink, buildWazeLink, buildWhatsAppLink, extractCityFromAddress, toUpperOrNull } from "@/lib/format";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import TabelaPrecosModal from "@/components/TabelaPrecosModal";
+import MelhoresDatasModal from "@/components/MelhoresDatasModal";
 import NovaTarefaModal from "./NovaTarefaModal";
 import AgendamentosDoCliente from "@/components/AgendamentosDoCliente";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
@@ -47,6 +48,7 @@ export default function LeadCardModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [melhoresDatasOpen, setMelhoresDatasOpen] = useState(false);
   const [tabelaOpen, setTabelaOpen] = useState(false);
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
 
@@ -393,8 +395,16 @@ export default function LeadCardModal({
 
         <button
           type="button"
+          onClick={() => setMelhoresDatasOpen(true)}
+          className="mt-4 w-full rounded-xl border border-brand-teal bg-brand-teal/5 py-2 text-xs font-semibold text-brand-teal"
+        >
+          🗓️ Melhores datas para este contato
+        </button>
+
+        <button
+          type="button"
           onClick={() => setAvailabilityOpen(true)}
-          className="mt-4 w-full rounded-xl border border-brand-teal py-2 text-xs font-medium text-brand-teal"
+          className="mt-2 w-full rounded-xl border border-brand-teal py-2 text-xs font-medium text-brand-teal"
         >
           📅 Enviar datas disponíveis
         </button>
@@ -435,6 +445,8 @@ export default function LeadCardModal({
           </button>
         </div>
       </div>
+
+      {melhoresDatasOpen && <MelhoresDatasModal clienteId={lead.id} nome={lead.name} onClose={() => setMelhoresDatasOpen(false)} />}
 
       {availabilityOpen && (
         <AvailabilityImageModal

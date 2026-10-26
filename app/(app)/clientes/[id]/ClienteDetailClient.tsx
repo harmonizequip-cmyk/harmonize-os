@@ -23,6 +23,7 @@ import HistoricoClienteSection from "./HistoricoClienteSection";
 import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
 import CreditosClienteCard from "@/components/CreditosClienteCard";
 import AnotacoesFicha from "@/components/AnotacoesFicha";
+import MelhoresDatasModal from "@/components/MelhoresDatasModal";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkEvento, linkLancamentosCliente, linkLocacoesCliente, linkNovoPlanejamento, linkTarefasCliente } from "@/lib/atalhos";
 
@@ -199,6 +200,7 @@ export default function ClienteDetailClient({
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const [modalOpen, setModalOpen] = useState(false);
+  const [melhoresDatasOpen, setMelhoresDatasOpen] = useState(false);
   const [reservaOpen, setReservaOpen] = useState(false);
   const [editClientOpen, setEditClientOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<RentalRow | null>(null);
@@ -293,6 +295,13 @@ export default function ClienteDetailClient({
             </Link>
           )}
           <Atalhos className="mt-2">
+            <button
+              type="button"
+              onClick={() => setMelhoresDatasOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-brand-teal/30 bg-brand-teal/5 px-2.5 py-1 text-[11px] font-medium text-brand-teal-dark hover:bg-brand-teal/10"
+            >
+              <span aria-hidden>🗓️</span> Melhores datas
+            </button>
             <Atalho href={linkLancamentosCliente(client.id)} emoji="💰">Lançamentos</Atalho>
             <Atalho href={linkLocacoesCliente(client.id)} emoji="📦">Locações</Atalho>
             <Atalho href={linkTarefasCliente(client.id)} emoji="🗒️">Tarefas</Atalho>
@@ -692,6 +701,8 @@ export default function ClienteDetailClient({
       </div>
 
       <AnotacoesFicha clienteId={client.id} nome={client.name} />
+
+      {melhoresDatasOpen && <MelhoresDatasModal clienteId={client.id} nome={client.name} onClose={() => setMelhoresDatasOpen(false)} />}
 
       <CreditosClienteCard clientId={client.id} />
 
