@@ -43,14 +43,6 @@ export default async function ClientesPage(
   // hojeLocal em vez de toISOString: o segundo devolve a data em UTC, e
   // à noite fazia o "próximo evento" pular o dia seguinte.
   const todayStr = hojeLocal();
-  // TEMPORÁRIO (limpeza de leads): o link só aparece para administrador.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: perfil } = user
-    ? await supabase.from("profiles").select("is_admin, somente_leitura").eq("id", user.id).single()
-    : { data: null };
-  const podeLimparLeads = !!perfil?.is_admin && !perfil?.somente_leitura;
   const [clients, rentals, rentalsDeSempre, upcomingEvents, taxas] = await Promise.all([
     buscarTodas<any>((de, ate) =>
       supabase
@@ -167,7 +159,6 @@ export default async function ClientesPage(
       initialClients={clientsWithStats}
       cidades={cidades}
       periodo={periodo}
-      podeLimparLeads={podeLimparLeads}
     />
   );
 }
