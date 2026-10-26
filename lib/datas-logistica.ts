@@ -7,7 +7,7 @@
 
 import { coordenadasDaCidade, distanciaKm, normalizarCidade, type MapaCidades } from "./cidades-coordenadas";
 import { ehDiaLivre, vizinhosDoDia, type EventoComCidade } from "./encaixe";
-import { primeiroDiaDoMes, somarDias, ultimoDiaDoMes } from "./period";
+import { diasDoPeriodo, primeiroDiaDoMes, somarDias, ultimoDiaDoMes } from "./period";
 
 export type GrupoLogistica = "perto" | "medio" | "longe" | "sem";
 
@@ -205,6 +205,91 @@ export function mensagemMelhoresDatas(saudacao: string, mes: string, datas: stri
       ? `Tenho esta data livre em ${nomeDoMes(mes)}: ${lista}. Funciona para você?`
       : `Tenho estas datas livres em ${nomeDoMes(mes)}: ${lista}. Qual funciona melhor para você?`;
   return `${saudacao}\n\n${frase}`;
+}
+
+// ---------- Um HIPRO de cada vez (pedido do dono, 26/10/2026) ----------
+// Aba "Os dois livres" (regra de sempre), "HIPRO 1" e "HIPRO 2": na aba de um
+// aparelho, vale o dia em que SÓ ele está livre, mesmo que o outro esteja marcado.
+// Nesse caso a data mostra quem reservou o outro HIPRO naquele dia, com a cidade,
+// porque o dono trabalha sozinho e a cidade diz se dá para atender os dois.
+
+export type CodigoHipro = "hipro_1" | "hipro_2";
+export type VisaoHipro = "ambos" | CodigoHipro;
+
+export const ROTULO_VISAO: Record<VisaoHipro, string> = { ambos: "Os dois livres", hipro_1: "HIPRO 1", hipro_2: "HIPRO 2" };
+export const ROTULO_HIPRO: Record<CodigoHipro, string> = { hipro_1: "HIPRO 1", hipro_2: "HIPRO 2" };
+
+/** O que ocupa um HIPRO num dia: uma reserva (com cliente e cidade) ou um bloqueio. */
+export interface OcupacaoDoDia {
+  equipamento: CodigoHipro;
+  cliente: string | null;
+  cidade: string | null;
+  /** Preenchido quando é bloqueio ("manutenção", "recesso", "outro"). */
+  bloqueio: string | null;
+}
+
+export interface AgendaPorEquipamento {
+  ocupados: Record<CodigoHipro, Set<string>>;
+  ocupacoes: Map<string, OcupacaoDoDia[]>;
+}
+
+const ROTULO_BLOQUEIO: Record<string, string> = { manutencao: "manutenção", recesso: "recesso", outro: "bloqueio" };
+
+/**
+ * Dias ocupados de cada HIPRO e o que ocupa cada dia. `codigoDoEquipamento`
+ * traduz o equipment_id do bloqueio para hipro_1/hipro_2. Eventos que terminam
+ * antes de `de` ficam fora (mesma regra de agendaDoEncaixe).
+ */
+export function agendaPorEquipamento(
+  eventos: { date_start: string; date_end: string | null; event_type: string | null; clients?: unknown }[],
+  bloqueios: { equipment_id: string; data_inicio: string; data_fim: string; tipo?: string | null }[],
+  codigoDoEquipamento: ReadonlyMap<string, CodigoHipro>,
+  de: string
+): AgendaPorEquipamento {
+  const ocupados: Record<CodigoHipro, Set<string>> = { hipro_1: new Set(), hipro_2: new Set() };
+  const ocupacoes = new Map<string, OcupacaoDoDia[]>();
+  const anotar = (dia: string, o: OcupacaoDoDia) => {
+    ocupados[o.equipamento].add(dia);
+    const l = ocupacoes.get(dia) ?? [];
+    l.push(o);
+    ocupacoes.set(dia, l);
+  };
+  for (const e of eventos) {
+    const fim = e.date_end ?? e.date_start;
+    if (fim < de) continue;
+    if (e.event_type !== "hipro_1" && e.event_type !== "hipro_2") continue;
+    const cli = (Array.isArray(e.clients) ? e.clients[0] : e.clients) as
+      | { city?: string | null; name?: string | null; display_name?: string | null; treatment?: string | null }
+      | null
+      | undefined;
+    const cliente = cli?.display_name ? [cli.treatment, cli.display_name].filter(Boolean).join(" ") : cli?.name ?? null;
+    for (const d of diasDoPeriodo(e.date_start, fim)) anotar(d, { equipamento: e.event_type, cliente, cidade: cli?.city ?? null, bloqueio: null });
+  }
+  for (const b of bloqueios) {
+    const codigo = codigoDoEquipamento.get(b.equipment_id);
+    if (!codigo) continue;
+    for (const d of diasDoPeriodo(b.data_inicio, b.data_fim, 400)) anotar(d, { equipamento: codigo, cliente: null, cidade: null, bloqueio: ROTULO_BLOQUEIO[b.tipo ?? ""] ?? "bloqueio" });
+  }
+  return { ocupados, ocupacoes };
+}
+
+/** Dias que impedem a data na aba: "ambos" = qualquer um dos dois; um HIPRO = só os dele. */
+export function ocupadosDaVisao(ag: AgendaPorEquipamento, visao: VisaoHipro): Set<string> {
+  if (visao === "ambos") return new Set([...ag.ocupados.hipro_1, ...ag.ocupados.hipro_2]);
+  return ag.ocupados[visao];
+}
+
+/** O que ocupa o OUTRO HIPRO no dia (vazio na aba "ambos", onde os dois estão livres). */
+export function ocupacoesDoOutro(ag: AgendaPorEquipamento, dia: string, visao: VisaoHipro): OcupacaoDoDia[] {
+  if (visao === "ambos") return [];
+  return (ag.ocupacoes.get(dia) ?? []).filter((o) => o.equipamento !== visao);
+}
+
+/** "HIPRO 2: Dra. Simone · Caruaru" / "HIPRO 2: manutenção". */
+export function textoOcupacao(o: OcupacaoDoDia): string {
+  if (o.bloqueio) return `${ROTULO_HIPRO[o.equipamento]}: ${o.bloqueio}`;
+  const partes = [o.cliente?.trim() || "reserva sem cliente", o.cidade?.trim() || "sem cidade"];
+  return `${ROTULO_HIPRO[o.equipamento]}: ${partes.join(" · ")}`;
 }
 
 // ---------- Termômetro (pedido do dono, 26/10/2026) ----------

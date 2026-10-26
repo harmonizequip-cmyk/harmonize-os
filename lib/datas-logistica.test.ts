@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  agendaPorEquipamento,
+  ocupacoesDoOutro,
+  ocupadosDaVisao,
+  textoOcupacao,
   PROXIMIDADE_MINIMA,
   grupoDaDistancia,
   juntar,
@@ -207,5 +211,50 @@ describe("textos", () => {
       "Olá, Dra. Ana!\n\nTenho estas datas livres em novembro: qui 12/11 e sáb 14/11. Qual funciona melhor para você?"
     );
     expect(mensagemMelhoresDatas("Olá!", "2026-11", ["2026-11-12"])).toBe("Olá!\n\nTenho esta data livre em novembro: qui 12/11. Funciona para você?");
+  });
+});
+
+describe("um HIPRO de cada vez", () => {
+  const codigos = new Map([
+    ["e1", "hipro_1" as const],
+    ["e2", "hipro_2" as const],
+  ]);
+  const eventos = [
+    { date_start: "2026-11-10", date_end: null, event_type: "hipro_1", clients: { city: "Caruaru", name: "Maria", display_name: "Simone", treatment: "Dra." } },
+    { date_start: "2026-11-12", date_end: "2026-11-13", event_type: "hipro_2", clients: [{ city: "Patos", name: "Ana", display_name: null, treatment: null }] },
+    { date_start: "2026-11-14", date_end: null, event_type: "mentoria", clients: null },
+  ];
+  const bloqueios = [{ equipment_id: "e2", data_inicio: "2026-11-20", data_fim: "2026-11-21", tipo: "manutencao" }];
+  const ag = agendaPorEquipamento(eventos, bloqueios, codigos, "2026-11-01");
+
+  it("separa os dias ocupados por HIPRO (reserva de vários dias e bloqueio)", () => {
+    expect([...ag.ocupados.hipro_1]).toEqual(["2026-11-10"]);
+    expect([...ag.ocupados.hipro_2].sort()).toEqual(["2026-11-12", "2026-11-13", "2026-11-20", "2026-11-21"]);
+  });
+
+  it("a aba dos dois exige os dois livres; a de um só olha só o dele", () => {
+    expect(ocupadosDaVisao(ag, "ambos").size).toBe(5);
+    expect(ocupadosDaVisao(ag, "hipro_1").has("2026-11-12")).toBe(false);
+    expect(ocupadosDaVisao(ag, "hipro_2").has("2026-11-10")).toBe(false);
+  });
+
+  it("mostra quem ocupa o outro HIPRO, com cidade, e o bloqueio", () => {
+    const doDia10 = ocupacoesDoOutro(ag, "2026-11-10", "hipro_2");
+    expect(doDia10).toHaveLength(1);
+    expect(textoOcupacao(doDia10[0])).toBe("HIPRO 1: Dra. Simone · Caruaru");
+    expect(textoOcupacao(ocupacoesDoOutro(ag, "2026-11-13", "hipro_1")[0])).toBe("HIPRO 2: Ana · Patos");
+    expect(textoOcupacao(ocupacoesDoOutro(ag, "2026-11-20", "hipro_1")[0])).toBe("HIPRO 2: manutenção");
+    expect(ocupacoesDoOutro(ag, "2026-11-10", "hipro_1")).toEqual([]);
+    expect(ocupacoesDoOutro(ag, "2026-11-10", "ambos")).toEqual([]);
+  });
+
+  it("ignora o que não é HIPRO e o que terminou antes do período", () => {
+    const so = agendaPorEquipamento(eventos, [], codigos, "2026-11-11");
+    expect([...so.ocupados.hipro_1]).toEqual([]);
+    expect(so.ocupacoes.has("2026-11-14")).toBe(false);
+  });
+
+  it("cliente sem cadastro de cidade ou sem nome aparece com texto claro", () => {
+    expect(textoOcupacao({ equipamento: "hipro_2", cliente: null, cidade: null, bloqueio: null })).toBe("HIPRO 2: reserva sem cliente · sem cidade");
   });
 });

@@ -33,22 +33,31 @@ import { saudacaoCurta } from "@/lib/saudacao";
 import { usePreferencias } from "@/lib/usar-preferencias";
 import {
   ORDEM_GRUPOS,
+  ROTULO_VISAO,
   TITULO_GRUPO,
+  agendaPorEquipamento,
   larguraDasZonas,
   marcadoresDoTermometro,
   melhoresDatas,
   mensagemMelhoresDatas,
   mesPadrao,
   nomeDoMes,
+  ocupacoesDoOutro,
+  ocupadosDaVisao,
   periodoDoMes,
   proximidade,
   rotuloData,
   somarMeses,
   textoDatas,
   textoDias,
+  textoOcupacao,
   textoReferencia,
+  type AgendaPorEquipamento,
+  type CodigoHipro,
   type DataLogistica,
   type GrupoLogistica,
+  type OcupacaoDoDia,
+  type VisaoHipro,
 } from "@/lib/datas-logistica";
 import { avisar } from "@/components/Dialogos";
 import { IconeChip } from "@/components/ui/Visual";
@@ -72,7 +81,10 @@ interface Pessoa {
 interface AgendaMes {
   ocupados: Set<string>;
   eventos: EventoComCidade[];
+  porEquip: AgendaPorEquipamento;
 }
+
+const VISOES: VisaoHipro[] = ["ambos", "hipro_1", "hipro_2"];
 
 function nomeMesAno(mes: string) {
   const n = nomeDoMes(mes);
@@ -82,11 +94,11 @@ function nomeMesAno(mes: string) {
 async function carregarAgendaDoMes(mes: string): Promise<AgendaMes> {
   const supabase = createClient();
   const { de, ate } = periodoDoMes(mes);
-  const [eventos, { data: bloqueios, error: e2 }] = await Promise.all([
+  const [eventos, { data: bloqueios, error: e2 }, { data: equipamentos }] = await Promise.all([
     buscarTodas<{ date_start: string; date_end: string | null; event_type: string | null; clients: unknown }>((a, b) =>
       supabase
         .from("calendar_events")
-        .select("id, date_start, date_end, event_type, status, clients(city)")
+        .select("id, date_start, date_end, event_type, status, clients(city, name, display_name, treatment)")
         .neq("status", "cancelada")
         .eq("is_test", false)
         // Locação de vários dias que começou antes ainda pode cobrir o mês.
@@ -97,11 +109,14 @@ async function carregarAgendaDoMes(mes: string): Promise<AgendaMes> {
     ).catch(() => {
       throw new Error("Não consegui carregar a agenda do mês. Confira a internet e tente de novo.");
     }),
-    supabase.from("bloqueios_equipamento").select("data_inicio, data_fim").lte("data_inicio", ate).gte("data_fim", de),
+    supabase.from("bloqueios_equipamento").select("equipment_id, tipo, data_inicio, data_fim").lte("data_inicio", ate).gte("data_fim", de),
+    supabase.from("equipments").select("id, code"),
   ]);
   if (e2) throw new Error(`Não consegui carregar os bloqueios da agenda: ${e2.message}`);
   const { ocupados, comCidade } = agendaDoEncaixe(eventos, bloqueios ?? [], de);
-  return { ocupados, eventos: comCidade };
+  const codigos = new Map<string, CodigoHipro>();
+  for (const q of (equipamentos ?? []) as { id: string; code: string }[]) if (q.code === "hipro_1" || q.code === "hipro_2") codigos.set(q.id, q.code);
+  return { ocupados, eventos: comCidade, porEquip: agendaPorEquipamento(eventos, (bloqueios ?? []) as any[], codigos, de) };
 }
 
 export default function MelhoresDatasModal({
@@ -125,7 +140,9 @@ export default function MelhoresDatasModal({
   const [erro, setErro] = useState<string | null>(null);
   const [tentativa, setTentativa] = useState(0);
   // Datas marcadas por mês (null = ainda não mexeu: vale o padrão, as de "Perto").
+  // A chave é mês + aba, porque cada aba tem as suas datas.
   const [marcadas, setMarcadas] = useState<Record<string, Set<string>>>({});
+  const [visao, setVisao] = useState<VisaoHipro>("ambos");
   const [destaque, setDestaque] = useState<string | null>(null);
   const pedidos = useRef(new Set<string>());
   const primeiro = useRef<HTMLButtonElement>(null);
@@ -200,19 +217,22 @@ export default function MelhoresDatasModal({
   const agenda = agendas[mes];
   const datas: DataLogistica[] | null = useMemo(() => {
     if (!agenda || !pessoa || !mapa) return null;
-    return melhoresDatas({ mes, hoje, ocupados: agenda.ocupados, eventos: agenda.eventos, cidadePessoa: pessoa.cidade, pertoKm, raioKm, mapa });
-  }, [agenda, pessoa, mapa, mes, hoje, pertoKm, raioKm]);
+    const ocupados = visao === "ambos" ? agenda.ocupados : ocupadosDaVisao(agenda.porEquip, visao);
+    return melhoresDatas({ mes, hoje, ocupados, eventos: agenda.eventos, cidadePessoa: pessoa.cidade, pertoKm, raioKm, mapa });
+  }, [agenda, pessoa, mapa, mes, hoje, pertoKm, raioKm, visao]);
+
+  const chaveMarcadas = `${mes}|${visao}`;
 
   const selecionadas = useMemo(() => {
-    if (marcadas[mes]) return marcadas[mes];
+    if (marcadas[chaveMarcadas]) return marcadas[chaveMarcadas];
     return new Set((datas ?? []).filter((d) => d.grupo === "perto").map((d) => d.data));
-  }, [marcadas, mes, datas]);
+  }, [marcadas, chaveMarcadas, datas]);
 
   function alternar(dia: string) {
     const nova = new Set(selecionadas);
     if (nova.has(dia)) nova.delete(dia);
     else nova.add(dia);
-    setMarcadas((x) => ({ ...x, [mes]: nova }));
+    setMarcadas((x) => ({ ...x, [chaveMarcadas]: nova }));
   }
 
   function irPara(dia: string) {
@@ -305,6 +325,22 @@ export default function MelhoresDatasModal({
             </button>
           </div>
 
+          {/* Abas: os dois HIPROs livres, só o HIPRO 1 ou só o HIPRO 2 */}
+          <div role="tablist" aria-label="HIPRO" className="mt-2 grid grid-cols-3 gap-1 rounded-2xl bg-neutral-100 p-1">
+            {VISOES.map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={visao === v}
+                onClick={() => setVisao(v)}
+                className={`min-h-[40px] rounded-xl text-xs font-bold transition ${visao === v ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"}`}
+              >
+                {ROTULO_VISAO[v]}
+              </button>
+            ))}
+          </div>
+
           {/* Termômetro */}
           <div className="mt-3" aria-label="Termômetro da distância">
             <div className="relative" style={{ height: 6 + niveis * 14 }}>
@@ -365,7 +401,10 @@ export default function MelhoresDatasModal({
               <Loader2 size={16} className="animate-spin" /> Carregando as datas...
             </p>
           ) : datas && datas.length === 0 ? (
-            <p className="py-8 text-center text-sm text-neutral-500">Nenhuma data livre nos dois HIPROs em {nomeDoMes(mes)}{mes === mesMinimo ? " a partir de amanhã" : ""}.</p>
+            <p className="py-8 text-center text-sm text-neutral-500">
+              Nenhuma data livre {visao === "ambos" ? "nos dois HIPROs" : `no ${ROTULO_VISAO[visao]}`} em {nomeDoMes(mes)}
+              {mes === mesMinimo ? " a partir de amanhã" : ""}.
+            </p>
           ) : (
             ORDEM_GRUPOS.map((g) => {
               const doGrupo = (datas ?? []).filter((d) => d.grupo === g);
@@ -382,7 +421,7 @@ export default function MelhoresDatasModal({
                   </div>
                   <ul className="divide-y divide-neutral-100">
                     {doGrupo.map((d) => (
-                      <LinhaData key={d.data} d={d} marcada={selecionadas.has(d.data)} destaque={destaque === d.data} onToggle={() => alternar(d.data)} pertoKm={pertoKm} raioKm={raioKm} />
+                      <LinhaData key={d.data} d={d} outro={agenda ? ocupacoesDoOutro(agenda.porEquip, d.data, visao) : []} marcada={selecionadas.has(d.data)} destaque={destaque === d.data} onToggle={() => alternar(d.data)} pertoKm={pertoKm} raioKm={raioKm} />
                     ))}
                   </ul>
                 </section>
@@ -390,7 +429,10 @@ export default function MelhoresDatasModal({
             })
           )}
           <p className="pb-1 text-center text-[11px] text-neutral-400">
-            Dia livre: os dois HIPROs sem reserva nem bloqueio, fora domingo. Distância em linha reta até a cidade onde você atende no dia anterior ou no seguinte.
+            {visao === "ambos"
+              ? "Dia livre: os dois HIPROs sem reserva nem bloqueio, fora domingo."
+              : `Dia livre só para o ${ROTULO_VISAO[visao]}: o outro pode estar marcado, e a data mostra quem e onde, para você julgar. Fora domingo.`}{" "}
+            Distância em linha reta até a cidade onde você atende no dia anterior ou no seguinte.
           </p>
         </div>
 
@@ -436,6 +478,7 @@ export default function MelhoresDatasModal({
 
 function LinhaData({
   d,
+  outro,
   marcada,
   destaque,
   onToggle,
@@ -443,6 +486,8 @@ function LinhaData({
   raioKm,
 }: {
   d: DataLogistica;
+  /** O que ocupa o outro HIPRO neste dia (só nas abas de um HIPRO). */
+  outro: OcupacaoDoDia[];
   marcada: boolean;
   destaque: boolean;
   onToggle: () => void;
@@ -486,6 +531,12 @@ function LinhaData({
               {d.cidadesAoRedor.length > 0 && <span className="block text-[11px] text-neutral-400">Ao redor: {d.cidadesAoRedor.join(", ")}</span>}
             </>
           )}
+          {outro.map((o, i) => (
+            <span key={i} className="mt-1 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+              <MapPin size={11} className="mt-0.5 flex-shrink-0" />
+              <span>Ocupado no {textoOcupacao(o)}</span>
+            </span>
+          ))}
         </span>
       </label>
     </li>
