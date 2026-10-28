@@ -392,10 +392,9 @@ function nomeDoProcedimento(ids: Set<string>, nomes: string[]): string {
 // Modo Cérebro: só lê o banco e grava insights.
 const CATEGORIAS = ["prospeccao", "relacionamento", "vendas", "financeiro", "agenda", "marketing", "operacao"];
 const FERRAMENTAS_INSIGHTS = [
-  FERRAMENTAS[0],
   {
     name: "registrar_insights",
-    description: "Grava os insights da rodada (de 8 a 12) na tela Cérebro. Uma chamada com todos.",
+    description: "Grava os insights da rodada (de 6 a 8) na tela Cérebro. Uma chamada com todos.",
     input_schema: {
       type: "object",
       properties: {
@@ -429,6 +428,40 @@ const FOCOS: Record<string, string> = {
   marketing: "Foque em marketing: conteúdo, posicionamento, eventos, parcerias.",
   operacao: "Foque em operação: deslocamento, equipamentos, rotina do Eder.",
 };
+
+
+// Cérebro (28/10/2026): os números vêm prontos, numa leva só de consultas em paralelo,
+// e a IA responde numa chamada única. Antes ela fazia até 8 consultas, uma por vez, e a
+// rodada passava de 150 s (limite de tempo da Edge Function no plano gratuito).
+const LENTES_INSIGHTS: Record<string, string> = {
+  locacoes_por_mes: "select to_char(event_date,'YYYY-MM') mes, count(*) locacoes, round(sum(calculated_value)) faturado, round(avg(calculated_value)) ticket_medio, round(avg(shots)) disparos_medios, count(distinct client_id) clientes from rentals_contabilizaveis where event_date >= current_date - interval '12 months' and event_date <= current_date group by 1 order by 1",
+  clientes_que_alugam: "with b as (select client_id, count(*) n, min(event_date) primeira, max(event_date) ultima, round(sum(calculated_value)) faturado from rentals_contabilizaveis where event_date <= current_date group by 1) select c.id client_id, c.name nome, c.city cidade, c.parceiro, b.n locacoes, b.primeira, b.ultima, current_date - b.ultima dias_sem_alugar, case when b.n > 1 then round((b.ultima - b.primeira)::numeric / (b.n - 1)) end ritmo_dias, b.faturado, round(l.lucro_liquido) lucro, (select min(e.date_start) from calendar_events e where e.client_id = c.id and e.status <> 'cancelada' and not e.is_test and e.date_start >= current_date) proxima_reserva from b join clients c on c.id = b.client_id left join clientes_lucro l on l.client_id = c.id order by b.faturado desc",
+  funil_leads: "select stage etapa, count(*) leads, round(avg(current_date - created_at::date)) dias_medio_desde_cadastro, count(*) filter (where coalesce(whatsapp,'') = '') sem_whatsapp, count(*) filter (where coalesce(city,'') = '') sem_cidade from clients c where not is_test and not is_client and not exists (select 1 from rentals r where r.client_id = c.id) group by stage order by 2 desc",
+  origem_e_conversao: "select coalesce(origem,'(sem origem)') origem, count(*) cadastros, count(*) filter (where exists (select 1 from rentals_contabilizaveis r where r.client_id = c.id)) ja_alugaram from clients c where not is_test group by 1 order by 2 desc",
+  indicacoes: "select i.name quem_indicou, count(*) indicadas, count(*) filter (where exists (select 1 from rentals_contabilizaveis r where r.client_id = c.id)) indicadas_que_alugaram from clients c join clients i on i.id = c.indicado_por where not c.is_test group by 1 order by 2 desc",
+  cidades: "select coalesce(nullif(trim(city),''),'(sem cidade)') cidade, count(*) cadastros, count(*) filter (where exists (select 1 from rentals_contabilizaveis r where r.client_id = c.id)) clientes_que_alugam from clients c where not is_test group by 1 order by 2 desc limit 30",
+  dia_da_semana: "select extract(isodow from event_date)::int dia_semana_1_seg, count(*) locacoes, round(avg(calculated_value)) ticket from rentals_contabilizaveis where event_date >= current_date - interval '12 months' group by 1 order by 1",
+  agenda_futura: "select to_char(date_trunc('week', date_start),'YYYY-MM-DD') semana, count(*) filter (where event_type in ('hipro_1','hipro_2')) reservas_hipro, count(*) filter (where rental_id is null) sem_finalizar, count(*) filter (where taxa_status = 'pendente') taxa_pendente from calendar_events where not is_test and status <> 'cancelada' and date_start between current_date and current_date + 60 group by 1 order by 1",
+  cancelamentos: "select count(*) filter (where status = 'cancelada') canceladas, count(*) filter (where no_show) nao_compareceu, count(*) filter (where rescheduled) reagendadas, count(*) total from calendar_events where not is_test and event_type in ('hipro_1','hipro_2') and date_start >= current_date - 180",
+  recebimento: "select c.name cliente, r.event_date, round(s.saldo) saldo, current_date - r.event_date dias from rentals_situacao_pagamento s join rentals_contabilizaveis r on r.id = s.rental_id join clients c on c.id = r.client_id where s.saldo > 0.5 and r.event_date <= current_date order by s.saldo desc limit 20",
+  taxas_de_reserva: "select taxa_status, count(*) eventos, round(sum(coalesce(taxa_valor,0))) valor from calendar_events where not is_test and event_type in ('hipro_1','hipro_2') and date_start >= current_date - 180 group by 1",
+  equipamentos: "select q.name equipamento, count(r.id) locacoes_6m, round(avg(r.shots)) disparos_medios from equipments q left join rentals_contabilizaveis r on r.equipment_id = q.id and r.event_date >= current_date - 180 group by 1 order by 1",
+  despesas_3m: "select coalesce(k.name,'(sem categoria)') categoria, round(sum(t.amount)) total, count(*) lancamentos from transactions_contabilizaveis t left join categories k on k.id = t.category_id where t.scope = 'harmonize' and t.type = 'saida' and t.date >= current_date - 90 and coalesce(t.cartao_mov,'') <> 'pagamento' and coalesce(k.name,'') not in ('Retiradas','Empréstimo concedido','Pagamento de fatura') group by 1 order by 2 desc limit 15",
+  lucro_por_locacao: "select round(avg(lucro_liquido)) lucro_medio, round(avg(total_despesas)) despesa_media, round(avg(valor_deslocamento)) deslocamento_medio, round(100 * sum(total_despesas) / nullif(sum(valor_total),0), 1) pct_despesas from rentals_lucro where event_date >= current_date - 180",
+  campanhas: "select k.nome campanha, k.arquivada, count(e.id) filter (where e.enviado_em is not null) enviados, count(e.id) filter (where e.status = 'respondeu') responderam, count(e.id) filter (where e.status = 'agendou') agendaram, count(e.id) filter (where e.status = 'nao_quer') nao_querem from campanhas k left join campanha_envios e on e.campanha_id = k.id group by k.id, k.nome, k.arquivada order by k.created_at desc limit 10",
+  tarefas: "select count(*) filter (where status = 'pendente' and due_date < current_date) atrasadas, count(*) filter (where status = 'pendente' and due_date >= current_date) pendentes_futuras, count(*) filter (where status = 'concluida' and completed_at >= current_date - 30) concluidas_30d from tasks where not is_test",
+  insights_anteriores: "select categoria, titulo, status, util, created_at::date criado from insights order by created_at desc limit 60",
+};
+
+async function pacoteDeDados(supabase: SupabaseClient): Promise<string> {
+  const pares = await Promise.all(
+    Object.entries(LENTES_INSIGHTS).map(async ([nome, sql]) => {
+      const { data, error } = await supabase.rpc("assistente_consultar", { p_sql: sql, p_limite: 100 });
+      return [nome, error ? { erro: error.message } : data] as const;
+    })
+  );
+  return JSON.stringify(Object.fromEntries(pares));
+}
 
 function json(corpo: unknown, status = 200) {
   return new Response(JSON.stringify(corpo), { status, headers: { ...CORS, "Content-Type": "application/json" } });
@@ -1036,27 +1069,44 @@ Deno.serve(async (req) => {
   const uso = { entrada: 0, saida: 0, cacheLeitura: 0, cacheEscrita: 0 };
   let resposta = "";
 
-  const maxRodadas = modoInsights ? 11 : MAX_RODADAS;
+  const blocoDados = modoInsights ? `Dados para os insights (JSON gerado agora pelas consultas do sistema; cada chave é uma lente):\n${await pacoteDeDados(supabase)}` : "";
+  // Cérebro: uma chamada só, já obrigada a gravar os insights.
+  const maxRodadas = modoInsights ? 0 : MAX_RODADAS;
   for (let rodada = 0; rodada <= maxRodadas; rodada++) {
     const ultimaRodada = rodada === maxRodadas;
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({
-        model: MODELO,
-        max_tokens: 8000,
-        system: [
-          { type: "text", text: pessoal ? CONHECIMENTO_PESSOAL : CONHECIMENTO, cache_control: { type: "ephemeral" } },
-          ...(modoInsights ? [{ type: "text", text: INSIGHTS }] : []),
-          { type: "text", text: contexto },
-          ...(blocoDossie && !modoInsights ? [{ type: "text", text: blocoDossie, cache_control: { type: "ephemeral" } }] : []),
-        ],
-        tools: modoInsights ? FERRAMENTAS_INSIGHTS : pessoal ? FERRAMENTAS_PESSOAL : FERRAMENTAS,
-        // Na última rodada, sem ferramentas: responde com o que já tem.
-        ...(ultimaRodada ? { tool_choice: { type: "none" } } : {}),
-        messages: comCacheNoFim(enviar()),
-      }),
-    });
+    // Cérebro: corta antes dos 150 s da Edge Function, para a tela receber o motivo de verdade.
+    const corte = modoInsights ? new AbortController() : null;
+    const relogio = corte ? setTimeout(() => corte.abort(), 130_000) : null;
+    let r: Response;
+    try {
+      r = await fetch("https://api.anthropic.com/v1/messages", {
+        signal: corte?.signal,
+        method: "POST",
+        headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model: MODELO,
+          max_tokens: 8000,
+          system: [
+            { type: "text", text: pessoal ? CONHECIMENTO_PESSOAL : CONHECIMENTO, cache_control: { type: "ephemeral" } },
+            ...(modoInsights ? [{ type: "text", text: INSIGHTS }] : []),
+            { type: "text", text: contexto },
+            ...(blocoDados ? [{ type: "text", text: blocoDados }] : []),
+            ...(blocoDossie && !modoInsights ? [{ type: "text", text: blocoDossie, cache_control: { type: "ephemeral" } }] : []),
+          ],
+          tools: modoInsights ? FERRAMENTAS_INSIGHTS : pessoal ? FERRAMENTAS_PESSOAL : FERRAMENTAS,
+          // Cérebro: obrigado a gravar. Nas outras, a última rodada é sem ferramentas: responde com o que já tem.
+          ...(modoInsights ? { tool_choice: { type: "tool", name: "registrar_insights" } } : ultimaRodada ? { tool_choice: { type: "none" } } : {}),
+          messages: comCacheNoFim(enviar()),
+        }),
+      });
+    } catch (e) {
+      if (relogio) clearTimeout(relogio);
+      if ((e as Error)?.name === "AbortError")
+        return json({ erro: "A IA demorou demais para montar os insights. Tente de novo em alguns minutos." }, 504);
+      console.error("anthropic fetch", e);
+      return json({ erro: "Não consegui falar com a IA agora. Tente de novo." }, 502);
+    }
+    if (relogio) clearTimeout(relogio);
     if (!r.ok) {
       const txt = await r.text();
       console.error("anthropic", r.status, txt);
@@ -1111,6 +1161,12 @@ Deno.serve(async (req) => {
       resultados.push({ type: "tool_result", tool_use_id: u.id, content: res.texto, ...(res.erro ? { is_error: true } : {}) });
     }
     mensagens.push({ role: "user", content: resultados });
+    if (modoInsights) {
+      const falha = resultados.find((x) => x.type === "tool_result" && (x as { is_error?: boolean }).is_error);
+      resposta = falha ? "" : `Gravados ${estado.insights} insights.`;
+      if (falha) return json({ erro: "A IA respondeu, mas não consegui gravar os insights. Tente de novo." }, 502);
+      break;
+    }
   }
 
   if (!resposta) resposta = "Não consegui fechar a resposta. Tente perguntar de outro jeito.";
