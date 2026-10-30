@@ -22,8 +22,11 @@ import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { linkNovoPlanejamento } from "@/lib/atalhos";
 import { confirmar, avisar } from "@/components/Dialogos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
-import { filtrarSessoes, montarLinhaDoTempo, resumirHistorico, type EntradaHistorico } from "@/lib/historico-paciente";
-import { idade, type PacienteResumo, type PlanoDoPaciente } from "@/lib/pacientes";
+import { montarLinhaDoTempo, resumirHistorico, type EntradaHistorico } from "@/lib/historico-paciente";
+import { idade, situacaoDoPlano, type PacienteResumo, type PlanoDoPaciente } from "@/lib/pacientes";
+import { saldoParaProximaSessao } from "@/lib/historico-paciente";
+import SeloSituacao from "@/components/planejador/SeloSituacao";
+import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -64,9 +67,9 @@ export default function FichaPaciente({
   const [montado, setMontado] = useState(false);
   const [entradas, setEntradas] = useState<EntradaHistorico[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [texto, setTexto] = useState("");
-  const [de, setDe] = useState("");
-  const [ate, setAte] = useState("");
+  const [selecionando, setSelecionando] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [confirmarApagar, setConfirmarApagar] = useState(false);
   const [editando, setEditando] = useState(false);
   const [form, setForm] = useState({ nome: "", whatsapp: "", nascimento: "", observacoes: "" });
   const [salvando, setSalvando] = useState(false);
@@ -79,9 +82,9 @@ export default function FichaPaciente({
 
   useEffect(() => {
     setEditando(false);
-    setTexto("");
-    setDe("");
-    setAte("");
+    setSelecionando(false);
+    setSelecionados(new Set());
+    setConfirmarApagar(false);
     setJuntarCom("");
   }, [paciente?.chave]);
 
@@ -127,8 +130,6 @@ export default function FichaPaciente({
 
   const resumo = useMemo(() => (entradas ? resumirHistorico(entradas) : null), [entradas]);
   const tempo = useMemo(() => (entradas ? montarLinhaDoTempo(entradas) : []), [entradas]);
-  const visiveis = useMemo(() => filtrarSessoes(tempo, { de, ate, texto }), [tempo, de, ate, texto]);
-  const filtrando = !!(texto || de || ate);
   const paraJuntar = outros.filter((o) => o.pacienteId && o.pacienteId !== paciente?.pacienteId);
 
   if (!montado || !paciente) return null;
@@ -215,15 +216,15 @@ export default function FichaPaciente({
         <div className="mx-auto max-w-3xl space-y-3 px-4 pb-24 pt-4">
           {/* Saldo a usar: o mais importante, sempre no topo. */}
           {paciente.saldos.length > 0 && (
-            <section className="rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-200">
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+            <section className="rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-200">
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">
                 <Sparkles size={13} /> Saldo de disparos para usar
               </p>
               <div className="space-y-2">
                 {paciente.saldos.map((s) => (
-                  <div key={s.plano.id} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 ring-1 ring-emerald-100">
+                  <div key={s.plano.id} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 ring-1 ring-amber-100">
                     <div className="min-w-0">
-                      <p className="text-lg font-black tabular-nums text-emerald-700">{fmt(s.saldo)} disparos</p>
+                      <p className="text-lg font-black tabular-nums text-amber-700">{fmt(s.saldo)} disparos</p>
                       <p className="truncate text-xs text-neutral-600">
                         Para a Sessão {s.proximaSessao} de {s.sessoes}
                         {s.plano.procedimento ? ` · ${s.plano.procedimento}` : ""}
@@ -232,7 +233,7 @@ export default function FichaPaciente({
                     </div>
                     <Link
                       href={`${base}/${s.plano.id}`}
-                      className="inline-flex min-h-10 flex-shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-4 text-xs font-bold text-white active:bg-emerald-700"
+                      className="inline-flex min-h-10 flex-shrink-0 items-center gap-1 rounded-full bg-amber-500 px-4 text-xs font-bold text-white active:bg-amber-600"
                     >
                       Continuar <ChevronRight size={14} />
                     </Link>
@@ -253,7 +254,7 @@ export default function FichaPaciente({
             </div>
             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-neutral-200/80">
               <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Saldo</p>
-              <p className={`mt-0.5 text-xl font-black tabular-nums ${resumo && resumo.saldoRestante > 0 ? "text-emerald-700" : "text-neutral-900"}`}>
+              <p className={`mt-0.5 text-xl font-black tabular-nums ${resumo && resumo.saldoRestante > 0 ? "text-amber-700" : "text-neutral-900"}`}>
                 {resumo ? fmt(resumo.saldoRestante) : "-"}
               </p>
             </div>
@@ -338,101 +339,112 @@ export default function FichaPaciente({
             </section>
           )}
 
-          {/* Sessões. */}
+          {/* Planejamentos (cada um com as suas sessões). */}
           <section className="space-y-2">
-            <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Todas as sessões</p>
+            <div className="flex items-center justify-between gap-2 px-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                Planejamentos ({paciente.planos.length})
+              </p>
+              {!somenteLeitura && paciente.planos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelecionando((v) => !v);
+                    setSelecionados(new Set());
+                  }}
+                  className="min-h-9 rounded-full bg-neutral-100 px-3 text-xs font-semibold text-neutral-700 active:bg-neutral-200"
+                >
+                  {selecionando ? "Cancelar" : "Selecionar para apagar"}
+                </button>
+              )}
+            </div>
             {erro && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{erro}</p>}
-            {!entradas && !erro && (
-              <p className="flex items-center justify-center gap-2 py-10 text-sm text-neutral-500">
-                <Loader2 size={16} className="animate-spin" /> Carregando as sessões...
-              </p>
+            {paciente.planos.length === 0 && (
+              <p className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500">Este paciente ainda não tem planejamentos.</p>
             )}
-            {tempo.length > 2 && (
-              <div className="space-y-2 rounded-2xl bg-white p-3 ring-1 ring-neutral-200/80">
-                <div className="relative">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                  <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar por área ou procedimento" className={`${entrada} pl-9`} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className={rotulo}>De</span>
-                    <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={entrada} />
-                  </label>
-                  <label className="block">
-                    <span className={rotulo}>Até</span>
-                    <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={entrada} />
-                  </label>
-                </div>
-                {filtrando && (
-                  <button
-                    type="button"
-                    onClick={() => (setTexto(""), setDe(""), setAte(""))}
-                    className="min-h-10 w-full rounded-lg bg-neutral-100 px-3 text-sm font-semibold text-neutral-700 active:bg-neutral-200"
-                  >
-                    Limpar filtros ({visiveis.length} de {tempo.length})
-                  </button>
-                )}
-              </div>
-            )}
-            {entradas && visiveis.length === 0 && (
-              <p className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500">
-                {filtrando ? "Nenhuma sessão com esse filtro." : "Este paciente ainda não tem sessões."}
-              </p>
-            )}
-            <ol className="space-y-3">
-              {visiveis.map((s) => {
-                const diasRetorno = s.retorno ? Math.round((Date.parse(`${s.retorno}T12:00:00Z`) - Date.parse(`${hoje}T12:00:00Z`)) / 86400000) : null;
-                const comSaldo = s.saldoParaProxima > 0;
+            {paciente.planos.map((pl) => {
+                const sessoes = tempo.filter((s) => s.planoId === pl.id).sort((x, y) => x.n - y.n);
+                const situacao = situacaoDoPlano(pl);
+                const saldo = saldoParaProximaSessao(pl);
+                const marcado = selecionados.has(pl.id);
+                const alternar = () =>
+                  setSelecionados((atual) => {
+                    const novo = new Set(atual);
+                    if (novo.has(pl.id)) novo.delete(pl.id);
+                    else novo.add(pl.id);
+                    return novo;
+                  });
                 return (
-                  <li key={`${s.planoId}-${s.n}`} className={`rounded-2xl bg-white p-4 ${comSaldo ? "ring-2 ring-emerald-300" : "ring-1 ring-neutral-200/80"}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-neutral-900">{s.data ? formatDate(s.data) : "Sem data"}</p>
-                        <p className="truncate text-xs text-neutral-500">{s.procedimento || "Sem procedimento"}</p>
-                      </div>
-                      <div className="flex-shrink-0 text-right">
-                        <p className="font-mono text-sm font-semibold text-brand-teal-dark">{fmt(s.total)}</p>
-                        <p className="text-[10px] text-neutral-400">disparos</p>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-semibold text-brand-teal-dark">
-                        Sessão {s.n} de {s.sessoes}
-                      </span>
-                      {s.aberta && s.sessoes > 1 && <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600">Em andamento</span>}
-                      {comSaldo && (
-                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">Saldo p/ próxima: {fmt(s.saldoParaProxima)}</span>
-                      )}
-                      {s.retorno && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                          <CalendarClock size={11} />
-                          {s.aberta ? "Retorno" : "Próxima sessão"} {formatDate(s.retorno)}
-                          {s.aberta && diasRetorno !== null && diasRetorno >= 0 ? (diasRetorno === 0 ? " (hoje)" : ` (em ${diasRetorno} d)`) : ""}
-                        </span>
-                      )}
-                    </div>
-                    {s.areas.length > 0 ? (
-                      <ul className="mt-3 divide-y divide-neutral-100 rounded-xl bg-neutral-50 px-3 text-sm">
-                        {s.areas.map((a) => (
-                          <li key={a.nome} className="flex items-center justify-between gap-2 py-2">
-                            <span className="min-w-0 truncate text-neutral-700">{a.nome}</span>
-                            <span className="flex-shrink-0 font-mono text-xs font-semibold text-neutral-800">{fmt(a.total)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2 text-xs text-neutral-500">Nenhuma área com disparos nesta sessão.</p>
-                    )}
-                    <Link
-                      href={`${base}/${s.planoId}`}
-                      className="mt-3 inline-flex min-h-10 items-center gap-1 rounded-full bg-neutral-100 px-4 text-xs font-semibold text-neutral-700 active:bg-neutral-200"
+                  <article
+                    key={pl.id}
+                    className={`relative overflow-hidden rounded-2xl bg-white ${marcado ? "ring-2 ring-rose-400" : situacao === "pendente" ? "ring-1 ring-amber-300" : "ring-1 ring-neutral-200/80"}`}
+                  >
+                    <span className={`absolute inset-y-0 left-0 w-1.5 ${situacao === "pendente" ? "bg-amber-400" : "bg-emerald-400"}`} aria-hidden />
+                    <div
+                      className={`flex items-start gap-3 py-3 pl-4 pr-3 ${selecionando ? "cursor-pointer" : ""}`}
+                      onClick={selecionando ? alternar : undefined}
                     >
-                      Abrir planejamento <ChevronRight size={14} />
-                    </Link>
-                  </li>
+                      {selecionando && (
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={alternar}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Selecionar o planejamento de ${pl.data ? formatDate(pl.data) : "sem data"}`}
+                          className="mt-1 h-5 w-5 flex-shrink-0 accent-rose-600"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-neutral-900">HIPRO Day {pl.data ? formatDate(pl.data) : "sem data"}</p>
+                        <p className="truncate text-xs text-neutral-500">
+                          {pl.procedimento || "Sem procedimento"} · {fmt(pl.total_disparos)}
+                          {pl.saldo_total ? ` de ${fmt(pl.saldo_total)}` : ""} disparos
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <SeloSituacao situacao={situacao} detalhe={saldo > 0 ? `${fmt(saldo)} disparos p/ Sessão ${(pl.sessao_atual ?? 1) + 1}` : undefined} />
+                        </div>
+                      </div>
+                    </div>
+                    {!selecionando && (
+                      <div className="space-y-2 border-t border-neutral-100 px-4 pb-3 pt-2">
+                        {!entradas && !erro && (
+                          <p className="flex items-center gap-2 py-1 text-xs text-neutral-500">
+                            <Loader2 size={13} className="animate-spin" /> Carregando as sessões...
+                          </p>
+                        )}
+                        {sessoes.map((s) => (
+                          <div key={s.n} className="rounded-xl bg-neutral-50 px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-semibold text-neutral-800">
+                                Sessão {s.n} de {s.sessoes}
+                                {s.data ? ` · ${formatDate(s.data)}` : ""}
+                                {s.aberta && s.sessoes > 1 ? " · em andamento" : ""}
+                              </p>
+                              <p className="font-mono text-xs font-semibold text-brand-teal-dark">{fmt(s.total)}</p>
+                            </div>
+                            {s.areas.length > 0 ? (
+                              <p className="mt-0.5 text-[11px] leading-relaxed text-neutral-500">{s.areas.map((a) => `${a.nome} ${fmt(a.total)}`).join(" · ")}</p>
+                            ) : (
+                              <p className="mt-0.5 text-[11px] text-neutral-400">Nenhuma área com disparos.</p>
+                            )}
+                            {s.retorno && s.aberta && (
+                              <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-neutral-600">
+                                <CalendarClock size={11} /> Retorno {formatDate(s.retorno)}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        <Link
+                          href={`${base}/${pl.id}`}
+                          className={`inline-flex min-h-10 items-center gap-1 rounded-full px-4 text-xs font-semibold ${situacao === "pendente" ? "bg-amber-500 text-white" : "bg-neutral-100 text-neutral-700"}`}
+                        >
+                          {situacao === "pendente" ? "Continuar" : "Abrir planejamento"} <ChevronRight size={14} />
+                        </Link>
+                      </div>
+                    )}
+                  </article>
                 );
               })}
-            </ol>
           </section>
 
           {/* Cadastro repetido ou sem uso. */}
@@ -473,6 +485,47 @@ export default function FichaPaciente({
           )}
         </div>
       </div>
+      {selecionando && (
+        <div className="border-t border-neutral-200 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+          <div className="mx-auto flex max-w-3xl items-center gap-3">
+            <p className="min-w-0 flex-1 text-sm text-neutral-600">
+              {selecionados.size ? `${selecionados.size} ${selecionados.size === 1 ? "planejamento escolhido" : "planejamentos escolhidos"}` : "Toque nos planejamentos que quer apagar"}
+            </p>
+            <button
+              type="button"
+              disabled={!selecionados.size}
+              onClick={() => setConfirmarApagar(true)}
+              className="inline-flex min-h-11 flex-shrink-0 items-center gap-1.5 rounded-xl bg-rose-600 px-4 text-sm font-bold text-white disabled:opacity-40"
+            >
+              <Trash2 size={16} /> Apagar
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmarApagar && (
+        <ConfirmarApagarModal
+          titulo={`Apagar ${selecionados.size} ${selecionados.size === 1 ? "planejamento" : "planejamentos"} de ${paciente.nome || "este paciente"}?`}
+          descricao="Apaga só os planejamentos escolhidos, com as áreas, os disparos e as sessões deles. Os outros ficam."
+          onCancelar={() => setConfirmarApagar(false)}
+          onConfirmar={async () => {
+            const sb = createClient();
+            for (const id of selecionados) {
+              const { error } = await sb.rpc("excluir_planejamento", { p_id: id });
+              if (error) {
+                onMudou();
+                return error.message || "Não consegui apagar. Confira a internet.";
+              }
+            }
+            const apagouTodos = selecionados.size >= paciente.planos.length;
+            avisar(selecionados.size === 1 ? "Planejamento apagado." : `${selecionados.size} planejamentos apagados.`);
+            setConfirmarApagar(false);
+            setSelecionando(false);
+            setSelecionados(new Set());
+            if (apagouTodos && !paciente.pacienteId) onFechar();
+            onMudou();
+          }}
+        />
+      )}
     </div>,
     document.body
   );

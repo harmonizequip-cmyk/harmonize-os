@@ -181,3 +181,65 @@ export function idade(nascimento: string | null | undefined, hoje: string): numb
   if (hoje.slice(5) < n.slice(5)) anos--;
   return anos >= 0 && anos < 130 ? anos : null;
 }
+
+export type Situacao = "pendente" | "concluido";
+
+/** Planejamento com disparos para a próxima sessão = pendente; o resto, concluído. */
+export function situacaoDoPlano(p: { saldo_total: number; total_disparos: number; sessoes_total?: number | null; sessao_atual?: number | null }): Situacao {
+  return saldoParaProximaSessao(p) > 0 ? "pendente" : "concluido";
+}
+
+/** Paciente com algum planejamento pendente = pendente. */
+export function situacaoDoPaciente(r: { saldoTotal: number }): Situacao {
+  return r.saldoTotal > 0 ? "pendente" : "concluido";
+}
+
+/** Dias de HIPRO (data dos planejamentos), do mais recente para o mais antigo, sem repetir. */
+export function diasDeHipro<T extends PlanoDoPaciente>(pacientes: PacienteResumo<T>[]): string[] {
+  const s = new Set<string>();
+  for (const r of pacientes) for (const p of r.planos) if (dia(p.data)) s.add(dia(p.data));
+  return Array.from(s).sort().reverse();
+}
+
+/** Pacientes atendidos num dia de HIPRO (vazio = todos). */
+export function pacientesDoDia<T extends PlanoDoPaciente>(pacientes: PacienteResumo<T>[], diaHipro: string): PacienteResumo<T>[] {
+  if (!diaHipro) return pacientes;
+  return pacientes.filter((r) => r.planos.some((p) => dia(p.data) === diaHipro));
+}
+
+export interface ClienteDoPlanejador<T extends PlanoDoPaciente = PlanoDoPaciente> {
+  clientId: string | null;
+  nome: string;
+  pacientes: PacienteResumo<T>[];
+  pendentes: number;
+  concluidos: number;
+  /** Último dia de HIPRO com planejamento. */
+  ultimoDia: string | null;
+}
+
+/** Um grupo por cliente: quem tem pendente primeiro, depois o atendido mais recentemente. */
+export function agruparPacientesPorCliente<T extends PlanoDoPaciente>(
+  pacientes: PacienteResumo<T>[],
+  nomeDaCliente: (clientId: string | null, sugestao: string | null) => string
+): ClienteDoPlanejador<T>[] {
+  const m = new Map<string, ClienteDoPlanejador<T>>();
+  for (const r of pacientes) {
+    const k = r.client_id ?? "";
+    let g = m.get(k);
+    if (!g) {
+      g = { clientId: r.client_id, nome: nomeDaCliente(r.client_id, r.cliente_nome), pacientes: [], pendentes: 0, concluidos: 0, ultimoDia: null };
+      m.set(k, g);
+    }
+    g.pacientes.push(r);
+    if (situacaoDoPaciente(r) === "pendente") g.pendentes++;
+    else g.concluidos++;
+    if (r.ultimaData && (!g.ultimoDia || r.ultimaData > g.ultimoDia)) g.ultimoDia = r.ultimaData;
+  }
+  return Array.from(m.values()).sort(
+    (a, b) =>
+      (a.clientId ? 0 : 1) - (b.clientId ? 0 : 1) ||
+      (b.pendentes > 0 ? 1 : 0) - (a.pendentes > 0 ? 1 : 0) ||
+      (b.ultimoDia ?? "").localeCompare(a.ultimoDia ?? "") ||
+      a.nome.localeCompare(b.nome, "pt-BR")
+  );
+}

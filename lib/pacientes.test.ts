@@ -100,3 +100,41 @@ describe("busca e sugestões", () => {
     expect(idade(null, "2026-10-30")).toBeNull();
   });
 });
+
+import { agruparPacientesPorCliente, diasDeHipro, pacientesDoDia, situacaoDoPaciente, situacaoDoPlano } from "./pacientes";
+
+describe("situação, dias de HIPRO e clientes", () => {
+  const lista = agruparPorPaciente([
+    plano({ id: "1", paciente: "Ana", data: "2026-10-30", saldo_total: 16000, total_disparos: 10000, sessoes_total: 2, sessao_atual: 1 }),
+    plano({ id: "2", paciente: "Bia", data: "2026-10-29" }),
+    plano({ id: "3", paciente: "Cris", data: "2026-10-29", client_id: "B", cliente_nome: "Dra. Bia" }),
+    plano({ id: "4", paciente: "Duda", data: "2026-09-01", client_id: null, cliente_nome: null }),
+  ]);
+
+  it("pendente quando sobra saldo para a próxima sessão", () => {
+    expect(situacaoDoPlano({ saldo_total: 16000, total_disparos: 10000, sessoes_total: 2, sessao_atual: 1 })).toBe("pendente");
+    expect(situacaoDoPlano({ saldo_total: 16000, total_disparos: 16000, sessoes_total: 2, sessao_atual: 2 })).toBe("concluido");
+    expect(lista.map((r) => [r.nome, situacaoDoPaciente(r)])).toEqual([
+      ["Ana", "pendente"],
+      ["Bia", "concluido"],
+      ["Cris", "concluido"],
+      ["Duda", "concluido"],
+    ]);
+  });
+
+  it("dias de HIPRO sem repetir e filtro por dia", () => {
+    expect(diasDeHipro(lista)).toEqual(["2026-10-30", "2026-10-29", "2026-09-01"]);
+    expect(pacientesDoDia(lista, "2026-10-29").map((r) => r.nome)).toEqual(["Bia", "Cris"]);
+    expect(pacientesDoDia(lista, "")).toHaveLength(4);
+  });
+
+  it("agrupa por cliente, com pendente primeiro e sem cliente no fim", () => {
+    const g = agruparPacientesPorCliente(lista, (id, s) => s ?? (id ? "?" : "Sem cliente"));
+    expect(g.map((x) => [x.nome, x.pacientes.length, x.pendentes, x.concluidos])).toEqual([
+      ["Dra. Ana", 2, 1, 1],
+      ["Dra. Bia", 1, 0, 1],
+      ["Sem cliente", 1, 0, 1],
+    ]);
+    expect(g[0].ultimoDia).toBe("2026-10-30");
+  });
+});
