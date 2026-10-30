@@ -443,6 +443,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `FichaPaciente.tsx`: Ficha do paciente do Planejador (`FichaPaciente`, tela cheia): saldo de disparos para usar com "Continuar", números, "Novo planejamento" já com o paciente, dados do cadastro (`salvar_paciente`), os planejamentos dele (HIPRO Day, procedimento, disparos, selo Pendente/Concluído e as sessões de cada um) com "Selecionar para apagar" (apaga só os escolhidos por `excluir_planejamento`, depois de escrever APAGAR) e "Mais opções" para juntar cadastro repetido (`juntar_pacientes`) ou excluir cadastro sem planejamento (`excluir_paciente`). Lê `planejamentos`.
 - `Partes.tsx`: Peças do Planejador HIPRO nativo: folha (bottom sheet), campo de disparos com - e +, cartão de área (modelo facial + linhas por profundidade), folha da modelo ampliada e folha de área manual.
 - `ResumoPlano.tsx`: Aba Resumo: números do plano, alertas, distribuição por área (barras com a modelo de cada área) e prévia do texto, do prontuário e da ficha do paciente.
+- `SeloSituacao.tsx`: Selo de situação do Planejador (`SeloSituacao`): laranja "Pendente" (ainda há disparos para a próxima sessão, com o detalhe) ou verde "Concluído".
 
 #### `components/ui/`
 

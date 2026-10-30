@@ -8,6 +8,7 @@ import {
   valorDosDisparos,
   type ResumoLocacaoInput,
 } from "./rental-calculator";
+import { calculateRentalValue, DEFAULT_PRICING } from "./rental-pricing";
 
 function entrada(extra: Partial<ResumoLocacaoInput>): ResumoLocacaoInput {
   return {
@@ -190,5 +191,37 @@ describe("PIX no resumo do WhatsApp", () => {
     expect(t).toContain("Chave: *12345678000190*");
     const outra = buildResumoWhatsApp({ ...base, contasPix, pagamentos: [{ ...base.pagamentos[0], pixConta: "eder" }] }, resumo);
     expect(outra).toContain("Favorecido: *Eder Campos de Almeida*");
+  });
+});
+
+describe("custo negociado no resumo do WhatsApp", () => {
+  const pricing = calculateRentalValue(69_636, DEFAULT_PRICING);
+  const base = {
+    ...entrada({ pricing, shots: 69_636, custoManualPorDisparo: 0.07 }),
+    initialCount: 0,
+    finalCount: 69_636,
+    patientCount: 0,
+    clientName: "Dra. Ana",
+    eventDate: "2026-11-10",
+    pagamentos: [],
+  };
+
+  it("mostra a conta da tabela, o valor pela tabela e o desconto", () => {
+    const resumo = calcularResumoLocacao(entrada({ pricing, shots: 69_636, custoManualPorDisparo: 0.07 }));
+    const t = buildResumoWhatsApp(base as any, resumo).replace(/\u00a0/g, " ");
+    expect(t).toContain("  Pacote fixo (até 20.000): R$ 2.500,00");
+    expect(t).toContain("49.636 x R$ 0,10 = R$ 4.963,60");
+    expect(t).toContain("  Valor pela tabela: R$ 7.463,60");
+    expect(t).toContain("69.636 x R$ 0,07 = *R$ 4.874,52*");
+    expect(t).toContain("  ✅ Desconto (35%): R$ 7.463,60 - R$ 4.874,52 = *R$ 2.589,08*");
+    expect(t.indexOf("Valor pela tabela")).toBeLessThan(t.indexOf("Custo negociado"));
+  });
+
+  it("negociado acima da tabela não mostra desconto", () => {
+    const p15 = calculateRentalValue(15_000, DEFAULT_PRICING);
+    const resumo = calcularResumoLocacao(entrada({ pricing: p15, shots: 15_000, custoManualPorDisparo: 0.2 }));
+    const t = buildResumoWhatsApp({ ...base, ...entrada({ pricing: p15, shots: 15_000, custoManualPorDisparo: 0.2 }) } as any, resumo);
+    expect(t).not.toContain("Desconto (");
+    expect(t).not.toContain("Valor pela tabela");
   });
 });

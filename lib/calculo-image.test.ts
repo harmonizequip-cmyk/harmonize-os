@@ -48,7 +48,75 @@ describe("faixa aplicada na imagem do cálculo", () => {
     expect(f.faixaTitulo).toBe("CUSTO NEGOCIADO");
     expect(f.valorDisparos).toBe(4008.15);
     expect(f.faixaLinhas[0]).toBe("80.163 disparos x R$ 0,05 = R$ 4.008,15");
-    expect(f.faixaLinhas[1]).toContain("economia");
+    expect(f.faixaLinhas[1]).toBe("Desconto (29%): R$ 5.611,41 - R$ 4.008,15 = R$ 1.603,26");
+    expect(f.tabelaTitulo).toBe("FAIXA 3 APLICADA");
+  });
+
+  it("custo negociado abaixo da tabela mostra a conta da tabela e a do desconto", () => {
+    const pricing = calculateRentalValue(69_636, DEFAULT_PRICING);
+    const f = descreverFaixa(pricing, 0.07, 69_636);
+    expect(f.faixaLinhas).toEqual([
+      "69.636 disparos x R$ 0,07 = R$ 4.874,52",
+      "Desconto (35%): R$ 7.463,60 - R$ 4.874,52 = R$ 2.589,08",
+    ]);
+    expect(f.tabelaLinhas).toEqual([
+      "Pacote fixo (até 20.000 disparos): R$ 2.500,00",
+      "49.636 disparos x R$ 0,10 = R$ 4.963,60",
+    ]);
+    expect(f.tabelaValor).toBe(7463.6);
+    expect(f.tabelaTitulo).toBe("FAIXA 2 APLICADA");
+    expect(f.tabelaChip).toBe("R$ 0,10");
+    expect(f.valorDisparos).toBe(4874.52);
+  });
+
+  it("no recibo, a conta da tabela vem antes do custo negociado", () => {
+    const pricing = calculateRentalValue(69_636, DEFAULT_PRICING);
+    const f = descreverFaixa(pricing, 0.07, 69_636);
+    const d = {
+      cliente: "Ana",
+      dataEvento: "2026-10-30",
+      contagemInicial: 0,
+      contagemFinal: 69_636,
+      disparos: 69_636,
+      ...f,
+      ajustes: [],
+      total: 4874.52,
+      observacaoTotal: null,
+    };
+    const l = linhasRecibo(d);
+    const i = l.findIndex((x) => x.rotulo.startsWith("Pela tabela"));
+    expect(l.slice(i).map((x) => [x.tipo, x.rotulo, x.detalhe, x.valor])).toEqual([
+      ["secao", "Pela tabela · Faixa 2 aplicada · R$ 0,10", undefined, undefined],
+      ["linha", "Pacote fixo (até 20.000 disparos)", undefined, "R$ 2.500,00"],
+      ["linha", "49.636 disparos x R$ 0,10", undefined, "R$ 4.963,60"],
+      ["subtotal", "Valor pela tabela", undefined, "R$ 7.463,60"],
+      ["secao", "Custo negociado · R$ 0,07", undefined, undefined],
+      ["linha", "69.636 disparos x R$ 0,07", undefined, "R$ 4.874,52"],
+      ["linha", "Desconto (35%)", "R$ 7.463,60 - R$ 4.874,52", "R$ 2.589,08"],
+      ["subtotal", "Valor dos disparos", undefined, "R$ 4.874,52"],
+      ["total", "Total a pagar", undefined, "R$ 4.874,52"],
+    ]);
+  });
+
+  it("custo negociado acima da tabela não mostra tabela nem desconto", () => {
+    const pricing = calculateRentalValue(15_000, DEFAULT_PRICING);
+    const f = descreverFaixa(pricing, 0.2, 15_000);
+    expect(f.valorDisparos).toBe(3000);
+    expect(f.faixaLinhas).toEqual(["15.000 disparos x R$ 0,20 = R$ 3.000,00"]);
+    expect(f.tabelaLinhas).toBeUndefined();
+    expect(f.tabelaValor).toBeUndefined();
+    const l = linhasRecibo({
+      cliente: null,
+      dataEvento: null,
+      contagemInicial: 0,
+      contagemFinal: 15_000,
+      disparos: 15_000,
+      ...f,
+      ajustes: [],
+      total: 3000,
+      observacaoTotal: null,
+    });
+    expect(l.some((x) => x.rotulo.startsWith("Pela tabela") || x.rotulo.startsWith("Desconto"))).toBe(false);
   });
 });
 

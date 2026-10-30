@@ -279,6 +279,31 @@ export interface ResumoWhatsAppInput extends ResumoLocacaoInput {
   contasPix?: ContaPix[];
 }
 
+// Conta pela tabela de preços (pacote fixo, excedente, acima do limite), uma
+// linha por parte, no formato do resumo do WhatsApp.
+function linhasDaTabela(pricing: RentalPricingBreakdown): string[] {
+  const { config } = pricing;
+  const out: string[] = [];
+  if (pricing.tier3Portion === 0) {
+    out.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(pricing.flatPackageValue)}`);
+  }
+  if (pricing.tier2Portion > 0) {
+    out.push(
+      `  Excedente ${fmtInt(config.flatPackageLimit + 1)}–${fmtInt(config.tier2Limit)}: ${fmtInt(
+        pricing.tier2Portion
+      )} x R$ ${fmtRate(config.tier2Rate)} = ${fmtMoney(pricing.tier2Value)}`
+    );
+  }
+  if (pricing.tier3Portion > 0) {
+    out.push(
+      `  Acima de ${fmtInt(config.tier2Limit)} (sobre o total): ${fmtInt(pricing.tier3Portion)} x R$ ${fmtRate(
+        config.tier3Rate
+      )} = ${fmtMoney(pricing.tier3Value)}`
+    );
+  }
+  return out;
+}
+
 // Monta o texto de resumo (mesmo formato do protótipo aprovado, com
 // disparos/mentoria + deslocamento + itens personalizados + pagamento(s) +
 // PIX), pronto para copiar ou mandar direto no WhatsApp.
@@ -328,29 +353,24 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
     if (!input.pricing) {
       linhas.push("  Todos os disparos foram cobertos pelo crédito.");
     } else if (input.custoManualPorDisparo != null) {
+      // A conta da tabela e o desconto só aparecem quando o negociado sai mais barato.
+      const comDesconto = resumo.subtotalTabela > resumo.subtotalProduto;
+      if (comDesconto) {
+        linhas.push(...linhasDaTabela(input.pricing));
+        linhas.push(`  Valor pela tabela: ${fmtMoney(resumo.subtotalTabela)}`);
+      }
       linhas.push(`  🤝 Custo negociado: R$ ${fmtRate(input.custoManualPorDisparo)} / disparo`);
       linhas.push(`  ${fmtInt(input.shots)} x R$ ${fmtRate(input.custoManualPorDisparo)} = *${fmtMoney(resumo.subtotalProduto)}*`);
-      linhas.push(`  Valor pela tabela normal: ${fmtMoney(resumo.subtotalTabela)}`);
-      linhas.push(`  ✅ Economia: *${fmtMoney(resumo.economiaCustoManual)}*`);
+      if (comDesconto) {
+        const pct = Math.round((resumo.economiaCustoManual / resumo.subtotalTabela) * 100);
+        linhas.push(
+          `  ✅ Desconto (${pct}%): ${fmtMoney(resumo.subtotalTabela)} - ${fmtMoney(resumo.subtotalProduto)} = *${fmtMoney(
+            resumo.economiaCustoManual
+          )}*`
+        );
+      }
     } else {
-      const { config } = input.pricing;
-      if (input.pricing.tier3Portion === 0) {
-        linhas.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(input.pricing.flatPackageValue)}`);
-      }
-      if (input.pricing.tier2Portion > 0) {
-        linhas.push(
-          `  Excedente ${fmtInt(config.flatPackageLimit + 1)}–${fmtInt(config.tier2Limit)}: ${fmtInt(
-            input.pricing.tier2Portion
-          )} x R$ ${fmtRate(config.tier2Rate)} = ${fmtMoney(input.pricing.tier2Value)}`
-        );
-      }
-      if (input.pricing.tier3Portion > 0) {
-        linhas.push(
-          `  Acima de ${fmtInt(config.tier2Limit)} (sobre o total): ${fmtInt(input.pricing.tier3Portion)} x R$ ${fmtRate(
-            config.tier3Rate
-          )} = ${fmtMoney(input.pricing.tier3Value)}`
-        );
-      }
+      linhas.push(...linhasDaTabela(input.pricing));
     }
     linhas.push(`  ▸ *Subtotal disparos: ${fmtMoney(resumo.subtotalProduto)}*`);
   }

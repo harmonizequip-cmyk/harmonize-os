@@ -33,6 +33,14 @@ export interface DadosImagemCalculo {
   faixaChip: string;
   faixaLinhas: string[];
   valorDisparos: number;
+  /**
+   * Com custo negociado abaixo da tabela: a conta pela tabela, para a cliente
+   * ver de onde veio o desconto. Sem negociação (ou negociado >= tabela), ausente.
+   */
+  tabelaTitulo?: string;
+  tabelaChip?: string;
+  tabelaLinhas?: string[];
+  tabelaValor?: number;
   ajustes: LinhaAjusteImagem[];
   total: number;
   observacaoTotal: string | null;
@@ -63,25 +71,45 @@ function taxaPorDisparo(n: number): string {
   return `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
 }
 
+type CamposFaixa =
+  | "faixaTitulo"
+  | "faixaSubtitulo"
+  | "faixaChip"
+  | "faixaLinhas"
+  | "valorDisparos"
+  | "tabelaTitulo"
+  | "tabelaChip"
+  | "tabelaLinhas"
+  | "tabelaValor";
+
 /** Texto da faixa de preço aplicada e a conta que levou ao valor dos disparos. */
 export function descreverFaixa(
   pricing: RentalPricingBreakdown,
   custoManualPorDisparo: number | null,
   disparos: number
-): Pick<DadosImagemCalculo, "faixaTitulo" | "faixaSubtitulo" | "faixaChip" | "faixaLinhas" | "valorDisparos"> {
+): Pick<DadosImagemCalculo, CamposFaixa> {
   if (custoManualPorDisparo != null) {
     const valor = Math.round(disparos * custoManualPorDisparo * 100) / 100;
     const linhas = [`${inteiro(disparos)} disparos x ${taxaPorDisparo(custoManualPorDisparo)} = ${reais(valor)}`];
-    if (pricing.totalValue > valor) {
-      linhas.push(`Tabela seria ${reais(pricing.totalValue)} (economia de ${reais(pricing.totalValue - valor)})`);
-    }
-    return {
+    const negociado: Pick<DadosImagemCalculo, CamposFaixa> = {
       faixaTitulo: "CUSTO NEGOCIADO",
       faixaSubtitulo: "Valor por disparo combinado",
       faixaChip: taxaPorDisparo(custoManualPorDisparo),
       faixaLinhas: linhas,
       valorDisparos: valor,
     };
+    const tabela = descreverFaixa(pricing, null, disparos);
+    // Só mostra a conta da tabela e o desconto quando o negociado sai mais barato.
+    if (tabela.valorDisparos > valor) {
+      const desconto = Math.round((tabela.valorDisparos - valor) * 100) / 100;
+      const pct = Math.round((desconto / tabela.valorDisparos) * 100);
+      linhas.push(`Desconto (${pct}%): ${reais(tabela.valorDisparos)} - ${reais(valor)} = ${reais(desconto)}`);
+      negociado.tabelaTitulo = tabela.faixaTitulo;
+      negociado.tabelaChip = tabela.faixaChip;
+      negociado.tabelaLinhas = tabela.faixaLinhas;
+      negociado.tabelaValor = tabela.valorDisparos;
+    }
+    return negociado;
   }
 
   const cfg = pricing.config;
@@ -191,7 +219,7 @@ export function montarDadosCalculo(params: {
   creditoUsado?: number;
 }): DadosImagemCalculo {
   const creditoUsado = Math.max(0, Math.round(params.creditoUsado ?? 0));
-  const faixa =
+  const faixa: Pick<DadosImagemCalculo, CamposFaixa> =
     params.pricing && params.disparos > 0
       ? descreverFaixa(params.pricing, params.custoManualPorDisparo, params.disparos)
       : faixaTudoNoCredito(creditoUsado || params.disparosRealizados || 0);
@@ -317,10 +345,23 @@ export function linhasRecibo(d: DadosImagemCalculo): LinhaRecibo[] {
       out.push({ tipo: "linha", rotulo: "Disparos cobrados", valor: inteiro(d.disparos) });
     }
   }
+  if (!ehMentoria && d.tabelaLinhas && d.tabelaLinhas.length && d.tabelaValor != null) {
+    const titulo = d.tabelaTitulo ?? "";
+    out.push({ tipo: "secao", rotulo: `Pela tabela · ${titulo.charAt(0)}${titulo.slice(1).toLowerCase()} · ${d.tabelaChip ?? ""}` });
+    for (const l of d.tabelaLinhas) {
+      const { rotulo, valor } = separarLinhaFaixa(l);
+      out.push({ tipo: "linha", rotulo, valor });
+    }
+    out.push({ tipo: "subtotal", rotulo: "Valor pela tabela", valor: reais(d.tabelaValor) });
+  }
   out.push({ tipo: "secao", rotulo: ehMentoria ? "Valor" : `${d.faixaTitulo.charAt(0)}${d.faixaTitulo.slice(1).toLowerCase()} · ${d.faixaChip}` });
   for (const l of d.faixaLinhas) {
     const { rotulo, valor } = separarLinhaFaixa(l);
-    out.push({ tipo: "linha", rotulo, valor });
+    // "Desconto (35%): R$ A - R$ B": a conta vai na linha de baixo, senão o
+    // rótulo não cabe ao lado do valor e sai cortado.
+    const desconto = /^(Desconto \(\d+%\)): (.+)$/.exec(rotulo);
+    if (desconto) out.push({ tipo: "linha", rotulo: desconto[1], detalhe: desconto[2], valor });
+    else out.push({ tipo: "linha", rotulo, valor });
   }
   out.push({ tipo: "subtotal", rotulo: ehMentoria ? "Valor da mentoria" : "Valor dos disparos", valor: reais(d.valorDisparos) });
   if (d.ajustes.length) {
