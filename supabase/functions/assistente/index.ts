@@ -394,7 +394,7 @@ const CATEGORIAS = ["prospeccao", "relacionamento", "vendas", "financeiro", "age
 const FERRAMENTAS_INSIGHTS = [
   {
     name: "registrar_insights",
-    description: "Grava os insights da rodada (de 6 a 8) na tela Cérebro. Uma chamada com todos.",
+    description: "Grava os insights da rodada (de 5 a 7) na tela Cérebro. Uma chamada com todos.",
     input_schema: {
       type: "object",
       properties: {
@@ -1091,7 +1091,7 @@ Deno.serve(async (req) => {
         headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
         body: JSON.stringify({
           model: MODELO,
-          max_tokens: 8000,
+          max_tokens: modoInsights ? 12000 : 8000,
           system: [
             { type: "text", text: pessoal ? CONHECIMENTO_PESSOAL : CONHECIMENTO, cache_control: { type: "ephemeral" } },
             ...(modoInsights ? [{ type: "text", text: INSIGHTS }] : []),
@@ -1153,9 +1153,19 @@ Deno.serve(async (req) => {
     mensagens.push({ role: "assistant", content: blocos });
 
     const usos = blocos.filter((b): b is Extract<Bloco, { type: "tool_use" }> => b.type === "tool_use");
-    if (modoInsights && (dados.stop_reason !== "tool_use" || usos.length === 0)) {
-      if (ultimaRodada) return json({ erro: "A IA não gravou os insights desta vez. Tente de novo." }, 502);
-      mensagens.push({ role: "user", content: "Grave agora os insights com a ferramenta registrar_insights, numa chamada só, sem texto antes." });
+    // Cérebro: aceita a gravação mesmo se a resposta foi cortada no fim (max_tokens), desde que
+    // já tenham vindo insights. Sem isso, tenta de novo trocando o pedido (sem deixar um tool_use
+    // sem tool_result na conversa, que a API recusa com 400).
+    const comItens = usos.some((u) => Array.isArray((u.input as { itens?: unknown[] })?.itens) && ((u.input as { itens?: unknown[] }).itens?.length ?? 0) > 0);
+    if (modoInsights && !(usos.length > 0 && (dados.stop_reason === "tool_use" || comItens))) {
+      if (ultimaRodada) return json({ erro: "A IA não conseguiu gravar os insights desta vez. Tente de novo em alguns minutos." }, 502);
+      mensagens.pop();
+      mensagens[mensagens.length - 1] = {
+        role: "user",
+        content:
+          pergunta +
+          " Grave já, com a ferramenta registrar_insights, no máximo 5 insights, cada campo curto (texto em 2 frases, acao em até 3 frases), sem texto antes.",
+      };
       continue;
     }
     if (dados.stop_reason !== "tool_use" || usos.length === 0) {

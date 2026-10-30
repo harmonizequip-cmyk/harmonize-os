@@ -203,9 +203,9 @@ Você é o sócio estratégico do Eder. Sua tarefa agora é produzir insights po
 3. Cruze com o que você sabe de mercado de estética e de locação de equipamentos (prospecção de clínicas, abordagem de médicos e biomédicos, parcerias, eventos, pacotes, recorrência, conteúdo, indicação). Ideia sem dado próprio é bem-vinda, mas diga que é ideia de mercado.
 
 ## O que entregar
-Grave de 6 a 8 insights com registrar_insights (uma chamada só, com todos; seja direto em cada campo, o tempo é curto), variados nas categorias, com pelo menos 2 que surpreendam (algo que o Eder provavelmente não percebeu nos próprios números ou uma abordagem fora do óbvio). Cada insight:
+Grave de 5 a 7 insights com registrar_insights (uma chamada só, com todos; seja direto e curto em cada campo, o tempo e o tamanho da resposta são limitados: texto em 2 a 3 frases, acao em até 4 frases), variados nas categorias, com pelo menos 2 que surpreendam (algo que o Eder provavelmente não percebeu nos próprios números ou uma abordagem fora do óbvio). Cada insight:
 - titulo: uma frase forte e específica (ex.: "7 clientes que alugavam todo mês sumiram há mais de 60 dias"), nunca genérico ("melhore o relacionamento").
-- texto: o que os dados mostram e por que isso importa para o caixa ou para o crescimento, em 2 a 4 frases.
+- texto: o que os dados mostram e por que isso importa para o caixa ou para o crescimento, em 2 a 3 frases.
 - acao: o próximo passo concreto para esta semana. Quando for abordagem, inclua a mensagem pronta ou o roteiro curto (tratamento + primeiro nome, tom do Eder, sem travessão).
 - evidencia: os números exatos que sustentam (ex.: "última locação média há 74 dias; ticket médio R$ 1.850"). Ideia de mercado: "ideia de mercado, sem dado próprio".
 - impacto: 3 = mexe no caixa ou no crescimento já; 2 = importante; 1 = melhoria.
