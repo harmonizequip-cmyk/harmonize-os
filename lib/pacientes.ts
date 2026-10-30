@@ -13,6 +13,8 @@ export interface PacienteCadastro {
   whatsapp: string | null;
   nascimento: string | null;
   observacoes: string | null;
+  /** Quando o paciente autorizou as fotos (nulo = não autorizou; ausente antes do SQL das fotos). */
+  fotos_autorizadas_em?: string | null;
 }
 
 /** O mínimo de cada planejamento que a lista precisa. */

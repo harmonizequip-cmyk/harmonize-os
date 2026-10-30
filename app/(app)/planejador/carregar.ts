@@ -26,6 +26,7 @@ export { um };
 
 const COLUNAS_LISTA =
   "id, client_id, calendar_event_id, paciente, data, data_retorno, procedimento, saldo_total, total_disparos, updated_at, sessoes_total:estado->>sessoesTotal, sessao_atual:estado->>sessaoAtual";
+const COLUNAS_PACIENTE = "id, client_id, nome, whatsapp, nascimento, observacoes";
 const DO_DONO = ", clients(name, display_name, treatment), autor:profiles!planejamentos_created_by_fkey(cliente_id)";
 
 /**
@@ -37,10 +38,16 @@ export async function carregarListaPlanejador(supabase: SupabaseClient, portal =
   const extra = portal ? "" : DO_DONO;
   const consulta = (colunas: string) =>
     supabase.from("planejamentos").select(colunas).order("data", { ascending: false }).order("updated_at", { ascending: false }).limit(1000);
-  const [planos, pacientes] = await Promise.all([
+  const consultaPacientes = (colunas: string) => supabase.from("pacientes").select(colunas).order("nome").limit(5000);
+  const [planos, pacientesComFotos] = await Promise.all([
     consulta(COLUNAS_LISTA + ", paciente_id" + extra),
-    supabase.from("pacientes").select("id, client_id, nome, whatsapp, nascimento, observacoes").order("nome").limit(5000),
+    consultaPacientes(COLUNAS_PACIENTE + ", fotos_autorizadas_em"),
   ]);
+  let pacientes = pacientesComFotos;
+  // Antes do SQL das fotos a coluna fotos_autorizadas_em não existe.
+  if (pacientes.error && (pacientes.error.code === "42703" || /fotos_autorizadas_em/.test(pacientes.error.message ?? ""))) {
+    pacientes = await consultaPacientes(COLUNAS_PACIENTE);
+  }
   let { data, error } = planos as { data: any[] | null; error: { code?: string; message?: string } | null };
   if (error && (error.code === "42703" || /paciente_id/.test(error.message ?? ""))) {
     ({ data, error } = (await consulta(COLUNAS_LISTA + extra)) as { data: any[] | null; error: { code?: string; message?: string } | null });
@@ -57,7 +64,7 @@ export async function carregarListaPlanejador(supabase: SupabaseClient, portal =
   }));
   return {
     lista,
-    pacientes: (pacientes.error ? [] : pacientes.data ?? []) as import("@/lib/pacientes").PacienteCadastro[],
+    pacientes: (pacientes.error ? [] : pacientes.data ?? []) as unknown as import("@/lib/pacientes").PacienteCadastro[],
     temCadastro: !pacientes.error,
     erro: error ? "Não consegui carregar os planejamentos." : null,
   };

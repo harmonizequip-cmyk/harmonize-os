@@ -27,6 +27,8 @@ import { idade, situacaoDoPlano, type PacienteResumo, type PlanoDoPaciente } fro
 import { saldoParaProximaSessao } from "@/lib/historico-paciente";
 import SeloSituacao from "@/components/planejador/SeloSituacao";
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
+import FotosPaciente from "@/components/planejador/FotosPaciente";
+import { areasCorporaisDosPlanos } from "@/lib/fotos-paciente";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -130,6 +132,8 @@ export default function FichaPaciente({
 
   const resumo = useMemo(() => (entradas ? resumirHistorico(entradas) : null), [entradas]);
   const tempo = useMemo(() => (entradas ? montarLinhaDoTempo(entradas) : []), [entradas]);
+  // Só as áreas corporais separam as fotos (o facial fica todo em "Rosto").
+  const areasCorporais = useMemo(() => (entradas ? areasCorporaisDosPlanos(entradas.map((e) => e.estado)) : []), [entradas]);
   const paraJuntar = outros.filter((o) => o.pacienteId && o.pacienteId !== paciente?.pacienteId);
 
   if (!montado || !paciente) return null;
@@ -337,6 +341,19 @@ export default function FichaPaciente({
                 </dl>
               )}
             </section>
+          )}
+
+          {/* Fotos (só o dono; dado sensível, pede autorização do paciente). */}
+          {!portal && paciente.pacienteId && !somenteLeitura && (
+            <FotosPaciente
+              key={paciente.pacienteId}
+              pacienteId={paciente.pacienteId}
+              nomePaciente={paciente.nome}
+              autorizadoEm={cad?.fotos_autorizadas_em ?? null}
+              planos={paciente.planos.map((p) => ({ id: p.id, data: p.data, procedimento: p.procedimento }))}
+              areas={areasCorporais}
+              onMudou={onMudou}
+            />
           )}
 
           {/* Planejamentos (cada um com as suas sessões). */}

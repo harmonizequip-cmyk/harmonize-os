@@ -13,6 +13,8 @@ import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import FichaPaciente from "@/components/planejador/FichaPaciente";
 import SeloSituacao from "@/components/planejador/SeloSituacao";
 import { normalizarNome } from "@/lib/historico-paciente";
+import { createClient } from "@/lib/supabase/client";
+import { formatarTamanho } from "@/lib/fotos-paciente";
 import {
   agruparPacientesPorCliente,
   agruparPorPaciente,
@@ -162,6 +164,23 @@ export default function PlanejadorLista({
   const [situacao, setSituacao] = useState<"" | Situacao>("");
   const [diaHipro, setDiaHipro] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
+  const [usoFotos, setUsoFotos] = useState<number | null>(null);
+
+  // Espaço usado pelas fotos dos pacientes (antes do SQL das fotos, não mostra nada).
+  useEffect(() => {
+    if (portal) return;
+    let ativo = true;
+    createClient()
+      .rpc("uso_fotos_pacientes")
+      .then(({ data, error }) => {
+        if (!ativo || error) return;
+        const r = (Array.isArray(data) ? data[0] : data) as { fotos?: number; bytes?: number } | null;
+        if (r && r.bytes !== undefined && r.bytes !== null) setUsoFotos(Number(r.bytes) || 0);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [portal]);
 
   const todos = useMemo(() => agruparPorPaciente(planejamentos, pacientes, hoje), [planejamentos, pacientes, hoje]);
   const nomeDaCliente = (id: string | null, sugestao: string | null) => sugestao || clientes.find((c) => c.id === id)?.name || (id ? "Cliente" : "Sem cliente");
@@ -346,6 +365,7 @@ export default function PlanejadorLista({
           <p className="text-sm text-neutral-500">
             {grupos.length} {grupos.length === 1 ? "cliente" : "clientes"} · {todos.length} {todos.length === 1 ? "paciente" : "pacientes"}
           </p>
+          {usoFotos !== null && <p className="text-[11px] text-neutral-400">Fotos: {formatarTamanho(usoFotos)} de 1 GB do plano gratuito</p>}
         </div>
         {!somenteLeitura && (
           <Link href={linkNovoPlanejamento(null)} className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2.5 text-sm font-semibold text-white">
