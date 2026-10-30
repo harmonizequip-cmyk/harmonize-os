@@ -29,8 +29,8 @@ ORDEM = [
     "client_tags", "calendar_events", "rentals", "rental_payments", "transactions",
     "emprestimos", "mentoring_events", "expense_limits", "tasks",
     "contratos_emitidos", "movimentacoes", "creditos_cliente", "locacao_contagens",
-    "reserva_contagens", "pacientes", "planejamentos", "convites_cadastro",
-    "cadastros_recebidos", "agenda_envios", "orcamentos_pessoais", "insights",
+    "reserva_contagens", "pacientes", "planejamentos", "paciente_fotos",
+    "convites_cadastro", "cadastros_recebidos", "agenda_envios", "orcamentos_pessoais", "insights",
     "assistente_memoria", "cliente_anotacoes", "campanhas", "campanha_envios",
 ]
 # Tabelas que o schema.sql já semeia com linhas padrão: saem antes da carga.
