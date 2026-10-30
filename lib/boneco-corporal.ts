@@ -16,6 +16,7 @@ export const CATALOGO_CORPORAL: RegiaoCorporal[] = [
   { id: "abdomen", nome: "Abdômen", bilateral: false, tipo: "gordura" },
   { id: "flancos", nome: "Flancos", bilateral: true, tipo: "gordura" },
   { id: "bracos", nome: "Braços", bilateral: true, tipo: "flacidez" },
+  { id: "maos", nome: "Mãos", bilateral: true, tipo: "flacidez" },
   { id: "costas", nome: "Costas (dobra do sutiã)", bilateral: true, tipo: "gordura" },
   { id: "gluteos", nome: "Glúteos", bilateral: true, tipo: "flacidez" },
   { id: "culote", nome: "Culote", bilateral: true, tipo: "gordura" },
@@ -62,6 +63,8 @@ const FORMAS: Record<string, Partial<Record<Vista, Forma[]>>> = {
     costas: par("M34,84 C36,90 35.5,97 35,104 L42,106 C42,98 41.5,91 40.5,84 Z"),
   },
   bracos: { costas: par("M30,44 C26,47 24,54 23,64 C22,70 22,74 21,80 L27,81 C28,73 29,65 31,56 Z") },
+  // Dorso das mãos: as mesmas elipses das mãos da silhueta.
+  maos: { frente: parE(16, 121, 3.5, 6), costas: parE(16, 121, 3.5, 6) },
   costas: { costas: [{ d: "M33,56 C44,60 56,60 67,56 L67,68 C56,72 44,72 33,68 Z" }] },
   gluteos: { costas: parE(42, 113, 8, 9.5) },
   culote: {

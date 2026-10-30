@@ -34,6 +34,16 @@ export const REGIOES_FOTO: Record<string, Partial<Record<Vista, Elipse[]>>> = {
       [64, 40, 3.5, 14],
     ],
   },
+  maos: {
+    frente: [
+      [10.5, 108.5, 3.6, 10, -15],
+      [65.5, 108.5, 3.6, 10, 15],
+    ],
+    costas: [
+      [8.5, 111, 3.3, 9.5, -15],
+      [64.5, 111, 3.3, 9.5, 15],
+    ],
+  },
   costas: { costas: [[38, 58, 16, 5]] },
   gluteos: {
     costas: [

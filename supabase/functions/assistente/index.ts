@@ -48,8 +48,8 @@ type Bloco =
 type Mensagem = { role: "user" | "assistant"; content: string | Bloco[] };
 
 // Áreas do seletor (lib/planejamento.ts CATALOGO_AREAS + lib/boneco-corporal.ts CATALOGO_CORPORAL).
-const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
-const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_CORPORAIS = ["abdomen", "flancos", "bracos", "maos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
+const AREAS_SELETOR = ["pescoco", "papada", "submandibular", "jowls", "arcomandibular", "frontal", "perioral_sup", "perioral_inf", "olhos", "mento", "abdomen", "flancos", "bracos", "maos", "costas", "gluteos", "culote", "coxa_interna", "coxa_anterior", "coxa_posterior", "joelhos", "panturrilhas"];
 
 const FERRAMENTAS = [
   {

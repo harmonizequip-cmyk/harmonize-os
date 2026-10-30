@@ -441,6 +441,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 - `CustoDisparos.tsx`: Painel de custos de disparos do planejador (`CustoDisparos`): multiplica disparos por 0,12, 0,10 e 0,07 e gera imagem. Não acessa o banco.
 - `FichaPaciente.tsx`: Ficha do paciente do Planejador (`FichaPaciente`, tela cheia): saldo de disparos para usar com "Continuar", números, "Novo planejamento" já com o paciente, dados do cadastro (`salvar_paciente`), os planejamentos dele (HIPRO Day, procedimento, disparos, selo Pendente/Concluído e as sessões de cada um) com "Selecionar para apagar" (apaga só os escolhidos por `excluir_planejamento`, depois de escrever APAGAR) e "Mais opções" para juntar cadastro repetido (`juntar_pacientes`) ou excluir cadastro sem planejamento (`excluir_paciente`). Lê `planejamentos`.
+- `FotosPaciente.tsx`: Seção Fotos da ficha do paciente (piloto só do dono): autorização do paciente, envio por etapa e área corporal, grade de miniaturas com `loading="lazy"`, visualizador com anterior/próxima e Apagar foto, e Comparar duas etapas lado a lado.
 - `Partes.tsx`: Peças do Planejador HIPRO nativo: folha (bottom sheet), campo de disparos com - e +, cartão de área (modelo facial + linhas por profundidade), folha da modelo ampliada e folha de área manual.
 - `ResumoPlano.tsx`: Aba Resumo: números do plano, alertas, distribuição por área (barras com a modelo de cada área) e prévia do texto, do prontuário e da ficha do paciente.
 - `SeloSituacao.tsx`: Selo de situação do Planejador (`SeloSituacao`): laranja "Pendente" (ainda há disparos para a próxima sessão, com o detalhe) ou verde "Concluído".
@@ -525,6 +526,9 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `falar.ts`: Leitura em voz alta com a voz do próprio aparelho (speechSynthesis do navegador, grátis). No Android usa a voz do Google em português. Texto longo vai em pedaços de frase: o Chrome corta falas muito longas.
 - `format.ts`: Formatação comum: `formatCurrency`, `formatDate`, `toUpperTrim`, `toUpperOrNull`, `buildMapsLink`, `buildWazeLink`, `buildWhatsAppLink` e `extractCityFromAddress`. Não acessa o banco.
 - `foto.ts`: JPEG. Uma foto de 4 MB do celular vira algo perto de 200 KB, o que cabe muitas no plano gratuito do Supabase e sobe rápido no 4G.
+- `fotos-paciente-envio.ts`: Envio e leitura das fotos do paciente: reduz no aparelho (1.600 px JPEG 0,85 e miniatura de 400 px), sobe para a pasta `fotos-pacientes`, registra por `registrar_foto_paciente` (apaga os arquivos se falhar), apaga por `excluir_foto_paciente` e reaproveita URLs assinadas de 24 h (`urlsAssinadas`).
+- `fotos-paciente.test.ts`: Testes automatizados (Vitest) das regras de `lib/fotos-paciente.ts`.
+- `fotos-paciente.ts`: Regras puras das fotos dos pacientes: etapas (`ETAPAS_FOTO`), caminhos no Storage (`caminhosDaFoto`), medidas reduzidas, agrupamento por etapa e área (`agruparFotos`), áreas corporais dos planejamentos (`areasCorporaisDosPlanos`) e tamanho formatado.
 - `funil-clientes.ts`: Funil de clientes: a etapa não é gravada no banco, é calculada aqui a partir de dados que já existem (reservas futuras, taxa de reserva e última locação concluída). Assim ela nunca fica desatualizada: paga a taxa, a etapa muda sozinha; passam 45 dias, cai em Reativar sozinha.
 - `grafico-fluxo.test.ts`: Testes automatizados (Vitest) das regras de `lib/grafico-fluxo.ts`.
 - `grafico-fluxo.ts`: Contas dos gráficos do Dashboard (sem React, para testar). Fluxo: entradas e saídas por dia (ou por mês, em período longo) e o resultado acumulado ao longo do período. Categorias: soma por categoria, as maiores primeiro, o resto em "Outras".
@@ -703,6 +707,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `2026-10-26-bloquear-exclusao-cliente-com-movimentos.sql`: Migration: Excluir cliente: quem tem movimentos não pode ser apagado (decisão do dono, 26/10/2026: "Quem tem movimentos deve bloquear") A trava da Leva P.3 (2026-09-25-leva-p3-excluir-cliente-lead.sql) recusava excluir lead/cliente com locação ou lançamento. Ela se perdeu quando 2026-10-03-despesas-ligadas-a-locacao.sql recriou delete_record_forever a partir de uma versão anterior: desde então o ramo 'clients' apagava em cascata locações, lançamentos, taxas e agenda, e o botão "Excluir" da ficha podia apagar faturamento.
 - `2026-10-26-campanha-registra-anotacao.sql`: Migration: Campanhas registram anotação na cliente (26/10/2026) Pedido do dono: tudo o que acontece numa campanha fica no histórico da cliente, como anotação (tabela cliente_anotacoes, a mesma do painel "Anotações" e que o assistente lê pelo dossiê). 1. cliente_anotacoes aceita a origem 'campanha' (as linhas existentes continuam válidas: só se acrescenta um valor ao check). 2. registrar_envio_campanha grava a anotação, na mesma transação, quando o status MUDA para enviado, respondeu, agendou ou nao_quer. Gravar de novo o mesmo status não duplica; 'pulado' não gera anotação (não houve contato).
 - `2026-10-30-pacientes.sql`: Migration: Cadastro de pacientes do Planejador HIPRO (pedido do dono, 30/10/2026). Cada paciente pertence à cliente (profissional) que o atende: o paciente da Dra. Ana fica com a Dra. Ana, e no portal ela vê só os dela. Todo planejamento com nome de paciente fica ligado a um cadastro (planejamentos.paciente_id), então a ficha do paciente junta todas as sessões, mesmo quando o procedimento se repete ou muda de área. salvar_planejamento não muda de assinatura: o editor manda o id escolhido dentro do estado (estado.pacienteId).
+- `2026-10-31-fotos-pacientes.sql`: Migration: Fotos dos pacientes do Planejador HIPRO (piloto só para o dono, 31/10/2026). Cada foto é de um paciente (tabela pacientes), de uma etapa (antes, imediato, 30, 60 e 90 dias) e, se quiser, de uma área tratada e de um planejamento. Os arquivos ficam na pasta privada "fotos-pacientes" do Storage: p/<paciente_id>/<etapa>/<id>.jpg e p/<paciente_id>/<etapa>/<id>_mini.jpg Piloto: só o dono (administrador ativo, que não é só de visualização nem login de cliente) vê e envia. Clientes do portal e o acesso de visualização não veem nada, nem a lista, nem os arquivos.
 
 #### `public/`
 
@@ -780,7 +785,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 ## 1.2 Dicionário de dados e tabelas
 
-O banco tem **41 tabelas**, **11 views**, **6 tipos enumerados**, **145 funções** (nomes distintos), **68 gatilhos**, **93 políticas RLS** (tabelas e Storage), **3 pastas no Storage**, **3 segredos no Vault** e **3 rotinas no pg_cron**. Além do banco, o app guarda estado no navegador (localStorage, sessionStorage, Cache Storage) e em objetos de memória, listados no fim desta seção.
+O banco tem **42 tabelas**, **11 views**, **6 tipos enumerados**, **150 funções** (nomes distintos), **69 gatilhos**, **97 políticas RLS** (tabelas e Storage), **4 pastas no Storage**, **3 segredos no Vault** e **3 rotinas no pg_cron**. Além do banco, o app guarda estado no navegador (localStorage, sessionStorage, Cache Storage) e em objetos de memória, listados no fim desta seção.
 
 Convenções gerais:
 
@@ -2016,7 +2021,7 @@ Gatilhos:
 
 - `trg_somente_leitura` (BEFORE INSERT OR DELETE OR UPDATE, por comando) executa `bloquear_somente_leitura()`
 
-Funções que gravam nesta tabela: `adiar_previsao_manutencao`, `alterar_fim_bloqueio_equipamento`, `aplicar_previsoes_manutencao_vencidas`, `arquivar_campanha`, `arquivar_categoria`, `cancelar_agendamento`, `cancelar_locacao`, `confirmar_agendamento`, `confirmar_cadastro_recebido`, `convite_cadastro_receber`, `corrigir_contagens_locacao`, `criar_bloqueio_equipamento`, `definir_contagem_inicial_reserva`, `definir_custo_disparo_manual_locacao`, `definir_deslocamento_locacao`, `definir_deslocamento_reserva`, `definir_status_equipamento`, `definir_taxa_agendamento`, `delete_record_forever`, `desfazer_conclusao_tarefa`, `desfazer_envio_campanha`, `desfazer_importacao_cartao`, `desfazer_pagamento_locacao`, `desfazer_troca_ponteira_reserva`, `editar_emprestimo`, `editar_pagamento_locacao`, `editar_transacao`, `excluir_anotacao_cliente`, `excluir_bloqueio_equipamento`, `excluir_campanha`, `excluir_categoria`, `excluir_cidade`, `excluir_compra_cartao`, `excluir_conta_pix`, `excluir_paciente`, `excluir_planejamento`, `importar_compras_cartao`, `juntar_pacientes`, `lancar_credito_cliente`, `liberar_acesso_planejador`, `liberar_acesso_visualizacao`, `liberar_portal_cliente`, `marcar_locacao_paga`, `marcar_realizada`, `montar_aplicador`, `pagar_fatura_cartao`, `reagendar_agendamento`, `reativar_agendamento`, `registrar_compra_cartao`, `registrar_contagens_locacao`, `registrar_despesa_locacao`, `registrar_despesa_reserva`, `registrar_emprestimo`, `registrar_envio_agenda`, `registrar_envio_campanha`, `registrar_leitura_aplicador`, `registrar_movimentacao`, `registrar_pagamento_locacao`, `registrar_pedido_confirmacao`, `registrar_permuta`, `registrar_revisao_equipamento`, `remover_acesso_planejador`, `remover_acesso_visualizacao`, `remover_emprestimo`, `remover_pagamento_locacao`, `salvar_anotacao_cliente`, `salvar_aplicador`, `salvar_campanha`, `salvar_cartao`, `salvar_categoria`, `salvar_cidade`, `salvar_conta_pix`, `salvar_orcamento_pessoal`, `salvar_paciente`, `salvar_planejamento`, `sincronizar_manutencao_por_bloqueio`, `transferir_cliente_locacao`, `trocar_ponteira_reserva`, `update_rental`, `usar_credito_valor`, `validar_equipamento_coerente`.
+Funções que gravam nesta tabela: `adiar_previsao_manutencao`, `alterar_fim_bloqueio_equipamento`, `aplicar_previsoes_manutencao_vencidas`, `arquivar_campanha`, `arquivar_categoria`, `cancelar_agendamento`, `cancelar_locacao`, `confirmar_agendamento`, `confirmar_cadastro_recebido`, `convite_cadastro_receber`, `corrigir_contagens_locacao`, `criar_bloqueio_equipamento`, `definir_autorizacao_fotos`, `definir_contagem_inicial_reserva`, `definir_custo_disparo_manual_locacao`, `definir_deslocamento_locacao`, `definir_deslocamento_reserva`, `definir_status_equipamento`, `definir_taxa_agendamento`, `delete_record_forever`, `desfazer_conclusao_tarefa`, `desfazer_envio_campanha`, `desfazer_importacao_cartao`, `desfazer_pagamento_locacao`, `desfazer_troca_ponteira_reserva`, `editar_emprestimo`, `editar_pagamento_locacao`, `editar_transacao`, `excluir_anotacao_cliente`, `excluir_bloqueio_equipamento`, `excluir_campanha`, `excluir_categoria`, `excluir_cidade`, `excluir_compra_cartao`, `excluir_conta_pix`, `excluir_foto_paciente`, `excluir_paciente`, `excluir_planejamento`, `importar_compras_cartao`, `juntar_pacientes`, `lancar_credito_cliente`, `liberar_acesso_planejador`, `liberar_acesso_visualizacao`, `liberar_portal_cliente`, `marcar_locacao_paga`, `marcar_realizada`, `montar_aplicador`, `pagar_fatura_cartao`, `reagendar_agendamento`, `reativar_agendamento`, `registrar_compra_cartao`, `registrar_contagens_locacao`, `registrar_despesa_locacao`, `registrar_despesa_reserva`, `registrar_emprestimo`, `registrar_envio_agenda`, `registrar_envio_campanha`, `registrar_foto_paciente`, `registrar_leitura_aplicador`, `registrar_movimentacao`, `registrar_pagamento_locacao`, `registrar_pedido_confirmacao`, `registrar_permuta`, `registrar_revisao_equipamento`, `remover_acesso_planejador`, `remover_acesso_visualizacao`, `remover_emprestimo`, `remover_pagamento_locacao`, `salvar_anotacao_cliente`, `salvar_aplicador`, `salvar_campanha`, `salvar_cartao`, `salvar_categoria`, `salvar_cidade`, `salvar_conta_pix`, `salvar_orcamento_pessoal`, `salvar_paciente`, `salvar_planejamento`, `sincronizar_manutencao_por_bloqueio`, `transferir_cliente_locacao`, `trocar_ponteira_reserva`, `update_rental`, `usar_credito_valor`, `validar_equipamento_coerente`.
 
 Arquivos que acessam direto (`.from`): `app/(app)/clientes/[id]/HistoricoClienteSection.tsx`, `app/(app)/movimentacoes/page.tsx`.
 
@@ -2053,6 +2058,53 @@ Funções que gravam nesta tabela: `salvar_categoria`, `salvar_orcamento_pessoal
 
 Arquivos que acessam direto (`.from`): `app/(app)/pessoal/page.tsx`, `supabase/functions/assistente/index.ts`.
 
+#### `paciente_fotos`
+
+Fotos dos pacientes do Planejador por etapa (antes, imediato, 30, 60 e 90 dias) e área corporal; piloto só do dono (31/10/2026). Só quem passa em `pode_ver_fotos_paciente()` (admin ativo, não visualização, não cliente) lê; escrita só por `registrar_foto_paciente` e `excluir_foto_paciente`. Os arquivos ficam na pasta privada `fotos-pacientes` do Storage; o backup guarda só esta lista.
+
+| Nome do campo | Tipo de dado | Obrigatório | Valor padrão | Descrição / finalidade |
+|---|---|---|---|---|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | Identificador único da foto (também o nome do arquivo). |
+| `paciente_id` | `uuid` | Sim | (sem padrão) | Paciente da foto; apagar o paciente apaga a lista (mas `excluir_paciente` recusa quem tem fotos). `juntar_pacientes` move as fotos para o paciente mantido. |
+| `planejamento_id` | `uuid` | Não | (sem padrão) | Planejamento ligado à foto (opcional); apagar o planejamento só solta a ligação. |
+| `etapa` | `text` | Sim | (sem padrão) | Etapa da foto: antes, imediato, d30, d60 ou d90 (`ETAPAS_FOTO` em `lib/fotos-paciente.ts`). |
+| `area` | `text` | Não | (sem padrão) | Área corporal da foto (até 60 caracteres); nula = Rosto, onde fica todo o facial. |
+| `caminho` | `text` | Sim | (sem padrão) | Caminho da foto reduzida no Storage (`p/<paciente>/<etapa>/<id>.jpg`), único; a função confere o prefixo do paciente. |
+| `miniatura` | `text` | Sim | (sem padrão) | Caminho da miniatura de 400 px (`p/<paciente>/<etapa>/<id>_mini.jpg`), usada na grade. |
+| `largura` | `integer` | Não | (sem padrão) | Largura em pixels da foto reduzida. |
+| `altura` | `integer` | Não | (sem padrão) | Altura em pixels da foto reduzida. |
+| `tamanho_bytes` | `integer` | Sim | `0` | Tamanho somado da foto e da miniatura, usado por `uso_fotos_pacientes` para mostrar o uso do plano gratuito. |
+| `tirada_em` | `date` | Sim | `hoje_local()` | Dia da foto (padrão hoje no fuso de Brasília). |
+| `observacao` | `text` | Não | (sem padrão) | Observação opcional da foto. |
+| `created_by` | `uuid` | Não | `auth.uid()` | Login que enviou a foto. |
+| `created_at` | `timestamp with time zone` | Sim | `now()` | Quando a foto foi registrada. |
+
+Chaves e restrições:
+
+- PK `paciente_fotos_pkey`: `PRIMARY KEY (id)`
+- FK `paciente_fotos_created_by_fkey`: `created_by` → `profiles.id` (ON DELETE SET NULL)
+- FK `paciente_fotos_paciente_id_fkey`: `paciente_id` → `pacientes.id` (ON DELETE CASCADE)
+- FK `paciente_fotos_planejamento_id_fkey`: `planejamento_id` → `planejamentos.id` (ON DELETE SET NULL)
+- Única `paciente_fotos_caminho_key`: `UNIQUE (caminho)`
+- Check `paciente_fotos_area_check`: `CHECK (((area IS NULL) OR (length(area) <= 60)))`
+- Check `paciente_fotos_etapa_check`: `CHECK ((etapa = ANY (ARRAY['antes'::text, 'imediato'::text, 'd30'::text, 'd60'::text, 'd90'::text])))`
+
+Índices:
+
+- `paciente_fotos_paciente_etapa_idx`: `INDEX paciente_fotos_paciente_etapa_idx em paciente_fotos USING btree (paciente_id, etapa, tirada_em)`
+
+Segurança (RLS ligada):
+
+- Política `paciente_fotos_select` (SELECT, permissiva, papéis {public}): usando `pode_ver_fotos_paciente()`
+
+Gatilhos:
+
+- `trg_somente_leitura` (BEFORE INSERT OR DELETE OR UPDATE, por comando) executa `bloquear_somente_leitura()`
+
+Funções que gravam nesta tabela: `excluir_foto_paciente`, `juntar_pacientes`, `registrar_foto_paciente`.
+
+Arquivos que acessam direto (`.from`): `components/planejador/FotosPaciente.tsx`.
+
 #### `pacientes`
 
 Pacientes do Planejador HIPRO, cada um da cliente (profissional) que o atende (decisão do dono, 30/10/2026). `planejamentos.paciente_id` liga cada planejamento ao cadastro, e a ficha do paciente junta todas as sessões. Escrita só por `salvar_paciente`, `juntar_pacientes`, `excluir_paciente` e `salvar_planejamento` (que acha o paciente pelo nome ou cria). O login da cliente no portal lê só os dela (`pacientes_select_cliente`).
@@ -2068,6 +2120,7 @@ Pacientes do Planejador HIPRO, cada um da cliente (profissional) que o atende (d
 | `created_by` | `uuid` | Não | `auth.uid()` | Login que criou o cadastro. |
 | `created_at` | `timestamp with time zone` | Sim | `now()` | Quando o cadastro foi criado. |
 | `updated_at` | `timestamp with time zone` | Sim | `now()` | Última alteração da ficha. |
+| `fotos_autorizadas_em` | `timestamp with time zone` | Não | (sem padrão) | Quando o dono marcou que o paciente autorizou o uso das fotos (`definir_autorizacao_fotos`); nulo = sem autorização, e `registrar_foto_paciente` recusa. |
 
 Chaves e restrições:
 
@@ -2089,7 +2142,7 @@ Gatilhos:
 
 - `trg_somente_leitura` (BEFORE INSERT OR DELETE OR UPDATE, por comando) executa `bloquear_somente_leitura()`
 
-Funções que gravam nesta tabela: `excluir_paciente`, `juntar_pacientes`, `salvar_paciente`, `salvar_planejamento`.
+Funções que gravam nesta tabela: `definir_autorizacao_fotos`, `excluir_paciente`, `juntar_pacientes`, `salvar_paciente`, `salvar_planejamento`.
 
 Arquivos que acessam direto (`.from`): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/carregar.ts`.
 
@@ -3454,6 +3507,22 @@ erDiagram
     numeric limite
     timestamptz created_at
   }
+  paciente_fotos {
+    uuid id PK
+    uuid paciente_id FK
+    uuid planejamento_id FK
+    text etapa
+    text area
+    text caminho
+    text miniatura
+    integer largura
+    integer altura
+    integer tamanho_bytes
+    date tirada_em
+    text observacao
+    uuid created_by FK
+    timestamptz created_at
+  }
   pacientes {
     uuid id PK
     uuid client_id FK
@@ -3464,6 +3533,7 @@ erDiagram
     uuid created_by FK
     timestamptz created_at
     timestamptz updated_at
+    timestamptz fotos_autorizadas_em
   }
   planejamentos {
     uuid id PK
@@ -3721,6 +3791,9 @@ erDiagram
   clients ||--o{ pacientes : "client_id"
   profiles ||--o{ pacientes : "created_by"
   pacientes ||--o{ planejamentos : "paciente_id"
+  profiles ||--o{ paciente_fotos : "created_by"
+  pacientes ||--|{ paciente_fotos : "paciente_id"
+  planejamentos ||--o{ paciente_fotos : "planejamento_id"
 ```
 
 Relacionamentos com tabelas fora do esquema `public` (não desenhados): nenhum. `profiles.id` é o mesmo id de `auth.users` (criado pelo gatilho de cadastro do Auth).
@@ -3756,6 +3829,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `creditos_apagar_gasto_pessoal` | (nenhum) | `trigger` | Sim | postgres | `transactions` D | Função de gatilho. Apagou a permuta (a saída da Harmonize leva a linha do crédito junto): o gasto pessoal vai também. |
 | `criar_bloqueio_equipamento` | `p_equipment_id uuid, p_tipo text, p_inicio date, p_fim date, p_motivo text` | `uuid` | Sim | authenticated,postgres,service_role | `bloqueios_equipamento` CR, `equipments` RU, `movimentacoes` C | Chamada em: `components/BloqueiosEquipamento.tsx`. |
 | `criar_convite_cadastro` | `p_client_id uuid` | `text` | Sim | authenticated,postgres,service_role | `clients` R, `convites_cadastro` CR | Dono gera o link. Para uma cliente, reaproveita o link ainda aberto dela. Chamada em: `components/AcessoPlanejadorCard.tsx`, `components/LinkCadastroBotao.tsx`. |
+| `definir_autorizacao_fotos` | `p_paciente_id uuid, p_autorizado boolean` | `void` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `paciente_fotos` R, `pacientes` RU | 4. Funções. Chamada em: `components/planejador/FotosPaciente.tsx`. |
 | `definir_contagem_inicial_reserva` | `p_event_id uuid, p_contagem bigint` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` RU, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rentals` R, `tasks` R, `transactions` R | CONTAGEM INICIAL GUARDADA NA RESERVA (2026-10-05) p_contagem nulo apaga a contagem registrada. Chamada em: `app/(app)/agenda/EditarEventoModal.tsx`. |
 | `definir_custo_disparo_manual_locacao` | `p_rental_id uuid, p_custo_disparo_manual numeric` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rentals` RU, `tasks` R, `transactions` R | Chamada em: `components/CalculadoraLocacaoModal.tsx`. |
 | `definir_deslocamento_locacao` | `p_rental_id uuid, p_km_ida numeric, p_valor_deslocamento numeric, p_incluso_no_valor boolean` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` R, `rentals` RU, `tasks` R, `transactions` RD | 4. Definir deslocamento da locação: não cria mais lançamento no Financeiro; só grava o valor e recalcula o "pago". Recusa deixar o devido abaixo do que já foi recebido. Chamada em: `app/(app)/agenda/EditarEventoModal.tsx`, `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`, `components/CalculadoraLocacaoModal.tsx`. |
@@ -3786,9 +3860,10 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `excluir_cidade` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `cidades_coordenadas` RD, `movimentacoes` C | Chamada em: `app/(app)/configuracoes/secoes/Cidades.tsx`. |
 | `excluir_compra_cartao` | `p_compra_grupo uuid` | `void` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `transactions` RD | Apaga uma compra inteira (todas as parcelas). Chamada em: `app/(app)/financeiro/cartoes/CartoesClient.tsx`. |
 | `excluir_conta_pix` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `contas_pix` RD, `movimentacoes` C, `rental_payments` R | Apaga só conta que nunca recebeu pagamento e não é a padrão. Chamada em: `app/(app)/configuracoes/secoes/ContasPix.tsx`. |
+| `excluir_foto_paciente` | `p_id uuid` | `jsonb` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `paciente_fotos` D, `pacientes` R | Chamada em: `lib/fotos-paciente-envio.ts`. |
 | `excluir_locacao_cascata` | `p_rental_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` RUD, `mentoring_events` U, `rentals` UD, `transactions` RD | Cascata de uma locação: quebra os ciclos de chave estrangeira (com a transação, com a taxa) antes de apagar, na ordem que o banco permite. |
 | `excluir_mentoria_cascata` | `p_mentoria_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` UD, `mentoring_events` RUD, `transactions` UD | Cascata de uma mentoria. |
-| `excluir_paciente` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `pacientes` D, `planejamentos` R, `rentals` R | 6. Excluir cadastro: só sem planejamento. Chamada em: `components/planejador/FichaPaciente.tsx`. |
+| `excluir_paciente` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `paciente_fotos` R, `pacientes` D, `planejamentos` R, `rentals` R | Chamada em: `components/planejador/FichaPaciente.tsx`. |
 | `excluir_planejamento` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `planejamentos` D, `rentals` R | Chamada em: `app/(app)/planejador/EditorPlanejamento.tsx`, `components/planejador/FichaPaciente.tsx`. |
 | `fatura_da_compra` | `p_data date, p_fechamento integer, p_vencimento integer` | `text` | Não | authenticated,postgres,service_role | (nenhuma) | Fatura (mês do vencimento, 'AAAA-MM') em que cai uma compra feita em p_data. |
 | `finalize_rental_reservation` | `p_calendar_event_id uuid, p_shots integer, p_calculated_value numeric, p_payment_method payment_method_type, p_notes text, p_pix_conta text, p_pago boolean` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` RU, `categories` R, `clients` RU, `rental_payments` CR, `rentals` CRU, `transactions` C | 5. Finalizar reserva: o deslocamento da reserva vai para a locação como valor a receber, sem lançamento próprio no Financeiro. Chamada em: `components/CalculadoraLocacaoModal.tsx`. |
@@ -3804,7 +3879,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `importar_compras_cartao` | `p_cartao_id uuid, p_itens jsonb` | `jsonb` | Sim | authenticated,postgres,service_role | `cartoes` R, `categories` R, `movimentacoes` C, `transactions` C | Importar fatura: parcela antecipada movida de fatura leva o dia da compra junto (a data em si sai do gatilho, pelo vencimento da fatura nova). Chamada em: `components/ImportarFaturaModal.tsx`. |
 | `isentar_taxa_ao_trocar_cliente` | (nenhum) | `trigger` | Sim | postgres,service_role | `clients` R, `tasks` D | Função de gatilho. |
 | `isentar_taxa_de_parceiro` | (nenhum) | `trigger` | Sim | postgres,service_role | `calendar_events` U, `tasks` D | Função de gatilho. Parceiro não paga taxa também nas reservas que já existiam: virar parceiro, ou a reserva passar para um parceiro, tira a taxa pendente (migrations/2026-10-13-parceiro-sem-taxa.sql). |
-| `juntar_pacientes` | `p_manter uuid, p_juntar uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `pacientes` RUD, `planejamentos` U, `rentals` R | 5. Juntar dois cadastros do mesmo paciente (nome escrito de dois jeitos). Chamada em: `components/planejador/FichaPaciente.tsx`. |
+| `juntar_pacientes` | `p_manter uuid, p_juntar uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `paciente_fotos` U, `pacientes` RUD, `planejamentos` U, `rentals` R | 5. Excluir e juntar pacientes passam a cuidar das fotos. Chamada em: `components/planejador/FichaPaciente.tsx`. |
 | `keep_client_forever` | (nenhum) | `trigger` | Não | postgres,service_role | (nenhuma) | Função de gatilho. Marca como cliente ao entrar na etapa "cliente" e impede tirar a marca, preservando a data original (became_client_at). Convive com marcar_is_client (acima), que faz parte disso de outro jeito. |
 | `lancar_credito_cliente` | `p_client_id uuid, p_tipo text, p_quantidade numeric, p_descricao text` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `creditos_cliente` CR, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rentals` R, `tasks` R, `transactions` R | Ajuste manual do crédito (disparos ou R$ sem permuta). Positivo dá, negativo tira. Chamada em: `components/CreditosClienteCard.tsx`. |
 | `liberar_acesso_planejador` | `p_email text, p_client_id uuid` | `uuid` | Sim | authenticated,postgres,service_role | `clients` RU, `movimentacoes` C, `profiles` CR | 5. Acesso ao Planejador: um formulário preenchido com o e-mail de outra cliente fazia o "Liberar acesso" mudar o login dela para esta ficha (ela perdia os planejamentos). Agora recusa login que já é de outra cliente. Chamada em: `components/AcessoPlanejadorCard.tsx`. |
@@ -3817,6 +3892,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `normalizar_cidade` | `p_nome text` | `text` | Não | authenticated,postgres,service_role | (nenhuma) | CIDADES DO ENCAIXE (2026-10-24, migration 2026-10-24-cidades-coordenadas.sql) Cidades do encaixe no banco (24/10/2026, etapa 2b). A lista fixa de lib/cidades-coordenadas.ts (posição de cada cidade, usada no encaixe de datas livres para medir distância em linha reta) passa para a tabela cidades_coordenadas, editável em Configurações > Cidades. A migration copia exatamente as cidades de hoje; o app continua com a lista fixa de reserva se a tabela não puder ser lida. 1. normalizar_cidade(texto): igual a normalizarCidade do app ("JOÃO PESSOA - PB" vira "joao pessoa"). 2. Tabela cidades_coordenadas (nome normalizado único). 3. Escrita só por salvar_cidade e excluir_cidade. |
 | `normalizar_nome_paciente` | `p_nome text` | `text` | Não | authenticated,postgres,service_role | (nenhuma) | 1. Nome comparável: " JOÃO da Silva " = "joao da silva" (igual a normalizarNome em lib/historico-paciente.ts). |
 | `pagar_fatura_cartao` | `p_cartao_id uuid, p_fatura_ref text, p_valor numeric, p_data date, p_forma payment_method_type` | `uuid` | Sim | authenticated,postgres,service_role | `cartoes` R, `categories` R, `movimentacoes` C, `transactions` C | Pagamento da fatura: tira o dinheiro da conta, fora do resultado. Chamada em: `app/(app)/financeiro/cartoes/CartoesClient.tsx`. |
+| `pode_ver_fotos_paciente` | (nenhum) | `boolean` | Sim | authenticated,postgres,service_role | `profiles` R | 1. Quem pode ver e enviar fotos: só o dono. |
 | `portal_cliente` | (nenhum) | `TABLE(client_id uuid, nome text, profissional text)` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `rentals` R | Nome e "Profissional" (tratamento + nome) da cliente logada, para o portal. Chamada em: `app/(portal)/portal/carregar.ts`. |
 | `portal_situacao` | (nenhum) | `jsonb` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `profiles` R, `rentals` R | Situação do portal para a tela da própria cliente (mesmo travada). Chamada em: `app/(portal)/layout.tsx`. |
 | `portal_ultimo_atendimento` | `p_client_id uuid` | `date` | Sim | postgres,service_role | `calendar_events` R, `rentals` R | Último dia com atendimento de HIPRO da cliente (locação ou reserva não cancelada; a futura também). |
@@ -3837,6 +3913,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `registrar_emprestimo` | `p_devedor text, p_tipo text, p_valor numeric, p_forma payment_method_type, p_data date, p_descricao text, p_sem_caixa boolean` | `uuid` | Sim | authenticated,postgres,service_role | `categories` R, `emprestimos` CR, `movimentacoes` C, `transactions` C | Chamada em: `app/(app)/financeiro/NovoLancamentoModal.tsx`, `app/(app)/financeiro/emprestimos/EmprestimosClient.tsx`. |
 | `registrar_envio_agenda` | `p_client_id uuid, p_mensagem text, p_inicio date, p_fim date` | `uuid` | Sim | authenticated,postgres,service_role | `agenda_envios` C, `clients` R, `movimentacoes` C | Chamada em: `app/(app)/assistente/CartaoAgenda.tsx`. |
 | `registrar_envio_campanha` | `p_campanha uuid, p_client uuid, p_status text, p_mensagem text` | `uuid` | Sim | authenticated,postgres,service_role | `campanha_envios` CRU, `campanhas` R, `cliente_anotacoes` C, `clients` R, `movimentacoes` C | (versão da migration 2026-10-26-campanha-registra-anotacao.sql: grava anotação na cliente) Cria ou atualiza o envio de uma cliente numa campanha. 'enviado' grava a hora do envio (a primeira) e o texto exato; os outros status mantêm a hora. Campanha arquivada não recebe envio novo (só muda o que já existe). Cada mudança de status (menos 'pulado') vira anotação da cliente. Chamada em: `app/(app)/campanhas/FilaCampanha.tsx`, `app/(app)/campanhas/ResultadoCampanha.tsx`, `components/VinculoCampanha.tsx`. |
+| `registrar_foto_paciente` | `p_paciente_id uuid, p_etapa text, p_area text, p_caminho text, p_miniatura text, p_largura integer, p_altura integer, p_tamanho_bytes integer, p_tirada_em date DEFAULT NULL::date, p_planejamento_id uuid DEFAULT NULL::uuid, p_observacao text DEFAULT NULL::text` | `uuid` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `paciente_fotos` C, `pacientes` R, `planejamentos` R | Chamada em: `lib/fotos-paciente-envio.ts`. |
 | `registrar_leitura_aplicador` | `p_aplicador_id uuid, p_contador integer, p_data date` | `void` | Sim | authenticated,postgres,service_role | `aplicadores` U, `movimentacoes` C | Leitura do contador do aplicador: passa a ser a nova base. Chamada em: `components/AplicadoresCard.tsx`. |
 | `registrar_movimentacao` | `p_acao text, p_entidade text, p_entidade_id uuid, p_descricao text, p_detalhes jsonb` | `void` | Sim | postgres,service_role | `movimentacoes` C, `profiles` R | Escreve no histórico. usuario_nome é resolvido e gravado na hora, não por referência, para o histórico continuar legível mesmo depois que o perfil for removido. |
 | `registrar_pagamento_locacao` | `p_rental_id uuid, p_forma payment_method_type, p_valor numeric, p_data date, p_pix_conta text, p_notes text` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `categories` R, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` C, `rentals` R, `rentals_situacao_pagamento` R, `tasks` R, `transactions` CR | Registrar UM pagamento (parcial ou não). Chamar de novo para dividir entre formas (ex: parte em dinheiro, parte em PIX) ou completar um saldo em aberto, pago/pago_em se ajustam sozinhos pelo trigger acima. Chamada em: `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`, `components/CalculadoraLocacaoModal.tsx`, `components/ReceberPagamentoBotao.tsx`. |
@@ -3873,6 +3950,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `trocar_ponteira_reserva` | `p_event_id uuid, p_final_atual bigint, p_gera_credito boolean, p_inicial_nova bigint, p_aplicador_novo uuid, p_registrar_troca boolean` | `void` | Sim | authenticated,postgres,service_role | `aplicador_montagens` CRUD, `aplicadores` R, `calendar_events` RU, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rentals` R, `reserva_contagens` CR, `tasks` R, `transactions` R | Chamada em: `app/(app)/agenda/EditarEventoModal.tsx`. |
 | `update_rental` | `p_rental_id uuid, p_equipment_id uuid, p_event_date date, p_shots integer, p_calculated_value numeric, p_payment_method payment_method_type, p_status event_status_type, p_notes text, p_event_date_end date` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` RU, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` R, `rentals` RU, `tasks` R, `transactions` R | 6. Editar locação: a trava "valor abaixo do recebido" passa a considerar o deslocamento cobrado à parte. Chamada em: `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`. |
 | `usar_credito_valor` | `p_rental_id uuid, p_valor numeric, p_data date` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `categories` R, `clients` R, `creditos_cliente` CR, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` C, `rentals` R, `rentals_situacao_pagamento` R, `tasks` R, `transactions` CR | Usa crédito em R$ para abater uma locação: vira pagamento com forma permuta. Chamada em: `components/ReceberPagamentoBotao.tsx`. |
+| `uso_fotos_pacientes` | (nenhum) | `jsonb` | Sim | authenticated,postgres,service_role | `paciente_fotos` R | Chamada em: `app/(app)/planejador/PlanejadorLista.tsx`. |
 | `validar_bloqueio_equipamento` | (nenhum) | `trigger` | Sim | postgres | `bloqueios_equipamento` R, `equipments` R | Função de gatilho. Reserva de HIPRO dentro de um período bloqueado é recusada. Só confere quando a reserva nasce, muda de data ou de equipamento, ou volta de cancelada: o que já existia no período continua como está. |
 | `validar_equipamento_coerente` | (nenhum) | `trigger` | Sim | postgres,service_role | `bloqueios_equipamento` R, `equipments` RU, `movimentacoes` C | Função de gatilho. event_type e equipment_id não podem discordar entre si (leva R): hipro_1/hipro_2 sempre com o equipamento correspondente, qualquer outro tipo sempre sem equipamento. Feito como trigger (não como check simples) porque precisa consultar equipments.code. |
 | `valor_taxa_atual` | (nenhum) | `numeric` | Sim | authenticated,postgres,service_role | `settings` R | Valor da taxa configurado (settings.reservation_fee, com fallback). |
@@ -3884,6 +3962,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `fotos-contador` | Não | 5 MB | `image/jpeg`, `image/png`, `image/webp` | Fotos do contador de disparos; retiradas das telas em 10/10/2026, pasta sem uso. |
 | `comprovantes` | Não | 5 MB | `image/jpeg`, `image/png`, `image/webp`, `application/pdf` | Comprovantes de pagamento enviados em Receber pagamento (`locacao/<id>` ou `taxa/<id>`), `lib/comprovante.ts`. |
 | `campanhas` | Não | 5 MB | `image/jpeg`, `image/png`, `image/webp` | Arte das campanhas (`campanhas.arte_path`), reduzida a 1600 px em JPEG por `lib/campanha-arte.ts`. |
+| `fotos-pacientes` | Não | 5 MB | `image/jpeg`, `image/webp` | Fotos dos pacientes do Planejador (piloto só do dono), `p/<paciente>/<etapa>/<id>.jpg` e `_mini.jpg`, reduzidas no aparelho por `lib/fotos-paciente-envio.ts`; só `pode_ver_fotos_paciente()`. Sem backup. |
 
 Políticas do Storage (`storage.objects`):
 
@@ -3900,6 +3979,9 @@ Políticas do Storage (`storage.objects`):
 - `somente_leitura_nao_altera` (UPDATE, restritiva): usando `(NOT eh_somente_leitura())`
 - `somente_leitura_nao_apaga` (DELETE, restritiva): usando `(NOT eh_somente_leitura())`
 - `somente_leitura_nao_envia` (INSERT, restritiva); checagem `(NOT eh_somente_leitura())`
+- `fotos_pacientes_ler` (SELECT, permissiva): usando `((bucket_id = 'fotos-pacientes'::text) AND pode_ver_fotos_paciente())`
+- `fotos_pacientes_enviar` (INSERT, permissiva); checagem `((bucket_id = 'fotos-pacientes'::text) AND pode_ver_fotos_paciente())`
+- `fotos_pacientes_apagar` (DELETE, permissiva): usando `((bucket_id = 'fotos-pacientes'::text) AND pode_ver_fotos_paciente())`
 
 ### Vault (segredos, sem os valores)
 
@@ -4378,7 +4460,7 @@ Rotas: `/configuracoes`, `/configuracoes/dados-teste`.
 
 Rotas: `/planejador`, `/planejador/[id]`, `/planejador/novo`.
 
-**O que faz (fluxo do usuário).** Início com um cartão por cliente (`agruparPacientesPorCliente`: pacientes, pendentes em laranja, concluídos em verde, último HIPRO Day) e busca por cliente ou paciente. Tocar na cliente (`?cliente=<id>`) mostra os pacientes dela com filtro por HIPRO Day (`diasDeHipro`, `pacientesDoDia`) e por situação (Pendente/Concluído, `situacaoDoPaciente`). Tocar no paciente abre a ficha (`FichaPaciente`): saldo para usar, dados do cadastro, planejamentos com as sessões e apagar só os escolhidos. O editor (`EditorPlanejamento`, tela cheia) tem abas Paciente, Áreas e Resumo: áreas fixas do rosto (Pescoço, Papada, Submandibular, Jowls, Terço médio, Pálpebras e lateral dos olhos, Frontal, Perioral superior e inferior) e áreas corporais pelo modelo de fotos (`BonecoCorporal`), linhas por profundidade com disparos direito e esquerdo, saldo do pacote, sessões, custos de disparos (`CustoDisparos`), PDF do prontuário e ficha para assinar. "Montar pelas regras" (`SeletorPlanejamento`) e "Montar com a IA".
+**O que faz (fluxo do usuário).** Início com um cartão por cliente (`agruparPacientesPorCliente`: pacientes, pendentes em laranja, concluídos em verde, último HIPRO Day) e busca por cliente ou paciente. Tocar na cliente (`?cliente=<id>`) mostra os pacientes dela com filtro por HIPRO Day (`diasDeHipro`, `pacientesDoDia`) e por situação (Pendente/Concluído, `situacaoDoPaciente`). Tocar no paciente abre a ficha (`FichaPaciente`): saldo para usar, dados do cadastro, planejamentos com as sessões e apagar só os escolhidos. O editor (`EditorPlanejamento`, tela cheia) tem abas Paciente, Áreas e Resumo: áreas fixas do rosto (Pescoço, Papada, Submandibular, Jowls, Terço médio, Pálpebras e lateral dos olhos, Frontal, Perioral superior e inferior) e áreas corporais pelo modelo de fotos (`BonecoCorporal`), linhas por profundidade com disparos direito e esquerdo, saldo do pacote, sessões, custos de disparos (`CustoDisparos`), PDF do prontuário e ficha para assinar. "Montar pelas regras" (`SeletorPlanejamento`) e "Montar com a IA". A ficha do paciente tem a seção Fotos (`FotosPaciente`, piloto só do dono): fotos por etapa e área corporal, reduzidas no aparelho, na pasta privada `fotos-pacientes`.
 
 **Regras de negócio, cálculos, filtros, permissões e validações:**
 
@@ -4388,12 +4470,13 @@ Rotas: `/planejador`, `/planejador/[id]`, `/planejador/novo`.
 - Escrita só por `salvar_planejamento` e `excluir_planejamento`; excluir pede para escrever APAGAR.
 - Paciente é da cliente que o atende: `salvar_planejamento` liga ao cadastro escolhido (`estado.pacienteId`) ou ao de mesmo nome, ou cria; ficha editada por `salvar_paciente`, repetidos juntados por `juntar_pacientes`.
 
-**Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/PlanejadorLista.tsx`, `app/(app)/planejador/[id]/page.tsx`, `app/(app)/planejador/carregar.ts`, `app/(app)/planejador/novo/page.tsx`, `app/(app)/planejador/page.tsx`, `components/Atalhos.tsx`, `components/BonecoCorporal.tsx`, `components/ClientPicker.tsx`, `components/ConfirmarApagarModal.tsx`, `components/Dialogos.tsx`, `components/SeletorPlanejamento.tsx`, `components/SomenteLeitura.tsx`, `components/planejador/CustoDisparos.tsx`, `components/planejador/FichaPaciente.tsx`, `components/planejador/Partes.tsx`, `components/planejador/ResumoPlano.tsx`, `components/planejador/SeloSituacao.tsx`, `lib/atalhos.ts`, `lib/availability-image.ts`, `lib/boneco-corporal.ts`, `lib/busca-cliente.ts`, `lib/corpo-foto-dados.ts`, `lib/corpo-foto.ts`, `lib/custo-disparos-imagem.ts`, `lib/custo-disparos.ts`, `lib/format.ts`, `lib/historico-paciente.ts`, `lib/mensagens-modelos.ts`, `lib/meta-mes.ts`, `lib/pacientes.ts`, `lib/period.ts`, `lib/planejador-impressao.ts`, `lib/planejador.ts`, `lib/planejamento.ts`, `lib/preferencias.ts`, `lib/rental-pricing.ts`, `lib/settings.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/usar-preferencias.ts`, `lib/valor.ts`.
+**Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/PlanejadorLista.tsx`, `app/(app)/planejador/[id]/page.tsx`, `app/(app)/planejador/carregar.ts`, `app/(app)/planejador/novo/page.tsx`, `app/(app)/planejador/page.tsx`, `components/Atalhos.tsx`, `components/BonecoCorporal.tsx`, `components/ClientPicker.tsx`, `components/ConfirmarApagarModal.tsx`, `components/Dialogos.tsx`, `components/SeletorPlanejamento.tsx`, `components/SomenteLeitura.tsx`, `components/planejador/CustoDisparos.tsx`, `components/planejador/FichaPaciente.tsx`, `components/planejador/FotosPaciente.tsx`, `components/planejador/Partes.tsx`, `components/planejador/ResumoPlano.tsx`, `components/planejador/SeloSituacao.tsx`, `lib/atalhos.ts`, `lib/availability-image.ts`, `lib/boneco-corporal.ts`, `lib/busca-cliente.ts`, `lib/corpo-foto-dados.ts`, `lib/corpo-foto.ts`, `lib/custo-disparos-imagem.ts`, `lib/custo-disparos.ts`, `lib/format.ts`, `lib/fotos-paciente-envio.ts`, `lib/fotos-paciente.ts`, `lib/historico-paciente.ts`, `lib/mensagens-modelos.ts`, `lib/meta-mes.ts`, `lib/pacientes.ts`, `lib/period.ts`, `lib/planejador-impressao.ts`, `lib/planejador.ts`, `lib/planejamento.ts`, `lib/preferencias.ts`, `lib/rental-pricing.ts`, `lib/settings.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/usar-preferencias.ts`, `lib/valor.ts`.
 
-**Funções RPC chamadas:** `excluir_paciente`, `excluir_planejamento`, `juntar_pacientes`, `salvar_paciente`, `salvar_planejamento`.
+**Funções RPC chamadas:** `definir_autorizacao_fotos`, `excluir_foto_paciente`, `excluir_paciente`, `excluir_planejamento`, `juntar_pacientes`, `registrar_foto_paciente`, `salvar_paciente`, `salvar_planejamento`, `uso_fotos_pacientes`.
 
+**Storage:** `PASTA_FOTOS`.
 
-**Tabelas e views tocadas:** `calendar_events` (R), `clients` (CR), `movimentacoes` (C), `pacientes` (CRUD), `planejamentos` (CRUD), `rentals` (R), `settings` (RU).
+**Tabelas e views tocadas:** `calendar_events` (R), `clients` (CR), `movimentacoes` (C), `paciente_fotos` (CRUD), `pacientes` (CRUD), `planejamentos` (CRUD), `rentals` (R), `settings` (RU).
 
 ### Portal da cliente e formulário de cadastro público
 
@@ -4407,12 +4490,13 @@ Rotas: `/cadastro/[token]`, `/portal`, `/portal/[id]`, `/portal/novo`.
 - Token de 64 hexadecimais, uso único, 14 dias.
 - Login que já tem acesso à Harmonize não vira login de cliente; ninguém troca o próprio `cliente_id`.
 
-**Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/PlanejadorLista.tsx`, `app/(app)/planejador/carregar.ts`, `app/(portal)/PortalTopo.tsx`, `app/(portal)/layout.tsx`, `app/(portal)/portal/[id]/page.tsx`, `app/(portal)/portal/carregar.ts`, `app/(portal)/portal/novo/page.tsx`, `app/(portal)/portal/page.tsx`, `app/cadastro/[token]/FormularioCadastro.tsx`, `app/cadastro/[token]/page.tsx`, `components/AcessoPlanejadorCard.tsx`, `components/Atalhos.tsx`, `components/BonecoCorporal.tsx`, `components/ClientPicker.tsx`, `components/ConfirmarApagarModal.tsx`, `components/Dialogos.tsx`, `components/LiberarAcademy.tsx`, `components/SeletorPlanejamento.tsx`, `components/SomenteLeitura.tsx`, `components/planejador/CustoDisparos.tsx`, `components/planejador/FichaPaciente.tsx`, `components/planejador/Partes.tsx`, `components/planejador/ResumoPlano.tsx`, `components/planejador/SeloSituacao.tsx`, `lib/atalhos.ts`, `lib/availability-image.ts`, `lib/boneco-corporal.ts`, `lib/busca-cliente.ts`, `lib/cadastro-formulario.ts`, `lib/corpo-foto-dados.ts`, `lib/corpo-foto.ts`, `lib/custo-disparos-imagem.ts`, `lib/custo-disparos.ts`, `lib/format.ts`, `lib/historico-paciente.ts`, `lib/mensagens-modelos.ts`, `lib/meta-mes.ts`, `lib/pacientes.ts`, `lib/period.ts`, `lib/planejador-impressao.ts`, `lib/planejador.ts`, `lib/planejamento.ts`, `lib/preferencias.ts`, `lib/rental-pricing.ts`, `lib/saudacao.ts`, `lib/senha.ts`, `lib/settings.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/usar-preferencias.ts`, `lib/valor.ts`.
+**Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/PlanejadorLista.tsx`, `app/(app)/planejador/carregar.ts`, `app/(portal)/PortalTopo.tsx`, `app/(portal)/layout.tsx`, `app/(portal)/portal/[id]/page.tsx`, `app/(portal)/portal/carregar.ts`, `app/(portal)/portal/novo/page.tsx`, `app/(portal)/portal/page.tsx`, `app/cadastro/[token]/FormularioCadastro.tsx`, `app/cadastro/[token]/page.tsx`, `components/AcessoPlanejadorCard.tsx`, `components/Atalhos.tsx`, `components/BonecoCorporal.tsx`, `components/ClientPicker.tsx`, `components/ConfirmarApagarModal.tsx`, `components/Dialogos.tsx`, `components/LiberarAcademy.tsx`, `components/SeletorPlanejamento.tsx`, `components/SomenteLeitura.tsx`, `components/planejador/CustoDisparos.tsx`, `components/planejador/FichaPaciente.tsx`, `components/planejador/FotosPaciente.tsx`, `components/planejador/Partes.tsx`, `components/planejador/ResumoPlano.tsx`, `components/planejador/SeloSituacao.tsx`, `lib/atalhos.ts`, `lib/availability-image.ts`, `lib/boneco-corporal.ts`, `lib/busca-cliente.ts`, `lib/cadastro-formulario.ts`, `lib/corpo-foto-dados.ts`, `lib/corpo-foto.ts`, `lib/custo-disparos-imagem.ts`, `lib/custo-disparos.ts`, `lib/format.ts`, `lib/fotos-paciente-envio.ts`, `lib/fotos-paciente.ts`, `lib/historico-paciente.ts`, `lib/mensagens-modelos.ts`, `lib/meta-mes.ts`, `lib/pacientes.ts`, `lib/period.ts`, `lib/planejador-impressao.ts`, `lib/planejador.ts`, `lib/planejamento.ts`, `lib/preferencias.ts`, `lib/rental-pricing.ts`, `lib/saudacao.ts`, `lib/senha.ts`, `lib/settings.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/usar-preferencias.ts`, `lib/valor.ts`.
 
-**Funções RPC chamadas:** `criar_convite_cadastro`, `excluir_paciente`, `excluir_planejamento`, `juntar_pacientes`, `liberar_acesso_planejador`, `liberar_portal_cliente`, `portal_cliente`, `portal_situacao`, `portal_validade_cliente`, `remover_acesso_planejador`, `salvar_paciente`, `salvar_planejamento`.
+**Funções RPC chamadas:** `criar_convite_cadastro`, `definir_autorizacao_fotos`, `excluir_foto_paciente`, `excluir_paciente`, `excluir_planejamento`, `juntar_pacientes`, `liberar_acesso_planejador`, `liberar_portal_cliente`, `portal_cliente`, `portal_situacao`, `portal_validade_cliente`, `registrar_foto_paciente`, `remover_acesso_planejador`, `salvar_paciente`, `salvar_planejamento`, `uso_fotos_pacientes`.
 
+**Storage:** `PASTA_FOTOS`.
 
-**Tabelas e views tocadas:** `calendar_events` (R), `clients` (CRU), `convites_cadastro` (CR), `equipments` (R), `mentoring_events` (R), `movimentacoes` (C), `pacientes` (CRUD), `planejamentos` (CRUD), `profiles` (CRU), `rentals` (R), `settings` (RU), `tasks` (R), `transactions` (R).
+**Tabelas e views tocadas:** `calendar_events` (R), `clients` (CRU), `convites_cadastro` (CR), `equipments` (R), `mentoring_events` (R), `movimentacoes` (C), `paciente_fotos` (CRUD), `pacientes` (CRUD), `planejamentos` (CRUD), `profiles` (CRU), `rentals` (R), `settings` (RU), `tasks` (R), `transactions` (R).
 
 ### Assistente (IA) e Cérebro (insights)
 
@@ -4902,6 +4986,7 @@ Uma linha por par funcionalidade e tabela (ou view). X indica a operação. Leit
 | Planejador HIPRO | `calendar_events` |  | X |  |  |
 | Planejador HIPRO | `clients` | X | X |  |  |
 | Planejador HIPRO | `movimentacoes` | X |  |  |  |
+| Planejador HIPRO | `paciente_fotos` | X | X | X | X |
 | Planejador HIPRO | `pacientes` | X | X | X | X |
 | Planejador HIPRO | `planejamentos` | X | X | X | X |
 | Planejador HIPRO | `rentals` |  | X |  |  |
@@ -4912,6 +4997,7 @@ Uma linha por par funcionalidade e tabela (ou view). X indica a operação. Leit
 | Portal da cliente e formulário de cadastro público | `equipments` |  | X |  |  |
 | Portal da cliente e formulário de cadastro público | `mentoring_events` |  | X |  |  |
 | Portal da cliente e formulário de cadastro público | `movimentacoes` | X |  |  |  |
+| Portal da cliente e formulário de cadastro público | `paciente_fotos` | X | X | X | X |
 | Portal da cliente e formulário de cadastro público | `pacientes` | X | X | X | X |
 | Portal da cliente e formulário de cadastro público | `planejamentos` | X | X | X | X |
 | Portal da cliente e formulário de cadastro público | `profiles` | X | X | X |  |
@@ -4996,6 +5082,7 @@ Resumo inverso (tabela x funcionalidades que gravam nela):
 | `mentoring_events` | Agenda (reservas, eventos, confirmação e imagem de datas livres); Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Espaço Pessoal; Financeiro (lançamentos), Cartões e Empréstimos |
 | `movimentacoes` | Agenda (reservas, eventos, confirmação e imagem de datas livres); Assistente (IA) e Cérebro (insights); Cadastros do formulário Google (Contourline Academy); Campanhas; Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Encaixe de datas livres; Equipamentos, aplicadores, bloqueios e revisão anual; Espaço Pessoal; Estrutura global: menu, barra de baixo, "+", busca, temas, diálogos e recibo; Financeiro (lançamentos), Cartões e Empréstimos; Funil de vendas (leads e clientes); Locações (histórico de locações realizadas); Login, sessão e controle de acesso; Menu de atalhos da cliente, Anotações e Melhores datas; Nova locação, finalização com disparos e calculadora; Pendências e Receber pagamento; Planejador HIPRO; Portal da cliente e formulário de cadastro público; Próximas locações (Agenda de hoje); Relacionamento; Tarefas e Atacar a fila |
 | `orcamentos_pessoais` | Assistente (IA) e Cérebro (insights) |
+| `paciente_fotos` | Planejador HIPRO; Portal da cliente e formulário de cadastro público |
 | `pacientes` | Planejador HIPRO; Portal da cliente e formulário de cadastro público |
 | `planejamentos` | Agenda (reservas, eventos, confirmação e imagem de datas livres); Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Espaço Pessoal; Financeiro (lançamentos), Cartões e Empréstimos; Planejador HIPRO; Portal da cliente e formulário de cadastro público |
 | `profiles` | Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Portal da cliente e formulário de cadastro público |
@@ -5174,6 +5261,7 @@ Tabelas acessadas direto: `cadastros_recebidos` (CU), `push_inscricoes` (RD). RP
 | `mentoring_events` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `movimentacoes` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `orcamentos_pessoais` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
+| `paciente_fotos` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `pacientes` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `planejamentos` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `profiles` | `trg_profiles_lock_privileged_fields` | BEFORE UPDATE (linha) | `profiles_lock_privileged_fields` | Ninguém troca o próprio cliente_id (senão leria os planejamentos de outra). |
@@ -5215,7 +5303,7 @@ Tabelas acessadas direto: `cadastros_recebidos` (CU), `push_inscricoes` (RD). RP
 
 ## Anexo A: schema das funções (código completo)
 
-O código abaixo é a definição atual de cada uma das 145 funções do esquema `public`, extraída do banco com `pg_get_functiondef` (igual ao banco real do Supabase, conferido por soma de verificação). Está como no banco, sem edição. Junto com a seção 1.2 (tabelas, colunas, chaves, índices, políticas, gatilhos e views), este anexo cobre o schema inteiro. O arquivo `schema.sql` na raiz continua sendo o que recria o banco do zero e guarda também o histórico comentado de cada mudança; permissões de execução (`grant`/`revoke`) estão na coluna Executam da tabela de funções.
+O código abaixo é a definição atual de cada uma das 150 funções do esquema `public`, extraída do banco com `pg_get_functiondef` (igual ao banco real do Supabase, conferido por soma de verificação). Está como no banco, sem edição. Junto com a seção 1.2 (tabelas, colunas, chaves, índices, políticas, gatilhos e views), este anexo cobre o schema inteiro. O arquivo `schema.sql` na raiz continua sendo o que recria o banco do zero e guarda também o histórico comentado de cada mudança; permissões de execução (`grant`/`revoke`) estão na coluna Executam da tabela de funções.
 
 ### `adiar_previsao_manutencao`
 
@@ -6176,6 +6264,40 @@ begin
   end if;
   insert into convites_cadastro (client_id) values (p_client_id) returning token into v_token;
   return v_token;
+end;
+$function$
+```
+
+### `definir_autorizacao_fotos`
+
+```sql
+CREATE OR REPLACE FUNCTION public.definir_autorizacao_fotos(p_paciente_id uuid, p_autorizado boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_nome text;
+begin
+  if not pode_ver_fotos_paciente() then
+    raise exception 'Sem permissão para as fotos dos pacientes.';
+  end if;
+  select nome into v_nome from pacientes where id = p_paciente_id;
+  if not found then raise exception 'Paciente não encontrado.'; end if;
+  if not coalesce(p_autorizado, false)
+     and exists (select 1 from paciente_fotos where paciente_id = p_paciente_id) then
+    raise exception 'Apague as fotos antes de tirar a autorização.';
+  end if;
+  update pacientes set
+    fotos_autorizadas_em = case when coalesce(p_autorizado, false) then now() else null end,
+    updated_at = now()
+   where id = p_paciente_id;
+  perform registrar_movimentacao('editado', 'paciente', p_paciente_id,
+    case when coalesce(p_autorizado, false)
+         then 'Uso de imagem autorizado: ' || v_nome
+         else 'Autorização de uso de imagem retirada: ' || v_nome end,
+    jsonb_build_object('fotos_autorizadas', coalesce(p_autorizado, false)));
 end;
 $function$
 ```
@@ -7796,6 +7918,33 @@ end;
 $function$
 ```
 
+### `excluir_foto_paciente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.excluir_foto_paciente(p_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  f paciente_fotos%rowtype;
+  v_nome text;
+begin
+  if not pode_ver_fotos_paciente() then
+    raise exception 'Sem permissão para as fotos dos pacientes.';
+  end if;
+  delete from paciente_fotos where id = p_id returning * into f;
+  if f.id is null then raise exception 'Foto não encontrada.'; end if;
+  select nome into v_nome from pacientes where id = f.paciente_id;
+  perform registrar_movimentacao('excluido', 'paciente_foto', p_id,
+    'Foto do paciente ' || coalesce(v_nome, '') || ' apagada (' || f.etapa || coalesce(', ' || f.area, '') || ')',
+    jsonb_build_object('paciente_id', f.paciente_id, 'etapa', f.etapa));
+  return jsonb_build_object('caminho', f.caminho, 'miniatura', f.miniatura);
+end;
+$function$
+```
+
 ### `excluir_locacao_cascata`
 
 ```sql
@@ -7882,6 +8031,9 @@ begin
   end if;
   if exists (select 1 from planejamentos where paciente_id = p_id) then
     raise exception 'Este paciente tem planejamentos. Apague os planejamentos antes, ou junte com outro paciente.';
+  end if;
+  if exists (select 1 from paciente_fotos where paciente_id = p_id) then
+    raise exception 'Este paciente tem fotos. Apague as fotos antes.';
   end if;
   delete from pacientes where id = p_id and (v_cliente is null or client_id = v_cliente) returning nome into v_nome;
   if not found then raise exception 'Paciente não encontrado.'; end if;
@@ -8550,12 +8702,15 @@ begin
 
   update planejamentos set paciente_id = m.id, paciente = m.nome, estado = estado || jsonb_build_object('paciente', m.nome, 'pacienteId', m.id::text)
    where paciente_id = j.id;
+  -- As fotos vão para o paciente mantido (os arquivos continuam no caminho antigo).
+  update paciente_fotos set paciente_id = m.id where paciente_id = j.id;
   update pacientes set
     whatsapp = coalesce(whatsapp, j.whatsapp),
     nascimento = coalesce(nascimento, j.nascimento),
     observacoes = case when j.observacoes is null then observacoes
                        when observacoes is null then j.observacoes
                        else observacoes || E'\n' || j.observacoes end,
+    fotos_autorizadas_em = coalesce(fotos_autorizadas_em, j.fotos_autorizadas_em),
     updated_at = now()
    where id = m.id;
   delete from pacientes where id = j.id;
@@ -9043,6 +9198,26 @@ begin
   );
   return v_id;
 end;
+$function$
+```
+
+### `pode_ver_fotos_paciente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.pode_ver_fotos_paciente()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from profiles
+     where id = auth.uid()
+       and active
+       and is_admin
+       and not coalesce(somente_leitura, false)
+       and cliente_id is null
+  );
 $function$
 ```
 
@@ -10197,6 +10372,56 @@ begin
     values (p_client, v_anotacao, 'campanha', auth.uid());
   end if;
 
+  return v_id;
+end;
+$function$
+```
+
+### `registrar_foto_paciente`
+
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_foto_paciente(p_paciente_id uuid, p_etapa text, p_area text, p_caminho text, p_miniatura text, p_largura integer, p_altura integer, p_tamanho_bytes integer, p_tirada_em date DEFAULT NULL::date, p_planejamento_id uuid DEFAULT NULL::uuid, p_observacao text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_pac pacientes%rowtype;
+  v_prefixo text;
+  v_area text := nullif(left(btrim(coalesce(p_area, '')), 60), '');
+  v_id uuid;
+begin
+  if not pode_ver_fotos_paciente() then
+    raise exception 'Sem permissão para as fotos dos pacientes.';
+  end if;
+  select * into v_pac from pacientes where id = p_paciente_id;
+  if v_pac.id is null then raise exception 'Paciente não encontrado.'; end if;
+  if v_pac.fotos_autorizadas_em is null then
+    raise exception 'Marque primeiro que o paciente autorizou as fotos.';
+  end if;
+  if p_etapa is null or p_etapa not in ('antes', 'imediato', 'd30', 'd60', 'd90') then
+    raise exception 'Etapa inválida.';
+  end if;
+  v_prefixo := 'p/' || p_paciente_id::text || '/';
+  if p_caminho is null or left(p_caminho, length(v_prefixo)) <> v_prefixo
+     or p_miniatura is null or left(p_miniatura, length(v_prefixo)) <> v_prefixo then
+    raise exception 'Caminho da foto inválido.';
+  end if;
+  if p_planejamento_id is not null
+     and not exists (select 1 from planejamentos where id = p_planejamento_id and paciente_id = p_paciente_id) then
+    raise exception 'Este planejamento não é deste paciente.';
+  end if;
+
+  insert into paciente_fotos (paciente_id, planejamento_id, etapa, area, caminho, miniatura,
+                              largura, altura, tamanho_bytes, tirada_em, observacao)
+  values (p_paciente_id, p_planejamento_id, p_etapa, v_area, p_caminho, p_miniatura,
+          p_largura, p_altura, greatest(coalesce(p_tamanho_bytes, 0), 0),
+          coalesce(p_tirada_em, hoje_local()), nullif(btrim(left(p_observacao, 1000)), ''))
+  returning id into v_id;
+  perform registrar_movimentacao('criado', 'paciente_foto', v_id,
+    'Foto do paciente ' || v_pac.nome || ' (' || p_etapa || coalesce(', ' || v_area, '') || ')',
+    jsonb_build_object('paciente_id', p_paciente_id, 'etapa', p_etapa, 'planejamento_id', p_planejamento_id));
   return v_id;
 end;
 $function$
@@ -11856,6 +12081,28 @@ begin
   insert into creditos_cliente (client_id, tipo, quantidade, origem, rental_id, rental_payment_id, descricao, data)
   values (v_client, 'valor', -round(p_valor, 2), 'uso', p_rental_id, v_pag, 'Usado na locação', p_data);
   return v_pag;
+end;
+$function$
+```
+
+### `uso_fotos_pacientes`
+
+```sql
+CREATE OR REPLACE FUNCTION public.uso_fotos_pacientes()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v jsonb;
+begin
+  if not pode_ver_fotos_paciente() then
+    raise exception 'Sem permissão para as fotos dos pacientes.';
+  end if;
+  select jsonb_build_object('fotos', count(*), 'bytes', coalesce(sum(tamanho_bytes), 0))
+    into v from paciente_fotos;
+  return v;
 end;
 $function$
 ```
