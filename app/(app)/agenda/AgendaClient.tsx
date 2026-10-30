@@ -253,6 +253,7 @@ export default function AgendaClient({
       url.searchParams.delete("evento");
       const ev = initialEvents.find((e) => e.id === evento);
       if (ev) {
+        setAba(ev.event_type === "outros" ? "compromissos" : "atendimentos");
         setCurrentMonth(startOfMonth(parseDate(ev.date_start)));
         setSelectedDate(ev.date_start);
         setEditingEvent(ev);
@@ -277,6 +278,25 @@ export default function AgendaClient({
   // duplicar isso com um segundo seletor. O que faltava eram os filtros
   // por categoria, e são esses dois que entram agora.
   const [tipoFiltro, setTipoFiltro] = useState<string | null>(null);
+  // Abas (pedido do dono, 30/10/2026): os eventos "Outro" são compromissos pessoais,
+  // não atendimentos; ficam numa aba própria e fora da contagem e da confirmação.
+  const [aba, setAba] = useState<"atendimentos" | "compromissos">(() =>
+    searchParams.get("aba") === "compromissos" ? "compromissos" : "atendimentos"
+  );
+  const ehCompromisso = (e: EventRow) => e.event_type === "outros";
+  const eventosDaAba = useMemo(
+    () => initialEvents.filter((e) => (aba === "compromissos" ? ehCompromisso(e) : !ehCompromisso(e))),
+    [initialEvents, aba]
+  );
+  function trocarAba(nova: "atendimentos" | "compromissos") {
+    setAba(nova);
+    setTipoFiltro(null);
+    setConfirmadoFiltro("todos");
+    const url = new URL(window.location.href);
+    if (nova === "compromissos") url.searchParams.set("aba", "compromissos");
+    else url.searchParams.delete("aba");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
   const [confirmadoFiltro, setConfirmadoFiltro] = useState<"todos" | "sim" | "nao">("todos");
 
   // Chegando aqui pela busca global (ver components/GlobalSearch.tsx), o
@@ -293,22 +313,22 @@ export default function AgendaClient({
   // — assim, se um equipamento novo entrar, o filtro já aparece sozinho.
   const tiposDisponiveis = useMemo(() => {
     const vistos = new Map<string, string>();
-    for (const e of initialEvents) {
+    for (const e of eventosDaAba) {
       if (!vistos.has(e.event_type)) {
         vistos.set(e.event_type, EVENT_META[e.event_type]?.label ?? e.event_type);
       }
     }
     return Array.from(vistos.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [initialEvents]);
+  }, [eventosDaAba]);
 
   const eventosFiltrados = useMemo(() => {
-    return initialEvents.filter((e) => {
+    return eventosDaAba.filter((e) => {
       if (tipoFiltro && e.event_type !== tipoFiltro) return false;
       if (confirmadoFiltro === "sim" && !e.confirmed) return false;
       if (confirmadoFiltro === "nao" && e.confirmed) return false;
       return true;
     });
-  }, [initialEvents, tipoFiltro, confirmadoFiltro]);
+  }, [eventosDaAba, tipoFiltro, confirmadoFiltro]);
 
   const filtroAtivo = tipoFiltro !== null || confirmadoFiltro !== "todos";
 
@@ -356,13 +376,23 @@ export default function AgendaClient({
     const today = parseDate(toDateKey(new Date()));
     const in7 = new Date(today);
     in7.setDate(in7.getDate() + 7);
+    if (aba === "compromissos") return [];
     return eventosFiltrados
       .filter((e) => {
         const d = parseDate(e.date_start);
         return !e.confirmed && d >= today && d <= in7;
       })
       .sort((a, b) => a.date_start.localeCompare(b.date_start));
-  }, [eventosFiltrados]);
+  }, [eventosFiltrados, aba]);
+
+  // Compromissos do dia escolhido, para avisar na aba Atendimentos (o dono trabalha sozinho).
+  const compromissosNoDia = useMemo(
+    () =>
+      aba === "compromissos"
+        ? 0
+        : initialEvents.filter((e) => ehCompromisso(e) && diasDoPeriodo(e.date_start, e.date_end).includes(selectedDate)).length,
+    [initialEvents, aba, selectedDate]
+  );
 
   // Resumo do mês aberto no calendário, já com os filtros aplicados — é o
   // "total" desta tela. Não soma o histórico inteiro de propósito: quem
@@ -628,7 +658,11 @@ export default function AgendaClient({
     <div className="space-y-4">
       <HeroTela
         etiqueta={`Agenda · ${format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}`}
-        rotulo={filtroAtivo ? "Atendimentos (filtrado)" : "Atendimentos no mês"}
+        rotulo={
+          aba === "compromissos"
+            ? filtroAtivo ? "Compromissos (filtrado)" : "Compromissos no mês"
+            : filtroAtivo ? "Atendimentos (filtrado)" : "Atendimentos no mês"
+        }
         valor={resumoMes.total}
         apoio={
           resumoMes.total === 0
@@ -638,12 +672,32 @@ export default function AgendaClient({
                 .map((t) => `${t.label} ${t.qtd}`)
                 .join(" · ")
         }
-        chips={[
+        chips={aba === "compromissos" ? [] : [
           needsConfirmation.length > 0
             ? { texto: `${needsConfirmation.length} sem confirmação nos próximos 7 dias`, icone: Clock3, tom: "ruim" }
             : { texto: "Próximos 7 dias confirmados", icone: CalendarCheck, tom: "bom" },
         ]}
       />
+      <div role="tablist" aria-label="Tipo de agenda" className="grid grid-cols-2 gap-1 rounded-2xl bg-neutral-100 p-1">
+        {(
+          [
+            ["atendimentos", "Atendimentos", initialEvents.filter((e) => !ehCompromisso(e)).length],
+            ["compromissos", "Compromissos", initialEvents.filter(ehCompromisso).length],
+          ] as const
+        ).map(([valor, rotulo]) => (
+          <button
+            key={valor}
+            type="button"
+            role="tab"
+            aria-selected={aba === valor}
+            onClick={() => trocarAba(valor)}
+            className={`min-h-[44px] rounded-xl text-sm font-bold transition ${aba === valor ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"}`}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="sr-only">Agenda</h1>
         <div className="flex gap-2 self-start sm:self-auto">
@@ -723,6 +777,7 @@ export default function AgendaClient({
             </option>
           ))}
         </select>
+        {aba === "atendimentos" && (
         <select
           value={confirmadoFiltro}
           onChange={(e) => setConfirmadoFiltro(e.target.value as "todos" | "sim" | "nao")}
@@ -732,6 +787,7 @@ export default function AgendaClient({
           <option value="sim">Só confirmados</option>
           <option value="nao">Só não confirmados</option>
         </select>
+        )}
         {filtroAtivo && (
           <button
             type="button"
@@ -918,6 +974,15 @@ export default function AgendaClient({
             </div>
           ))}
           {selectedDayEvents.map((e) => renderCard(e))}
+          {compromissosNoDia > 0 && (
+            <button
+              type="button"
+              onClick={() => trocarAba("compromissos")}
+              className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-xs text-neutral-600"
+            >
+              Você tem {compromissosNoDia} {compromissosNoDia === 1 ? "compromisso pessoal" : "compromissos pessoais"} neste dia · ver na aba Compromissos
+            </button>
+          )}
           {selectedDayEvents.length === 0 && (
             <div className="rounded-xl border border-dashed border-neutral-300/70 bg-white/50 py-8 text-center text-neutral-400 backdrop-blur-xl">
               Nenhum evento nesse dia.

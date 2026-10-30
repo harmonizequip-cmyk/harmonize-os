@@ -283,6 +283,10 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Manutenção agora é bloqueio do tipo manutencao (tela Equipamentos > Bloquear período). Quando cobre hoje, `sincronizar_manutencao_por_bloqueio` põe o equipamento em manutenção com `status_previsto_fim` = último dia + 1; o retorno automático antigo continua. "Voltar para ativo" e "Adiar previsão" ajustam o bloqueio.
 - Agenda (traço cinza no dia e cartão 🔒), imagem de datas livres e aviso de dias livres tratam dia bloqueado como ocupado.
 
+## Agenda: Atendimentos e Compromissos (30/10/2026, pedido do dono)
+
+- Eventos do tipo "Outro" (`event_type = 'outros'`) são compromissos pessoais, não atendimentos. A Agenda (`AgendaClient.tsx`) tem abas "Atendimentos" (HIPRO 1, HIPRO 2 e mentoria) e "Compromissos" (outros); a aba fica em `?aba=compromissos`, e `?evento=<id>` abre na aba certa. O destaque conta só a aba aberta ("Atendimentos no mês" ou "Compromissos no mês"); confirmação (aviso dos 7 dias, filtro de confirmado) só existe em Atendimentos. Na aba Atendimentos, o dia com compromisso mostra "Você tem N compromissos pessoais neste dia". O aviso "atendimentos sem confirmação" do Dashboard e o "próximo evento" do Funil ignoram `outros`; a função `alertas` já olhava só HIPRO.
+
 ## Aplicadores (desgaste por disparos)
 
 - A contagem de disparos é por aplicador, não por HIPRO: 4 aplicadores, 2 montados e 2 de reserva, e eles trocam de aparelho.

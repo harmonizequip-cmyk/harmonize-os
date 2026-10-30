@@ -438,6 +438,8 @@ export default async function DashboardPage(
     .eq("confirmed", false)
     .eq("is_test", false)
     .neq("status", "cancelada")
+    // Compromisso pessoal ("Outro") não é atendimento: não pede confirmação.
+    .neq("event_type", "outros")
     .gte("date_start", todayStr)
     .lte("date_start", in7Str);
 

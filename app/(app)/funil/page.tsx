@@ -58,6 +58,8 @@ export default async function FunilPage() {
     .from("calendar_events")
     .select("id, client_id, date_start, confirmed, confirmation_message_sent_at, equipment_id, taxa_status, is_mentoria, created_at")
     .neq("status", "cancelada")
+    // Compromisso pessoal ("Outro") não é atendimento da cliente.
+    .neq("event_type", "outros")
     .not("client_id", "is", null)
     .gte("date_start", todayStr)
     .order("date_start", { ascending: true });
