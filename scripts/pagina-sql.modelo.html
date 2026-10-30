@@ -31,22 +31,26 @@ p { margin:0; color:var(--muted); }
 .passo { flex:none; width:32px; height:32px; border-radius:50%; background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; font-weight:700; font-variant-numeric:tabular-nums; }
 .barra { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:14px 0 10px; }
 .copiar { font:inherit; font-weight:600; background:var(--accent); color:var(--accent-fg); border:0; border-radius:10px; padding:12px 18px; min-height:44px; cursor:pointer; }
-.copiar:focus-visible, pre:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.copiar.secundario { background:transparent; color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent); }
+.editor { display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; font-size:1.05rem; background:var(--accent); color:var(--accent-fg); text-decoration:none; border-radius:12px; padding:14px 18px; min-height:52px; margin-top:14px; }
+.editor + p { margin-top:8px; }
+.editor:focus-visible, .copiar:focus-visible, pre:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
 .aviso { font-size:.92rem; color:var(--ok); min-width:0; }
 pre { margin:0; background:var(--code-bg); color:var(--code-fg); font-family:var(--mono); font-size:12.5px; line-height:1.5; padding:14px; border-radius:10px; max-height:260px; overflow:auto; white-space:pre; tab-size:2; }
 .verif pre { max-height:none; }
-@media (prefers-reduced-motion: no-preference) { .copiar { transition: filter .15s; } .copiar:active { filter:brightness(.9); } }
+@media (prefers-reduced-motion: no-preference) { .copiar, .editor { transition: filter .15s; } .copiar:active, .editor:active { filter:brightness(.9); } }
 </style>
 <main>
   <h1>SQL para rodar no Supabase</h1>
   <section class="intro">
     <p>{{TOTAL}} script(s), para rodar <strong>um de cada vez, nesta ordem</strong>.</p>
     <ol>
-      <li>Abra o Supabase, projeto <code>vidnlzbxaxjlmzncqhxw</code>, e vá em <strong>SQL Editor</strong>.</li>
-      <li>Toque em <strong>New query</strong> (consulta nova).</li>
-      <li>Toque em <strong>Copiar SQL 1</strong> abaixo, cole no editor e toque em <strong>Run</strong>.</li>
-      <li>Deve aparecer <em>Success. No rows returned</em>. Se houver mais de um, repita com o seguinte, cada um numa consulta nova.</li>
+      <li>Toque em <strong>Copiar e abrir o SQL Editor</strong>.</li>
+      <li>Cole (segure e <strong>Colar</strong>) e toque em <strong>Run</strong>.</li>
+      <li>Faça o mesmo com a conferência no fim.</li>
     </ol>
+    <a class="editor" href="{{EDITOR_URL}}" target="_blank" rel="noopener">Abrir o SQL Editor do Supabase</a>
+    <p>Projeto <code>{{PROJETO}}</code>. Deve aparecer <em>Success. No rows returned</em> em cada script.</p>
     <p class="alerta">Se aparecer algum erro, não rode os seguintes. Me mande a mensagem exata.</p>
   </section>
   
@@ -55,16 +59,29 @@ pre { margin:0; background:var(--code-bg); color:var(--code-fg); font-family:var
 </main>
 <script>
 (function () {
+  var EDITOR = document.querySelector('.editor').href;
   function selecionar(el) {
     var r = document.createRange(); r.selectNodeContents(el);
     var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  // Cópia síncrona (no mesmo toque), para dar tempo antes de abrir a aba nova.
+  function copiarJa(el) {
+    try { selecionar(el); var ok = document.execCommand('copy'); window.getSelection().removeAllRanges(); return ok; }
+    catch (e) { return false; }
   }
   document.querySelectorAll('.copiar').forEach(function (b) {
     b.addEventListener('click', function () {
       var el = document.getElementById(b.getAttribute('data-alvo'));
       var aviso = b.parentNode.querySelector('.aviso');
       var texto = el.textContent;
-      function ok() { aviso.textContent = 'Copiado. Cole no SQL Editor.'; }
+      if (b.classList.contains('abrir')) {
+        var copiou = copiarJa(el);
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(texto).catch(function () {}); copiou = true; }
+        window.open(EDITOR, '_blank', 'noopener');
+        aviso.textContent = copiou ? 'Copiado. Cole no SQL Editor e toque em Run.' : 'Não deu para copiar: use o botão Copiar.';
+        return;
+      }
+      function ok() { aviso.textContent = 'Copiado. Cole no SQL Editor e toque em Run.'; }
       function plano() { selecionar(el); aviso.textContent = 'Texto selecionado: use Copiar do celular.'; }
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(texto).then(ok, plano);

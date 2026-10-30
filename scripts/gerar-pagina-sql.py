@@ -2,11 +2,14 @@
 """
 Gera a página HTML (para publicar como Artifact) com os SQLs que o dono vai
 rodar no SQL Editor do Supabase pelo celular: um bloco por arquivo, na ordem
-em que forem passados, cada um com botão Copiar.
+em que forem passados, cada um com botão Copiar e botão "Copiar e abrir o
+SQL Editor" (copia e já abre o SQL Editor do projeto numa aba nova). No topo,
+botão "Abrir o SQL Editor do Supabase".
 
 Uso:
   python3 scripts/gerar-pagina-sql.py saida.html migrations/a.sql migrations/b.sql \
-      [--conferencia "select ...;" --conferencia-texto "Deve voltar uma linha: x."]
+      [--conferencia "select ...;" --conferencia-texto "Deve voltar uma linha: x."] \
+      [--projeto outro_id]
 
 O título de cada bloco é a primeira linha de comentário depois do STATUS, e a
 descrição são as linhas seguintes do mesmo comentário (até 3). Comentários do
@@ -17,6 +20,13 @@ execução, nunca como arquivo anexo.
 """
 import html
 import sys
+
+# Projeto Supabase do SQL Editor (troque com --projeto).
+PROJETO = "vidnlzbxaxjlmzncqhxw"
+
+
+def url_editor(projeto):
+    return f"https://supabase.com/dashboard/project/{projeto}/sql/new"
 
 
 def partes(caminho):
@@ -59,6 +69,11 @@ def main():
         k = args.index("--conferencia-texto")
         conf_txt = args[k + 1]
         del args[k : k + 2]
+    projeto = PROJETO
+    if "--projeto" in args:
+        k = args.index("--projeto")
+        projeto = args[k + 1]
+        del args[k : k + 2]
     if len(args) < 2:
         sys.exit(__doc__)
     saida, arquivos = args[0], args[1:]
@@ -69,7 +84,7 @@ def main():
         blocos += f"""
 <section class="script">
   <header><span class="passo">{n}</span><div><h2>{html.escape(t)}</h2><p>{html.escape(d)}</p></div></header>
-  <div class="barra"><button class="copiar" data-alvo="sql{n}">Copiar SQL {n}</button><span class="aviso" role="status"></span></div>
+  <div class="barra"><button class="copiar abrir" data-alvo="sql{n}">Copiar e abrir o SQL Editor</button><button class="copiar secundario" data-alvo="sql{n}">Copiar SQL {n}</button><span class="aviso" role="status"></span></div>
   <pre id="sql{n}" tabindex="0">{html.escape(sql)}</pre>
 </section>"""
     verif = ""
@@ -77,12 +92,13 @@ def main():
         verif = f"""
 <section class="verif">
   <h2>Conferência</h2><p>{html.escape(conf_txt)}</p>
-  <div class="barra"><button class="copiar" data-alvo="sqlv">Copiar consulta</button><span class="aviso" role="status"></span></div>
+  <div class="barra"><button class="copiar abrir" data-alvo="sqlv">Copiar e abrir o SQL Editor</button><button class="copiar secundario" data-alvo="sqlv">Copiar consulta</button><span class="aviso" role="status"></span></div>
   <pre id="sqlv" tabindex="0">{html.escape(conf)}</pre>
 </section>"""
 
     modelo = open(__file__.replace("gerar-pagina-sql.py", "pagina-sql.modelo.html"), encoding="utf-8").read()
     pagina = modelo.replace("{{BLOCOS}}", blocos).replace("{{CONFERENCIA}}", verif).replace("{{TOTAL}}", str(len(arquivos)))
+    pagina = pagina.replace("{{EDITOR_URL}}", html.escape(url_editor(projeto))).replace("{{PROJETO}}", html.escape(projeto))
     open(saida, "w", encoding="utf-8").write(pagina)
     print(f"{saida}: {len(arquivos)} script(s)")
 
