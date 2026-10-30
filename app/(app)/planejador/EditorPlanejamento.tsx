@@ -38,6 +38,7 @@ import ResumoPlano from "@/components/planejador/ResumoPlano";
 import CustoDisparos from "@/components/planejador/CustoDisparos";
 import { aplicarQuantidades } from "@/lib/custo-disparos";
 import { formatDate } from "@/lib/format";
+import { pacienteDeMesmoNome, sugerirPacientes, type PacienteCadastro } from "@/lib/pacientes";
 import {
   ArrowLeft,
   ArrowRight,
@@ -58,6 +59,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { confirmar } from "@/components/Dialogos";
+import { CircleCheck } from "lucide-react";
 
 type Cliente = ClientOption & { profissional: string };
 type Evento = { id: string; date_start: string; event_type: string };
@@ -120,6 +122,9 @@ export default function EditorPlanejamento({
   const [confirmarApagar, setConfirmarApagar] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [digitando, setDigitando] = useState(false);
+  // Cadastros de paciente da cliente (sugestões do campo "Nome do paciente").
+  const [cadastros, setCadastros] = useState<PacienteCadastro[]>([]);
+  const [sugerindo, setSugerindo] = useState(false);
   const rolagem = useRef<HTMLDivElement>(null);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -301,7 +306,23 @@ export default function EditorPlanejamento({
     };
   }, [cliente, supabase, portal]);
 
+  useEffect(() => {
+    let ativo = true;
+    let q = supabase.from("pacientes").select("id, client_id, nome, whatsapp, nascimento, observacoes").order("nome").limit(2000);
+    if (!portal) q = cliente ? q.eq("client_id", cliente) : q.is("client_id", null);
+    q.then(({ data, error }) => {
+      if (ativo) setCadastros(error ? [] : ((data ?? []) as PacienteCadastro[]));
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [cliente, supabase, portal]);
+
   function mudarLigacao(novoCliente: string, novoEvento: string) {
+    if (novoCliente !== ligacao.current.cliente && planoRef.current.pacienteId) {
+      planoRef.current = { ...planoRef.current, pacienteId: "" };
+      setPlano(planoRef.current);
+    }
     setCliente(novoCliente);
     setEvento(novoEvento);
     ligacao.current = { cliente: novoCliente, evento: novoEvento };
@@ -345,7 +366,7 @@ export default function EditorPlanejamento({
     const est = paraEstado(plano);
     const DATA = Object.fromEntries(Object.entries(plano.DATA).map(([k, ls]) => [k, ls.map(({ feito: _f, ...l }) => l)]));
     try {
-      sessionStorage.setItem(CHAVE_PLANO_IA, JSON.stringify({ ...est, paciente: "", dataRetorno: "", obs: "", DATA, sessaoAtual: 1, sessoesAnteriores: [] }));
+      sessionStorage.setItem(CHAVE_PLANO_IA, JSON.stringify({ ...est, paciente: "", pacienteId: "", dataRetorno: "", obs: "", DATA, sessaoAtual: 1, sessoesAnteriores: [] }));
     } catch {
       return mostrarAviso("Não consegui duplicar neste aparelho.");
     }
@@ -574,7 +595,7 @@ export default function EditorPlanejamento({
                   )}
                   {!somenteLeitura && (
                     <button onClick={excluir} className="flex w-full items-center gap-2.5 border-t border-neutral-100 px-4 py-3 text-left text-sm text-rose-600 active:bg-rose-50">
-                      <Trash2 size={16} /> Excluir paciente
+                      <Trash2 size={16} /> Excluir planejamento
                     </button>
                   )}
                 </div>
@@ -684,10 +705,62 @@ export default function EditorPlanejamento({
               <div className={cartao}>
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Paciente</p>
                 <div className="space-y-3">
-                  <label className="block">
-                    <span className={rotulo}>Nome do paciente</span>
-                    <input value={plano.paciente} onChange={(e) => campo("paciente", e.target.value)} placeholder="Nome completo" autoComplete="off" className={`${entrada} text-base font-semibold`} />
-                  </label>
+                  <div className="relative">
+                    <label className="block">
+                      <span className={rotulo}>Nome do paciente</span>
+                      <input
+                        value={plano.paciente}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          mudar((p) => ({ ...p, paciente: v, pacienteId: "" }));
+                          setSugerindo(true);
+                        }}
+                        onFocus={() => setSugerindo(true)}
+                        onBlur={() => setTimeout(() => setSugerindo(false), 150)}
+                        placeholder={cadastros.length ? "Digite para achar ou cadastrar" : "Nome completo"}
+                        autoComplete="off"
+                        className={`${entrada} text-base font-semibold`}
+                      />
+                    </label>
+                    {sugerindo && !plano.pacienteId && !somenteLeitura && (() => {
+                      const lista = sugerirPacientes(cadastros, plano.paciente).filter((c) => c.nome !== plano.paciente);
+                      if (!lista.length) return null;
+                      return (
+                        <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-neutral-200">
+                          <li className="px-3 pt-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400">Pacientes já cadastrados</li>
+                          {lista.map((c) => (
+                            <li key={c.id}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  mudar((p) => ({ ...p, paciente: c.nome, pacienteId: c.id }));
+                                  setSugerindo(false);
+                                }}
+                                className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm text-neutral-800 active:bg-brand-teal/10"
+                              >
+                                <UserRound size={15} className="text-brand-teal-dark" /> {c.nome}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
+                    {plano.paciente.trim() && (() => {
+                      const mesmo = plano.pacienteId ? cadastros.find((c) => c.id === plano.pacienteId) : pacienteDeMesmoNome(cadastros, plano.paciente);
+                      return (
+                        <p className={`mt-1.5 flex items-center gap-1.5 text-xs ${mesmo ? "text-emerald-700" : "text-neutral-500"}`}>
+                          {mesmo ? <CircleCheck size={13} /> : <Plus size={13} />}
+                          <span className="min-w-0 flex-1">{mesmo ? `Na ficha de ${mesmo.nome}: este planejamento entra no histórico dele.` : "Paciente novo: a ficha dele é criada ao salvar."}</span>
+                          {mesmo && (
+                            <Link href={`${base}?paciente=${mesmo.id}`} className="flex-shrink-0 font-semibold text-brand-teal-dark underline">
+                              Ver ficha
+                            </Link>
+                          )}
+                        </p>
+                      );
+                    })()}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block min-w-0">
                       <span className={rotulo}>Data</span>

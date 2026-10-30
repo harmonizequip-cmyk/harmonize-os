@@ -1,20 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { LinkCliente } from "@/components/Atalhos";
-import { linkNovoPlanejamento, linkEvento } from "@/lib/atalhos";
-import { agruparPorCliente, diasAte, retornosProximos, type PlanejamentoLinha } from "@/lib/planejamento";
+import { linkNovoPlanejamento } from "@/lib/atalhos";
+import { diasAte, type PlanejamentoLinha } from "@/lib/planejamento";
 import { formatDate } from "@/lib/format";
-import { CalendarClock, ClipboardList, History, Pencil, Plus, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
-import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
+import { CalendarClock, ChevronRight, ClipboardList, History, Pencil, Plus, Search, SlidersHorizontal, UserRound, X } from "lucide-react";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
-import { createClient } from "@/lib/supabase/client";
 import { usePreferencias } from "@/lib/usar-preferencias";
-import HistoricoPaciente from "@/components/planejador/HistoricoPaciente";
-import { normalizarNome, planosDoPaciente, saldoParaProximaSessao } from "@/lib/historico-paciente";
+import FichaPaciente, { linkNovoDoPaciente } from "@/components/planejador/FichaPaciente";
+import { normalizarNome } from "@/lib/historico-paciente";
+import { agruparPorPaciente, pacienteBate, type PacienteCadastro, type PacienteResumo } from "@/lib/pacientes";
 
 /** Linha da lista + o que sai do estado sem baixar ele todo (quantas sessões tem e em qual está). */
 export type LinhaLista = PlanejamentoLinha & { sessoes_total?: number; sessao_atual?: number };
@@ -27,135 +26,104 @@ function quando(dias: number) {
   return `em ${dias} dias`;
 }
 
-function Linha({ p, hoje, mostrarCliente, portal, onHistorico }: { p: LinhaLista; hoje: string; mostrarCliente?: boolean; portal?: boolean; onHistorico: (p: LinhaLista) => void }) {
-  const router = useRouter();
+function CartaoPaciente({
+  r,
+  hoje,
+  portal,
+  mostrarCliente,
+  onAbrir,
+}: {
+  r: PacienteResumo<LinhaLista>;
+  hoje: string;
+  portal?: boolean;
+  mostrarCliente?: boolean;
+  onAbrir: (r: PacienteResumo<LinhaLista>) => void;
+}) {
   const somenteLeitura = useSomenteLeitura();
-  const [apagar, setApagar] = useState(false);
   const base = portal ? "/portal" : "/planejador";
-  const passou = p.saldo_total > 0 && p.total_disparos > p.saldo_total;
-  const retorno = p.data_retorno ? diasAte(p.data_retorno, hoje) : null;
-  const varias = (p.sessoes_total ?? 1) > 1;
-  const saldoProxima = saldoParaProximaSessao(p);
+  const continuar = r.saldos[0]?.plano ?? r.planos[0] ?? null;
+  const diasRetorno = r.retorno ? diasAte(r.retorno, hoje) : null;
+  const pararClique = (e: React.MouseEvent) => e.stopPropagation();
   return (
-    <>
-    <Link href={`${base}/${p.id}`} className="block rounded-xl border border-neutral-200 bg-white px-3 py-2.5 hover:border-brand-teal/40">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-neutral-900">{p.paciente || "Paciente sem nome"}</p>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onAbrir(r)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onAbrir(r))}
+      className={`cursor-pointer rounded-2xl bg-white px-3 py-3 text-left ring-1 transition active:scale-[.99] ${r.saldoTotal > 0 ? "ring-emerald-300" : "ring-neutral-200 hover:ring-brand-teal/40"}`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-teal/10 text-sm font-black text-brand-teal-dark">
+          {r.nome ? r.nome.trim()[0]?.toUpperCase() : <UserRound size={18} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-bold text-neutral-900">{r.nome || "Paciente sem nome"}</p>
           <p className="truncate text-xs text-neutral-500">
-            {p.data ? formatDate(p.data) : "sem data"}
-            {p.procedimento ? ` · ${p.procedimento}` : ""}
-            {mostrarCliente && p.cliente_nome ? (
-              <>
-                {" · "}
-                <LinkCliente id={p.client_id}>{p.cliente_nome}</LinkCliente>
-              </>
-            ) : null}
+            {r.sessoes} {r.sessoes === 1 ? "sessão" : "sessões"}
+            {r.ultimaData ? ` · último ${formatDate(r.ultimaData)}` : ""}
+            {r.ultimoProcedimento ? ` · ${r.ultimoProcedimento}` : ""}
           </p>
+          {mostrarCliente && r.cliente_nome && (
+            <p className="truncate text-xs text-neutral-500" onClick={pararClique}>
+              <LinkCliente id={r.client_id}>{r.cliente_nome}</LinkCliente>
+            </p>
+          )}
         </div>
-        <div className="flex-shrink-0 text-right">
-          <p className={`font-mono text-sm font-semibold ${passou ? "text-rose-600" : "text-brand-teal-dark"}`}>{fmt(p.total_disparos)}</p>
-          <p className="text-[10px] text-neutral-400">{p.saldo_total ? `de ${fmt(p.saldo_total)}` : "disparos"}</p>
-        </div>
+        <ChevronRight size={18} className="mt-2 flex-shrink-0 text-neutral-300" />
       </div>
-      {varias || saldoProxima > 0 || (retorno !== null && retorno >= 0) || (!portal && (p.calendar_event_id || p.pela_cliente)) ? (
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {varias && (
-            <span className="rounded-full bg-brand-teal/10 px-2 py-0.5 text-[11px] font-semibold text-brand-teal-dark">
-              Sessão {p.sessao_atual ?? 1} de {p.sessoes_total}
+
+      {(r.saldoTotal > 0 || (diasRetorno !== null && diasRetorno >= 0) || r.planos.length > 1 || (!portal && r.pelaCliente)) && (
+        <div className="mt-2 flex flex-wrap gap-1.5 pl-[52px]">
+          {r.saldos.map((s) => (
+            <span key={s.plano.id} className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-bold text-white">
+              {fmt(s.saldo)} disparos p/ Sessão {s.proximaSessao}
+            </span>
+          ))}
+          {diasRetorno !== null && diasRetorno >= 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+              <CalendarClock size={11} /> Retorno {quando(diasRetorno)} ({formatDate(r.retorno!)})
             </span>
           )}
-          {saldoProxima > 0 && (
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Saldo p/ próxima: {fmt(saldoProxima)}</span>
+          {r.planos.length > 1 && (
+            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600">{r.planos.length} planejamentos</span>
           )}
-          {retorno !== null && retorno >= 0 && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-              Retorno {quando(retorno)} ({formatDate(p.data_retorno!)})
-            </span>
-          )}
-          {!portal && p.pela_cliente && (
-            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">Feito pela cliente</span>
-          )}
-          {!portal && p.calendar_event_id && (
-            <span
-              role="link"
-              tabIndex={0}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push(linkEvento(p.calendar_event_id!));
-              }}
-              className="rounded-full border border-brand-teal/30 bg-brand-teal/5 px-2 py-0.5 text-[11px] font-medium text-brand-teal-dark"
-            >
-              📅 Atendimento
-            </span>
-          )}
+          {!portal && r.pelaCliente && <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">Feito pela cliente</span>}
         </div>
-      ) : null}
-      <div className="mt-2 flex flex-wrap gap-2 border-t border-neutral-100 pt-2">
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onHistorico(p);
-          }}
+      )}
+
+      <div className="mt-2.5 flex flex-wrap gap-2 border-t border-neutral-100 pt-2.5" onClick={pararClique}>
+        <button
+          type="button"
+          onClick={() => onAbrir(r)}
           className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-brand-teal/10 px-4 text-xs font-semibold text-brand-teal-dark active:bg-brand-teal/20"
         >
-          <History size={14} /> Histórico
-        </span>
+          <History size={14} /> Ficha
+        </button>
+        {continuar && (
+          <Link
+            href={`${base}/${continuar.id}`}
+            className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-4 text-xs font-semibold ${r.saldoTotal > 0 ? "bg-emerald-600 text-white" : "bg-neutral-100 text-neutral-700"}`}
+          >
+            <Pencil size={14} /> {r.saldoTotal > 0 ? "Continuar" : "Abrir último"}
+          </Link>
+        )}
         {!somenteLeitura && (
-          <>
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push(`${base}/${p.id}?aba=paciente`);
-              }}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-neutral-100 px-4 text-xs font-semibold text-neutral-700"
-            >
-              <Pencil size={14} /> Editar
-            </span>
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setApagar(true);
-              }}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-rose-50 px-4 text-xs font-semibold text-rose-600"
-            >
-              <Trash2 size={14} /> Excluir
-            </span>
-          </>
+          <Link href={linkNovoDoPaciente(r, portal)} className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-neutral-100 px-4 text-xs font-semibold text-neutral-700">
+            <Plus size={14} /> Novo
+          </Link>
         )}
       </div>
-    </Link>
-    {apagar && (
-      <ConfirmarApagarModal
-        titulo={`Excluir ${p.paciente || "este paciente"}?`}
-        descricao="Apaga o planejamento deste paciente, com as áreas e os disparos."
-        onCancelar={() => setApagar(false)}
-        onConfirmar={async () => {
-          const { error } = await createClient().rpc("excluir_planejamento", { p_id: p.id });
-          if (error) return error.message || "Não consegui apagar. Confira a internet.";
-          setApagar(false);
-          router.refresh();
-        }}
-      />
-    )}
-    </>
+    </div>
   );
 }
 
 export default function PlanejadorLista({
   planejamentos,
+  pacientes = [],
+  temCadastro = false,
   clientes,
   clienteInicial,
+  pacienteInicial = "",
   hoje,
   erro,
   portal,
@@ -164,11 +132,16 @@ export default function PlanejadorLista({
   portal?: boolean;
   nomeCliente?: string | null;
   planejamentos: LinhaLista[];
+  pacientes?: PacienteCadastro[];
+  temCadastro?: boolean;
   clientes: ClientOption[];
   clienteInicial: string;
+  /** ?paciente=<id>: abre a ficha dele ao entrar. */
+  pacienteInicial?: string;
   hoje: string;
   erro: string | null;
 }) {
+  const router = useRouter();
   const [cliente, setCliente] = useState(clienteInicial);
   const [busca, setBusca] = useState("");
   const [filtros, setFiltros] = useState(false);
@@ -177,7 +150,16 @@ export default function PlanejadorLista({
   const [procedimento, setProcedimento] = useState("");
   const [comSaldo, setComSaldo] = useState(false);
   const [comRetorno, setComRetorno] = useState(false);
-  const [historico, setHistorico] = useState<LinhaLista | null>(null);
+  const [aberta, setAberta] = useState<string | null>(null);
+
+  const todos = useMemo(() => agruparPorPaciente(planejamentos, pacientes, hoje), [planejamentos, pacientes, hoje]);
+
+  useEffect(() => {
+    if (!pacienteInicial) return;
+    const r = todos.find((x) => x.pacienteId === pacienteInicial);
+    if (r) setAberta(r.chave);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacienteInicial]);
 
   const procedimentos = useMemo(
     () => Array.from(new Set(planejamentos.map((p) => (p.procedimento ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
@@ -187,19 +169,17 @@ export default function PlanejadorLista({
   const algumFiltro = nFiltros > 0 || !!busca.trim();
 
   const filtrados = useMemo(() => {
-    const t = normalizarNome(busca);
     const proc = normalizarNome(procedimento);
-    return planejamentos.filter((p) => {
-      if (cliente && p.client_id !== cliente) return false;
-      if (t && ![p.paciente, p.procedimento, p.cliente_nome].some((v) => normalizarNome(v).includes(t))) return false;
-      if (de && (!p.data || p.data.slice(0, 10) < de)) return false;
-      if (ate && (!p.data || p.data.slice(0, 10) > ate)) return false;
-      if (proc && !normalizarNome(p.procedimento).includes(proc)) return false;
-      if (comSaldo && saldoParaProximaSessao(p) <= 0) return false;
-      if (comRetorno && !(p.data_retorno && diasAte(p.data_retorno, hoje) >= 0)) return false;
+    return todos.filter((r) => {
+      if (cliente && r.client_id !== cliente) return false;
+      if (!pacienteBate(r, busca)) return false;
+      if ((de || ate) && !r.planos.some((p) => p.data && (!de || p.data.slice(0, 10) >= de) && (!ate || p.data.slice(0, 10) <= ate))) return false;
+      if (proc && !r.planos.some((p) => normalizarNome(p.procedimento).includes(proc))) return false;
+      if (comSaldo && r.saldoTotal <= 0) return false;
+      if (comRetorno && !r.retorno) return false;
       return true;
     });
-  }, [planejamentos, cliente, busca, de, ate, procedimento, comSaldo, comRetorno, hoje]);
+  }, [todos, cliente, busca, de, ate, procedimento, comSaldo, comRetorno]);
 
   function limparFiltros() {
     setBusca("");
@@ -210,23 +190,44 @@ export default function PlanejadorLista({
     setComRetorno(false);
   }
 
-  const doHistorico = useMemo(() => (historico ? planosDoPaciente(planejamentos, historico) : []), [historico, planejamentos]);
-  const grupos = useMemo(() => agruparPorCliente(filtrados), [filtrados]);
   const retornoDias = usePreferencias().planejador.retornoDias;
-  const retornos = useMemo(() => retornosProximos(filtrados, hoje, retornoDias), [filtrados, hoje, retornoDias]);
+  const retornos = useMemo(
+    () =>
+      filtrados
+        .filter((r) => r.retorno && diasAte(r.retorno, hoje) <= retornoDias)
+        .sort((a, b) => (a.retorno ?? "").localeCompare(b.retorno ?? "")),
+    [filtrados, hoje, retornoDias]
+  );
+  const comSaldoTotal = useMemo(() => todos.filter((r) => (!cliente || r.client_id === cliente) && r.saldoTotal > 0).length, [todos, cliente]);
+  const grupos = useMemo(() => {
+    const m = new Map<string, { clientId: string | null; nome: string; itens: PacienteResumo<LinhaLista>[] }>();
+    for (const r of filtrados) {
+      const k = r.client_id ?? "";
+      const nome = r.cliente_nome || clientes.find((c) => c.id === r.client_id)?.name || "Sem cliente";
+      if (!m.has(k)) m.set(k, { clientId: r.client_id, nome, itens: [] });
+      m.get(k)!.itens.push(r);
+    }
+    return Array.from(m.values()).sort((a, b) => (a.clientId ? 0 : 1) - (b.clientId ? 0 : 1) || a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [filtrados, clientes]);
+  const fichaAberta = todos.find((r) => r.chave === aberta) ?? null;
+  const outrosDaCliente = useMemo(
+    () => (fichaAberta ? todos.filter((r) => r.client_id === fichaAberta.client_id && r.chave !== fichaAberta.chave) : []),
+    [todos, fichaAberta]
+  );
   const nomeCliente = clientes.find((c) => c.id === cliente)?.name;
   const linkNovo = portal ? "/portal/novo" : linkNovoPlanejamento(cliente || null);
+  const abrir = (r: PacienteResumo<LinhaLista>) => setAberta(r.chave);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 pb-28">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-neutral-900">
-            <ClipboardList size={20} className="text-brand-teal" /> {portal ? "Meus planejamentos" : "Planejador HIPRO"}
+            <ClipboardList size={20} className="text-brand-teal" /> {portal ? "Meus pacientes" : "Planejador HIPRO"}
           </h1>
           <p className="text-sm text-neutral-500">
-            {planejamentos.length} {planejamentos.length === 1 ? "planejamento" : "planejamentos"}
-            {portal ? (nomePortal ? ` de ${nomePortal}` : "") : ", por cliente e paciente."}
+            {todos.length} {todos.length === 1 ? "paciente" : "pacientes"}
+            {portal ? (nomePortal ? ` de ${nomePortal}` : "") : ", por cliente."} Toque no paciente para ver a ficha.
           </p>
         </div>
         <Link
@@ -271,6 +272,18 @@ export default function PlanejadorLista({
             <SlidersHorizontal size={15} /> Filtros{nFiltros > 0 ? ` (${nFiltros})` : ""}
           </button>
         </div>
+        {comSaldoTotal > 0 && !comSaldo && (
+          <button
+            type="button"
+            onClick={() => setComSaldo(true)}
+            className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 text-left text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200 active:bg-emerald-100"
+          >
+            <span>
+              {comSaldoTotal} {comSaldoTotal === 1 ? "paciente com saldo" : "pacientes com saldo"} para a próxima sessão
+            </span>
+            <ChevronRight size={16} />
+          </button>
+        )}
         {filtros && (
           <div className="space-y-2 rounded-xl bg-neutral-50 p-2.5">
             <div className="grid grid-cols-2 gap-2">
@@ -324,7 +337,7 @@ export default function PlanejadorLista({
             onClick={limparFiltros}
             className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-neutral-100 px-3 text-sm font-semibold text-neutral-700 active:bg-neutral-200"
           >
-            <X size={14} /> Limpar filtros ({filtrados.length} de {planejamentos.length})
+            <X size={14} /> Limpar filtros ({filtrados.length} de {todos.length})
           </button>
         )}
         {cliente && !portal && (
@@ -336,27 +349,27 @@ export default function PlanejadorLista({
         )}
       </div>
 
-      {retornos.length > 0 && (
+      {retornos.length > 0 && !comRetorno && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
             <CalendarClock size={14} /> Retornos nos próximos {retornoDias} dias
           </p>
           <div className="space-y-2">
-            {retornos.map((p) => (
-              <Linha key={p.id} p={p} hoje={hoje} mostrarCliente={!portal} portal={portal} onHistorico={setHistorico} />
+            {retornos.map((r) => (
+              <CartaoPaciente key={r.chave} r={r} hoje={hoje} portal={portal} mostrarCliente={!portal} onAbrir={abrir} />
             ))}
           </div>
         </div>
       )}
 
-      {grupos.length === 0 && !erro && (
+      {filtrados.length === 0 && !erro && (
         <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center">
-          <p className="text-3xl">📋</p>
+          <ClipboardList size={28} className="mx-auto text-neutral-300" />
           <p className="mt-2 text-sm font-medium text-neutral-800">
-            {algumFiltro && planejamentos.length > 0 ? "Nenhum planejamento com esses filtros" : `Nenhum planejamento ${cliente ? "desta cliente" : "ainda"}`}
+            {algumFiltro && todos.length > 0 ? "Nenhum paciente com esses filtros" : `Nenhum paciente ${cliente ? "desta cliente" : "ainda"}`}
           </p>
           <p className="mt-1 text-sm text-neutral-500">
-            {algumFiltro && planejamentos.length > 0
+            {algumFiltro && todos.length > 0
               ? "Toque em Limpar filtros para ver todos."
               : portal
                 ? 'Toque em "Novo" para montar o primeiro.'
@@ -365,38 +378,38 @@ export default function PlanejadorLista({
         </div>
       )}
 
-      {portal &&
-        filtrados.map((p) => <Linha key={p.id} p={p} hoje={hoje} portal onHistorico={setHistorico} />)}
+      {portal && <div className="space-y-2">{filtrados.map((r) => <CartaoPaciente key={r.chave} r={r} hoje={hoje} portal onAbrir={abrir} />)}</div>}
 
-      {!portal && grupos.map((g) => (
-        <section key={g.clientId ?? "sem"} className="space-y-2">
-          <div className="flex items-center justify-between gap-2 px-1">
-            <p className="text-sm font-semibold text-neutral-800">
-              <LinkCliente id={g.clientId}>{g.nome}</LinkCliente>{" "}
-              <span className="font-normal text-neutral-400">
-                · {g.itens.length} {g.itens.length === 1 ? "paciente" : "pacientes"}
-              </span>
-            </p>
-            {g.clientId && (
-              <Link href={linkNovoPlanejamento(g.clientId)} className="text-xs font-medium text-brand-teal-dark">
-                + Novo para ela
-              </Link>
-            )}
-          </div>
-          {g.itens.map((p) => (
-            <Linha key={p.id} p={p} hoje={hoje} onHistorico={setHistorico} />
-          ))}
-        </section>
-      ))}
+      {!portal &&
+        grupos.map((g) => (
+          <section key={g.clientId ?? "sem"} className="space-y-2">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <p className="text-sm font-semibold text-neutral-800">
+                <LinkCliente id={g.clientId}>{g.nome}</LinkCliente>{" "}
+                <span className="font-normal text-neutral-400">
+                  · {g.itens.length} {g.itens.length === 1 ? "paciente" : "pacientes"}
+                </span>
+              </p>
+              {g.clientId && (
+                <Link href={linkNovoPlanejamento(g.clientId)} className="text-xs font-medium text-brand-teal-dark">
+                  + Novo para ela
+                </Link>
+              )}
+            </div>
+            {g.itens.map((r) => (
+              <CartaoPaciente key={r.chave} r={r} hoje={hoje} onAbrir={abrir} />
+            ))}
+          </section>
+        ))}
 
-      <HistoricoPaciente
-        aberto={!!historico}
-        onFechar={() => setHistorico(null)}
-        planoIds={doHistorico.map((p) => p.id)}
-        paciente={historico?.paciente ?? ""}
-        cliente={portal ? null : historico?.cliente_nome}
-        base={portal ? "/portal" : "/planejador"}
+      <FichaPaciente
+        paciente={fichaAberta}
+        outros={outrosDaCliente}
+        portal={portal}
+        temCadastro={temCadastro}
         hoje={hoje}
+        onFechar={() => setAberta(null)}
+        onMudou={() => router.refresh()}
       />
     </div>
   );

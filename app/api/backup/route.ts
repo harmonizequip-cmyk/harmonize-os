@@ -35,6 +35,7 @@ const TABELAS = [
   "creditos_cliente",
   "locacao_contagens",
   "reserva_contagens",
+  "pacientes",
   "planejamentos",
   "convites_cadastro",
   "cadastros_recebidos",
@@ -47,9 +48,9 @@ const TABELAS = [
   "campanha_envios",
 ];
 
-// Tabelas que podem ainda não existir no banco (SQL das campanhas não rodado):
+// Tabelas que podem ainda não existir no banco (SQL das campanhas ou dos pacientes não rodado):
 // sem a tabela não há dado a perder, então o backup sai sem ela em vez de falhar.
-const PODEM_FALTAR = new Set(["campanhas", "campanha_envios"]);
+const PODEM_FALTAR = new Set(["campanhas", "campanha_envios", "pacientes"]);
 
 function tabelaNaoExiste(error: { code?: string; message?: string }): boolean {
   return error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");

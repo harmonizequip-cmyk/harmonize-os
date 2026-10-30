@@ -23,6 +23,8 @@ export interface PlanejamentoLinha {
   client_id: string | null;
   calendar_event_id: string | null;
   paciente: string | null;
+  /** Cadastro do paciente (tabela pacientes); nulo antes do SQL dos pacientes. */
+  paciente_id?: string | null;
   data: string | null;
   data_retorno: string | null;
   procedimento: string | null;

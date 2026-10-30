@@ -126,23 +126,21 @@ export interface ResumoHistorico {
   sessoes: number;
   /** Disparos já distribuídos em todas as sessões de todos os planejamentos. */
   usados: number;
-  /** Quanto resta do pacote do planejamento mais recente (0 se não há saldo definido). */
+  /** Quanto resta dos pacotes, somando todos os planejamentos (0 nos que não têm saldo definido). */
   saldoRestante: number;
   planejamentos: number;
 }
 
-/** Números do topo: sessões feitas, disparos usados e o que resta do pacote mais recente. */
+/** Números do topo: sessões feitas, disparos usados e o que resta dos pacotes (todos os planejamentos). */
 export function resumirHistorico(entradas: EntradaHistorico[]): ResumoHistorico {
   const sessoes = entradas.flatMap(sessoesDoPlano);
   const usados = sessoes.reduce((t, s) => t + s.total, 0);
-  const maisRecente = [...entradas].sort((a, b) => dia(b.data).localeCompare(dia(a.data)) || b.updated_at.localeCompare(a.updated_at))[0];
   let saldoRestante = 0;
-  if (maisRecente) {
-    const plano = normalizarPlano(maisRecente.estado);
-    if (plano.saldoTotal !== "0") {
-      const feitos = sessoesDoPlano(maisRecente).reduce((t, s) => t + s.total, 0);
-      saldoRestante = Math.max(0, (Number(plano.saldoTotal) || 0) - feitos);
-    }
+  for (const e of entradas) {
+    const pacote = Number(normalizarPlano(e.estado).saldoTotal) || 0;
+    if (!pacote) continue;
+    const feitos = sessoesDoPlano(e).reduce((t, s) => t + s.total, 0);
+    saldoRestante += Math.max(0, pacote - feitos);
   }
   return { sessoes: sessoes.length, usados, saldoRestante, planejamentos: entradas.length };
 }

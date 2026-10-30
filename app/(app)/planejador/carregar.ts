@@ -23,3 +23,49 @@ export async function carregarContexto(supabase: SupabaseClient, clienteId?: str
 }
 
 export { um };
+
+const COLUNAS_LISTA =
+  "id, client_id, calendar_event_id, paciente, data, data_retorno, procedimento, saldo_total, total_disparos, updated_at, sessoes_total:estado->>sessoesTotal, sessao_atual:estado->>sessaoAtual";
+const DO_DONO = ", clients(name, display_name, treatment), autor:profiles!planejamentos_created_by_fkey(cliente_id)";
+
+/**
+ * Planejamentos da lista e os cadastros de paciente. Antes do SQL dos pacientes
+ * (2026-10-30-pacientes.sql) a coluna paciente_id e a tabela pacientes não
+ * existem: a lista carrega sem elas e junta os pacientes pelo nome.
+ */
+export async function carregarListaPlanejador(supabase: SupabaseClient, portal = false) {
+  const extra = portal ? "" : DO_DONO;
+  const consulta = (colunas: string) =>
+    supabase.from("planejamentos").select(colunas).order("data", { ascending: false }).order("updated_at", { ascending: false }).limit(1000);
+  const [planos, pacientes] = await Promise.all([
+    consulta(COLUNAS_LISTA + ", paciente_id" + extra),
+    supabase.from("pacientes").select("id, client_id, nome, whatsapp, nascimento, observacoes").order("nome").limit(5000),
+  ]);
+  let { data, error } = planos as { data: any[] | null; error: { code?: string; message?: string } | null };
+  if (error && (error.code === "42703" || /paciente_id/.test(error.message ?? ""))) {
+    ({ data, error } = (await consulta(COLUNAS_LISTA + extra)) as { data: any[] | null; error: { code?: string; message?: string } | null });
+  }
+  const lista = (data ?? []).map((p: any) => ({
+    ...p,
+    clients: undefined,
+    autor: undefined,
+    paciente_id: p.paciente_id ?? null,
+    cliente_nome: portal ? null : nomeDe(um(p.clients)),
+    pela_cliente: portal ? false : !!um<any>(p.autor)?.cliente_id,
+    sessoes_total: Number(p.sessoes_total) || undefined,
+    sessao_atual: Number(p.sessao_atual) || undefined,
+  }));
+  return {
+    lista,
+    pacientes: (pacientes.error ? [] : pacientes.data ?? []) as import("@/lib/pacientes").PacienteCadastro[],
+    temCadastro: !pacientes.error,
+    erro: error ? "Não consegui carregar os planejamentos." : null,
+  };
+}
+
+/** Um cadastro de paciente (a RLS só devolve o que quem está logado pode ver). */
+export async function carregarPaciente(supabase: SupabaseClient, id?: string | null) {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const { data } = await supabase.from("pacientes").select("id, client_id, nome").eq("id", id).maybeSingle();
+  return (data as { id: string; client_id: string | null; nome: string } | null) ?? null;
+}

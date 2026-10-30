@@ -82,6 +82,8 @@ export function minimoDaLinha(areaId: string): number | null {
 
 export interface Plano {
   paciente: string;
+  /** Cadastro do paciente (tabela pacientes) escolhido na tela; "" = o banco acha ou cria pelo nome. */
+  pacienteId: string;
   data: string;
   dataRetorno: string;
   queixa: string;
@@ -192,6 +194,7 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
   const maiorId = customAreas.reduce((m, a) => Math.max(m, Number(a.id.replace(/\D/g, "")) || 0), 0);
   return {
     paciente: txt(s.paciente),
+    pacienteId: txt(s.pacienteId),
     data: txt(s.data) || hoje,
     dataRetorno: txt(s.dataRetorno),
     queixa: txt(s.queixa),
@@ -253,6 +256,7 @@ const areasCustomParaEstado = (areas: Area[]) =>
 export function paraEstado(p: Plano): EstadoPlanejador {
   return {
     paciente: p.paciente,
+    ...(p.pacienteId ? { pacienteId: p.pacienteId } : {}),
     data: p.data,
     dataRetorno: p.dataRetorno,
     queixa: p.queixa,

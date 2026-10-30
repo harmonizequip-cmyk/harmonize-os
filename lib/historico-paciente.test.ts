@@ -78,9 +78,14 @@ describe("histórico do paciente", () => {
     expect(filtrarSessoes(tempo, { texto: "nada disso" })).toEqual([]);
   });
 
-  it("resumo: sessões, disparos usados e saldo restante do pacote mais recente", () => {
+  it("resumo: sessões, disparos usados e saldo restante dos pacotes", () => {
     const r = resumirHistorico([doisTempos]);
     expect(r).toMatchObject({ sessoes: 2, usados: 14000, saldoRestante: 2000, planejamentos: 1 });
+  });
+
+  it("resumo soma o saldo de todos os planejamentos", () => {
+    const outro = entrada("p8", "2026-05-05", { paciente: "Bia", data: "2026-05-05", saldoTotal: "5000", DATA: { frontal: [{ prof: "1.5", dispD: 500, dispE: 500 }] } });
+    expect(resumirHistorico([doisTempos, outro])).toMatchObject({ planejamentos: 2, saldoRestante: 6000 });
   });
 
   it("plano antigo, sem sessões no estado, vira uma sessão só", () => {
