@@ -1069,14 +1069,20 @@ Deno.serve(async (req) => {
   const uso = { entrada: 0, saida: 0, cacheLeitura: 0, cacheEscrita: 0 };
   let resposta = "";
 
+  // Cérebro: tudo precisa caber nos 150 s da Edge Function (plano gratuito); prazo com folga.
+  const prazoCerebro = Date.now() + 135_000;
   const blocoDados = modoInsights ? `Dados para os insights (JSON gerado agora pelas consultas do sistema; cada chave é uma lente):\n${await pacoteDeDados(supabase)}` : "";
-  // Cérebro: uma chamada só, já obrigada a gravar os insights.
-  const maxRodadas = modoInsights ? 0 : MAX_RODADAS;
+  // Cérebro: uma chamada; se a IA responder em texto sem gravar, uma segunda pedindo a gravação.
+  // (Forçar a ferramenta por tool_choice não é aceito por este modelo: a API devolve 400.)
+  const maxRodadas = modoInsights ? 1 : MAX_RODADAS;
   for (let rodada = 0; rodada <= maxRodadas; rodada++) {
     const ultimaRodada = rodada === maxRodadas;
     // Cérebro: corta antes dos 150 s da Edge Function, para a tela receber o motivo de verdade.
     const corte = modoInsights ? new AbortController() : null;
-    const relogio = corte ? setTimeout(() => corte.abort(), 130_000) : null;
+    const restante = prazoCerebro - Date.now();
+    if (corte && restante < 15_000)
+      return json({ erro: "A IA demorou demais para montar os insights. Tente de novo em alguns minutos." }, 504);
+    const relogio = corte ? setTimeout(() => corte.abort(), restante) : null;
     let r: Response;
     try {
       r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1094,8 +1100,8 @@ Deno.serve(async (req) => {
             ...(blocoDossie && !modoInsights ? [{ type: "text", text: blocoDossie, cache_control: { type: "ephemeral" } }] : []),
           ],
           tools: modoInsights ? FERRAMENTAS_INSIGHTS : pessoal ? FERRAMENTAS_PESSOAL : FERRAMENTAS,
-          // Cérebro: obrigado a gravar. Nas outras, a última rodada é sem ferramentas: responde com o que já tem.
-          ...(modoInsights ? { tool_choice: { type: "tool", name: "registrar_insights" } } : ultimaRodada ? { tool_choice: { type: "none" } } : {}),
+          // Fora do Cérebro, a última rodada é sem ferramentas: responde com o que já tem.
+          ...(!modoInsights && ultimaRodada ? { tool_choice: { type: "none" } } : {}),
           messages: comCacheNoFim(enviar()),
         }),
       });
@@ -1117,6 +1123,8 @@ Deno.serve(async (req) => {
           ? "A IA está ocupada agora. Tente de novo em instantes."
           : /credit|billing|balance/i.test(txt)
           ? "Acabou o crédito da conta da IA (console da Anthropic)."
+          : r.status === 400
+          ? `A IA recusou o pedido: ${(() => { try { return String(JSON.parse(txt)?.error?.message ?? "").slice(0, 160); } catch { return ""; } })() || "motivo não informado"}.`
           : "A IA não respondeu. Tente de novo.";
       // Rodadas anteriores desta pergunta já gastaram: registra, senão a trava do mês não as vê.
       if (uso.entrada + uso.saida > 0) {
@@ -1145,6 +1153,11 @@ Deno.serve(async (req) => {
     mensagens.push({ role: "assistant", content: blocos });
 
     const usos = blocos.filter((b): b is Extract<Bloco, { type: "tool_use" }> => b.type === "tool_use");
+    if (modoInsights && (dados.stop_reason !== "tool_use" || usos.length === 0)) {
+      if (ultimaRodada) return json({ erro: "A IA não gravou os insights desta vez. Tente de novo." }, 502);
+      mensagens.push({ role: "user", content: "Grave agora os insights com a ferramenta registrar_insights, numa chamada só, sem texto antes." });
+      continue;
+    }
     if (dados.stop_reason !== "tool_use" || usos.length === 0) {
       resposta = blocos
         .filter((b): b is Extract<Bloco, { type: "text" }> => b.type === "text")

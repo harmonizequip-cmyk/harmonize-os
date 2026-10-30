@@ -4349,13 +4349,13 @@ Rotas: `/cadastro/[token]`, `/portal`, `/portal/[id]`, `/portal/novo`.
 
 Rotas: `/assistente`, `/insights`.
 
-**O que faz (fluxo do usuário).** Chat com a IA da Anthropic pela Edge Function `assistente` (modelo pelo segredo `ASSISTENTE_MODELO`, padrão `claude-sonnet-5-5`). Consulta o banco só para leitura por `assistente_consultar`, guarda memórias (`assistente_memoria`), histórico (`assistente_conversas`) e custo (`assistente_uso`), lê o dossiê da cliente (`dossie_cliente`) e devolve cartões: WhatsApp pronto, planilha, envio da agenda (`CartaoAgenda`), escolha de áreas e planejamento (`CartaoEscolhaAreas`, `CartaoPlanejamento`). Voz grátis do aparelho. O Cérebro (`/insights`) pede à mesma função, com `modo: "insights"`: ela roda de uma vez as 17 consultas fixas de `LENTES_INSIGHTS` (`pacoteDeDados`) e faz uma chamada única à IA, obrigada a gravar de 6 a 8 insights em `insights` por `registrar_insights`.
+**O que faz (fluxo do usuário).** Chat com a IA da Anthropic pela Edge Function `assistente` (modelo pelo segredo `ASSISTENTE_MODELO`, padrão `claude-sonnet-5-5`). Consulta o banco só para leitura por `assistente_consultar`, guarda memórias (`assistente_memoria`), histórico (`assistente_conversas`) e custo (`assistente_uso`), lê o dossiê da cliente (`dossie_cliente`) e devolve cartões: WhatsApp pronto, planilha, envio da agenda (`CartaoAgenda`), escolha de áreas e planejamento (`CartaoEscolhaAreas`, `CartaoPlanejamento`). Voz grátis do aparelho. O Cérebro (`/insights`) pede à mesma função, com `modo: "insights"`: ela roda de uma vez as 17 consultas fixas de `LENTES_INSIGHTS` (`pacoteDeDados`) e faz uma chamada à IA com só a ferramenta `registrar_insights` (uma segunda, se ela responder em texto), gravando de 6 a 8 insights em `insights`.
 
 **Regras de negócio, cálculos, filtros, permissões e validações:**
 
 - Etapa 1: só consulta, não altera dados de negócio.
 - Limite de gasto mensal pelo segredo `ASSISTENTE_LIMITE_MENSAL_USD` (padrão 20).
-- Cérebro cabe no limite de 150 s da Edge Function: consultas em paralelo antes, uma chamada à IA com corte de 130 s e mensagem própria quando demora.
+- Cérebro cabe no limite de 150 s da Edge Function: consultas em paralelo antes, chamadas à IA com prazo de 135 s e mensagem própria quando demora.
 - Login de cliente é recusado; Pessoal exige a permissão `pessoal` e não mistura memórias.
 - Envio da agenda: dia 20 abre o mês seguinte, dia 5 atualiza; mensagens diferentes para cada cliente; "Marcar enviado" grava em `agenda_envios`.
 
