@@ -14,7 +14,8 @@ import PrecisaDeVoce, { type AvisoDash } from "@/components/dashboard/PrecisaDeV
 import PrevisaoCaixaCard from "@/components/PrevisaoCaixaCard";
 import { preverCaixa, type ReservaFutura, type LocacaoPassada } from "@/lib/previsao";
 import { calcularMetaDoMes } from "@/lib/meta-mes";
-import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
+import { ehForaDoResultado } from "@/lib/ajuste-saldo";
+import AjustarSaldoLink from "@/components/AjustarSaldoLink";
 import { foraDoResultadoPorCartao, foraDoSaldo } from "@/lib/cartao";
 import { buscarTodas } from "@/lib/buscar-todas";
 import { diasDoPeriodo } from "@/lib/period";
@@ -524,14 +525,14 @@ export default async function DashboardPage(
     .in("stage", ["nutricao", "qualificado"])
     .order("name");
 
-  // Empréstimo a terceiros e a devolução dele mexem no caixa (Saldo), mas não
-  // são receita nem despesa: ficam fora de Entradas, Saídas, Resultado e gráficos.
+  // Empréstimo a terceiros, a devolução dele e o ajuste de saldo mexem no caixa
+  // (Saldo), mas não são receita nem despesa: ficam fora de Entradas, Saídas, Resultado e gráficos.
   const normalizedRows = (transactions ?? [])
     .map((t: any) => ({
       ...t,
       categories: Array.isArray(t.categories) ? (t.categories[0] ?? null) : (t.categories ?? null),
     }))
-    .filter((t: any) => !ehCategoriaDeEmprestimo(t.categories?.name) && !foraDoResultadoPorCartao(t.cartao_mov));
+    .filter((t: any) => !ehForaDoResultado(t.categories?.name) && !foraDoResultadoPorCartao(t.cartao_mov));
   // Compra no cartão só tira dinheiro quando a fatura é paga.
   const saldoTotal = (allTimeTransactions ?? []).filter((t: any) => !foraDoSaldo(t)).reduce(
     (sum, t) => sum + (t.type === "entrada" ? Number(t.amount) : -Number(t.amount)),
@@ -750,12 +751,17 @@ export default async function DashboardPage(
       {/* Dinheiro agora */}
       {blocoVisivel("dinheiro") && (
       <div className="grid grid-cols-2 gap-2">
-        <Link href="/financeiro" className="cartao p-4 active:bg-neutral-50">
-          <IconeChip icone={Wallet} cor="teal" className="mb-2" />
-          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Saldo em caixa</p>
-          <p className={`mt-1 text-lg font-extrabold tabular-nums ${saldoTotal < 0 ? "text-rose-600" : "text-neutral-900"}`}>{formatCurrency(saldoTotal)}</p>
-          <p className="text-[11px] text-neutral-400">Ver o financeiro →</p>
-        </Link>
+        <div className="cartao p-4">
+          <Link href="/financeiro" className="block active:opacity-80">
+            <IconeChip icone={Wallet} cor="teal" className="mb-2" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Saldo em caixa</p>
+            <p className={`mt-1 text-lg font-extrabold tabular-nums ${saldoTotal < 0 ? "text-rose-600" : "text-neutral-900"}`}>{formatCurrency(saldoTotal)}</p>
+          </Link>
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/financeiro" className="text-[11px] text-neutral-400">Ver o financeiro →</Link>
+            <AjustarSaldoLink />
+          </div>
+        </div>
         <Link href="/pendencias" className="cartao p-4 active:bg-neutral-50">
           <IconeChip icone={HandCoins} cor="ambar" className="mb-2" />
           <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">A receber</p>

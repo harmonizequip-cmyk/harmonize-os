@@ -1,8 +1,9 @@
 // Contas dos relatórios financeiros (aba Harmonize e aba Pessoal). Ficam
-// fora de Entradas/Saídas: empréstimo e devolução (caixa, não resultado) e
-// pagamento de fatura (as compras do cartão já contaram).
+// fora de Entradas/Saídas: empréstimo e devolução (caixa, não resultado),
+// ajuste de saldo (só acerta o saldo) e pagamento de fatura (as compras do
+// cartão já contaram).
 
-import { ehCategoriaDeEmprestimo } from "./emprestimos";
+import { ehForaDoResultado } from "./ajuste-saldo";
 import { foraDoResultadoPorCartao, type CartaoMov } from "./cartao";
 
 export interface LinhaFinanceira {
@@ -44,7 +45,7 @@ export interface MesResumo {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export function contaNoResultado(l: LinhaFinanceira): boolean {
-  return !ehCategoriaDeEmprestimo(l.categoria) && !foraDoResultadoPorCartao(l.cartao_mov);
+  return !ehForaDoResultado(l.categoria) && !foraDoResultadoPorCartao(l.cartao_mov);
 }
 
 /** Soma por categoria de um tipo, maior primeiro, com o peso de cada uma. */

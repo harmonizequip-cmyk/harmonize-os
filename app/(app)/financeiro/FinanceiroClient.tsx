@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { ehCategoriaDeEmprestimo } from "@/lib/emprestimos";
+import { ehAjusteDeSaldo, ehForaDoResultado } from "@/lib/ajuste-saldo";
+import AjustarSaldoModal from "@/components/AjustarSaldoModal";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Periodo } from "@/lib/period";
 import FiltroBarra from "@/components/FiltroBarra";
@@ -119,6 +121,7 @@ export default function FinanceiroClient({
   atingiuTeto,
   escopo = "harmonize",
   resumoPessoal,
+  saldoCaixa,
 }: {
   initialTransactions: TransactionRow[];
   categories: CategoryRow[];
@@ -131,6 +134,8 @@ export default function FinanceiroClient({
   escopo?: "harmonize" | "pessoal";
   // Só no pessoal: saldo de sempre da conta e as contas fixas pessoais.
   resumoPessoal?: { saldo: number; fixas: { nome: string; valor: number }[] };
+  // Só na Harmonize: saldo de sempre do caixa (mesma conta do Dashboard).
+  saldoCaixa?: number;
 }) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
@@ -139,6 +144,19 @@ export default function FinanceiroClient({
   // Cliente do filtro da tela: o Novo lançamento já abre com ela escolhida.
   const [clienteNovo, setClienteNovo] = useState("");
   const [editing, setEditing] = useState<TransactionRow | null>(null);
+  const [ajustando, setAjustando] = useState(false);
+  const saldoAtual = pessoal ? resumoPessoal?.saldo : saldoCaixa;
+
+  // /financeiro?acao=ajustar-saldo (atalho do Dashboard): abre o Ajustar saldo.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("acao") !== "ajustar-saldo") return;
+    url.searchParams.delete("acao");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    if (!somenteLeitura && saldoAtual != null) setAjustando(true);
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // A filtragem inteira mora na consulta do servidor agora, então o que
   // chega aqui já é o conjunto final. Os totais saem dessas mesmas
@@ -150,10 +168,16 @@ export default function FinanceiroClient({
     let emprestado = 0;
     let devolvido = 0;
     let faturasPagas = 0;
+    let ajustes = 0;
     for (const t of initialTransactions) {
       // Pagamento de fatura: as compras do cartão já contaram como saída.
       if (foraDoResultadoPorCartao((t as any).cartao_mov)) {
         faturasPagas += Number(t.amount);
+        continue;
+      }
+      // Ajuste de saldo: só acerta o saldo, não é receita nem despesa.
+      if (ehAjusteDeSaldo(t.categories?.name)) {
+        ajustes += (t.type === "entrada" ? 1 : -1) * Number(t.amount);
         continue;
       }
       // Empréstimo a terceiros e devolução: caixa, não resultado.
@@ -165,7 +189,7 @@ export default function FinanceiroClient({
       if (t.type === "entrada") entradas += Number(t.amount);
       else saidas += Number(t.amount);
     }
-    return { entradas, saidas, resultado: entradas - saidas, emprestado, devolvido, faturasPagas };
+    return { entradas, saidas, resultado: entradas - saidas, emprestado, devolvido, faturasPagas, ajustes };
   }, [initialTransactions]);
 
   // As compras do cartão aparecem numa linha por fatura, que abre a tela Cartões.
@@ -204,10 +228,10 @@ export default function FinanceiroClient({
           { rotulo: "Saídas", valor: totais.saidas },
           { rotulo: "Resultado", valor: totais.resultado },
         ],
-        // Gráficos sem empréstimo e sem pagamento de fatura, como o resultado.
+        // Gráficos sem empréstimo, ajuste de saldo e pagamento de fatura, como o resultado.
         graficos: graficosFinanceiro(
           initialTransactions
-            .filter((t) => !ehCategoriaDeEmprestimo(t.categories?.name) && !foraDoResultadoPorCartao((t as any).cartao_mov))
+            .filter((t) => !ehForaDoResultado(t.categories?.name) && !foraDoResultadoPorCartao((t as any).cartao_mov))
             .map((t) => ({ type: t.type, amount: Number(t.amount), date: t.date, categories: t.categories ?? null }))
         ),
       }
@@ -327,6 +351,27 @@ export default function FinanceiroClient({
         </Link>
       )}
 
+      {!pessoal && saldoCaixa != null && (
+        <div className="cartao flex items-center justify-between gap-3 p-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Saldo em caixa</p>
+            <p className={`text-lg font-extrabold tabular-nums ${saldoCaixa < 0 ? "text-rose-600" : "text-neutral-900"}`}>
+              {formatCurrency(saldoCaixa)}
+            </p>
+            <p className="text-[11px] text-neutral-400">Tudo que entrou menos tudo que saiu, desde o primeiro lançamento.</p>
+          </div>
+          {!somenteLeitura && (
+            <button
+              type="button"
+              onClick={() => setAjustando(true)}
+              className="whitespace-nowrap rounded-xl border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-700"
+            >
+              Ajustar saldo
+            </button>
+          )}
+        </div>
+      )}
+
       {pessoal && resumoPessoal && (
         <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
           <p className="text-[11px] uppercase tracking-wide text-neutral-400">Saldo da conta pessoal</p>
@@ -336,6 +381,15 @@ export default function FinanceiroClient({
           <p className="text-[11px] text-neutral-500">
             Tudo que entrou menos tudo que saiu, desde o primeiro lançamento. Retiradas da Harmonize entram aqui sozinhas.
           </p>
+          {!somenteLeitura && (
+            <button
+              type="button"
+              onClick={() => setAjustando(true)}
+              className="mt-2 rounded-xl border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700"
+            >
+              Ajustar saldo
+            </button>
+          )}
           {resumoPessoal.fixas.length > 0 && (
             <div className="mt-3 border-t border-neutral-200/70 pt-2">
               <p className="text-xs font-medium text-neutral-600">
@@ -441,6 +495,12 @@ export default function FinanceiroClient({
           Fora do resultado: faturas de cartão pagas {formatCurrency(totais.faturasPagas)} (as compras já contaram) →
         </Link>
       )}
+      {totais.ajustes !== 0 && (
+        <p className="text-xs text-neutral-500">
+          Fora do resultado: ajustes de saldo {totais.ajustes > 0 ? "+" : "-"}
+          {formatCurrency(Math.abs(totais.ajustes))} (só acertam o saldo)
+        </p>
+      )}
       {(totais.emprestado > 0 || totais.devolvido > 0) && (
         <Link href="/financeiro/emprestimos" className="block text-xs text-neutral-500">
           Fora do resultado: empréstimos {formatCurrency(totais.emprestado)} saíram
@@ -489,6 +549,11 @@ export default function FinanceiroClient({
                   {t.is_test && (
                     <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-700">
                       TESTE
+                    </span>
+                  )}
+                  {ehAjusteDeSaldo(t.categories?.name) && (
+                    <span className="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-neutral-600">
+                      AJUSTE
                     </span>
                   )}
                 </p>
@@ -593,6 +658,11 @@ export default function FinanceiroClient({
                       TESTE
                     </span>
                   )}
+                  {ehAjusteDeSaldo(t.categories?.name) && (
+                    <span className="ml-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-neutral-600">
+                      AJUSTE
+                    </span>
+                  )}
                   {t.clients?.name && (
                     <span className="ml-1 text-xs font-normal text-neutral-400">
                       · <LinkCliente id={t.client_id}>{t.clients.name}</LinkCliente>
@@ -624,6 +694,10 @@ export default function FinanceiroClient({
           </tbody>
         </table>
       </div>
+
+      {ajustando && saldoAtual != null && (
+        <AjustarSaldoModal escopo={escopo} saldoApp={saldoAtual} onFechar={() => setAjustando(false)} />
+      )}
 
       {modalOpen && (
         <NovoLancamentoModal

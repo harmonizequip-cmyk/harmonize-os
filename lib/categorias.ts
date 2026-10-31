@@ -32,6 +32,10 @@ export const CATEGORIAS_DO_SISTEMA: { scope: string; type: string; name: string 
   { scope: "harmonize", type: "saida", name: "Pagamento de fatura" },
   { scope: "pessoal", type: "entrada", name: "Retirada da Harmonize" },
   { scope: "pessoal", type: "saida", name: "Pagamento de fatura" },
+  { scope: "harmonize", type: "entrada", name: "Ajuste de saldo" },
+  { scope: "harmonize", type: "saida", name: "Ajuste de saldo" },
+  { scope: "pessoal", type: "entrada", name: "Ajuste de saldo" },
+  { scope: "pessoal", type: "saida", name: "Ajuste de saldo" },
 ];
 
 export function ehDoSistema(c: CategoriaLinha): boolean {
@@ -43,12 +47,19 @@ export function ordenarCategorias<T extends CategoriaLinha>(lista: T[]): T[] {
   return [...lista].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || a.name.localeCompare(b.name, "pt-BR"));
 }
 
+/** "Ajuste de saldo" só nasce pela função ajustar_saldo (Financeiro > Ajustar saldo). */
+const SO_PELO_AJUSTE = "ajuste de saldo";
+
 /**
- * Lista para escolher numa tela: sem as arquivadas (menos a que já está no
- * lançamento sendo editado, `manterId`), na ordem da tabela.
+ * Lista para escolher numa tela: sem as arquivadas e sem "Ajuste de saldo"
+ * (menos a que já está no lançamento sendo editado, `manterId`), na ordem da tabela.
  */
 export function paraEscolha<T extends CategoriaLinha>(lista: T[] | null | undefined, manterId?: string | null): T[] {
-  return ordenarCategorias((lista ?? []).filter((c) => !c.arquivada || (manterId && c.id === manterId)));
+  return ordenarCategorias(
+    (lista ?? []).filter(
+      (c) => (manterId && c.id === manterId) || (!c.arquivada && c.name.trim().toLowerCase() !== SO_PELO_AJUSTE)
+    )
+  );
 }
 
 /** Mesmo critério do banco: espaços extras saem. */
