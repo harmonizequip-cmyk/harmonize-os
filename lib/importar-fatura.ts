@@ -47,6 +47,20 @@ export interface ItemImportacao {
   abatido?: number;
   /** "pagamento" = pagamento de fatura feito no banco (sai do saldo). Sem valor = compra. */
   tipo?: "compra" | "pagamento";
+  /** Juros, IOF, multa ou encargos do cartão (rotativo, atraso, parcelamento da fatura). */
+  encargo?: boolean;
+}
+
+/** Rotativo: o que ficou da fatura anterior e como os pagamentos do arquivo o quitam. */
+export interface Rotativo {
+  /** "Valor pendente do mês anterior": a fatura anterior passada para frente (não é compra). */
+  pendente: number;
+  /** Quanto dos pagamentos do arquivo quitou o pendente (vai para a fatura anterior). */
+  quitado: number;
+  /** Fatura anterior (AAAA-MM). */
+  refAnterior: string;
+  /** Juros, IOF, multa e encargos do arquivo. */
+  encargos: number;
 }
 
 export interface Abatimento {
@@ -66,6 +80,23 @@ export interface PlanoImportacao {
   creditos: { qtd: number; total: number };
   /** Descontos e estornos do banco abatidos das compras a que se referem. */
   abatimentos: Abatimento[];
+  /** Só quando o arquivo traz "Valor pendente do mês anterior" ou encargos. */
+  rotativo: Rotativo | null;
+}
+
+/** "Valor pendente do mês anterior (rotativo)": é a fatura anterior, não compra. */
+export function ehValorPendente(memo: string): boolean {
+  return /^\s*valor pendente do m[eê]s anterior/i.test(memo);
+}
+
+/**
+ * Juros, multa e encargos do cartão; IOF só quando é do rotativo, do atraso ou do
+ * parcelamento da fatura (o IOF de compra internacional continua sendo da compra).
+ */
+export function ehEncargo(memo: string): boolean {
+  const t = semAcento(memo).trim();
+  if (/^(juros|multa|encargos?)\b/.test(t)) return true;
+  return /^iof\b/.test(t) && /(rotativo|atraso|parcelamento|pagamento parcial|fatura|financiamento)/.test(t);
 }
 
 /** Lê o arquivo em UTF-8 e, se vier com caracteres quebrados, em Windows-1252. */
@@ -241,7 +272,7 @@ export function planejarImportacao(
   const maisRecente = new Map<string, LinhaFatura>(); // por compra parcelada: a parcela de maior número
 
   for (const l of fatura.linhas) {
-    if (l.tipo !== "compra") continue;
+    if (l.tipo !== "compra" || ehValorPendente(l.memo)) continue;
     if (l.parcela) {
       const grupo = `${l.fitid}|${l.parcela.n}`;
       const atual = maisRecente.get(grupo);
@@ -275,6 +306,7 @@ export function planejarImportacao(
         parcela_num: null,
         parcelas_total: null,
         origem: "fatura",
+        ...(ehEncargo(l.memo) ? { encargo: true } : {}),
       });
     }
   }
@@ -300,43 +332,73 @@ export function planejarImportacao(
 
   const abatimentos = opcoes.modo === "aberta" ? abaterCreditos(fatura, itens) : [];
 
+  // Rotativo: "Valor pendente do mês anterior" de V. Os pagamentos do arquivo, em ordem de data,
+  // primeiro quitam V (fatura anterior); o que passa de V fica nesta fatura. Os pagamentos de
+  // antes da data de corte também quitam V, só não são registrados de novo.
+  const anterior = somarMesesRef(faturaRef, -1);
+  const pendente = r2(fatura.linhas.filter((l) => l.tipo === "compra" && ehValorPendente(l.memo)).reduce((s, l) => s + l.valor, 0));
+  const encargos = r2(fatura.linhas.filter((l) => l.tipo === "compra" && ehEncargo(l.memo)).reduce((s, l) => s + l.valor, 0));
+  let faltaQuitar = pendente;
+
   // Pagamentos feitos no banco a partir da data de corte (os antigos já estão no saldo informado).
-  // Pagamento até o vencimento da fatura anterior paga aquela; depois dele, esta.
+  // Sem rotativo: pagamento até o vencimento da fatura anterior paga aquela; depois dele, esta.
   const pagamentosARegistrar = { qtd: 0, total: 0 };
-  if (opcoes.pagamentosDesde) {
-    const anterior = somarMesesRef(faturaRef, -1);
-    const [ya, ma] = anterior.split("-").map(Number);
-    const diaAnterior = Math.min(opcoes.diaVencimento, new Date(Date.UTC(ya, ma, 0)).getUTCDate());
-    const vencAnterior = `${anterior}-${String(diaAnterior).padStart(2, "0")}`;
-    const vistas = new Map<string, number>();
-    for (const l of fatura.linhas) {
-      if (l.tipo !== "pagamento" || l.data < opcoes.pagamentosDesde) continue;
+  const [ya, ma] = anterior.split("-").map(Number);
+  const diaAnterior = Math.min(opcoes.diaVencimento, new Date(Date.UTC(ya, ma, 0)).getUTCDate());
+  const vencAnterior = `${anterior}-${String(diaAnterior).padStart(2, "0")}`;
+  const vistas = new Map<string, number>();
+  // A chave conta as repetições na ordem do arquivo (igual a antes); a quitação segue a data.
+  const pagamentos = fatura.linhas
+    .filter((l) => l.tipo === "pagamento")
+    .map((l) => {
+      const registrar = !!opcoes.pagamentosDesde && l.data >= opcoes.pagamentosDesde;
       const base = fatura.formato === "ofx" ? `${l.fitid}|pag|${l.valor.toFixed(2)}` : `csv|pag|${l.data}|${l.valor.toFixed(2)}`;
-      const vez = (vistas.get(base) ?? 0) + 1;
-      vistas.set(base, vez);
-      itens.push({
-        chave: vez > 1 ? `${base}#${vez}` : base,
-        grupo: "pagamento",
-        data: l.data,
-        valor: l.valor,
-        descricao: "Pagamento de fatura",
-        nome: "Pagamento de fatura",
-        fatura_ref: l.data > vencAnterior ? faturaRef : anterior,
-        parcela_num: null,
-        parcelas_total: null,
-        origem: "fatura",
-        tipo: "pagamento",
-      });
-      pagamentosARegistrar.qtd += 1;
-      pagamentosARegistrar.total = r2(pagamentosARegistrar.total + l.valor);
+      // Como antes: só os que vão ser registrados contam para o "#2".
+      const vez = registrar ? (vistas.get(base) ?? 0) + 1 : 1;
+      if (registrar) vistas.set(base, vez);
+      return { l, registrar, chave: vez > 1 ? `${base}#${vez}` : base };
+    })
+    .map((p, ordem) => ({ ...p, ordem }))
+    .sort((a, b) => (a.l.data === b.l.data ? a.ordem - b.ordem : a.l.data < b.l.data ? -1 : 1));
+  const pagamento = (chave: string, l: LinhaFatura, valor: number, ref: string): ItemImportacao => ({
+    chave,
+    grupo: "pagamento",
+    data: l.data,
+    valor,
+    descricao: "Pagamento de fatura",
+    nome: "Pagamento de fatura",
+    fatura_ref: ref,
+    parcela_num: null,
+    parcelas_total: null,
+    origem: "fatura",
+    tipo: "pagamento",
+  });
+  for (const { l, chave, registrar } of pagamentos) {
+    const novos: ItemImportacao[] = [];
+    if (pendente > 0) {
+      const quita = r2(Math.min(faltaQuitar, l.valor));
+      faltaQuitar = r2(faltaQuitar - quita);
+      if (quita > 0 && quita < l.valor) {
+        novos.push(pagamento(`${chave}|parte1`, l, quita, anterior), pagamento(`${chave}|parte2`, l, r2(l.valor - quita), faturaRef));
+      } else {
+        novos.push(pagamento(chave, l, l.valor, quita > 0 ? anterior : faturaRef));
+      }
+    } else {
+      novos.push(pagamento(chave, l, l.valor, l.data > vencAnterior ? faturaRef : anterior));
     }
+    if (!registrar) continue;
+    itens.push(...novos);
+    pagamentosARegistrar.qtd += 1;
+    pagamentosARegistrar.total = r2(pagamentosARegistrar.total + l.valor);
   }
+  const rotativo: Rotativo | null =
+    pendente > 0 || encargos > 0 ? { pendente, quitado: r2(pendente - faltaQuitar), refAnterior: anterior, encargos } : null;
 
   const soma = (tipo: TipoLinha) => {
     const ls = fatura.linhas.filter((l) => l.tipo === tipo);
     return { qtd: ls.length, total: r2(ls.reduce((s, l) => s + l.valor, 0)) };
   };
-  return { itens, faturaRef, pagamentos: soma("pagamento"), pagamentosARegistrar, creditos: soma("credito"), abatimentos };
+  return { itens, faturaRef, pagamentos: soma("pagamento"), pagamentosARegistrar, creditos: soma("credito"), abatimentos, rotativo };
 }
 
 const semPrefixoDeCredito = (memo: string) =>
@@ -379,8 +441,15 @@ function abaterCreditos(fatura: FaturaLida, itens: ItemImportacao[]): Abatimento
 const semAcento = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // Palavras do estabelecimento -> começo do nome da categoria (a categoria é escolhida entre as que existem).
-const PALAVRAS: [string[], string[]][] = [
-  [["supermercado", "mercado", "atacad", "hortifruti", "frutos", "padaria", "panificadora", "delicia"], ["mercado", "aliment"]],
+// Texto casa como pedaço do nome; expressão regular, como está escrita (para palavras curtas como "99" e "meta").
+// As primeiras listas vêm antes porque são mais específicas ("Google Ads" antes de "google").
+const PALAVRAS: [(string | RegExp)[], string[]][] = [
+  [["facebk", "facebook", /\bmeta\b/, "rd station", "google ads", "hostinger", "publigyn"], ["marketing"]],
+  [["unidas", "localiza", "movida", /\buber\b/, /\b99\b/], ["transporte"]],
+  [["ferreira costa", "materiais", "tintas", "torneira", "nordife", "leroy"], ["manutencao e obras", "manutencao"]],
+  [["hotel", "booking", "pousada"], ["hospedagem"]],
+  [["contourline", "nobreak"], ["parcela de equipamento"]],
+  [["supermercado", /\bmercado\b/, "atacad", "hortifruti", "frutos", "padaria", "panificadora", "delicia"], ["mercado", "aliment"]],
   [["restaurant", "lanche", "bobs", "salgado", "ze delivery", "ifood", "pizza", "burger", "sorvet", "cafe"], ["aliment", "restaurante", "lazer"]],
   [["posto", "combust", "shell", "ipiranga", "estacion"], ["combust", "transporte"]],
   [["uber", "99", "unidas", "locadora", "latam", "gol ", "azul", "passagem", "pedagio", "lava jato"], ["transporte", "viagem", "carro"]],
@@ -389,17 +458,75 @@ const PALAVRAS: [string[], string[]][] = [
   [["tim ", "claro", "vivo", "nucel", "oi "], ["telefone", "internet", "conta"]],
 ];
 
+/** Categoria dos juros, IOF, multa e encargos do cartão. */
+const CATEGORIA_ENCARGOS = "juros e encargos do cartao";
+
 /** Sugere a categoria (id) pelo nome do estabelecimento; vazio quando não há palpite. */
 export function sugerirCategoria(nome: string, categorias: { id: string; name: string }[]): string {
   const alvo = semAcento(nome);
+  if (ehEncargo(nome)) return categorias.find((x) => semAcento(x.name).trim() === CATEGORIA_ENCARGOS)?.id ?? "";
+  // Mercado Livre vende de tudo: sem palpite (e "mercado" não pode casar com "Mercadol").
+  if (/mercado\s*livre|mercadol/.test(alvo)) return "";
   for (const [palavras, comecos] of PALAVRAS) {
-    if (!palavras.some((p) => alvo.includes(p))) continue;
+    if (!palavras.some((p) => (typeof p === "string" ? alvo.includes(p) : p.test(alvo)))) continue;
     for (const c of comecos) {
       const achada = categorias.find((x) => semAcento(x.name).includes(c));
       if (achada) return achada.id;
     }
   }
   return "";
+}
+
+/** Linha já lançada no cartão com chave de importação (para conferir antes de gravar). */
+export interface LancadaNoCartao {
+  fatura_ref: string;
+  amount: number;
+  description: string | null;
+  data_compra: string | null;
+}
+
+/** Pagamento de fatura já lançado no cartão (importado ou do "Pagar fatura"). */
+export interface PagamentoLancado {
+  date: string;
+  amount: number;
+  importacao_chave: string | null;
+}
+
+export type SituacaoItem = "nova" | "antecipada" | "atualizar" | "repetida" | "pagamento_lancado";
+
+const semRepeticao = (chave: string) => chave.replace(/#\d+$/, "");
+const PARTE = /\|parte\d+$/;
+
+/** Pagamento do arquivo que já está lançado no cartão (mesma regra de importar_compras_cartao). */
+export function pagamentoJaLancado(item: Pick<ItemImportacao, "chave" | "data" | "valor">, pagamentos: PagamentoLancado[]): boolean {
+  const raiz = item.chave.replace(PARTE, "");
+  const dividido = PARTE.test(item.chave);
+  return pagamentos.some((p) => {
+    const k = p.importacao_chave;
+    if (k === item.chave) return true;
+    if (dividido ? k === raiz : !!k && k.startsWith(`${item.chave}|parte`)) return true;
+    const mesmoDia = p.date === item.data && Math.abs(Number(p.amount) - item.valor) < 0.005;
+    return mesmoDia && (!k || semRepeticao(k) !== semRepeticao(item.chave));
+  });
+}
+
+/**
+ * O que acontece com o item ao importar (a mesma regra de importar_compras_cartao):
+ * nova; antecipada (a mesma chave numa fatura futura vem para esta); atualizar (linha real da
+ * fatura, já lançada nesta mesma fatura, com valor, descrição ou dia da compra diferentes);
+ * repetida; pagamento_lancado (pagamento com a mesma data e valor já está no cartão).
+ */
+export function situacaoDoItem(item: ItemImportacao, existentes: Map<string, LancadaNoCartao>, pagamentos: PagamentoLancado[]): SituacaoItem {
+  if (item.tipo === "pagamento") return pagamentoJaLancado(item, pagamentos) ? "pagamento_lancado" : "nova";
+  const atual = existentes.get(item.chave);
+  if (!atual) return "nova";
+  if (item.fatura_ref < atual.fatura_ref) return "antecipada";
+  if (item.origem === "fatura" && item.fatura_ref === atual.fatura_ref) {
+    const difere =
+      Math.abs(Number(atual.amount) - item.valor) >= 0.005 || (atual.description ?? "") !== item.descricao.trim().slice(0, 200) || (atual.data_compra ?? "") !== item.data;
+    if (difere) return "atualizar";
+  }
+  return "repetida";
 }
 
 export interface LinhaImportada {

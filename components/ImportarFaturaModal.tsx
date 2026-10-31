@@ -7,9 +7,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { X, FileUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { rotuloFatura } from "@/lib/cartao";
-import { hojeLocal } from "@/lib/period";
+import { hojeLocal, somarDias } from "@/lib/period";
 import { avisar } from "@/components/Dialogos";
 import {
   decodificarArquivo,
@@ -18,7 +18,10 @@ import {
   planejarImportacao,
   refDaFatura,
   sugerirCategoria,
+  situacaoDoItem,
   type FaturaLida,
+  type LancadaNoCartao,
+  type PagamentoLancado,
 } from "@/lib/importar-fatura";
 
 interface CartaoOpcao {
@@ -31,6 +34,9 @@ interface Categoria {
   id: string;
   name: string;
 }
+
+const MESES_EXTENSO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const mesDaRef = (ref: string) => MESES_EXTENSO[Number(ref.split("-")[1]) - 1] ?? ref;
 
 const campo = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm";
 const LOTE = 300;
@@ -56,10 +62,14 @@ export default function ImportarFaturaModal({
   const [modo, setModo] = useState<"paga" | "aberta">("paga");
   const [faturaRef, setFaturaRef] = useState("");
   // Pagamentos feitos no banco só entram a partir desta data (vazio = não registrar nenhum).
+  // Padrão: o dia seguinte ao último pagamento já lançado neste cartão; sem nenhum, hoje.
   const [pagamentosDesde, setPagamentosDesde] = useState(hojeLocal());
+  // Pagamentos de fatura já lançados neste cartão (importados ou do "Pagar fatura"), do mais recente ao mais antigo.
+  const [pagamentosLancados, setPagamentosLancados] = useState<PagamentoLancado[]>([]);
+  const [pagamentosConferidos, setPagamentosConferidos] = useState(false);
   const [categoriaPorNome, setCategoriaPorNome] = useState<Record<string, string>>({});
-  // chave -> fatura em que a linha já está lançada neste cartão.
-  const [jaLancadas, setJaLancadas] = useState<Map<string, string>>(new Map());
+  // chave -> linha já lançada neste cartão (fatura, valor, descrição e dia da compra).
+  const [jaLancadas, setJaLancadas] = useState<Map<string, LancadaNoCartao>>(new Map());
   // Só libera a prévia e o botão depois de conferir o que já está lançado (senão parece duplicado).
   const [conferido, setConferido] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -70,18 +80,41 @@ export default function ImportarFaturaModal({
     [fatura, cartao, modo, faturaRef, pagamentosDesde]
   );
 
-  // A data de corte dos pagamentos fica guardada por cartão: nas próximas importações vale a primeira
-  // escolhida, para não perder pagamento feito no meio do mês (os repetidos são pulados).
-  const chaveCorte = `harmonize-import-corte-${cartaoId}`;
+  // Pagamentos já lançados no cartão: dão a data de corte padrão e marcam os "já lançados" na prévia.
   useEffect(() => {
-    try {
-      const guardada = localStorage.getItem(chaveCorte);
-      if (guardada) setPagamentosDesde(guardada);
-    } catch {
-      // sem armazenamento: fica a data de hoje
-    }
+    if (!cartaoId) return;
+    let vivo = true;
+    setPagamentosConferidos(false);
+    (async () => {
+      const lista: PagamentoLancado[] = [];
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("date, amount, importacao_chave")
+          .eq("cartao_id", cartaoId)
+          .eq("cartao_mov", "pagamento")
+          .order("date", { ascending: false })
+          .order("id")
+          .range(de, de + 999);
+        if (!vivo) return;
+        if (error) {
+          setErro(`Não consegui conferir os pagamentos já lançados: ${error.message}`);
+          return;
+        }
+        const linhas = (data ?? []) as PagamentoLancado[];
+        lista.push(...linhas.map((p) => ({ ...p, amount: Number(p.amount) })));
+        if (linhas.length < 1000) break;
+      }
+      setPagamentosLancados(lista);
+      setPagamentosDesde(lista[0] ? somarDias(lista[0].date, 1) : hojeLocal());
+      setPagamentosConferidos(true);
+    })();
+    return () => {
+      vivo = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartaoId]);
+  const ultimoPagamento = pagamentosLancados[0] ?? null;
 
   // Fatura de referência padrão: a data no nome do arquivo (Nubank_2026-10-02 = vence em outubro);
   // sem ela, o primeiro vencimento depois do fechamento.
@@ -100,11 +133,11 @@ export default function ImportarFaturaModal({
     setConferido(false);
     (async () => {
       // O Supabase devolve no máximo 1000 linhas por vez: busca em páginas.
-      const mapa = new Map<string, string>();
+      const mapa = new Map<string, LancadaNoCartao>();
       for (let de = 0; ; de += 1000) {
         const { data, error } = await supabase
           .from("transactions")
-          .select("importacao_chave, fatura_ref")
+          .select("importacao_chave, fatura_ref, amount, description, data_compra")
           .eq("cartao_id", cartaoId)
           .not("importacao_chave", "is", null)
           .order("id")
@@ -114,8 +147,15 @@ export default function ImportarFaturaModal({
           setErro(`Não consegui conferir o que já foi lançado: ${error.message}`);
           return;
         }
-        const linhas = (data ?? []) as { importacao_chave: string; fatura_ref: string | null }[];
-        for (const r of linhas) mapa.set(r.importacao_chave, r.fatura_ref ?? "");
+        const linhas = (data ?? []) as {
+          importacao_chave: string;
+          fatura_ref: string | null;
+          amount: number;
+          description: string | null;
+          data_compra: string | null;
+        }[];
+        for (const r of linhas)
+          mapa.set(r.importacao_chave, { fatura_ref: r.fatura_ref ?? "", amount: Number(r.amount), description: r.description, data_compra: r.data_compra });
         if (linhas.length < 1000) break;
       }
       setJaLancadas(mapa);
@@ -155,13 +195,20 @@ export default function ImportarFaturaModal({
   }, [fatura, jaLancadas]);
 
   // Já lançada na mesma fatura (ou numa anterior) fica de fora. Parcela que estava numa fatura
-  // futura e o banco trouxe para esta (antecipação) é movida para esta fatura.
-  const novos = useMemo(
-    () => (plano ? plano.itens.filter((i) => !jaLancadas.has(i.chave) || i.fatura_ref < (jaLancadas.get(i.chave) ?? "")) : []),
-    [plano, jaLancadas]
+  // futura e o banco trouxe para esta (antecipação) é movida para esta fatura. Linha real da
+  // fatura já lançada nesta mesma fatura com valor, nome ou data diferentes é atualizada
+  // (a fatura manda). Pagamento com a mesma data e valor de um já lançado fica de fora.
+  const situacoes = useMemo(
+    () => (plano ? plano.itens.map((i) => ({ item: i, situacao: situacaoDoItem(i, jaLancadas, pagamentosLancados) })) : []),
+    [plano, jaLancadas, pagamentosLancados]
   );
-  const antecipadas = novos.filter((i) => jaLancadas.has(i.chave)).length;
-  const repetidos = plano ? plano.itens.length - novos.length : 0;
+  const vaiGravar = (s: string) => s === "nova" || s === "antecipada" || s === "atualizar";
+  const enviar = useMemo(() => situacoes.filter((x) => vaiGravar(x.situacao)).map((x) => x.item), [situacoes]);
+  const novos = useMemo(() => situacoes.filter((x) => x.situacao === "nova" || x.situacao === "antecipada").map((x) => x.item), [situacoes]);
+  const antecipadas = situacoes.filter((x) => x.situacao === "antecipada").length;
+  const atualizar = situacoes.filter((x) => x.situacao === "atualizar").map((x) => x.item);
+  const repetidos = situacoes.filter((x) => x.situacao === "repetida").length;
+  const pagamentosDoArquivo = situacoes.filter((x) => x.item.tipo === "pagamento");
   const compras = novos.filter((i) => i.tipo !== "pagamento");
   const pagamentos = novos.filter((i) => i.tipo === "pagamento");
   const total = compras.reduce((s, i) => s + i.valor, 0);
@@ -197,14 +244,16 @@ export default function ImportarFaturaModal({
   }, [compras]);
 
   async function importar() {
-    if (!cartao || novos.length === 0) return;
+    if (!cartao || enviar.length === 0) return;
     setSalvando(true);
     setErro(null);
     let inseridos = 0;
     let pulados = 0;
     let movidos = 0;
-    for (let i = 0; i < novos.length; i += LOTE) {
-      const lote = novos.slice(i, i + LOTE).map((x) => ({
+    let atualizados = 0;
+    let pagRepetidos = 0;
+    for (let i = 0; i < enviar.length; i += LOTE) {
+      const lote = enviar.slice(i, i + LOTE).map((x) => ({
         chave: x.chave,
         grupo: x.grupo,
         data: x.data,
@@ -214,6 +263,8 @@ export default function ImportarFaturaModal({
         parcela_num: x.parcela_num,
         parcelas_total: x.parcelas_total,
         tipo: x.tipo ?? "compra",
+        // Linha que está de verdade na fatura (a parcela futura gerada aqui não sobrescreve nada).
+        real: x.origem === "fatura",
         category_id: x.tipo === "pagamento" ? null : categoriaPorNome[x.nome] || null,
       }));
       const { data, error } = await supabase.rpc("importar_compras_cartao", { p_cartao_id: cartao.id, p_itens: lote });
@@ -225,17 +276,15 @@ export default function ImportarFaturaModal({
       inseridos += Number((data as { inseridos: number }).inseridos);
       pulados += Number((data as { repetidos: number }).repetidos);
       movidos += Number((data as { movidos?: number }).movidos ?? 0);
+      atualizados += Number((data as { atualizados?: number }).atualizados ?? 0);
+      pagRepetidos += Number((data as { pagamentos_repetidos?: number }).pagamentos_repetidos ?? 0);
     }
     setSalvando(false);
-    try {
-      if (pagamentosDesde && !localStorage.getItem(chaveCorte)) localStorage.setItem(chaveCorte, pagamentosDesde);
-    } catch {
-      // sem armazenamento
-    }
     avisar(
       `${inseridos} lançamento${inseridos === 1 ? "" : "s"} entraram no cartão ${cartao.nome}` +
         `${movidos ? `, ${movidos} parcela${movidos === 1 ? "" : "s"} antecipada${movidos === 1 ? "" : "s"} passaram para esta fatura` : ""}` +
-        `${pulados ? ` (${pulados} já existiam)` : ""}.`
+        `${atualizados ? `, ${atualizados} ficaram com o valor e o nome da fatura` : ""}` +
+        `${pulados || pagRepetidos ? ` (${pulados + pagRepetidos} já existiam)` : ""}.`
     );
     onFeito();
   }
@@ -275,9 +324,15 @@ export default function ImportarFaturaModal({
 
           {erro && <p className="text-xs text-red-600">{erro}</p>}
 
-          {fatura && !conferido && !erro && <p className="text-xs text-neutral-500">Conferindo o que já foi lançado...</p>}
+          {fatura?.formato === "csv" && (
+            <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+              Prefira o OFX: o CSV não traz o código da compra e pode perder compras iguais ou duplicar parcelas que mudam centavos.
+            </p>
+          )}
 
-          {fatura && plano && cartao && conferido && (
+          {fatura && (!conferido || !pagamentosConferidos) && !erro && <p className="text-xs text-neutral-500">Conferindo o que já foi lançado...</p>}
+
+          {fatura && plano && cartao && conferido && pagamentosConferidos && (
             <>
               <div className="space-y-2">
                 <p className="text-xs font-medium text-neutral-700">Esta fatura</p>
@@ -320,6 +375,21 @@ export default function ImportarFaturaModal({
                     {plano.creditos.qtd} desconto{plano.creditos.qtd === 1 ? "" : "s"} ou estorno{plano.creditos.qtd === 1 ? "" : "s"} do banco ({formatCurrency(plano.creditos.total)}) não entram: a fatura já foi paga.
                   </p>
                 )}
+                {plano.rotativo && (
+                  <p className="mt-1 text-neutral-700">
+                    {plano.rotativo.pendente > 0 && (
+                      <>
+                        {plano.rotativo.quitado > 0
+                          ? `${formatCurrency(plano.rotativo.quitado)} quitam a fatura de ${mesDaRef(plano.rotativo.refAnterior)} com atraso`
+                          : `A fatura de ${mesDaRef(plano.rotativo.refAnterior)} passou ${formatCurrency(plano.rotativo.pendente)} para esta (não é compra)`}
+                        {plano.rotativo.quitado > 0 && plano.rotativo.quitado < plano.rotativo.pendente - 0.009 &&
+                          ` (faltam ${formatCurrency(plano.rotativo.pendente - plano.rotativo.quitado)})`}
+                        {plano.rotativo.encargos > 0 ? "; " : "."}
+                      </>
+                    )}
+                    {plano.rotativo.encargos > 0 && `juros e IOF: ${formatCurrency(plano.rotativo.encargos)}${modo === "paga" ? " (já pagos com a fatura)" : ", lançados como compra"}.`}
+                  </p>
+                )}
                 {plano.abatimentos.length > 0 && (
                   <div className="mt-2 border-t border-neutral-200 pt-2">
                     <p className="font-medium text-neutral-700">Descontos e estornos abatidos das compras</p>
@@ -342,18 +412,60 @@ export default function ImportarFaturaModal({
                 Registrar os pagamentos feitos a partir de
                 <input type="date" className={`${campo} mt-1`} value={pagamentosDesde} onChange={(e) => setPagamentosDesde(e.target.value)} />
                 <span className="mt-1 block text-[11px] text-neutral-500">
-                  Os pagamentos antigos já estão no saldo que você informou. Apague a data para não registrar nenhum.
+                  {ultimoPagamento
+                    ? `Último pagamento lançado: ${formatDate(ultimoPagamento.date)}, ${formatCurrency(Number(ultimoPagamento.amount))}`
+                    : "Nenhum pagamento lançado neste cartão ainda."}
+                </span>
+                <span className="mt-1 block text-[11px] text-neutral-500">
+                  Os pagamentos vêm do extrato. Só use Pagar fatura se quiser registrar antes de importar. Apague a data para não registrar nenhum.
                 </span>
               </label>
-              {pagamentos.length > 0 && (
-                <p className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
-                  {pagamentos.length} pagamento{pagamentos.length === 1 ? "" : "s"} de fatura, {formatCurrency(totalPagamentos)}, saem do seu saldo.
-                </p>
+              {pagamentosDoArquivo.length > 0 && (
+                <div className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
+                  {pagamentos.length > 0 && (
+                    <p>
+                      {pagamentos.length} pagamento{pagamentos.length === 1 ? "" : "s"} de fatura, {formatCurrency(totalPagamentos)}, saem do seu saldo.
+                    </p>
+                  )}
+                  <ul className="mt-1 space-y-0.5 text-[11px] text-neutral-600">
+                    {pagamentosDoArquivo.map(({ item, situacao }) => (
+                      <li key={item.chave}>
+                        {formatDate(item.data)}: {formatCurrency(item.valor)}, fatura de {rotuloFatura(item.fatura_ref)}
+                        {situacao === "pagamento_lancado" && <span className="text-neutral-500"> (já lançado)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {atualizar.length > 0 && (
+                <div className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
+                  <p>
+                    {atualizar.length} parcela{atualizar.length === 1 ? "" : "s"} já lançada{atualizar.length === 1 ? "" : "s"} nesta fatura{" "}
+                    {atualizar.length === 1 ? "fica" : "ficam"} com o valor, o nome e a data do arquivo (a categoria não muda):
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-[11px] text-neutral-600">
+                    {atualizar.slice(0, 8).map((i) => {
+                      const antes = jaLancadas.get(i.chave);
+                      return (
+                        <li key={i.chave}>
+                          {i.descricao}
+                          {antes && Math.abs(antes.amount - i.valor) >= 0.005 ? `: ${formatCurrency(antes.amount)} vira ${formatCurrency(i.valor)}` : ""}
+                        </li>
+                      );
+                    })}
+                    {atualizar.length > 8 && <li>e mais {atualizar.length - 8}</li>}
+                  </ul>
+                </div>
               )}
 
               {novos.length === 0 ? (
                 <p className="text-xs text-neutral-600">
-                  {repetidos > 0 ? "Tudo deste arquivo já foi lançado antes." : "Nada para lançar com essa escolha."}
+                  {atualizar.length > 0
+                    ? "Nenhum lançamento novo."
+                    : repetidos > 0
+                      ? "Tudo deste arquivo já foi lançado antes."
+                      : "Nada para lançar com essa escolha."}
                 </p>
               ) : (
                 <>
@@ -426,11 +538,11 @@ export default function ImportarFaturaModal({
           </button>
           <button
             type="button"
-            disabled={salvando || !conferido || novos.length === 0}
+            disabled={salvando || !conferido || !pagamentosConferidos || enviar.length === 0}
             onClick={importar}
             className="flex-1 rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
-            {salvando ? "Importando..." : novos.length ? `Importar ${novos.length}` : "Importar"}
+            {salvando ? "Importando..." : enviar.length ? `Importar ${enviar.length}` : "Importar"}
           </button>
         </div>
       </div>
