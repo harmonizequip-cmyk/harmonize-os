@@ -7,7 +7,7 @@ export default async function PlanejamentoPage(props: { params: Promise<{ id: st
   const { id } = await props.params;
   const supabase = createClient();
   const [{ data: plano }, clientes] = await Promise.all([
-    supabase.from("planejamentos").select("id, client_id, calendar_event_id, estado").eq("id", id).maybeSingle(),
+    supabase.from("planejamentos").select("id, client_id, calendar_event_id, estado, updated_at").eq("id", id).maybeSingle(),
     carregarClientes(supabase),
   ]);
   if (!plano) notFound();
@@ -16,6 +16,7 @@ export default async function PlanejamentoPage(props: { params: Promise<{ id: st
       key={plano.id}
       planoId={plano.id}
       estado={plano.estado ?? {}}
+      updatedAt={plano.updated_at ?? null}
       clienteId={plano.client_id}
       eventoId={plano.calendar_event_id}
       clientes={clientes}

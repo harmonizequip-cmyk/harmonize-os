@@ -39,6 +39,7 @@ import CustoDisparos from "@/components/planejador/CustoDisparos";
 import { aplicarQuantidades } from "@/lib/custo-disparos";
 import { formatDate } from "@/lib/format";
 import { pacienteDeMesmoNome, sugerirPacientes, type PacienteCadastro } from "@/lib/pacientes";
+import { chaveRascunho, decidirRascunho, impressao, lerRascunho, proximaEspera, type Rascunho } from "@/lib/rascunho-planejamento";
 import {
   ArrowLeft,
   ArrowRight,
@@ -57,6 +58,7 @@ import {
   Trash2,
   UserRound,
   CalendarDays,
+  CloudOff,
 } from "lucide-react";
 import { confirmar } from "@/components/Dialogos";
 import { CircleCheck } from "lucide-react";
@@ -71,9 +73,32 @@ const EQUIP: Record<string, string> = { hipro_1: "HIPRO 1", hipro_2: "HIPRO 2" }
 // paciente, cliente e saldo; abas Paciente, Áreas e Resumo. Guarda sozinho
 // no banco (com intervalo); planejamento novo só vira registro quando ganha
 // conteúdo. O estado salvo é o mesmo do planejador antigo.
+//
+// Salvamento resiliente (sinal fraco na clínica, Android que mata a aba em
+// segundo plano): cada mudança vai na hora para um rascunho no celular
+// (localStorage, `lib/rascunho-planejamento.ts`), apagado só quando o banco
+// confirma aquele estado; salva ao esconder a tela (troca de app, tela
+// bloqueada), repete sozinho quando falha (2 s, 5 s, 10 s, 20 s e depois a
+// cada 30 s), ao voltar a rede e ao voltar para a tela; ao abrir, recupera o
+// rascunho que não chegou ao banco.
+const DEBOUNCE_MS = 600;
+/** Sem resposta do banco neste prazo, a tentativa conta como falha (e repete). */
+const PRAZO_SALVAR_MS = 25000;
+/** Salvando há mais que isto: a faixa "Salvando..." aparece. */
+const LENTO_MS = 3000;
+
+function comPrazo(ms: number): AbortSignal | undefined {
+  try {
+    return typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(ms) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function EditorPlanejamento({
   planoId,
   estado,
+  updatedAt,
   clienteId,
   eventoId,
   clientes,
@@ -83,11 +108,13 @@ export default function EditorPlanejamento({
   portal?: boolean;
   planoId: string | null;
   estado: EstadoPlanejador;
+  /** updated_at do plano no banco quando a página carregou (para decidir o rascunho). */
+  updatedAt?: string | null;
   clienteId: string | null;
   eventoId: string | null;
   clientes: Cliente[];
 }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const preferencias = usePreferencias();
@@ -128,13 +155,25 @@ export default function EditorPlanejamento({
   const rolagem = useRef<HTMLDivElement>(null);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repetir = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tentativas = useRef(0);
+  const montado = useRef(true);
   const idRef = useRef(id);
   const planoRef = useRef(plano);
   const sujo = useRef(false);
+  // Desde quando há mudança ainda não mandada (para não esperar o intervalo para sempre enquanto digita).
+  const sujoDesde = useRef<number | null>(null);
   const emAndamento = useRef<Promise<void> | null>(null);
   const ligacao = useRef({ cliente, evento });
+  // Rascunho no celular: chave, número da mudança e impressão do estado do banco sobre o qual ele foi feito.
+  const chaveRef = useRef(chaveRascunho(planoId, clienteId, eventoId));
+  const versao = useRef(0);
+  const baseRef = useRef<string | null>(planoId ? impressao(estado) : null);
+  const [falhou, setFalhou] = useState(false);
+  const [lento, setLento] = useState(false);
+  const [semRede, setSemRede] = useState(false);
+  const [rascunhoOk, setRascunhoOk] = useState(true);
   idRef.current = id;
-  planoRef.current = plano;
   ligacao.current = { cliente, evento };
 
   // Tela cheia: a página de trás não rola.
@@ -160,75 +199,156 @@ export default function EditorPlanejamento({
     };
   }, []);
 
-  const mostrarAviso = useCallback((t: string) => {
+  const mostrarAviso = useCallback((t: string, ms = 2600) => {
     setAviso(t);
-    setTimeout(() => setAviso((a) => (a === t ? null : a)), 2600);
+    setTimeout(() => setAviso((a) => (a === t ? null : a)), ms);
   }, []);
 
-  // Uma ida ao banco. Devolve true quando gravou (o laço de `salvar` repete se
-  // ficou sujo enquanto isso), false quando não há o que gravar ou deu erro.
-  const salvarUmaVez = useCallback(async (): Promise<boolean> => {
-    if (!sujo.current || somenteLeitura) return false;
+  // Guarda o estado atual no celular (a cada mudança e antes de sair).
+  const gravarRascunho = useCallback(() => {
+    if (somenteLeitura) return;
+    try {
+      const r: Rascunho = {
+        v: 1,
+        estado: paraEstado(planoRef.current),
+        cliente: ligacao.current.cliente,
+        evento: ligacao.current.evento,
+        versao: versao.current,
+        em: Date.now(),
+        base: baseRef.current,
+      };
+      localStorage.setItem(chaveRef.current, JSON.stringify(r));
+      setRascunhoOk(true);
+    } catch {
+      setRascunhoOk(false);
+    }
+  }, [somenteLeitura]);
+
+  const apagarRascunho = useCallback((chave?: string) => {
+    try {
+      localStorage.removeItem(chave ?? chaveRef.current);
+    } catch {
+      // sem armazenamento: nada a apagar
+    }
+  }, []);
+
+  // Uma ida ao banco. "ok" quando gravou (o laço de `salvar` repete se ficou
+  // sujo enquanto isso), "nada" quando não há o que gravar, "erro" quando falhou.
+  const salvarUmaVez = useCallback(async (): Promise<"ok" | "nada" | "erro"> => {
+    if (!sujo.current || somenteLeitura) return "nada";
     const p = planoRef.current;
     const total = totalDistribuido(p) + usadoEmAnteriores(p);
     const est = paraEstado(p);
-    if (!idRef.current && !temConteudo(est, total)) return false;
+    if (!idRef.current && !temConteudo(est, total)) return "nada";
+    const versaoEnviada = versao.current;
     sujo.current = false;
+    sujoDesde.current = null;
     setStatus("salvando");
-    const { data, error } = await supabase.rpc("salvar_planejamento", {
-      p_id: idRef.current,
-      p_client_id: ligacao.current.cliente || null,
-      p_calendar_event_id: ligacao.current.evento || null,
-      p_estado: est,
-      p_total: total,
-    });
-    if (error) {
+    const relogioLento = setTimeout(() => setLento(true), LENTO_MS);
+    let data: unknown = null;
+    let falha = false;
+    try {
+      let consulta = supabase.rpc("salvar_planejamento", {
+        p_id: idRef.current,
+        p_client_id: ligacao.current.cliente || null,
+        p_calendar_event_id: ligacao.current.evento || null,
+        p_estado: est,
+        p_total: total,
+      });
+      const sinal = comPrazo(PRAZO_SALVAR_MS);
+      if (sinal) consulta = consulta.abortSignal(sinal);
+      const r = await consulta;
+      data = r.data;
+      falha = !!r.error;
+    } catch {
+      falha = true;
+    } finally {
+      clearTimeout(relogioLento);
+      setLento(false);
+    }
+    if (falha) {
       sujo.current = true;
+      sujoDesde.current ??= Date.now();
       setStatus("erro");
-      return false;
+      setFalhou(true);
+      return "erro";
     }
     if (!idRef.current && data) {
-      idRef.current = data as string;
-      setId(data as string);
-      window.history.replaceState(null, "", `${base}/${data}`);
+      const novoId = data as string;
+      idRef.current = novoId;
+      setId(novoId);
+      window.history.replaceState(null, "", `${base}/${novoId}`);
+      // O rascunho passa a ser do plano salvo (o "novo" daquela cliente fica livre).
+      const antiga = chaveRef.current;
+      chaveRef.current = chaveRascunho(novoId);
+      apagarRascunho(antiga);
     }
+    // O banco agora tem `est` (fora o paciente, que ele ajusta e a impressão ignora).
+    baseRef.current = impressao(est);
+    if (versao.current === versaoEnviada && !sujo.current) apagarRascunho();
+    else gravarRascunho();
     setStatus("salvo");
-    return true;
-  }, [supabase, somenteLeitura, base]);
+    setFalhou(false);
+    tentativas.current = 0;
+    return "ok";
+  }, [supabase, somenteLeitura, base, apagarRascunho, gravarRascunho]);
 
   // Salvamentos em fila, um de cada vez: enquanto o primeiro de um plano novo
   // roda, o id ainda não existe e um segundo em paralelo criaria outro registro.
   // Quem chama durante um salvamento espera o mesmo; se mudou algo nesse meio
-  // tempo, ele grava de novo com o estado mais recente ao terminar.
+  // tempo, ele grava de novo com o estado mais recente ao terminar. Se falhar,
+  // tenta de novo sozinho com espera crescente enquanto houver mudança.
+  const salvarRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const salvar = useCallback((): Promise<void> => {
     if (emAndamento.current) return emAndamento.current;
+    if (repetir.current) {
+      clearTimeout(repetir.current);
+      repetir.current = null;
+    }
     const rodada = (async () => {
+      let r: "ok" | "nada" | "erro" = "nada";
       try {
-        while (sujo.current && (await salvarUmaVez())) {
+        while (sujo.current && (r = await salvarUmaVez()) === "ok") {
           // repete enquanto houver mudança nova
         }
       } finally {
         emAndamento.current = null;
       }
+      if (r === "erro" && sujo.current && montado.current) {
+        const ms = proximaEspera(tentativas.current++);
+        repetir.current = setTimeout(() => {
+          repetir.current = null;
+          void salvarRef.current();
+        }, ms);
+      }
     })();
     emAndamento.current = rodada;
     return rodada;
   }, [salvarUmaVez]);
+  salvarRef.current = salvar;
 
   const agendar = useCallback(() => {
+    if (somenteLeitura) return;
     sujo.current = true;
+    sujoDesde.current ??= Date.now();
+    versao.current += 1;
+    gravarRascunho();
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(salvar, 1000);
-  }, [salvar]);
+    // Digitando sem parar: no máximo a cada 3 s vai ao banco, sem esperar a pausa.
+    const espera = Date.now() - (sujoDesde.current ?? Date.now()) > LENTO_MS ? 0 : DEBOUNCE_MS;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      void salvar();
+    }, espera);
+  }, [salvar, gravarRascunho, somenteLeitura]);
 
   const mudar = useCallback(
     (fn: (p: Plano) => Plano) => {
       if (somenteLeitura) return;
-      setPlano((p) => {
-        const novo = fn(p);
-        planoRef.current = novo;
-        return novo;
-      });
+      // Calcula já (e não no setState) para o rascunho guardar o estado novo na hora.
+      const novo = fn(planoRef.current);
+      planoRef.current = novo;
+      setPlano(novo);
       agendar();
     },
     [agendar, somenteLeitura]
@@ -263,21 +383,176 @@ export default function EditorPlanejamento({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Ao sair da tela, guarda o que faltou.
+  // Ao abrir: recupera o rascunho que não chegou ao banco e, sem ele, confere
+  // se o banco tem versão mais nova que a da página (voltar pelo histórico do
+  // aparelho reaproveita a página guardada pelo Next, que pode estar velha).
+  const abriu = useRef(false);
   useEffect(() => {
-    const sair = () => {
+    if (abriu.current || somenteLeitura) return;
+    abriu.current = true;
+    const veioDaIa = !planoId && new URLSearchParams(window.location.search).get("ia") === "1";
+    let texto: string | null = null;
+    try {
+      texto = localStorage.getItem(chaveRef.current);
+    } catch {
+      setRascunhoOk(false);
+    }
+    const r = lerRascunho(texto);
+    const decisao = veioDaIa ? "nada" : decidirRascunho({ rascunho: r, novo: !planoId, servidorEstado: estado, servidorUpdatedAt: updatedAt ?? null, agora: Date.now() });
+
+    const aplicar = (rr: Rascunho) => {
+      const novo = normalizarPlano(rr.estado);
+      planoRef.current = novo;
+      setPlano(novo);
+      if (!portal) {
+        setCliente(rr.cliente);
+        setEvento(rr.evento);
+        ligacao.current = { cliente: rr.cliente, evento: rr.evento };
+      }
+      setAbertas(new Set(todasAreas(novo).filter((a) => totalArea(novo, a) > 0).map((a) => a.id)));
+      if (rr.estado.sessoesTotal !== undefined) setPerguntarSessoes(false);
+      if (totalDistribuido(novo) > 0) setAba("areas");
+      agendar();
+    };
+
+    if (decisao === "restaurar" && r) {
+      aplicar(r);
+      mostrarAviso("Recuperamos o que não tinha sido salvo.", 5000);
+      return;
+    }
+    if (decisao === "descartar") apagarRascunho();
+    if (decisao === "perguntar" && r) {
+      const quem = typeof r.estado.paciente === "string" && r.estado.paciente.trim() ? ` de ${r.estado.paciente.trim()}` : "";
+      const quando = new Date(r.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      // Espera o DialogosHost (montado no layout) ligar: os efeitos dos filhos rodam antes.
+      setTimeout(() => {
+        void confirmar({
+          titulo: "Continuar de onde parou?",
+          texto: `Ficou guardado no celular um planejamento novo${quem} que não chegou a ser salvo (${quando}).`,
+          confirmar: "Continuar",
+          cancelar: "Começar do zero",
+        }).then((ok) => {
+          if (ok && versao.current === 0) aplicar(r);
+          else if (!ok) apagarRascunho();
+        });
+      }, 60);
+      return;
+    }
+    if (!planoId) return;
+    const v0 = versao.current;
+    let q = supabase.from("planejamentos").select("estado, client_id, calendar_event_id").eq("id", planoId);
+    const sinal = comPrazo(15000);
+    if (sinal) q = q.abortSignal(sinal);
+    q.maybeSingle().then(
+      ({ data }) => {
+        if (!data || versao.current !== v0 || sujo.current) return;
+        const atual = (data.estado ?? {}) as EstadoPlanejador;
+        if (impressao(atual) === impressao(estado)) return;
+        const novo = normalizarPlano(atual);
+        planoRef.current = novo;
+        setPlano(novo);
+        baseRef.current = impressao(atual);
+        if (!portal) {
+          setCliente(data.client_id ?? "");
+          setEvento(data.calendar_event_id ?? "");
+          ligacao.current = { cliente: data.client_id ?? "", evento: data.calendar_event_id ?? "" };
+        }
+        setAbertas(new Set(todasAreas(novo).filter((a) => totalArea(novo, a) > 0).map((a) => a.id)));
+        mostrarAviso("Atualizado com a última versão salva.");
+      },
+      () => {
+        // sem sinal: segue com o que a página trouxe
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Salva na hora quando a tela some (troca de app, tela bloqueada: no Android
+  // o sistema pode matar a aba em segundo plano) e ao sair; volta a tentar ao
+  // voltar a rede ou a tela.
+  useEffect(() => {
+    montado.current = true;
+    const agora = () => {
       if (timer.current) {
         clearTimeout(timer.current);
         timer.current = null;
       }
-      salvar();
+      if (sujo.current) {
+        gravarRascunho();
+        void salvar();
+      }
     };
-    window.addEventListener("pagehide", sair);
+    const visibilidade = () => {
+      if (document.visibilityState === "hidden") agora();
+      else if (sujo.current) {
+        tentativas.current = 0;
+        void salvar();
+      }
+    };
+    const voltouRede = () => {
+      setSemRede(false);
+      if (sujo.current) {
+        tentativas.current = 0;
+        void salvar();
+      }
+    };
+    const caiuRede = () => setSemRede(true);
+    setSemRede(typeof navigator !== "undefined" && navigator.onLine === false);
+    window.addEventListener("pagehide", agora);
+    document.addEventListener("visibilitychange", visibilidade);
+    window.addEventListener("online", voltouRede);
+    window.addEventListener("offline", caiuRede);
     return () => {
-      window.removeEventListener("pagehide", sair);
-      sair();
+      window.removeEventListener("pagehide", agora);
+      document.removeEventListener("visibilitychange", visibilidade);
+      window.removeEventListener("online", voltouRede);
+      window.removeEventListener("offline", caiuRede);
+      montado.current = false;
+      if (repetir.current) {
+        clearTimeout(repetir.current);
+        repetir.current = null;
+      }
+      agora();
     };
-  }, [salvar]);
+  }, [salvar, gravarRascunho]);
+
+  // Antes de sair pelos botões do editor: tenta salvar (até 8 s) e, se não
+  // deu, avisa que está guardado no celular.
+  const precisaSalvar = () => !somenteLeitura && (sujo.current || !!emAndamento.current || !!timer.current);
+  async function antesDeSair(): Promise<boolean> {
+    if (!precisaSalvar()) return true;
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    tentativas.current = 0;
+    await Promise.race([salvar(), new Promise((ok) => setTimeout(ok, 8000))]);
+    const p = planoRef.current;
+    if (!idRef.current && !temConteudo(paraEstado(p), totalDistribuido(p) + usadoEmAnteriores(p))) return true;
+    if (!sujo.current && !emAndamento.current) return true;
+    gravarRascunho();
+    let guardado = true;
+    try {
+      guardado = !!localStorage.getItem(chaveRef.current);
+    } catch {
+      guardado = false;
+    }
+    return confirmar({
+      titulo: "Ainda não salvou no sistema",
+      texto: guardado
+        ? "Mas está guardado no celular: ao abrir este planejamento de novo, ele volta e é salvo. Sair mesmo assim?"
+        : "E não deu para guardar no celular. Se sair agora, o que mudou pode se perder. Sair mesmo assim?",
+      confirmar: "Sair mesmo assim",
+      cancelar: "Ficar",
+      perigo: !guardado,
+    });
+  }
+  // Para os links internos do editor: sem nada pendente, o Link segue normal.
+  const aoSair = (href: string) => (e: React.MouseEvent) => {
+    if (!precisaSalvar() || e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    void antesDeSair().then((ok) => ok && router.push(href));
+  };
 
   // Atendimentos HIPRO da cliente (60 dias para trás e para frente).
   useEffect(() => {
@@ -348,21 +623,26 @@ export default function EditorPlanejamento({
     mostrarAviso("Planejamento montado pelas regras.");
   }
 
+  // "Tentar agora" da faixa: salva já, recomeçando a espera das repetições.
   async function guardarAgora() {
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    tentativas.current = 0;
     await salvar();
   }
 
   async function novo() {
     setMenu(false);
-    await guardarAgora();
+    if (!(await antesDeSair())) return;
     window.location.href = portal ? "/portal/novo" : linkNovoPlanejamento(cliente || null, evento || null);
   }
 
   // Mesmo plano para outro paciente: copia áreas, saldo e procedimento; zera paciente e "feito".
   async function duplicar() {
     setMenu(false);
-    await guardarAgora();
+    if (!(await antesDeSair())) return;
     const est = paraEstado(plano);
     const DATA = Object.fromEntries(Object.entries(plano.DATA).map(([k, ls]) => [k, ls.map(({ feito: _f, ...l }) => l)]));
     try {
@@ -380,6 +660,8 @@ export default function EditorPlanejamento({
     if (emAndamento.current) await emAndamento.current;
     if (!idRef.current) {
       sujo.current = false;
+      if (timer.current) clearTimeout(timer.current);
+      apagarRascunho();
       router.push(base);
       return;
     }
@@ -392,6 +674,7 @@ export default function EditorPlanejamento({
     if (emAndamento.current) await emAndamento.current;
     const { error } = await supabase.rpc("excluir_planejamento", { p_id: idRef.current });
     if (error) return error.message || "Não consegui apagar. Confira a internet.";
+    apagarRascunho();
     router.push(base);
     router.refresh();
     return null;
@@ -513,6 +796,9 @@ export default function EditorPlanejamento({
   const quemAtende = nomeCliente || plano.profissional;
   const areas = todasAreas(plano).filter((a) => !soPreenchidas || totalArea(plano, a) > 0);
   const voltar = portal ? base : cliente ? `/planejador?cliente=${cliente}` : "/planejador";
+  const linkIa = `/assistente?${cliente ? `cliente=${cliente}&` : ""}pergunta=${encodeURIComponent(
+    `Monta um planejamento: paciente ${plano.paciente}, saldo de ${plano.saldoTotal !== "0" ? plano.saldoTotal : ""} disparos, queixa principal: ${plano.queixa}`
+  )}`;
   const usado = s.disponivel > 0 ? Math.min(100, (s.total / s.disponivel) * 100) : s.total > 0 ? 100 : 0;
   // Seletor: com várias sessões sugere dividir o que resta igual entre as sessões que faltam.
   const saldoSeletor = varias
@@ -530,7 +816,7 @@ export default function EditorPlanejamento({
       {/* Topo: volta, paciente e cliente, situação do salvamento, menu. */}
       <header className="relative z-10 bg-white/90 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(16,24,40,.06)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 pb-1 pt-2">
-          <Link href={voltar} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-neutral-600 active:bg-neutral-100" aria-label="Voltar para os planejamentos">
+          <Link href={voltar} onClick={aoSair(voltar)} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-neutral-600 active:bg-neutral-100" aria-label="Voltar para os planejamentos">
             <ArrowLeft size={20} />
           </Link>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -545,16 +831,14 @@ export default function EditorPlanejamento({
           <span className="flex flex-shrink-0 items-center text-xs text-neutral-500" aria-live="polite">
             {somenteLeitura ? (
               <span className="rounded-full bg-neutral-100 px-2 py-1">Só ver</span>
+            ) : falhou ? (
+              <CloudOff size={16} className="text-amber-600" aria-label="Não salvo ainda" />
             ) : status === "salvando" ? (
               <Loader2 size={16} className="animate-spin text-neutral-400" />
             ) : status === "salvo" ? (
-              <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">
+              <span className="flex items-center gap-1 rounded-full px-1.5 py-1 font-semibold text-emerald-700">
                 <Check size={13} /> Salvo
               </span>
-            ) : status === "erro" ? (
-              <button onClick={guardarAgora} className="rounded-full bg-rose-50 px-2 py-1 font-semibold text-rose-600">
-                Não salvou · tentar
-              </button>
             ) : null}
           </span>
           <div className="relative">
@@ -603,6 +887,29 @@ export default function EditorPlanejamento({
             )}
           </div>
         </div>
+
+        {/* Mudança que ainda não chegou ao banco: faixa bem visível. */}
+        {!somenteLeitura && (falhou || lento) && (
+          <div className="mx-auto max-w-3xl px-3 pb-2" role="status">
+            <div className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 text-[13px] font-semibold ring-1 ${falhou ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-sky-50 text-sky-900 ring-sky-200"}`}>
+              {falhou ? <CloudOff size={17} className="flex-shrink-0" /> : <Loader2 size={17} className="flex-shrink-0 animate-spin" />}
+              <span className="min-w-0 flex-1 leading-snug">
+                {semRede
+                  ? `Sem internet: ${rascunhoOk ? "guardado no celular, vamos salvar quando voltar" : "não feche esta tela, vamos salvar quando voltar"}.`
+                  : falhou
+                    ? status === "salvando"
+                      ? "Tentando salvar de novo..."
+                      : `Não salvou ainda: ${rascunhoOk ? "guardado no celular, tentando de novo" : "não feche esta tela, tentando de novo"}.`
+                    : `Salvando... ${rascunhoOk ? "(sinal fraco, já está guardado no celular)" : "(sinal fraco)"}`}
+              </span>
+              {falhou && status !== "salvando" && !semRede && (
+                <button type="button" onClick={guardarAgora} className="flex-shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-amber-800 ring-1 ring-amber-300">
+                  Tentar agora
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Saldo sempre à vista. */}
         <div className="mx-auto max-w-3xl px-4 pb-2.5">
@@ -682,17 +989,17 @@ export default function EditorPlanejamento({
                     {(cliente || evento) && (
                       <div className="flex flex-wrap gap-2">
                         {cliente && (
-                          <Link href={linkCliente(cliente)} className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700">
+                          <Link href={linkCliente(cliente)} onClick={aoSair(linkCliente(cliente))} className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700">
                             <UserRound size={13} /> Ficha da cliente
                           </Link>
                         )}
                         {evento && (
-                          <Link href={linkEvento(evento)} className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700">
+                          <Link href={linkEvento(evento)} onClick={aoSair(linkEvento(evento))} className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700">
                             <CalendarDays size={13} /> Atendimento
                           </Link>
                         )}
                         {cliente && (
-                          <Link href={`/planejador?cliente=${cliente}`} className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700">
+                          <Link href={`/planejador?cliente=${cliente}`} onClick={aoSair(`/planejador?cliente=${cliente}`)} className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700">
                             <ClipboardCopy size={13} /> Outros pacientes dela
                           </Link>
                         )}
@@ -753,7 +1060,7 @@ export default function EditorPlanejamento({
                           {mesmo ? <CircleCheck size={13} /> : <Plus size={13} />}
                           <span className="min-w-0 flex-1">{mesmo ? `Na ficha de ${mesmo.nome}: este planejamento entra no histórico dele.` : "Paciente novo: a ficha dele é criada ao salvar."}</span>
                           {mesmo && (
-                            <Link href={`${base}?paciente=${mesmo.id}`} className="flex-shrink-0 font-semibold text-brand-teal-dark underline">
+                            <Link href={`${base}?paciente=${mesmo.id}`} onClick={aoSair(`${base}?paciente=${mesmo.id}`)} className="flex-shrink-0 font-semibold text-brand-teal-dark underline">
                               Ver ficha
                             </Link>
                           )}
@@ -942,9 +1249,8 @@ export default function EditorPlanejamento({
                   </button>
                   {!portal ? (
                     <Link
-                      href={`/assistente?${cliente ? `cliente=${cliente}&` : ""}pergunta=${encodeURIComponent(
-                        `Monta um planejamento: paciente ${plano.paciente}, saldo de ${plano.saldoTotal !== "0" ? plano.saldoTotal : ""} disparos, queixa principal: ${plano.queixa}`
-                      )}`}
+                      href={linkIa}
+                      onClick={aoSair(linkIa)}
                       className="flex items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-sm font-bold text-[#7a5fa0] ring-1 ring-brand-lilac/50"
                     >
                       <Sparkles size={17} /> Montar com a IA
