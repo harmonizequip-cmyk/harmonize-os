@@ -7,7 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
-import { linkFaturaDoEmprestimo, type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
+import {
+  faltaSqlEmprestimoPessoal,
+  linkFaturaDoEmprestimo,
+  MSG_FALTA_SQL_EMPRESTIMO_PESSOAL,
+  type EscopoEmprestimo,
+  type ResumoDevedor,
+  type MovimentoEmprestimo,
+} from "@/lib/emprestimos";
 import { usePreferencias } from "@/lib/usar-preferencias";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { confirmar, avisar } from "@/components/Dialogos";
@@ -23,7 +30,20 @@ const FORMAS = [
 
 type Tipo = "concedido" | "devolucao";
 
-export default function EmprestimosClient({ devedores }: { devedores: ResumoDevedor[] }) {
+// Mesma tela nos dois espaços: Harmonize (/financeiro/emprestimos) e Pessoal
+// (/pessoal/emprestimos). O espaço vai para registrar_emprestimo (p_scope);
+// editar e apagar usam o espaço gravado na linha.
+export default function EmprestimosClient({
+  devedores,
+  escopo = "harmonize",
+  faltaSql = false,
+}: {
+  devedores: ResumoDevedor[];
+  escopo?: EscopoEmprestimo;
+  /** Pessoal sem o SQL novo rodado. */
+  faltaSql?: boolean;
+}) {
+  const pessoal = escopo === "pessoal";
   const supabase = createClient();
   const router = useRouter();
   const sugeridos = usePreferencias().listas.devedores;
@@ -64,7 +84,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
         "Valor e data vêm da fatura (conta no mês em que ela vence). Para mudar ou desfazer, abra a compra em Cartões e toque em \"Não é da Laser Dream\".",
       confirmar: "Abrir no cartão",
     });
-    if (ok) router.push(linkFaturaDoEmprestimo(m.cartaoId, m.faturaRef));
+    if (ok) router.push(linkFaturaDoEmprestimo(m.cartaoId, m.faturaRef, escopo));
   }
 
   function abrirEdicao(m: MovimentoEmprestimo) {
@@ -102,7 +122,7 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
         p_sem_caixa: semCaixa,
       });
       setSalvando(false);
-      if (error) return setErro(error.message || "Não foi possível salvar.");
+      if (error) return setErro(pessoal && faltaSqlEmprestimoPessoal(error) ? MSG_FALTA_SQL_EMPRESTIMO_PESSOAL : error.message || "Não foi possível salvar.");
       setForm(null);
       router.refresh();
       return;
@@ -114,8 +134,14 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
           texto: "Fica só como pendência, sem mexer no caixa.",
         }
       : form.tipo === "concedido"
-        ? { titulo: `Registrar empréstimo de ${formatCurrency(numero)} para ${nome.toUpperCase()}?`, texto: "Sai do caixa como saída, fora do resultado." }
-        : { titulo: `Registrar devolução de ${formatCurrency(numero)} de ${nome.toUpperCase()}?`, texto: "Entra no caixa como entrada, fora do faturamento." };
+        ? {
+            titulo: `Registrar empréstimo de ${formatCurrency(numero)} para ${nome.toUpperCase()}?`,
+            texto: pessoal ? "Sai da conta pessoal como saída, fora do resultado do mês." : "Sai do caixa como saída, fora do resultado.",
+          }
+        : {
+            titulo: `Registrar devolução de ${formatCurrency(numero)} de ${nome.toUpperCase()}?`,
+            texto: pessoal ? "Entra na conta pessoal como entrada, fora do resultado do mês." : "Entra no caixa como entrada, fora do faturamento.",
+          };
     if (!(await confirmar({ ...pergunta, confirmar: "Registrar" }))) return;
     setSalvando(true);
     setErro(null);
@@ -127,9 +153,11 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
       p_data: data,
       p_descricao: descricao || null,
       p_sem_caixa: semCaixa,
+      // Só manda o espaço no Pessoal: na Harmonize a chamada fica igual à de antes do SQL novo.
+      ...(pessoal ? { p_scope: "pessoal" } : {}),
     });
     setSalvando(false);
-    if (error) return setErro(error.message || "Não foi possível salvar.");
+    if (error) return setErro(pessoal && faltaSqlEmprestimoPessoal(error) ? MSG_FALTA_SQL_EMPRESTIMO_PESSOAL : error.message || "Não foi possível salvar.");
     setForm(null);
     router.refresh();
   }
@@ -153,12 +181,12 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <Link href="/financeiro" className="text-xs text-neutral-500">
-            ← Financeiro
+          <Link href={pessoal ? "/pessoal" : "/financeiro"} className="text-xs text-neutral-500">
+            ← {pessoal ? "Início" : "Financeiro"}
           </Link>
-          <h1 className="text-xl font-semibold text-neutral-900">Empréstimos</h1>
+          <h1 className="text-xl font-semibold text-neutral-900">{pessoal ? "Empréstimos pessoais" : "Empréstimos"}</h1>
         </div>
-        {!somenteLeitura && <button
+        {!somenteLeitura && !faltaSql && <button
           onClick={() => abrir("concedido", nomes[0] ?? "__outro__")}
           className="rounded-xl bg-brand-gradient px-4 py-2.5 text-sm font-medium text-white shadow-glow-teal"
         >
@@ -170,13 +198,29 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
         <p className="text-[11px] uppercase tracking-wide text-neutral-400">A receber de volta</p>
         <p className="mt-0.5 text-2xl font-semibold text-amber-600">{formatCurrency(totalAReceber)}</p>
         <p className="mt-1 text-xs text-neutral-500">
-          Empréstimo sai do caixa, mas não é despesa: fica fora do Resultado, do quadro &quot;Este mês&quot; e dos
-          relatórios. A devolução também não conta como faturamento. Compra no cartão da Harmonize que é de um devedor entra aqui
-          (selo &quot;cartão&quot;), uma linha por parcela, no mês em que a fatura vence: marque em Cartões.
+          {pessoal ? (
+            <>
+              Empréstimo sai da conta pessoal, mas não é gasto: fica fora do resultado do mês, da rosca, dos orçamentos e dos
+              relatórios por categoria. A devolução também não conta como entrada do mês. Compra num cartão pessoal que é de um
+              devedor entra aqui (selo &quot;cartão&quot;), uma linha por parcela, no mês em que a fatura vence: marque em Cartões.
+            </>
+          ) : (
+            <>
+              Empréstimo sai do caixa, mas não é despesa: fica fora do Resultado, do quadro &quot;Este mês&quot; e dos
+              relatórios. A devolução também não conta como faturamento. Compra no cartão da Harmonize que é de um devedor entra
+              aqui (selo &quot;cartão&quot;), uma linha por parcela, no mês em que a fatura vence: marque em Cartões.
+            </>
+          )}
         </p>
       </div>
 
-      {devedores.length === 0 && (
+      {faltaSql && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {MSG_FALTA_SQL_EMPRESTIMO_PESSOAL} Até lá, os empréstimos ficam só na Harmonize.
+        </div>
+      )}
+
+      {devedores.length === 0 && !faltaSql && (
         <div className="rounded-xl border border-dashed border-neutral-300 py-8 text-center text-sm text-neutral-400">
           Nenhum empréstimo lançado ainda.
         </div>

@@ -254,7 +254,7 @@ export default function FinanceiroClient({
         router.push(linkFatura(pessoal ? "pessoal" : "harmonize", c.cartao_id, c.fatura_ref));
         return;
       }
-      router.push("/financeiro/emprestimos");
+      router.push(pessoal ? "/pessoal/emprestimos" : "/financeiro/emprestimos");
       return;
     }
     setEditing(t);
@@ -324,14 +324,12 @@ export default function FinanceiroClient({
           >
             Cartões
           </Link>
-          {!pessoal && (
-            <Link
-              href="/financeiro/emprestimos"
-              className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700"
-            >
-              Empréstimos
-            </Link>
-          )}
+          <Link
+            href={pessoal ? "/pessoal/emprestimos" : "/financeiro/emprestimos"}
+            className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700"
+          >
+            Empréstimos
+          </Link>
           {!somenteLeitura && (
             <button
               onClick={() => {
@@ -502,7 +500,7 @@ export default function FinanceiroClient({
         </p>
       )}
       {(totais.emprestado > 0 || totais.devolvido > 0) && (
-        <Link href="/financeiro/emprestimos" className="block text-xs text-neutral-500">
+        <Link href={pessoal ? "/pessoal/emprestimos" : "/financeiro/emprestimos"} className="block text-xs text-neutral-500">
           Fora do resultado: empréstimos {formatCurrency(totais.emprestado)} saíram
           {totais.devolvido > 0 ? `, ${formatCurrency(totais.devolvido)} voltaram` : ""} →
         </Link>

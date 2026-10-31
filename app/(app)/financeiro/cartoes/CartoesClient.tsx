@@ -19,7 +19,7 @@ import { Atalho } from "@/components/Atalhos";
 import { linkLancamento } from "@/lib/atalhos";
 import { confirmar, avisar } from "@/components/Dialogos";
 import { usePreferencias } from "@/lib/usar-preferencias";
-import { grupoDevedores, rotuloDevedor, siglaDevedor } from "@/lib/emprestimos";
+import { faltaSqlEmprestimoPessoal, grupoDevedores, MSG_FALTA_SQL_EMPRESTIMO_PESSOAL, rotuloDevedor, siglaDevedor } from "@/lib/emprestimos";
 import ImportarFaturaModal from "@/components/ImportarFaturaModal";
 import DesfazerImportacaoModal from "@/components/DesfazerImportacaoModal";
 
@@ -61,6 +61,13 @@ function faltaSqlEmprestimo(error: { code?: string; message?: string }): boolean
   return error.code === "PGRST202" || error.code === "42883" || /could not find the function|does not exist/i.test(error.message ?? "");
 }
 const MSG_FALTA_SQL = "Falta rodar o SQL do empréstimo no cartão.";
+
+/** Mensagem do erro ao marcar/desmarcar empréstimo, conforme o espaço do cartão. */
+function erroEmprestimo(error: { code?: string; message?: string }, escopo: "harmonize" | "pessoal", padrao: string): string {
+  if (escopo === "pessoal" && faltaSqlEmprestimoPessoal(error)) return MSG_FALTA_SQL_EMPRESTIMO_PESSOAL;
+  if (faltaSqlEmprestimo(error)) return MSG_FALTA_SQL;
+  return error.message || padrao;
+}
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -111,7 +118,7 @@ export default function CartoesClient({
   const [erro, setErro] = useState<string | null>(null);
   const [importando, setImportando] = useState(false);
   const [desfazendo, setDesfazendo] = useState(false);
-  // Compra da Harmonize que é de um devedor (Laser Dream) vira empréstimo, parcela a parcela.
+  // Compra que é de um devedor (Laser Dream) vira empréstimo, parcela a parcela (Harmonize e Pessoal).
   const sugeridos = usePreferencias().listas.devedores;
   const [emprestimoDe, setEmprestimoDe] = useState<Map<string, string>>(new Map());
   const [marcando, setMarcando] = useState<Compra | null>(null);
@@ -176,7 +183,7 @@ export default function CartoesClient({
         // Quais compras desta fatura já viraram empréstimo (sem o SQL rodado, nenhuma).
         const mapa = new Map<string, string>();
         const ids = lista.filter((c) => c.cartao_mov === "compra").map((c) => c.id);
-        if (escopo === "harmonize" && ids.length > 0) {
+        if (ids.length > 0) {
           const { data: emp } = await supabase
             .from("emprestimos")
             .select("transaction_id, devedor")
@@ -246,7 +253,7 @@ export default function CartoesClient({
     });
     setSalvandoEmp(false);
     if (error) {
-      avisar(faltaSqlEmprestimo(error) ? MSG_FALTA_SQL : error.message || "Não consegui marcar.", "erro");
+      avisar(erroEmprestimo(error, escopo, "Não consegui marcar."), "erro");
       return;
     }
     setMarcando(null);
@@ -261,14 +268,14 @@ export default function CartoesClient({
     const ok = await confirmar({
       titulo: `${rotuloDesfazer}?`,
       texto: varias
-        ? "Todas as parcelas desta compra deixam de ser empréstimo e voltam para a categoria de antes (contam de novo como despesa da Harmonize)."
-        : "A compra deixa de ser empréstimo e volta para a categoria de antes (conta de novo como despesa da Harmonize).",
+        ? `Todas as parcelas desta compra deixam de ser empréstimo e voltam para a categoria de antes (contam de novo como ${escopo === "pessoal" ? "gasto pessoal" : "despesa da Harmonize"}).`
+        : `A compra deixa de ser empréstimo e volta para a categoria de antes (conta de novo como ${escopo === "pessoal" ? "gasto pessoal" : "despesa da Harmonize"}).`,
       confirmar: rotuloDesfazer,
     });
     if (!ok) return;
     const { error } = await supabase.rpc("desmarcar_compra_emprestimo", { p_transaction_id: c.id, p_todas_parcelas: true });
     if (error) {
-      avisar(faltaSqlEmprestimo(error) ? MSG_FALTA_SQL : error.message || "Não consegui desfazer.", "erro");
+      avisar(erroEmprestimo(error, escopo, "Não consegui desfazer."), "erro");
       return;
     }
     setRecarregar((r) => r + 1);
@@ -532,7 +539,7 @@ export default function CartoesClient({
                           )}
                         </span>
                       )}
-                      {!devedorEmp && !somenteLeitura && escopo === "harmonize" && cartao.scope === "harmonize" && c.cartao_mov === "compra" && (
+                      {!devedorEmp && !somenteLeitura && cartao.scope === escopo && c.cartao_mov === "compra" && (
                         <button type="button" onClick={() => abrirMarcar(c)} className="mt-0.5 block text-[11px] text-brand-teal underline">
                           {rotuloAcao.charAt(0).toUpperCase() + rotuloAcao.slice(1)}
                         </button>
@@ -600,8 +607,9 @@ export default function CartoesClient({
                 {marcando.description.replace(/ \(\d+\/\d+\)$/, "")} · {formatCurrency(marcando.amount)}
               </p>
               <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-                Cada parcela vira um empréstimo no mês em que a fatura dela vence. Sai das despesas e do resultado da Harmonize e entra
-                em Empréstimos, como dinheiro que volta. A compra continua na fatura do cartão.
+                Cada parcela vira um empréstimo no mês em que a fatura dela vence. Sai{" "}
+                {escopo === "pessoal" ? "dos gastos e do resultado do mês do Pessoal" : "das despesas e do resultado da Harmonize"} e entra
+                em Empréstimos{escopo === "pessoal" ? " pessoais" : ""}, como dinheiro que volta. A compra continua na fatura do cartão.
               </p>
               <p className="mb-1 mt-4 text-xs font-medium text-neutral-600">Para quem</p>
               <div className="space-y-1.5">

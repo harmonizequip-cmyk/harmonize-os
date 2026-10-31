@@ -115,7 +115,7 @@ export default function MovimentacoesClient({
           const href =
             m.acao === "excluido"
               ? null
-              : linkDaMovimentacao(m.entidade, m.entidade_id, { client_id: m.detalhes?.client_id ?? null });
+              : linkDaMovimentacao(m.entidade, m.entidade_id, { client_id: m.detalhes?.client_id ?? null, escopo: m.detalhes?.escopo ?? null });
           const classe = "block rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl";
           const conteudo = (
             <>

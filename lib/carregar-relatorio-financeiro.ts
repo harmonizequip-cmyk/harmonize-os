@@ -11,35 +11,36 @@ import {
 } from "@/lib/relatorio-financeiro";
 import type { FaturaRelatorio } from "@/components/RelatorioFinanceiro";
 import { buscarTodas } from "@/lib/buscar-todas";
+import { carregarMovimentosEmprestimo } from "@/lib/carregar-emprestimos";
 
-// Empréstimos com a origem (caixa ou cartão). Sem o SQL do empréstimo no cartão
-// (coluna origem), lê como antes: tudo vira origem manual.
-async function carregarEmprestimos(supabase: SupabaseClient): Promise<{ data: EmprestimoPeriodo[] | null }> {
-  const novo = await supabase
-    .from("emprestimos")
-    .select("id, devedor, tipo, valor, data, descricao, origem, transaction_id, transactions(cartao_id, fatura_ref)")
-    .eq("is_test", false);
-  const linhas: any[] | null = novo.error
-    ? (await supabase.from("emprestimos").select("id, devedor, tipo, valor, data, descricao, transaction_id").eq("is_test", false)).data
-    : novo.data;
-  if (!linhas) return { data: null };
-  return {
-    data: linhas.map((e) => {
-      const t = oneOf<{ cartao_id: string | null; fatura_ref: string | null }>(e.transactions);
-      return {
-        id: e.id,
-        devedor: e.devedor,
-        tipo: e.tipo,
-        valor: Number(e.valor),
-        data: e.data,
-        descricao: e.descricao,
-        origem: e.origem === "cartao" ? "cartao" : "manual",
-        semCaixa: !e.transaction_id,
-        cartaoId: t?.cartao_id ?? null,
-        faturaRef: t?.fatura_ref ?? null,
-      } satisfies EmprestimoPeriodo;
-    }),
-  };
+// Empréstimos do espaço com a origem (caixa ou cartão). Sem o SQL dos empréstimos
+// do Pessoal, a Harmonize lê como antes e o Pessoal fica sem (data nula: os quadros somem).
+async function carregarEmprestimos(
+  supabase: SupabaseClient,
+  escopo: "harmonize" | "pessoal"
+): Promise<{ data: EmprestimoPeriodo[] | null; faltaSql: boolean }> {
+  try {
+    const { movimentos, faltaSql } = await carregarMovimentosEmprestimo(supabase, escopo);
+    if (faltaSql) return { data: null, faltaSql: true };
+    return {
+      data: movimentos.map((m) => ({
+        id: m.id,
+        devedor: m.devedor,
+        tipo: m.tipo,
+        valor: Number(m.valor),
+        data: m.data,
+        descricao: m.descricao,
+        origem: m.origem === "cartao" ? "cartao" : "manual",
+        semCaixa: !!m.semCaixa,
+        cartaoId: m.cartaoId ?? null,
+        faturaRef: m.faturaRef ?? null,
+      })),
+      faltaSql: false,
+    };
+  } catch {
+    // Como antes: sem empréstimos o relatório abre sem esses quadros.
+    return { data: null, faltaSql: false };
+  }
 }
 
 function oneOf<T>(value: T | T[] | null | undefined): T | null {
@@ -66,7 +67,7 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
     ).then((data) => ({ data })),
     supabase.from("faturas_cartao").select("cartao_id, fatura_ref, vencimento, total_compras, total_pago").eq("scope", escopo).order("fatura_ref"),
     supabase.from("cartoes").select("id, nome"),
-    escopo === "harmonize" ? carregarEmprestimos(supabase) : Promise.resolve({ data: null }),
+    carregarEmprestimos(supabase, escopo),
   ]);
   const linhas: LinhaFinanceira[] = ((linhasRaw ?? []) as any[]).map((l) => ({
     id: l.id,
@@ -107,6 +108,7 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
     evolucao: evolucaoMensal(linhas, hoje, 12),
     faturas,
     emprestimos,
+    emprestimosFaltaSql: emprestimosRes.faltaSql,
   };
 }
 

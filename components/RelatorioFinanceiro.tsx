@@ -2,7 +2,8 @@
 
 // Relatório financeiro de um lado (Harmonize ou Pessoal): gastos e entradas
 // por categoria no período, evolução dos últimos 12 meses, faturas de cartão
-// e, na Harmonize, empréstimos. Contas em lib/relatorio-financeiro.ts.
+// e empréstimos do espaço ("Tudo que saiu da conta" e saldo por devedor; no
+// Pessoal desde 31/10/2026). Contas em lib/relatorio-financeiro.ts.
 
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -11,7 +12,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CategoriaSoma, ItemLancamento, MesResumo, TudoQueSaiu } from "@/lib/relatorio-financeiro";
 import { usePreferencias } from "@/lib/usar-preferencias";
-import { grupoDevedores, linkFaturaDoEmprestimo, rotuloDevedor } from "@/lib/emprestimos";
+import { grupoDevedores, linkEmprestimos, linkFaturaDoEmprestimo, MSG_FALTA_SQL_EMPRESTIMO_PESSOAL, rotuloDevedor } from "@/lib/emprestimos";
 
 export interface FaturaRelatorio {
   cartao: string;
@@ -115,8 +116,17 @@ function Barras({
   );
 }
 
-/** Despesas + empréstimos do período: tudo que saiu da conta da Harmonize. */
-function TudoQueSaiuQuadro({ saidas, rotuloPeriodo }: { saidas: TudoQueSaiu; rotuloPeriodo: string }) {
+/** Despesas (ou gastos) + empréstimos do período: tudo que saiu da conta do espaço. */
+function TudoQueSaiuQuadro({
+  saidas,
+  rotuloPeriodo,
+  escopo,
+}: {
+  saidas: TudoQueSaiu;
+  rotuloPeriodo: string;
+  escopo: "harmonize" | "pessoal";
+}) {
+  const pessoal = escopo === "pessoal";
   const [aberto, setAberto] = useState(false);
   const sugeridos = usePreferencias().listas.devedores;
   const devedores = Array.from(new Set([...sugeridos, ...saidas.porDevedor.map((d) => d.devedor)]));
@@ -126,11 +136,15 @@ function TudoQueSaiuQuadro({ saidas, rotuloPeriodo }: { saidas: TudoQueSaiu; rot
   return (
     <Cartao
       titulo={`Tudo que saiu da conta (${rotuloPeriodo})`}
-      dica="Despesas mais o que foi emprestado. O resultado e o lucro continuam sem empréstimo, porque esse dinheiro volta."
+      dica={
+        pessoal
+          ? "Gastos mais o que foi emprestado. O resultado do mês continua sem empréstimo, porque esse dinheiro volta."
+          : "Despesas mais o que foi emprestado. O resultado e o lucro continuam sem empréstimo, porque esse dinheiro volta."
+      }
     >
       <div className="space-y-1 text-xs">
         <div className="flex items-baseline justify-between gap-2 py-1">
-          <span className="text-neutral-700">Despesas</span>
+          <span className="text-neutral-700">{pessoal ? "Gastos" : "Despesas"}</span>
           <span className="font-medium text-neutral-900">{formatCurrency(saidas.despesas)}</span>
         </div>
         <button
@@ -164,7 +178,7 @@ function TudoQueSaiuQuadro({ saidas, rotuloPeriodo }: { saidas: TudoQueSaiu; rot
             {saidas.lancamentos.map((e) => (
               <li key={e.id}>
                 <Link
-                  href={e.origem === "cartao" ? linkFaturaDoEmprestimo(e.cartaoId, e.faturaRef) : "/financeiro/emprestimos"}
+                  href={e.origem === "cartao" ? linkFaturaDoEmprestimo(e.cartaoId, e.faturaRef, escopo) : linkEmprestimos(escopo)}
                   className="flex items-center gap-3 py-2 text-xs active:opacity-60"
                 >
                   <span className="w-10 shrink-0 text-neutral-400">{formatDate(e.data).slice(0, 5)}</span>
@@ -190,12 +204,12 @@ function TudoQueSaiuQuadro({ saidas, rotuloPeriodo }: { saidas: TudoQueSaiu; rot
         )}
       </div>
       <p className="mt-2 text-[11px] text-neutral-400">
-        Compras no cartão contam no mês em que a fatura vence, nas despesas ou nos empréstimos. O pagamento da fatura não entra, para não
+        Compras no cartão contam no mês em que a fatura vence, {pessoal ? "nos gastos" : "nas despesas"} ou nos empréstimos. O pagamento da fatura não entra, para não
         contar duas vezes.
         {saidas.soPendencia > 0 && ` Empréstimos lançados só como pendência (${formatCurrency(saidas.soPendencia)}) ficam fora do total.`}
       </p>
-      <Link href="/financeiro/emprestimos" className="mt-1 block text-[11px] text-brand-teal underline">
-        Abrir Empréstimos
+      <Link href={linkEmprestimos(escopo)} className="mt-1 block text-[11px] text-brand-teal underline">
+        Abrir Empréstimos{pessoal ? " pessoais" : ""}
       </Link>
     </Cartao>
   );
@@ -213,6 +227,7 @@ export default function RelatorioFinanceiro({
   hoje,
   emprestimos,
   saidas,
+  emprestimosFaltaSql = false,
 }: {
   escopo: "harmonize" | "pessoal";
   rotuloPeriodo: string;
@@ -225,6 +240,8 @@ export default function RelatorioFinanceiro({
   hoje: string;
   emprestimos?: EmprestimoRelatorio[];
   saidas?: TudoQueSaiu;
+  /** Pessoal sem o SQL dos empréstimos do Pessoal rodado. */
+  emprestimosFaltaSql?: boolean;
 }) {
   // Meses do começo sem movimento nenhum (antes de usar o app) ficam de fora.
   const primeiro = evolucao.findIndex((m) => m.entradas > 0 || m.saidas > 0);
@@ -240,7 +257,12 @@ export default function RelatorioFinanceiro({
 
   return (
     <div className="space-y-4">
-      {escopo === "harmonize" && saidas && <TudoQueSaiuQuadro saidas={saidas} rotuloPeriodo={rotuloPeriodo} />}
+      {saidas && <TudoQueSaiuQuadro saidas={saidas} rotuloPeriodo={rotuloPeriodo} escopo={escopo} />}
+      {escopo === "pessoal" && emprestimosFaltaSql && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          {MSG_FALTA_SQL_EMPRESTIMO_PESSOAL} Depois disso aparecem aqui &quot;Tudo que saiu da conta&quot; e os empréstimos pessoais.
+        </p>
+      )}
 
       <Cartao titulo={`Para onde foi o dinheiro (${rotuloPeriodo})`} dica="Gastos por categoria. Empréstimo (também a compra no cartão marcada como empréstimo) e pagamento de fatura ficam fora (a compra no cartão já conta).">
         <Barras itens={gastos} cor="bg-brand-pink" detalhes={lancamentosGastos} hrefLancamento={hrefLancamento} />
@@ -287,7 +309,10 @@ export default function RelatorioFinanceiro({
       >
         {faturas.length === 0 ? (
           <p className="text-xs text-neutral-400">
-            Nenhuma compra no cartão ainda. <Link href="/financeiro/cartoes" className="text-brand-teal underline">Ver cartões</Link>
+            Nenhuma compra no cartão ainda.{" "}
+            <Link href={escopo === "pessoal" ? "/pessoal/cartoes" : "/financeiro/cartoes"} className="text-brand-teal underline">
+              Ver cartões
+            </Link>
           </p>
         ) : (
           <>
@@ -338,8 +363,11 @@ export default function RelatorioFinanceiro({
         )}
       </Cartao>
 
-      {escopo === "harmonize" && emprestimos && (
-        <Cartao titulo="Empréstimos" dica={`A receber de volta: ${formatCurrency(totalEmprestado)}. Fica fora do resultado.`}>
+      {emprestimos && (
+        <Cartao
+          titulo={escopo === "pessoal" ? "Empréstimos pessoais" : "Empréstimos"}
+          dica={`A receber de volta: ${formatCurrency(totalEmprestado)}. Fica fora do resultado.`}
+        >
           {emprestimos.length === 0 ? (
             <p className="text-xs text-neutral-400">Nenhum empréstimo lançado.</p>
           ) : (
@@ -359,8 +387,8 @@ export default function RelatorioFinanceiro({
               ))}
             </ul>
           )}
-          <Link href="/financeiro/emprestimos" className="mt-2 block text-[11px] text-brand-teal underline">
-            Abrir Empréstimos
+          <Link href={linkEmprestimos(escopo)} className="mt-2 block text-[11px] text-brand-teal underline">
+            Abrir Empréstimos{escopo === "pessoal" ? " pessoais" : ""}
           </Link>
         </Cartao>
       )}

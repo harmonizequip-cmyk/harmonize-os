@@ -63,6 +63,25 @@ describe("avisos", () => {
     expect(a.some((x) => x.id.includes("Itaú"))).toBe(false);
   });
 
+  it("fatura de cartão pessoal fechada e não importada avisa e leva à importação; a da Harmonize não", () => {
+    const lembrete = (nome: string, scope: "harmonize" | "pessoal", id: string) => ({
+      cartaoId: id,
+      nome,
+      scope,
+      fechamento: "2026-10-12",
+      faturaRef: "2026-10",
+      diasDesdeFechamento: 3,
+    });
+    const so = avisosPessoais({ ...base, faturasParaImportar: [lembrete("NUBANK (pessoal)", "pessoal", "p1"), lembrete("NUBANK", "harmonize", "h1")] });
+    const aviso = so.find((x) => x.id === "importar-fatura");
+    expect(aviso?.texto).toBe("Importar fatura do NUBANK (pessoal) (fechou 12/10)");
+    expect(aviso?.href).toBe("/pessoal/cartoes?cartao=p1&fatura=2026-10&importar=1");
+    expect(aviso?.nivel).toBe("atencao");
+    expect(avisosPessoais({ ...base, faturasParaImportar: [lembrete("NUBANK", "harmonize", "h1")] }).some((x) => x.id === "importar-fatura")).toBe(false);
+    const dois = avisosPessoais({ ...base, faturasParaImportar: [lembrete("A", "pessoal", "a"), lembrete("B", "pessoal", "b")] });
+    expect(dois.find((x) => x.id === "importar-fatura")?.texto).toBe("Importar fatura de 2 cartões");
+  });
+
   it("saldo negativo é urgente", () => {
     expect(avisosPessoais({ ...base, saldo: -50 }).some((x) => x.id === "saldo-negativo" && x.nivel === "urgente")).toBe(true);
   });

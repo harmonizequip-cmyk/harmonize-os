@@ -11,7 +11,7 @@ import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
 import { interpretarDespesa, type ClienteParaVoz } from "@/lib/voz";
-import { rotuloDevedor, tituloEmprestimo } from "@/lib/emprestimos";
+import { faltaSqlEmprestimoPessoal, MSG_FALTA_SQL_EMPRESTIMO_PESSOAL, rotuloDevedor, tituloEmprestimo } from "@/lib/emprestimos";
 import { usePreferencias } from "@/lib/usar-preferencias";
 const PAYMENT_METHODS = [
   { value: "pix", label: "PIX" },
@@ -218,10 +218,12 @@ export default function NovoLancamentoModal({
         p_data: date,
         p_descricao: [description, notes].filter(Boolean).join(" · ") || null,
         p_sem_caixa: emprestimoSemCaixa,
+        // Conta pessoal: o empréstimo é do Pessoal. Na Harmonize a chamada fica como antes.
+        ...(pessoal ? { p_scope: "pessoal" } : {}),
       });
       setSaving(false);
       if (e) {
-        setError(e.message || "Não foi possível salvar o empréstimo.");
+        setError(pessoal && faltaSqlEmprestimoPessoal(e) ? MSG_FALTA_SQL_EMPRESTIMO_PESSOAL : e.message || "Não foi possível salvar o empréstimo.");
         return;
       }
       onCreated();
@@ -282,7 +284,7 @@ export default function NovoLancamentoModal({
           <span className="text-[11px] text-neutral-400">(não entra no caixa da Harmonize)</span>
         </label>
 
-        {!pessoal && devedoresSugeridos.length > 0 && (
+        {devedoresSugeridos.length > 0 && (
           <div className="-mt-2 mb-4 rounded-xl border border-neutral-200 px-3 py-2">
             <label className="flex items-center gap-2 text-sm text-neutral-700">
               <input
@@ -310,7 +312,7 @@ export default function NovoLancamentoModal({
                   ))}
                 </div>
                 <p className="mt-1.5 text-[11px] text-neutral-400">
-                  {type === "saida" ? "Saída = empréstimo concedido." : "Entrada = devolução do empréstimo."} Fica fora do resultado e aparece em Empréstimos.
+                  {type === "saida" ? "Saída = empréstimo concedido." : "Entrada = devolução do empréstimo."} Fica fora do resultado e aparece em {pessoal ? "Empréstimos pessoais" : "Empréstimos"}.
                 </p>
                 <label className="mt-1.5 flex items-center gap-2 text-[11px] text-neutral-600">
                   <input type="checkbox" checked={emprestimoSemCaixa} onChange={(e) => setEmprestimoSemCaixa(e.target.checked)} />

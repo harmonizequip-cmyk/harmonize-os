@@ -55,10 +55,42 @@ export function siglaDevedor(nome: string, todos: string[] = DEVEDORES_SUGERIDOS
 /** De onde veio o empréstimo: lançado à mão (caixa ou só pendência) ou parcela de compra no cartão. */
 export type OrigemEmprestimo = "manual" | "cartao";
 
+/** Espaço do empréstimo: caixa e cartões da Harmonize ou conta e cartões pessoais. */
+export type EscopoEmprestimo = "harmonize" | "pessoal";
+
 /** Endereço da fatura onde está a parcela (empréstimo de origem cartão). */
-export function linkFaturaDoEmprestimo(cartaoId: string | null | undefined, faturaRef: string | null | undefined): string {
-  if (!cartaoId) return "/financeiro/cartoes";
-  return `/financeiro/cartoes?cartao=${cartaoId}${faturaRef ? `&fatura=${faturaRef}` : ""}`;
+export function linkFaturaDoEmprestimo(
+  cartaoId: string | null | undefined,
+  faturaRef: string | null | undefined,
+  escopo: EscopoEmprestimo = "harmonize"
+): string {
+  const base = escopo === "pessoal" ? "/pessoal/cartoes" : "/financeiro/cartoes";
+  if (!cartaoId) return base;
+  return `${base}?cartao=${cartaoId}${faturaRef ? `&fatura=${faturaRef}` : ""}`;
+}
+
+/** Tela de Empréstimos do espaço. */
+export function linkEmprestimos(escopo: EscopoEmprestimo = "harmonize"): string {
+  return escopo === "pessoal" ? "/pessoal/emprestimos" : "/financeiro/emprestimos";
+}
+
+/** Aviso quando o SQL dos empréstimos do Pessoal (migration 2026-10-31-pessoal-emprestimos-e-categorias.sql) ainda não rodou. */
+export const MSG_FALTA_SQL_EMPRESTIMO_PESSOAL = "Falta rodar o SQL dos empréstimos do Pessoal.";
+
+/**
+ * Erro que mostra que o banco ainda não conhece empréstimo no Pessoal: função sem
+ * o parâmetro p_scope, coluna scope que não existe ou a recusa antiga
+ * "Só compra num cartão da Harmonize".
+ */
+export function faltaSqlEmprestimoPessoal(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  const msg = error.message ?? "";
+  return (
+    error.code === "PGRST202" ||
+    error.code === "42883" ||
+    error.code === "42703" ||
+    /could not find the function|does not exist|cart[aã]o da Harmonize/i.test(msg)
+  );
 }
 
 export interface MovimentoEmprestimo {

@@ -56,7 +56,7 @@ export function linkNovoPlanejamento(clientId?: string | null, eventId?: string 
 export function linkDaMovimentacao(
   entidade: string,
   entidadeId: string | null,
-  extra?: { client_id?: string | null } | null
+  extra?: { client_id?: string | null; escopo?: string | null } | null
 ): string | null {
   if (!entidadeId) return null;
   switch (entidade) {
@@ -76,7 +76,7 @@ export function linkDaMovimentacao(
     case "envio_agenda":
       return extra?.client_id ? linkCliente(extra.client_id) : null;
     case "emprestimos":
-      return "/financeiro/emprestimos";
+      return extra?.escopo === "pessoal" ? "/pessoal/emprestimos" : "/financeiro/emprestimos";
     case "equipments":
       return "/equipamentos";
     case "cartoes":

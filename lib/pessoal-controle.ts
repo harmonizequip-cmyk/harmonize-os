@@ -10,6 +10,7 @@
 
 import { contaNoResultado, type LinhaFinanceira } from "./relatorio-financeiro";
 import { formatCurrency } from "./format";
+import { diaMes, linkImportarFatura, type LembreteFatura } from "./lembrete-fatura";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -172,6 +173,7 @@ export function avisosPessoais({
   totalFixas,
   ultimoLancamento,
   orcamentos = [],
+  faturasParaImportar = [],
 }: {
   linhas: LinhaFinanceira[];
   hoje: string;
@@ -181,8 +183,29 @@ export function avisosPessoais({
   /** Data (AAAA-MM-DD) do último lançamento feito, de qualquer mês; null se nunca. */
   ultimoLancamento: string | null;
   orcamentos?: OrcamentoPessoal[];
+  /** Lembretes de importar a fatura (lembretesDeFatura); só os cartões pessoais entram. */
+  faturasParaImportar?: LembreteFatura[];
 }): AvisoPessoal[] {
   const avisos: AvisoPessoal[] = [];
+
+  // Fatura de cartão pessoal que já fechou e ainda não foi importada (mesma regra do Dashboard).
+  const importar = faturasParaImportar.filter((f) => f.scope === "pessoal");
+  if (importar.length > 0) {
+    avisos.push({
+      id: "importar-fatura",
+      icone: "fatura",
+      texto:
+        importar.length === 1
+          ? `Importar fatura do ${importar[0].nome} (fechou ${diaMes(importar[0].fechamento)})`
+          : `Importar fatura de ${importar.length} cartões`,
+      detalhe:
+        importar.length === 1
+          ? "Baixe o arquivo OFX no app do banco e importe"
+          : importar.map((f) => `${f.nome} (fechou ${diaMes(f.fechamento)})`).join(", "),
+      href: linkImportarFatura(importar[0]),
+      nivel: "atencao",
+    });
+  }
   const resumo = resumoDoMes(linhas, hoje);
 
   // Faturas dos cartões: vencida é urgente; até 5 dias é atenção.

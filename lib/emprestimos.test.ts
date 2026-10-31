@@ -52,3 +52,28 @@ describe("selo e grupo dos devedores", () => {
     expect(m.linkFaturaDoEmprestimo(null, null)).toBe("/financeiro/cartoes");
   });
 });
+
+describe("empréstimos no Pessoal", () => {
+  it("endereços pelo espaço", async () => {
+    const m = await import("./emprestimos");
+    expect(m.linkFaturaDoEmprestimo("c1", "2026-11", "pessoal")).toBe("/pessoal/cartoes?cartao=c1&fatura=2026-11");
+    expect(m.linkFaturaDoEmprestimo(null, null, "pessoal")).toBe("/pessoal/cartoes");
+    expect(m.linkEmprestimos()).toBe("/financeiro/emprestimos");
+    expect(m.linkEmprestimos("pessoal")).toBe("/pessoal/emprestimos");
+  });
+
+  it("reconhece o banco sem o SQL dos empréstimos do Pessoal", async () => {
+    const m = await import("./emprestimos");
+    expect(m.faltaSqlEmprestimoPessoal({ code: "PGRST202", message: "Could not find the function" })).toBe(true);
+    expect(m.faltaSqlEmprestimoPessoal({ code: "P0001", message: "Só compra num cartão da Harmonize vira empréstimo." })).toBe(true);
+    expect(m.faltaSqlEmprestimoPessoal({ code: "42703", message: "column emprestimos.scope does not exist" })).toBe(true);
+    expect(m.faltaSqlEmprestimoPessoal({ code: "P0001", message: "Informe para quem foi o empréstimo." })).toBe(false);
+    expect(m.faltaSqlEmprestimoPessoal(null)).toBe(false);
+  });
+
+  it("as categorias de empréstimo do Pessoal (mesmo nome) ficam fora do resultado", async () => {
+    const m = await import("./emprestimos");
+    expect(m.ehCategoriaDeEmprestimo("Empréstimo concedido")).toBe(true);
+    expect(m.ehCategoriaDeEmprestimo("Devolução de empréstimo")).toBe(true);
+  });
+});

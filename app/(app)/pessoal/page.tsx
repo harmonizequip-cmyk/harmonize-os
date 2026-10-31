@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, CreditCard, ListOrdered, Wallet } from "lucide-react";
+import { BarChart3, ChevronRight, CreditCard, Landmark, ListOrdered, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { foraDoSaldo } from "@/lib/cartao";
 import { buscarTodas } from "@/lib/buscar-todas";
@@ -16,6 +16,9 @@ import HeroPessoal from "@/components/pessoal/HeroPessoal";
 import RosquinhaGastos from "@/components/pessoal/RosquinhaGastos";
 import FaturasCartoes from "@/components/pessoal/FaturasCartoes";
 import OrcamentosCard from "@/components/pessoal/OrcamentosCard";
+import { carregarLembretesFatura } from "@/lib/carregar-lembrete-fatura";
+import { carregarMovimentosEmprestimo } from "@/lib/carregar-emprestimos";
+import { resumirEmprestimos } from "@/lib/emprestimos";
 
 function oneOf<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
@@ -64,6 +67,17 @@ export default async function PessoalInicioPage() {
       supabase.from("orcamentos_pessoais").select("categoria, limite"),
     ]);
 
+  // Fatura de cartão pessoal que fechou e ainda não foi importada (aviso em "Atenção").
+  // E quanto os devedores ainda devem ao Pessoal (atalho para Empréstimos pessoais).
+  // Nenhum dos dois derruba a tela: sem eles, só não aparecem.
+  const [faturasParaImportar, emprestimosPessoais] = await Promise.all([
+    carregarLembretesFatura(supabase as any, hoje)
+      .then((l) => l.filter((x) => x.scope === "pessoal"))
+      .catch(() => []),
+    carregarMovimentosEmprestimo(supabase as any, "pessoal").catch(() => ({ movimentos: [], faltaSql: false })),
+  ]);
+  const aReceberEmprestimos = resumirEmprestimos(emprestimosPessoais.movimentos).reduce((s, d) => s + Math.max(0, d.saldo), 0);
+
   // Compra no cartão só sai da conta quando a fatura é paga.
   const saldo = (todos ?? [])
     .filter((t: any) => !foraDoSaldo(t))
@@ -101,7 +115,7 @@ export default async function PessoalInicioPage() {
     : null;
   const orcamentos = ((orcRaw ?? []) as any[]).map((o) => ({ categoria: o.categoria as string, limite: Number(o.limite) }));
   const usosOrcamento = usoDosOrcamentos(orcamentos, linhas, hoje);
-  const avisos = avisosPessoais({ linhas, hoje, saldo, faturas, totalFixas, ultimoLancamento, orcamentos }).map((a) => ({
+  const avisos = avisosPessoais({ linhas, hoje, saldo, faturas, totalFixas, ultimoLancamento, orcamentos, faturasParaImportar }).map((a) => ({
     id: a.id,
     icone: a.icone,
     texto: a.texto,
@@ -142,6 +156,15 @@ export default async function PessoalInicioPage() {
           <p className="text-[15px] font-black tabular-nums text-slate-900">{formatCurrency(totalFixas)}</p>
         </div>
       </div>
+
+      <Link href="/pessoal/emprestimos" className="cartao flex items-center gap-3 px-3 py-2.5 active:bg-violet-50">
+        <Landmark size={18} className="text-amber-600" />
+        <span className="min-w-0 flex-1 text-sm font-semibold text-slate-800">Empréstimos</span>
+        <span className="text-[12.5px] tabular-nums text-slate-500">
+          {aReceberEmprestimos > 0 ? `a receber ${formatCurrency(aReceberEmprestimos)}` : "nada a receber"}
+        </span>
+        <ChevronRight size={16} className="text-slate-400" />
+      </Link>
 
       <PrecisaDeVoce
         avisos={avisos}

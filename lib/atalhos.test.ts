@@ -18,6 +18,8 @@ describe("atalhos", () => {
     expect(linkDaMovimentacao("rentals", "r1", { client_id: "c1" })).toBe("/clientes/c1?locacao=r1");
     expect(linkDaMovimentacao("rentals", "r1")).toBeNull();
     expect(linkDaMovimentacao("equipments", "x")).toBe("/equipamentos");
+    expect(linkDaMovimentacao("emprestimos", "e1")).toBe("/financeiro/emprestimos");
+    expect(linkDaMovimentacao("emprestimos", "e1", { escopo: "pessoal" })).toBe("/pessoal/emprestimos");
     expect(linkDaMovimentacao("mentoring_events", "x")).toBeNull();
     expect(linkDaMovimentacao("clients", null)).toBeNull();
   });

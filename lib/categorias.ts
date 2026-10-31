@@ -32,6 +32,8 @@ export const CATEGORIAS_DO_SISTEMA: { scope: string; type: string; name: string 
   { scope: "harmonize", type: "saida", name: "Pagamento de fatura" },
   { scope: "pessoal", type: "entrada", name: "Retirada da Harmonize" },
   { scope: "pessoal", type: "saida", name: "Pagamento de fatura" },
+  { scope: "pessoal", type: "saida", name: "Empréstimo concedido" },
+  { scope: "pessoal", type: "entrada", name: "Devolução de empréstimo" },
   { scope: "harmonize", type: "entrada", name: "Ajuste de saldo" },
   { scope: "harmonize", type: "saida", name: "Ajuste de saldo" },
   { scope: "pessoal", type: "entrada", name: "Ajuste de saldo" },
