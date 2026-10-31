@@ -29,6 +29,8 @@ import { carregarDiasLivresDoMes, carregarEncaixe } from "@/lib/carregar-encaixe
 import { montarPlanoMeta } from "@/lib/plano-meta";
 import PlanoDaMeta from "@/components/dashboard/PlanoDaMeta";
 import { filtrarAvisosOcultos } from "@/lib/avisos-dashboard";
+import { carregarLembretesFatura } from "@/lib/carregar-lembrete-fatura";
+import { diaMes, linkImportarFatura, type LembreteFatura } from "@/lib/lembrete-fatura";
 
 function formatWeekdayDate(dateStr: string) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -336,6 +338,12 @@ export default async function DashboardPage(
   const aplicadoresAlerta = (aplicadoresUso ?? [])
     .map((a) => ({ nome: a.nome as string, ...situacaoAplicador({ disparos: Number(a.disparos), garantia_disparos: Number(a.garantia_disparos) }) }))
     .filter((a) => a.situacao === "perto");
+
+  // Fatura do cartão da Harmonize fechada e ainda não importada (só cartão que já
+  // usa importação). É lembrete: se a carga falhar, o aviso só não aparece.
+  const faturasParaImportar: LembreteFatura[] = await carregarLembretesFatura(supabase as any, todayStr)
+    .then((l) => l.filter((x) => x.scope === "harmonize"))
+    .catch(() => []);
 
   // Revisão anual dos HIPROs: avisa 30 dias antes e quando venceu. Consulta
   // à parte para não derrubar nada se a coluna ainda não existir.
@@ -678,6 +686,21 @@ export default async function DashboardPage(
       texto: "Garantia de aplicador acabando",
       detalhe: aplicadoresAlerta.map((a) => `${a.nome} em ${Math.round((a.pct ?? 0) * 100)}%`).join(", "),
       href: "/equipamentos#aplicadores",
+      nivel: "atencao",
+    });
+  if (faturasParaImportar.length > 0)
+    avisos.push({
+      id: "importar-fatura",
+      icone: "fatura",
+      texto:
+        faturasParaImportar.length === 1
+          ? `Importar fatura do ${faturasParaImportar[0].nome} (fechou ${diaMes(faturasParaImportar[0].fechamento)})`
+          : `Importar fatura de ${faturasParaImportar.length} cartões`,
+      detalhe:
+        faturasParaImportar.length === 1
+          ? "Baixe o arquivo OFX no app do banco e importe"
+          : faturasParaImportar.map((f) => `${f.nome} (fechou ${diaMes(f.fechamento)})`).join(", "),
+      href: linkImportarFatura(faturasParaImportar[0]),
       nivel: "atencao",
     });
   if (cadastrosNovos && cadastrosNovos > 0)

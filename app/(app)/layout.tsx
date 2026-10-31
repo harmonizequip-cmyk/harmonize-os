@@ -10,6 +10,7 @@ import RegistrarServiceWorker from "@/components/RegistrarServiceWorker";
 import AvisosDesligadosFaixa from "@/components/AvisosDesligadosFaixa";
 import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
 import ReciboHost from "@/components/ReciboHost";
+import LembreteImportarFatura from "@/components/LembreteImportarFatura";
 import { SomenteLeituraProvider } from "@/components/SomenteLeitura";
 import EspacoSwitch from "@/components/EspacoSwitch";
 import EspacoTema from "@/components/EspacoTema";
@@ -67,6 +68,7 @@ export default async function AppLayout({
       <EspacoTema />
       <GuardarAgendaOffline />
       {!somenteLeitura && <ReciboHost />}
+      {!somenteLeitura && <LembreteImportarFatura />}
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
       <main className="min-w-0 flex-1 pb-36 md:pb-0">
         <MobileHeader />

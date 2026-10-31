@@ -102,10 +102,17 @@ export default function CartoesClient({
   const [desfazendo, setDesfazendo] = useState(false);
 
   // ?cartao=<id>&fatura=AAAA-MM (linha da fatura em Lançamentos): abre direto naquela fatura.
+  // ?importar=1 (lembrete de importar a fatura): já abre a importação desse cartão.
   useEffect(() => {
     const url = new URL(window.location.href);
     const id = url.searchParams.get("cartao");
     const alvo = url.searchParams.get("fatura");
+    if (url.searchParams.get("importar") === "1") {
+      if (!somenteLeitura && ativos.length > 0) setImportando(true);
+      // Tira o parâmetro para não reabrir a importação ao recarregar a tela.
+      url.searchParams.delete("importar");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
     const c = cartoes.find((x) => x.id === id);
     if (!c) return;
     setSelecionado(c.id);

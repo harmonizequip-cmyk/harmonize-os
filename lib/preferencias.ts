@@ -151,6 +151,7 @@ export const AVISOS_DASHBOARD: { id: string; rotulo: string; dica: string }[] = 
   { id: "relacionamento", rotulo: "Pessoas para chamar hoje", dica: "Clientes e leads na hora de uma conversa." },
   { id: "aplicadores", rotulo: "Garantia de aplicador acabando", dica: "Entre 90% e 100% da garantia." },
   { id: "cadastros", rotulo: "Cadastros novos do formulário", dica: "Conferir e liberar na Academy." },
+  { id: "importar-fatura", rotulo: "Importar fatura do cartão", dica: "Depois do fechamento, até importar o OFX." },
 ];
 
 /** Blocos do Dashboard que podem ser escondidos (o destaque do mês e "Precisa de você" ficam sempre). */
