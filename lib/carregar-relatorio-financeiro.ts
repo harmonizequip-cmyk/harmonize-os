@@ -1,9 +1,46 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { hojeLocal, type Periodo } from "@/lib/period";
 import { resumirEmprestimos, type MovimentoEmprestimo } from "@/lib/emprestimos";
-import { porCategoria, evolucaoMensal, lancamentosPorCategoria, type LinhaFinanceira } from "@/lib/relatorio-financeiro";
+import {
+  porCategoria,
+  evolucaoMensal,
+  lancamentosPorCategoria,
+  tudoQueSaiu,
+  type EmprestimoPeriodo,
+  type LinhaFinanceira,
+} from "@/lib/relatorio-financeiro";
 import type { FaturaRelatorio } from "@/components/RelatorioFinanceiro";
 import { buscarTodas } from "@/lib/buscar-todas";
+
+// Empréstimos com a origem (caixa ou cartão). Sem o SQL do empréstimo no cartão
+// (coluna origem), lê como antes: tudo vira origem manual.
+async function carregarEmprestimos(supabase: SupabaseClient): Promise<{ data: EmprestimoPeriodo[] | null }> {
+  const novo = await supabase
+    .from("emprestimos")
+    .select("id, devedor, tipo, valor, data, descricao, origem, transaction_id, transactions(cartao_id, fatura_ref)")
+    .eq("is_test", false);
+  const linhas: any[] | null = novo.error
+    ? (await supabase.from("emprestimos").select("id, devedor, tipo, valor, data, descricao, transaction_id").eq("is_test", false)).data
+    : novo.data;
+  if (!linhas) return { data: null };
+  return {
+    data: linhas.map((e) => {
+      const t = oneOf<{ cartao_id: string | null; fatura_ref: string | null }>(e.transactions);
+      return {
+        id: e.id,
+        devedor: e.devedor,
+        tipo: e.tipo,
+        valor: Number(e.valor),
+        data: e.data,
+        descricao: e.descricao,
+        origem: e.origem === "cartao" ? "cartao" : "manual",
+        semCaixa: !e.transaction_id,
+        cartaoId: t?.cartao_id ?? null,
+        faturaRef: t?.fatura_ref ?? null,
+      } satisfies EmprestimoPeriodo;
+    }),
+  };
+}
 
 function oneOf<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
@@ -29,9 +66,7 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
     ).then((data) => ({ data })),
     supabase.from("faturas_cartao").select("cartao_id, fatura_ref, vencimento, total_compras, total_pago").eq("scope", escopo).order("fatura_ref"),
     supabase.from("cartoes").select("id, nome"),
-    escopo === "harmonize"
-      ? supabase.from("emprestimos").select("id, devedor, tipo, valor, data, descricao").eq("is_test", false)
-      : Promise.resolve({ data: null }),
+    escopo === "harmonize" ? carregarEmprestimos(supabase) : Promise.resolve({ data: null }),
   ]);
   const linhas: LinhaFinanceira[] = ((linhasRaw ?? []) as any[]).map((l) => ({
     id: l.id,
@@ -58,9 +93,14 @@ export async function carregarFinanceiro(supabase: SupabaseClient, escopo: "harm
         (emprestimosRes.data as any[]).map((e) => ({ ...e, valor: Number(e.valor) })) as MovimentoEmprestimo[]
       ).map(({ devedor, concedido, devolvido, saldo }) => ({ devedor, concedido, devolvido, saldo }))
     : undefined;
+  const gastos = porCategoria(doPeriodo, "saida");
+  const saidas = emprestimosRes.data
+    ? tudoQueSaiu(gastos, emprestimosRes.data as EmprestimoPeriodo[], periodo.inicio, periodo.fim)
+    : undefined;
   return {
     hoje,
-    gastos: porCategoria(doPeriodo, "saida"),
+    gastos,
+    saidas,
     entradas: porCategoria(doPeriodo, "entrada"),
     lancamentosGastos: lancamentosPorCategoria(doPeriodo, "saida"),
     lancamentosEntradas: lancamentosPorCategoria(doPeriodo, "entrada"),

@@ -159,7 +159,7 @@ Regras das somas de Entradas/Saídas/Resultado: só scope = 'harmonize' (a não 
 "Retiradas" (saída da Harmonize) vira entrada "Retirada da Harmonize" no pessoal.
 Contas fixas: settings.despesas_fixas (lista JSON com nome, valor, tipo harmonize/pessoal).
 cartoes: id, nome, scope, dia_fechamento, dia_vencimento, limite. View faturas_cartao: cartao_id, nome, scope, fatura_ref, vencimento, fechamento, total_compras, total_pago.
-emprestimos: devedor (ex.: Laser Dream João Pessoa / Campina Grande), tipo (concedido, devolucao), valor, data, descricao. Saldo devedor = concedido - devolução por devedor.
+emprestimos: devedor (ex.: Laser Dream João Pessoa / Campina Grande), tipo (concedido, devolucao), valor, data, descricao, origem ('manual' = lançado em Empréstimos, com lançamento no caixa ou só pendência sem transaction_id; 'cartao' = parcela de compra no cartão da Harmonize que é do devedor, transaction_id = a parcela, data = vencimento da fatura), categoria_anterior. Saldo devedor = concedido - devolução por devedor. A parcela de cartão marcada fica na categoria 'Empréstimo concedido' (fora das despesas e do resultado). Tudo que saiu da conta no período = despesas do resultado + empréstimos concedidos (caixa e cartão), sem pagamento de fatura (as compras já contam pelo vencimento).
 expense_limits: category_id, scope, month_limit.
 
 ## Tarefas

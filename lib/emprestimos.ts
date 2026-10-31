@@ -38,6 +38,29 @@ export function tituloEmprestimo(todos: string[] = DEVEDORES_SUGERIDOS): string 
   return prefixo === "Laser Dream" ? "Empréstimo para a Laser Dream" : `Empréstimo para ${prefixo}`;
 }
 
+/** Nome comum a todos os devedores, com cara de título ("Laser Dream"); vazio se não houver. */
+export function grupoDevedores(todos: string[] = DEVEDORES_SUGERIDOS): string {
+  return palavrasDe(todos[0] ?? "").slice(0, palavrasComuns(todos)).map(titulo).join(" ");
+}
+
+/** Selo curto: prefixo comum mais as iniciais do resto ("LASER DREAM JP"). */
+export function siglaDevedor(nome: string, todos: string[] = DEVEDORES_SUGERIDOS): string {
+  const palavras = palavrasDe(nome);
+  const comum = palavrasComuns(Array.from(new Set([...todos, nome])));
+  const resto = palavras.slice(comum);
+  if (comum === 0 || resto.length === 0) return nome;
+  return [...palavras.slice(0, comum), resto.map((p) => p.charAt(0)).join("")].join(" ");
+}
+
+/** De onde veio o empréstimo: lançado à mão (caixa ou só pendência) ou parcela de compra no cartão. */
+export type OrigemEmprestimo = "manual" | "cartao";
+
+/** Endereço da fatura onde está a parcela (empréstimo de origem cartão). */
+export function linkFaturaDoEmprestimo(cartaoId: string | null | undefined, faturaRef: string | null | undefined): string {
+  if (!cartaoId) return "/financeiro/cartoes";
+  return `/financeiro/cartoes?cartao=${cartaoId}${faturaRef ? `&fatura=${faturaRef}` : ""}`;
+}
+
 export interface MovimentoEmprestimo {
   id: string;
   devedor: string;
@@ -48,6 +71,10 @@ export interface MovimentoEmprestimo {
   forma?: string | null;
   /** Só a pendência: sem lançamento no caixa (empréstimo antigo). */
   semCaixa?: boolean;
+  /** Parcela de compra no cartão da Harmonize (desfaz no cartão, não aqui). */
+  origem?: OrigemEmprestimo;
+  cartaoId?: string | null;
+  faturaRef?: string | null;
 }
 
 export interface ResumoDevedor {

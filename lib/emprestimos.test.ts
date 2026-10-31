@@ -40,3 +40,15 @@ describe("devedores configuráveis", () => {
     expect(m.tituloEmprestimo([])).toBe("Empréstimo");
   });
 });
+
+describe("selo e grupo dos devedores", () => {
+  it("sigla curta e nome do grupo", async () => {
+    const m = await import("./emprestimos");
+    expect(m.siglaDevedor("LASER DREAM JOÃO PESSOA")).toBe("LASER DREAM JP");
+    expect(m.siglaDevedor("LASER DREAM CAMPINA GRANDE")).toBe("LASER DREAM CG");
+    expect(m.siglaDevedor("FULANO")).toBe("FULANO");
+    expect(m.grupoDevedores()).toBe("Laser Dream");
+    expect(m.linkFaturaDoEmprestimo("c1", "2026-11")).toBe("/financeiro/cartoes?cartao=c1&fatura=2026-11");
+    expect(m.linkFaturaDoEmprestimo(null, null)).toBe("/financeiro/cartoes");
+  });
+});

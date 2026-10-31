@@ -9,7 +9,9 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { rotuloFatura } from "@/lib/cartao";
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { CategoriaSoma, ItemLancamento, MesResumo } from "@/lib/relatorio-financeiro";
+import type { CategoriaSoma, ItemLancamento, MesResumo, TudoQueSaiu } from "@/lib/relatorio-financeiro";
+import { usePreferencias } from "@/lib/usar-preferencias";
+import { grupoDevedores, linkFaturaDoEmprestimo, rotuloDevedor } from "@/lib/emprestimos";
 
 export interface FaturaRelatorio {
   cartao: string;
@@ -113,6 +115,92 @@ function Barras({
   );
 }
 
+/** Despesas + empréstimos do período: tudo que saiu da conta da Harmonize. */
+function TudoQueSaiuQuadro({ saidas, rotuloPeriodo }: { saidas: TudoQueSaiu; rotuloPeriodo: string }) {
+  const [aberto, setAberto] = useState(false);
+  const sugeridos = usePreferencias().listas.devedores;
+  const devedores = Array.from(new Set([...sugeridos, ...saidas.porDevedor.map((d) => d.devedor)]));
+  const grupo = grupoDevedores(devedores);
+  const rotuloEmprestimos = grupo ? `Empréstimos à ${grupo}` : "Empréstimos";
+  const curto = (nome: string) => rotuloDevedor(nome, devedores) || nome;
+  return (
+    <Cartao
+      titulo={`Tudo que saiu da conta (${rotuloPeriodo})`}
+      dica="Despesas mais o que foi emprestado. O resultado e o lucro continuam sem empréstimo, porque esse dinheiro volta."
+    >
+      <div className="space-y-1 text-xs">
+        <div className="flex items-baseline justify-between gap-2 py-1">
+          <span className="text-neutral-700">Despesas</span>
+          <span className="font-medium text-neutral-900">{formatCurrency(saidas.despesas)}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAberto((a) => !a)}
+          aria-expanded={aberto}
+          className="-mx-2 flex w-[calc(100%+1rem)] items-baseline justify-between gap-2 rounded-xl px-2 py-1 text-left active:bg-neutral-100"
+        >
+          <span className="flex min-w-0 items-center gap-1 text-neutral-700">
+            <ChevronDown size={14} className={`shrink-0 text-neutral-400 transition ${aberto ? "rotate-180" : "-rotate-90"}`} />
+            <span className="truncate">{rotuloEmprestimos}</span>
+            <span className="shrink-0 text-[10.5px] text-neutral-400">({saidas.lancamentos.length})</span>
+          </span>
+          <span className="shrink-0 font-medium text-neutral-900">{formatCurrency(saidas.emprestimos)}</span>
+        </button>
+        {saidas.porDevedor.map((d) => (
+          <div key={d.devedor} className="flex items-baseline justify-between gap-2 pl-5 text-[11px] text-neutral-500">
+            <span className="min-w-0 truncate">
+              {curto(d.devedor)}
+              <span className="text-neutral-400">
+                {" "}
+                · caixa {formatCurrency(d.caixa)} · cartão {formatCurrency(d.cartao)}
+              </span>
+            </span>
+            <span className="shrink-0">{formatCurrency(d.total)}</span>
+          </div>
+        ))}
+        {aberto && (
+          <ul className="mb-2 ml-2 mt-1 max-h-80 divide-y divide-neutral-200/70 overflow-y-auto rounded-xl bg-neutral-50 px-3">
+            {saidas.lancamentos.length === 0 && <li className="py-2 text-xs text-neutral-400">Nenhum empréstimo no período.</li>}
+            {saidas.lancamentos.map((e) => (
+              <li key={e.id}>
+                <Link
+                  href={e.origem === "cartao" ? linkFaturaDoEmprestimo(e.cartaoId, e.faturaRef) : "/financeiro/emprestimos"}
+                  className="flex items-center gap-3 py-2 text-xs active:opacity-60"
+                >
+                  <span className="w-10 shrink-0 text-neutral-400">{formatDate(e.data).slice(0, 5)}</span>
+                  <span className="min-w-0 flex-1 truncate text-neutral-800">
+                    {e.descricao || curto(e.devedor)}
+                    <span className="ml-1 text-neutral-400">({e.origem === "cartao" ? "cartão" : "caixa"})</span>
+                  </span>
+                  <span className="shrink-0 font-semibold text-neutral-900">{formatCurrency(e.valor)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex items-baseline justify-between gap-2 border-t border-neutral-200/70 pt-2 text-sm">
+          <span className="font-semibold text-neutral-900">Total que saiu</span>
+          <span className="font-semibold text-brand-pink">{formatCurrency(saidas.total)}</span>
+        </div>
+        {saidas.devolvido > 0 && (
+          <div className="flex items-baseline justify-between gap-2 pt-1 text-[11px] text-neutral-500">
+            <span>Devoluções recebidas no período (não abatem o total)</span>
+            <span className="shrink-0 font-medium text-brand-teal">{formatCurrency(saidas.devolvido)}</span>
+          </div>
+        )}
+      </div>
+      <p className="mt-2 text-[11px] text-neutral-400">
+        Compras no cartão contam no mês em que a fatura vence, nas despesas ou nos empréstimos. O pagamento da fatura não entra, para não
+        contar duas vezes.
+        {saidas.soPendencia > 0 && ` Empréstimos lançados só como pendência (${formatCurrency(saidas.soPendencia)}) ficam fora do total.`}
+      </p>
+      <Link href="/financeiro/emprestimos" className="mt-1 block text-[11px] text-brand-teal underline">
+        Abrir Empréstimos
+      </Link>
+    </Cartao>
+  );
+}
+
 export default function RelatorioFinanceiro({
   escopo,
   rotuloPeriodo,
@@ -124,6 +212,7 @@ export default function RelatorioFinanceiro({
   faturas,
   hoje,
   emprestimos,
+  saidas,
 }: {
   escopo: "harmonize" | "pessoal";
   rotuloPeriodo: string;
@@ -135,6 +224,7 @@ export default function RelatorioFinanceiro({
   faturas: FaturaRelatorio[];
   hoje: string;
   emprestimos?: EmprestimoRelatorio[];
+  saidas?: TudoQueSaiu;
 }) {
   // Meses do começo sem movimento nenhum (antes de usar o app) ficam de fora.
   const primeiro = evolucao.findIndex((m) => m.entradas > 0 || m.saidas > 0);
@@ -150,7 +240,9 @@ export default function RelatorioFinanceiro({
 
   return (
     <div className="space-y-4">
-      <Cartao titulo={`Para onde foi o dinheiro (${rotuloPeriodo})`} dica="Gastos por categoria. Empréstimo e pagamento de fatura ficam fora (a compra no cartão já conta).">
+      {escopo === "harmonize" && saidas && <TudoQueSaiuQuadro saidas={saidas} rotuloPeriodo={rotuloPeriodo} />}
+
+      <Cartao titulo={`Para onde foi o dinheiro (${rotuloPeriodo})`} dica="Gastos por categoria. Empréstimo (também a compra no cartão marcada como empréstimo) e pagamento de fatura ficam fora (a compra no cartão já conta).">
         <Barras itens={gastos} cor="bg-brand-pink" detalhes={lancamentosGastos} hrefLancamento={hrefLancamento} />
       </Cartao>
 

@@ -97,3 +97,99 @@ export function evolucaoMensal(linhas: LinhaFinanceira[], hoje: string, meses = 
   }
   return lista.map((x) => ({ ...x, entradas: r2(x.entradas), saidas: r2(x.saidas), resultado: r2(x.entradas - x.saidas) }));
 }
+
+// ------------------------------------------------------------
+// "Tudo que saiu da conta" (Relatório da Harmonize, pedido do dono 31/10/2026):
+// despesas do resultado + empréstimos concedidos no período. Resultado e lucro
+// continuam sem empréstimo; este quadro só junta para mostrar tudo que saiu.
+// Pagamento de fatura não entra: as compras do cartão já estão nas despesas
+// (ou nos empréstimos, quando a compra é da Laser Dream), pela data do vencimento.
+// ------------------------------------------------------------
+
+export interface EmprestimoPeriodo {
+  id: string;
+  devedor: string;
+  tipo: "concedido" | "devolucao";
+  valor: number;
+  data: string;
+  descricao: string | null;
+  origem: "manual" | "cartao";
+  /** Só a pendência (sem lançamento no caixa): não saiu da conta pelo app, fica fora do total. */
+  semCaixa: boolean;
+  cartaoId?: string | null;
+  faturaRef?: string | null;
+}
+
+export interface SaidaPorDevedor {
+  devedor: string;
+  caixa: number;
+  cartao: number;
+  total: number;
+}
+
+export interface TudoQueSaiu {
+  despesas: number;
+  emprestimos: number;
+  emprestimosCaixa: number;
+  emprestimosCartao: number;
+  total: number;
+  porDevedor: SaidaPorDevedor[];
+  /** Empréstimos concedidos do período que entraram no total, do mais recente ao mais antigo. */
+  lancamentos: EmprestimoPeriodo[];
+  /** Devoluções recebidas no período (informativo, não abate o total). */
+  devolvido: number;
+  /** Empréstimos "só pendência" com data no período (não entram no total). */
+  soPendencia: number;
+}
+
+export function tudoQueSaiu(
+  gastos: CategoriaSoma[],
+  emprestimos: EmprestimoPeriodo[],
+  inicio: string,
+  fim: string
+): TudoQueSaiu {
+  const despesas = r2(gastos.reduce((s, g) => s + Number(g.total), 0));
+  const doPeriodo = emprestimos.filter((e) => e.data >= inicio && e.data <= fim);
+  const mapa = new Map<string, SaidaPorDevedor>();
+  let caixa = 0;
+  let cartao = 0;
+  let devolvido = 0;
+  let soPendencia = 0;
+  const lancamentos: EmprestimoPeriodo[] = [];
+  for (const e of doPeriodo) {
+    const v = Number(e.valor);
+    if (e.tipo === "devolucao") {
+      devolvido += v;
+      continue;
+    }
+    if (e.origem !== "cartao" && e.semCaixa) {
+      soPendencia += v;
+      continue;
+    }
+    const d = mapa.get(e.devedor) ?? { devedor: e.devedor, caixa: 0, cartao: 0, total: 0 };
+    if (e.origem === "cartao") {
+      d.cartao += v;
+      cartao += v;
+    } else {
+      d.caixa += v;
+      caixa += v;
+    }
+    d.total += v;
+    mapa.set(e.devedor, d);
+    lancamentos.push(e);
+  }
+  const emprestimosTotal = r2(caixa + cartao);
+  return {
+    despesas,
+    emprestimos: emprestimosTotal,
+    emprestimosCaixa: r2(caixa),
+    emprestimosCartao: r2(cartao),
+    total: r2(despesas + emprestimosTotal),
+    porDevedor: Array.from(mapa.values())
+      .map((d) => ({ ...d, caixa: r2(d.caixa), cartao: r2(d.cartao), total: r2(d.total) }))
+      .sort((a, b) => b.total - a.total || a.devedor.localeCompare(b.devedor)),
+    lancamentos: lancamentos.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : b.valor - a.valor)),
+    devolvido: r2(devolvido),
+    soPendencia: r2(soPendencia),
+  };
+}

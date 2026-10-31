@@ -224,6 +224,12 @@ export default function FinanceiroClient({
       return;
     }
     if (ehCategoriaDeEmprestimo(t.categories?.name)) {
+      // Compra no cartão marcada como empréstimo: desfaz ou muda na fatura dela.
+      const c = t as any;
+      if (c.cartao_mov === "compra" && c.cartao_id && c.fatura_ref) {
+        router.push(linkFatura(pessoal ? "pessoal" : "harmonize", c.cartao_id, c.fatura_ref));
+        return;
+      }
       router.push("/financeiro/emprestimos");
       return;
     }

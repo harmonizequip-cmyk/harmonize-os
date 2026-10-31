@@ -5,6 +5,7 @@
 // que a fatura vence; o pagamento da fatura tira o dinheiro e fica fora do resultado.
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, CreditCard } from "lucide-react";
@@ -16,7 +17,9 @@ import { faturaDaCompra, rotuloFatura, somarMesesRef } from "@/lib/cartao";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { Atalho } from "@/components/Atalhos";
 import { linkLancamento } from "@/lib/atalhos";
-import { confirmar } from "@/components/Dialogos";
+import { confirmar, avisar } from "@/components/Dialogos";
+import { usePreferencias } from "@/lib/usar-preferencias";
+import { grupoDevedores, rotuloDevedor, siglaDevedor } from "@/lib/emprestimos";
 import ImportarFaturaModal from "@/components/ImportarFaturaModal";
 import DesfazerImportacaoModal from "@/components/DesfazerImportacaoModal";
 
@@ -48,8 +51,16 @@ interface Compra {
   data_compra: string | null;
   cartao_mov: "compra" | "pagamento";
   compra_grupo: string | null;
+  parcela_num: number | null;
+  parcelas_total: number | null;
   categoria: string | null;
 }
+
+/** Erro de função que ainda não existe no banco (SQL não rodado). */
+function faltaSqlEmprestimo(error: { code?: string; message?: string }): boolean {
+  return error.code === "PGRST202" || error.code === "42883" || /could not find the function|does not exist/i.test(error.message ?? "");
+}
+const MSG_FALTA_SQL = "Falta rodar o SQL do empréstimo no cartão.";
 
 const FORMAS = [
   { value: "pix", label: "PIX" },
@@ -100,6 +111,18 @@ export default function CartoesClient({
   const [erro, setErro] = useState<string | null>(null);
   const [importando, setImportando] = useState(false);
   const [desfazendo, setDesfazendo] = useState(false);
+  // Compra da Harmonize que é de um devedor (Laser Dream) vira empréstimo, parcela a parcela.
+  const sugeridos = usePreferencias().listas.devedores;
+  const [emprestimoDe, setEmprestimoDe] = useState<Map<string, string>>(new Map());
+  const [marcando, setMarcando] = useState<Compra | null>(null);
+  const [devedorEscolhido, setDevedorEscolhido] = useState("");
+  const [todasParcelas, setTodasParcelas] = useState(true);
+  const [salvandoEmp, setSalvandoEmp] = useState(false);
+  const [recarregar, setRecarregar] = useState(0);
+  const devedores = Array.from(new Set([...sugeridos, ...emprestimoDe.values()]));
+  const grupo = grupoDevedores(devedores);
+  const rotuloAcao = grupo ? `é da ${grupo}` : "é empréstimo";
+  const rotuloDesfazer = grupo ? `Não é da ${grupo}` : "Não é empréstimo";
 
   // ?cartao=<id>&fatura=AAAA-MM (linha da fatura em Lançamentos): abre direto naquela fatura.
   // ?importar=1 (lembrete de importar a fatura): já abre a importação desse cartão.
@@ -138,24 +161,35 @@ export default function CartoesClient({
     setCarregando(true);
     supabase
       .from("transactions")
-      .select("id, description, amount, date, data_compra, cartao_mov, compra_grupo, categories(name)")
+      .select("id, description, amount, date, data_compra, cartao_mov, compra_grupo, parcela_num, parcelas_total, categories(name)")
       .eq("cartao_id", selecionado)
       .eq("fatura_ref", ref)
       .eq("is_test", false)
       .order("data_compra", { nullsFirst: false })
       .order("date")
-      .then(({ data }) => {
-        setCompras(
-          ((data ?? []) as any[]).map((t) => ({
-            ...t,
-            amount: Number(t.amount),
-            categoria: (Array.isArray(t.categories) ? t.categories[0] : t.categories)?.name ?? null,
-          }))
-        );
+      .then(async ({ data }) => {
+        const lista = ((data ?? []) as any[]).map((t) => ({
+          ...t,
+          amount: Number(t.amount),
+          categoria: (Array.isArray(t.categories) ? t.categories[0] : t.categories)?.name ?? null,
+        })) as Compra[];
+        // Quais compras desta fatura já viraram empréstimo (sem o SQL rodado, nenhuma).
+        const mapa = new Map<string, string>();
+        const ids = lista.filter((c) => c.cartao_mov === "compra").map((c) => c.id);
+        if (escopo === "harmonize" && ids.length > 0) {
+          const { data: emp } = await supabase
+            .from("emprestimos")
+            .select("transaction_id, devedor")
+            .eq("origem", "cartao")
+            .in("transaction_id", ids);
+          for (const e of (emp ?? []) as { transaction_id: string; devedor: string }[]) mapa.set(e.transaction_id, e.devedor);
+        }
+        setCompras(lista);
+        setEmprestimoDe(mapa);
         setCarregando(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selecionado, ref]);
+  }, [selecionado, ref, recarregar]);
 
   // Limite usado: tudo que foi comprado e ainda não foi pago, em todas as faturas.
   const usadoPorCartao = useMemo(() => {
@@ -188,10 +222,56 @@ export default function CartoesClient({
 
   async function excluirCompra(c: Compra) {
     if (!c.compra_grupo) return;
-    if (!(await confirmar({ titulo: `Apagar a compra "${c.description.replace(/ \(\d+\/\d+\)$/, "")}"?`, texto: "Todas as parcelas são apagadas.", confirmar: "Apagar", perigo: true }))) return;
+    if (!(await confirmar({ titulo: `Apagar a compra "${c.description.replace(/ \(\d+\/\d+\)$/, "")}"?`, texto: emprestimoDe.has(c.id) ? "Todas as parcelas são apagadas, e o empréstimo ligado a elas sai junto." : "Todas as parcelas são apagadas.", confirmar: "Apagar", perigo: true }))) return;
     setErro(null);
     const { error } = await supabase.rpc("excluir_compra_cartao", { p_compra_grupo: c.compra_grupo });
     if (error) return setErro(error.message || "Não consegui apagar.");
+    router.refresh();
+  }
+
+  function abrirMarcar(c: Compra) {
+    setErro(null);
+    setMarcando(c);
+    setDevedorEscolhido(devedores[0] ?? "");
+    setTodasParcelas(true);
+  }
+
+  async function marcarEmprestimo() {
+    if (!marcando || !devedorEscolhido) return;
+    setSalvandoEmp(true);
+    const { data, error } = await supabase.rpc("marcar_compra_emprestimo", {
+      p_transaction_id: marcando.id,
+      p_devedor: devedorEscolhido,
+      p_todas_parcelas: todasParcelas,
+    });
+    setSalvandoEmp(false);
+    if (error) {
+      avisar(faltaSqlEmprestimo(error) ? MSG_FALTA_SQL : error.message || "Não consegui marcar.", "erro");
+      return;
+    }
+    setMarcando(null);
+    const n = Number(data ?? 0);
+    avisar(n > 1 ? `${n} parcelas viraram empréstimo para ${devedorEscolhido}.` : `Virou empréstimo para ${devedorEscolhido}.`);
+    setRecarregar((r) => r + 1);
+    router.refresh();
+  }
+
+  async function desmarcarEmprestimo(c: Compra) {
+    const varias = !!c.compra_grupo && (c.parcelas_total ?? 1) > 1;
+    const ok = await confirmar({
+      titulo: `${rotuloDesfazer}?`,
+      texto: varias
+        ? "Todas as parcelas desta compra deixam de ser empréstimo e voltam para a categoria de antes (contam de novo como despesa da Harmonize)."
+        : "A compra deixa de ser empréstimo e volta para a categoria de antes (conta de novo como despesa da Harmonize).",
+      confirmar: rotuloDesfazer,
+    });
+    if (!ok) return;
+    const { error } = await supabase.rpc("desmarcar_compra_emprestimo", { p_transaction_id: c.id, p_todas_parcelas: true });
+    if (error) {
+      avisar(faltaSqlEmprestimo(error) ? MSG_FALTA_SQL : error.message || "Não consegui desfazer.", "erro");
+      return;
+    }
+    setRecarregar((r) => r + 1);
     router.refresh();
   }
 
@@ -426,14 +506,37 @@ export default function CartoesClient({
               <p className="mt-2 text-xs text-neutral-400">Nada nesta fatura.</p>
             ) : (
               <ul className="mt-2 divide-y divide-neutral-200/70">
-                {compras.map((c) => (
+                {compras.map((c) => {
+                  const devedorEmp = emprestimoDe.get(c.id);
+                  return (
                   <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-xs">
                     <span className="min-w-0">
                       <span className="block truncate text-neutral-800">{c.description}</span>
                       <span className="text-[11px] text-neutral-400">
                         {formatDate(c.data_compra ?? c.date)}
-                        {c.categoria ? ` · ${c.categoria}` : ""}
+                        {c.categoria && !devedorEmp ? ` · ${c.categoria}` : ""}
                       </span>
+                      {devedorEmp && (
+                        <span className="mt-0.5 block">
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            Empréstimo · {siglaDevedor(devedorEmp, devedores)}
+                          </span>
+                          {!somenteLeitura && (
+                            <button
+                              type="button"
+                              onClick={() => desmarcarEmprestimo(c)}
+                              className="ml-2 text-[11px] text-neutral-500 underline"
+                            >
+                              {rotuloDesfazer}
+                            </button>
+                          )}
+                        </span>
+                      )}
+                      {!devedorEmp && !somenteLeitura && escopo === "harmonize" && cartao.scope === "harmonize" && c.cartao_mov === "compra" && (
+                        <button type="button" onClick={() => abrirMarcar(c)} className="mt-0.5 block text-[11px] text-brand-teal underline">
+                          {rotuloAcao.charAt(0).toUpperCase() + rotuloAcao.slice(1)}
+                        </button>
+                      )}
                     </span>
                     <span className="flex flex-shrink-0 items-center gap-2">
                       <span className={`font-medium ${c.cartao_mov === "pagamento" ? "text-brand-teal" : "text-neutral-800"}`}>
@@ -455,7 +558,8 @@ export default function CartoesClient({
                       )}
                     </span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -481,6 +585,64 @@ export default function CartoesClient({
       )}
 
       {erro && <p className="text-xs text-red-600">{erro}</p>}
+
+      {marcando &&
+        createPortal(
+          <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setMarcando(null)}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-3xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-base font-bold text-neutral-900">Esta compra {rotuloAcao}?</p>
+              <p className="mt-1 truncate text-sm text-neutral-700">
+                {marcando.description.replace(/ \(\d+\/\d+\)$/, "")} · {formatCurrency(marcando.amount)}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                Cada parcela vira um empréstimo no mês em que a fatura dela vence. Sai das despesas e do resultado da Harmonize e entra
+                em Empréstimos, como dinheiro que volta. A compra continua na fatura do cartão.
+              </p>
+              <p className="mb-1 mt-4 text-xs font-medium text-neutral-600">Para quem</p>
+              <div className="space-y-1.5">
+                {devedores.map((d) => (
+                  <label key={d} className="flex items-center gap-2 rounded-xl border border-neutral-200 p-2.5 text-sm text-neutral-800">
+                    <input type="radio" name="devedor-emprestimo" checked={devedorEscolhido === d} onChange={() => setDevedorEscolhido(d)} />
+                    {rotuloDevedor(d, devedores) || d}
+                  </label>
+                ))}
+                {devedores.length === 0 && (
+                  <p className="text-xs text-neutral-500">Cadastre os devedores em Configurações &gt; Listas.</p>
+                )}
+              </div>
+              {(marcando.parcelas_total ?? 1) > 1 && marcando.compra_grupo && (
+                <label className="mt-3 flex items-start gap-2 rounded-xl border border-neutral-200 p-2.5 text-sm text-neutral-700">
+                  <input type="checkbox" checked={todasParcelas} onChange={(e) => setTodasParcelas(e.target.checked)} className="mt-0.5 h-4 w-4" />
+                  <span>
+                    Todas as {marcando.parcelas_total} parcelas
+                    <span className="block text-[11px] text-neutral-400">
+                      Desmarcado, só esta parcela ({marcando.parcela_num}/{marcando.parcelas_total}) vira empréstimo.
+                    </span>
+                  </span>
+                </label>
+              )}
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setMarcando(null)} className="rounded-xl border border-neutral-300 py-2.5 text-sm text-neutral-600">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={salvandoEmp || !devedorEscolhido}
+                  onClick={marcarEmprestimo}
+                  className="rounded-xl bg-brand-teal py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                >
+                  {salvandoEmp ? "Salvando..." : "Virar empréstimo"}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {desfazendo && cartao && (
         <DesfazerImportacaoModal

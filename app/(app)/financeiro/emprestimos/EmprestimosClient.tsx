@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { hojeLocal } from "@/lib/period";
 import { valorParaNumero } from "@/lib/valor";
-import type { ResumoDevedor, MovimentoEmprestimo } from "@/lib/emprestimos";
+import { linkFaturaDoEmprestimo, type ResumoDevedor, type MovimentoEmprestimo } from "@/lib/emprestimos";
 import { usePreferencias } from "@/lib/usar-preferencias";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { confirmar, avisar } from "@/components/Dialogos";
@@ -56,7 +56,22 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
     setErro(null);
   }
 
+  // Parcela de compra no cartão: valor e data vêm da fatura; desfaz no cartão.
+  async function abrirDoCartao(m: MovimentoEmprestimo) {
+    const ok = await confirmar({
+      titulo: "Este empréstimo é uma compra no cartão",
+      texto:
+        "Valor e data vêm da fatura (conta no mês em que ela vence). Para mudar ou desfazer, abra a compra em Cartões e toque em \"Não é da Laser Dream\".",
+      confirmar: "Abrir no cartão",
+    });
+    if (ok) router.push(linkFaturaDoEmprestimo(m.cartaoId, m.faturaRef));
+  }
+
   function abrirEdicao(m: MovimentoEmprestimo) {
+    if (m.origem === "cartao") {
+      void abrirDoCartao(m);
+      return;
+    }
     if (somenteLeitura) return;
     setForm({ tipo: m.tipo, devedor: m.devedor, editId: m.id });
     setValor(String(m.valor).replace(".", ","));
@@ -156,7 +171,8 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
         <p className="mt-0.5 text-2xl font-semibold text-amber-600">{formatCurrency(totalAReceber)}</p>
         <p className="mt-1 text-xs text-neutral-500">
           Empréstimo sai do caixa, mas não é despesa: fica fora do Resultado, do quadro &quot;Este mês&quot; e dos
-          relatórios. A devolução também não conta como faturamento.
+          relatórios. A devolução também não conta como faturamento. Compra no cartão da Harmonize que é de um devedor entra aqui
+          (selo &quot;cartão&quot;), uma linha por parcela, no mês em que a fatura vence: marque em Cartões.
         </p>
       </div>
 
@@ -209,15 +225,22 @@ export default function EmprestimosClient({ devedores }: { devedores: ResumoDeve
                 <button type="button" onClick={() => abrirEdicao(m)} className="min-w-0 text-left text-neutral-600 underline-offset-2 hover:underline">
                   {formatDate(m.data)} · {m.tipo === "concedido" ? "Emprestado" : "Devolvido"}
                   {m.descricao ? ` · ${m.descricao}` : ""}
-                  {m.semCaixa && <span className="ml-1 text-neutral-400">(só pendência)</span>}
-                  {!somenteLeitura && <span className="ml-1 text-brand-teal">editar</span>}
+                  {m.origem === "cartao" && (
+                    <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">cartão</span>
+                  )}
+                  {m.semCaixa && m.origem !== "cartao" && <span className="ml-1 text-neutral-400">(só pendência)</span>}
+                  {m.origem === "cartao" ? (
+                    <span className="ml-1 text-brand-teal">ver no cartão</span>
+                  ) : (
+                    !somenteLeitura && <span className="ml-1 text-brand-teal">editar</span>
+                  )}
                 </button>
                 <span className="flex items-center gap-2 whitespace-nowrap">
                   <span className={m.tipo === "concedido" ? "font-medium text-brand-pink" : "font-medium text-brand-teal"}>
                     {m.tipo === "concedido" ? "-" : "+"}
                     {formatCurrency(m.valor)}
                   </span>
-                  {!somenteLeitura && <button
+                  {!somenteLeitura && m.origem !== "cartao" && <button
                     onClick={() =>
                       remover(m.id, `${m.tipo === "concedido" ? "Empréstimo" : "Devolução"} de ${formatCurrency(m.valor)} em ${formatDate(m.data)}`)
                     }
