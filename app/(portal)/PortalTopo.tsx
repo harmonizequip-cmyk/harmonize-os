@@ -4,12 +4,14 @@ import { useState } from "react";
 import { problemaSenha, REGRA_SENHA } from "@/lib/senha";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { KeyRound, LogOut } from "lucide-react";
+import { KeyRound, LogOut, UsersRound, X } from "lucide-react";
+import ProfissionaisCliente from "@/components/planejador/ProfissionaisCliente";
 
-export default function PortalTopo({ nome }: { nome: string }) {
+export default function PortalTopo({ nome, clienteId }: { nome: string; clienteId?: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const [trocando, setTrocando] = useState(false);
+  const [equipe, setEquipe] = useState(false);
   const [senha, setSenha] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -39,6 +41,11 @@ export default function PortalTopo({ nome }: { nome: string }) {
           <span className="truncate text-xs text-neutral-500">Planejador · {nome}</span>
         </div>
         <div className="flex flex-shrink-0 items-center gap-3 text-neutral-500">
+          {clienteId && (
+            <button onClick={() => setEquipe((v) => !v)} aria-label="Profissionais da clínica" title="Profissionais da clínica" className="inline-flex items-center gap-1 text-xs font-semibold hover:text-brand-teal-dark">
+              <UsersRound size={17} /> <span className="hidden sm:inline">Profissionais</span>
+            </button>
+          )}
           <button onClick={() => setTrocando((v) => !v)} aria-label="Trocar senha" className="hover:text-brand-teal-dark">
             <KeyRound size={17} />
           </button>
@@ -47,6 +54,17 @@ export default function PortalTopo({ nome }: { nome: string }) {
           </button>
         </div>
       </div>
+      {equipe && clienteId && (
+        <div className="mx-auto max-w-6xl px-4 pb-3 md:px-8">
+          <div className="relative rounded-2xl border border-neutral-200 bg-white p-4">
+            <button onClick={() => setEquipe(false)} aria-label="Fechar" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+              <X size={15} />
+            </button>
+            <ProfissionaisCliente clienteId={clienteId} portal semMoldura />
+            <p className="mt-2 text-[11px] text-neutral-500">Quem você cadastrar aqui aparece para escolher no campo Profissional do planejamento.</p>
+          </div>
+        </div>
+      )}
       {(trocando || aviso) && (
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pb-2.5 md:px-8">
           {trocando && (

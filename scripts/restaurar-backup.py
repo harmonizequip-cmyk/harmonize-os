@@ -29,7 +29,8 @@ ORDEM = [
     "client_tags", "calendar_events", "rentals", "rental_payments", "transactions",
     "emprestimos", "mentoring_events", "expense_limits", "tasks",
     "contratos_emitidos", "movimentacoes", "creditos_cliente", "locacao_contagens",
-    "reserva_contagens", "pacientes", "planejamentos", "paciente_fotos",
+    "reserva_contagens", "pacientes", "profissionais", "planejamentos", "paciente_fotos",
+    "assinaturas_sessao",
     "convites_cadastro", "cadastros_recebidos", "agenda_envios", "orcamentos_pessoais", "insights",
     "assistente_memoria", "cliente_anotacoes", "campanhas", "campanha_envios",
 ]

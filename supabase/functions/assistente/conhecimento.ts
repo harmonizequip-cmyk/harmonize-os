@@ -170,7 +170,9 @@ Atrasada = pendente e due_date < hoje.
 mentoring_events: mentee_name, date, time_start, value, payment_method, notes. Na agenda: event_type = 'mentoria' ou is_mentoria.
 
 ## Planejamentos (Planejador HIPRO)
-planejamentos: id, client_id, calendar_event_id, paciente, data, data_retorno, procedimento, saldo_total, total_disparos, estado (jsonb do planejador: queixa, obs, DATA com as linhas por área), updated_at.
+planejamentos: id, client_id, calendar_event_id, paciente, paciente_id, data, data_retorno, procedimento, saldo_total, total_disparos, estado (jsonb do planejador: queixa, obs, profissional (nome), profissionalId, profissionalRegistro, DATA com as linhas por área), updated_at.
+profissionais: id, client_id, nome, registro (ex.: CRBM 1234), ativo. As profissionais de cada clínica que atendem os pacientes; o planejamento guarda o nome em estado->>'profissional' e o id em estado->>'profissionalId'.
+assinaturas_sessao: planejamento_id, sessao, papel (paciente, profissional), nome, registro, assinada_em, conteudo_hash. Sessão assinada pelo paciente e pela profissional no celular do dono (só ele vê).
 
 ## Outros
 bloqueios_equipamento: equipment_id, tipo (manutencao, recesso, outro), motivo, data_inicio, data_fim (inclusivas). Dia bloqueado = ocupado.

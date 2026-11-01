@@ -449,6 +449,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `CustoDisparos.tsx`: Painel de custos de disparos do planejador (`CustoDisparos`): multiplica disparos por 0,12, 0,10 e 0,07 e gera imagem. Não acessa o banco.
 - `FichaPaciente.tsx`: Ficha do paciente do Planejador (`FichaPaciente`, tela cheia): saldo de disparos para usar com "Continuar", números, "Novo planejamento" já com o paciente, dados do cadastro (`salvar_paciente`), os planejamentos dele (HIPRO Day, procedimento, disparos, selo Pendente/Concluído e as sessões de cada um) com "Selecionar para apagar" (apaga só os escolhidos por `excluir_planejamento`, depois de escrever APAGAR) e "Mais opções" para juntar cadastro repetido (`juntar_pacientes`) ou excluir cadastro sem planejamento (`excluir_paciente`). Lê `planejamentos`.
 - `FotosPaciente.tsx`: Seção Fotos da ficha do paciente (piloto só do dono): autorização do paciente, envio por etapa e área corporal, grade de miniaturas com `loading="lazy"`, visualizador com anterior/próxima e Apagar foto, e Comparar duas etapas lado a lado.
+- `AssinaturasSessoes.tsx`: Assinaturas por sessão (só o dono): selo "Assinada por paciente e profissional em dd/mm hh:mm" ou "Alterada depois de assinada" (com o que foi assinado), lista das assinaturas com Apagar e botão "Colher assinaturas"; sem o SQL avisa "Falta rodar o SQL das assinaturas". Usado no Resumo do editor e em cada sessão da ficha do paciente.
+- `CanvasAssinatura.tsx`: Quadro para assinar com o dedo (eventos de ponteiro, fundo branco, Limpar); `exportar()` devolve PNG recortado e reduzido (até 600 x 240).
+- `ColherAssinaturas.tsx`: Tela cheia (portal no body) para colher as assinaturas da sessão: resumo, paciente, profissional (do cadastro da clínica) e Confirmar; sobe as imagens e registra com o sha256 do resumo.
+- `ProfissionaisCliente.tsx`: Profissionais da clínica: listar, cadastrar, editar, desativar/reativar e excluir (a usada fica desativada). Cartão na ficha da cliente e painel no topo do portal.
 - `Partes.tsx`: Peças do Planejador HIPRO nativo: folha (bottom sheet), campo de disparos com - e +, cartão de área (modelo facial + linhas por profundidade), folha da modelo ampliada e folha de área manual.
 - `ResumoPlano.tsx`: Aba Resumo: números do plano, alertas, distribuição por área (barras com a modelo de cada área) e prévia do texto, do prontuário e da ficha do paciente.
 - `SeloSituacao.tsx`: Selo de situação do Planejador (`SeloSituacao`): laranja "Pendente" (ainda há disparos para a próxima sessão, com o detalhe) ou verde "Concluído".
@@ -539,6 +543,8 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `fotos-paciente-envio.ts`: Envio e leitura das fotos do paciente: reduz no aparelho (1.600 px JPEG 0,85 e miniatura de 400 px), sobe para a pasta `fotos-pacientes`, registra por `registrar_foto_paciente` (apaga os arquivos se falhar), apaga por `excluir_foto_paciente` e reaproveita URLs assinadas de 24 h (`urlsAssinadas`).
 - `fotos-paciente.test.ts`: Testes automatizados (Vitest) das regras de `lib/fotos-paciente.ts`.
 - `fotos-paciente.ts`: Regras puras das fotos dos pacientes: etapas (`ETAPAS_FOTO`), caminhos no Storage (`caminhosDaFoto`), medidas reduzidas, agrupamento por etapa e área (`agruparFotos`), áreas corporais dos planejamentos (`areasCorporaisDosPlanos`) e tamanho formatado.
+- `assinatura-sessao.ts`: Regras puras da assinatura da sessão: resumo da sessão (`resumoDaSessao`), JSON canônico e sha256 (`textoParaHash`, `hashDoResumo`), situação das assinaturas (`situacaoAssinaturas`), caminho do arquivo, datas de Brasília e recorte da imagem (`caixaDosTracos`, `escalaParaCaber`, `assinaturaVazia`). Testes em `assinatura-sessao.test.ts`.
+- `assinaturas-envio.ts`: Assinaturas no navegador: `useAssinaturasSessao` (só o dono), `enviarAssinatura` (sobe para a pasta `assinaturas` e registra; apaga o arquivo se falhar e o da assinatura substituída), `apagarAssinatura`, `prepararLimpezaAssinaturas` (antes de apagar planejamentos) e `paraImpressao` (imagens como data URL).
 - `funil-clientes.ts`: Funil de clientes: a etapa não é gravada no banco, é calculada aqui a partir de dados que já existem (reservas futuras, taxa de reserva e última locação concluída). Assim ela nunca fica desatualizada: paga a taxa, a etapa muda sozinha; passam 45 dias, cai em Reativar sozinha.
 - `grafico-fluxo.test.ts`: Testes automatizados (Vitest) das regras de `lib/grafico-fluxo.ts`.
 - `grafico-fluxo.ts`: Contas dos gráficos do Dashboard (sem React, para testar). Fluxo: entradas e saídas por dia (ou por mês, em período longo) e o resultado acumulado ao longo do período. Categorias: soma por categoria, as maiores primeiro, o resto em "Outras".
@@ -571,6 +577,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `planejador.test.ts`: Testes automatizados (Vitest) das regras de `lib/planejador.ts`.
 - `rascunho-planejamento.ts`: Regras puras do rascunho local do Planejador: `chaveRascunho`, `impressao` (compara estados ignorando paciente e pacienteId, que o banco ajusta), `lerRascunho`, `decidirRascunho` (restaurar, perguntar ou descartar ao abrir) e `proximaEspera` (2 s, 5 s, 10 s, 20 s, depois 30 s). Testes em `rascunho-planejamento.test.ts`.
 - `planejador.ts`: Planejador HIPRO nativo: áreas, contas, alertas e o texto do resumo. O estado salvo (planejamentos.estado) é o mesmo objeto do planejador antigo em HTML (paciente, data, DATA, customAreas), então os planos já guardados abrem iguais. Novidades: o "Arco Mandibular" agora se chama Terço médio (mesmo id, arcomandibular) e as áreas manuais guardam a parte do corpo em `parte` (antes iam com a imagem inteira dentro do estado).
+- `profissionais.ts`: Regras puras das profissionais da clínica: lista da cliente (`profissionaisDaCliente`), a do planejamento pelo id ou pelo nome (`profissionalDoPlano`), escolha automática com uma ativa só (`escolhaAutomatica`), rótulo com registro, validação e `faltaSql`. Testes em `profissionais.test.ts`.
 - `planejamento.test.ts`: Testes automatizados (Vitest) das regras de `lib/planejamento.ts`.
 - `planejamento.ts`: Planejador HIPRO dentro do app (tela nativa em app/(app)/planejador, contas em lib/planejador.ts): aqui ficam as contas da lista, o que decide quando vale guardar no banco e a montagem pelas regras. Terço médio usa o id antigo "arcomandibular"; Nasolabial saiu (fica dentro do Jowls).
 - `planilha-graficos.ts`: GRÁFICOS DENTRO DA PLANILHA (.xlsx) Gráficos nativos do Office (DrawingML), que o Google Planilhas e o Excel abrem como gráficos de verdade, editáveis. Ficam numa aba "Gráficos", com os números de cada um numa tabelinha ao lado (o gráfico lê dela). Mesmas cores do Dashboard. Usado por lib/planilha-xlsx.ts.
@@ -721,6 +728,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `2026-10-26-campanha-registra-anotacao.sql`: Migration: Campanhas registram anotação na cliente (26/10/2026) Pedido do dono: tudo o que acontece numa campanha fica no histórico da cliente, como anotação (tabela cliente_anotacoes, a mesma do painel "Anotações" e que o assistente lê pelo dossiê). 1. cliente_anotacoes aceita a origem 'campanha' (as linhas existentes continuam válidas: só se acrescenta um valor ao check). 2. registrar_envio_campanha grava a anotação, na mesma transação, quando o status MUDA para enviado, respondeu, agendou ou nao_quer. Gravar de novo o mesmo status não duplica; 'pulado' não gera anotação (não houve contato).
 - `2026-10-30-pacientes.sql`: Migration: Cadastro de pacientes do Planejador HIPRO (pedido do dono, 30/10/2026). Cada paciente pertence à cliente (profissional) que o atende: o paciente da Dra. Ana fica com a Dra. Ana, e no portal ela vê só os dela. Todo planejamento com nome de paciente fica ligado a um cadastro (planejamentos.paciente_id), então a ficha do paciente junta todas as sessões, mesmo quando o procedimento se repete ou muda de área. salvar_planejamento não muda de assinatura: o editor manda o id escolhido dentro do estado (estado.pacienteId).
 - `2026-10-31-fotos-pacientes.sql`: Migration: Fotos dos pacientes do Planejador HIPRO (piloto só para o dono, 31/10/2026). Cada foto é de um paciente (tabela pacientes), de uma etapa (antes, imediato, 30, 60 e 90 dias) e, se quiser, de uma área tratada e de um planejamento. Os arquivos ficam na pasta privada "fotos-pacientes" do Storage: p/<paciente_id>/<etapa>/<id>.jpg e p/<paciente_id>/<etapa>/<id>_mini.jpg Piloto: só o dono (administrador ativo, que não é só de visualização nem login de cliente) vê e envia. Clientes do portal e o acesso de visualização não veem nada, nem a lista, nem os arquivos.
+- `2026-10-31-profissionais-e-assinaturas.sql`: Migration: profissionais de cada clínica (tabela `profissionais`, `salvar_profissional`, `excluir_profissional`, semente pelos nomes já escritos em `planejamentos.estado->>'profissional'`) e assinatura da sessão pelo paciente e pela profissional no celular do dono (tabela `assinaturas_sessao`, `pode_assinar_sessao`, `registrar_assinatura_sessao`, `excluir_assinatura_sessao`, pasta privada `assinaturas` do Storage, PNG até 500 KB).
 - `2026-10-31-ajuste-de-saldo.sql`: Migration: ajuste de saldo (31/10/2026). Categorias de sistema "Ajuste de saldo" (entrada e saída, Harmonize e Pessoal) e as funções `saldo_do_caixa(p_scope)` (saldo com a regra das telas) e `ajustar_saldo(p_scope, p_saldo_real, p_observacao)`, que lança a diferença como um lançamento de ajuste. Não altera nem apaga dado existente.
 - `2026-10-31-emprestimo-compra-cartao.sql`: Migration: compra no cartão da Harmonize que é da Laser Dream vira empréstimo (31/10/2026). Colunas `emprestimos.origem` ('manual' ou 'cartao') e `emprestimos.categoria_anterior`, índice único por parcela de cartão, funções `marcar_compra_emprestimo` e `desmarcar_compra_emprestimo` (mais as internas `marcar_parcela_emprestimo`, `emprestimo_cartao_descricao`, `categoria_emprestimo_concedido`), gatilhos `trg_emprestimo_cartao_sincronizar`, `trg_emprestimo_cartao_apagar` e `trg_emprestimo_cartao_parcela_nova` em `transactions`; `editar_emprestimo` e `remover_emprestimo` recusam origem cartão. Linhas que já existem ficam com origem 'manual'; não altera nem apaga dado existente.
 - `2026-10-31-pessoal-emprestimos-e-categorias.sql`: Migration: empréstimos também no Pessoal e categorias do importador no Pessoal (31/10/2026). Coluna `emprestimos.scope` ('harmonize' padrão ou 'pessoal', check, índice `emprestimos_scope_devedor_idx`), política `emprestimos_select` por espaço, categorias do Pessoal "Empréstimo concedido" e "Devolução de empréstimo" (sistema), "Juros e encargos do cartão" e "Hospedagem"; `registrar_emprestimo` ganha `p_scope` (padrão 'harmonize'); `editar_emprestimo`, `remover_emprestimo`, `marcar_compra_emprestimo` e `desmarcar_compra_emprestimo` (mesma assinatura) e os gatilhos do empréstimo no cartão passam a valer nos dois espaços; internas novas `pode_mexer_emprestimo`, `categoria_de_emprestimo`, `saldo_emprestimo_devedor`; `categoria_emprestimo_concedido` passa a receber o espaço. Linhas que já existem ficam 'harmonize'; não altera nem apaga dado existente.
@@ -1055,6 +1063,47 @@ Gatilhos:
 
 
 Arquivos que acessam direto (`.from`): `app/(app)/assistente/AssistenteClient.tsx`, `supabase/functions/assistente/index.ts`.
+
+#### `assinaturas_sessao`
+
+Assinaturas (paciente e profissional) de cada sessão de um planejamento, colhidas com o dedo no celular do dono (31/10/2026). Só quem passa em `pode_assinar_sessao()` (admin ativo, não visualização, não cliente) lê; escrita só por `registrar_assinatura_sessao` e `excluir_assinatura_sessao`. As imagens ficam na pasta privada `assinaturas` do Storage; o backup guarda só esta lista.
+
+| Nome do campo | Tipo de dado | Obrigatório | Valor padrão | Descrição / finalidade |
+|---|---|---|---|---|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | Identificador único da assinatura. |
+| `planejamento_id` | `uuid` | Sim | (sem padrão) | Planejamento assinado; apagar o planejamento apaga as assinaturas (a tela apaga os arquivos). |
+| `sessao` | `integer` | Sim | (sem padrão) | Número da sessão (1 até `sessoesTotal`, conferido pela função). |
+| `papel` | `text` | Sim | (sem padrão) | `paciente` ou `profissional`. |
+| `nome` | `text` | Sim | (sem padrão) | Nome de quem assinou (digitado ou do cadastro). |
+| `profissional_id` | `uuid` | Não | (sem padrão) | Cadastro da profissional (só no papel profissional; tem de ser da clínica do planejamento). |
+| `registro` | `text` | Não | (sem padrão) | Registro da profissional na época (ex.: CRBM 1234). |
+| `imagem` | `text` | Sim | (sem padrão) | Caminho do PNG no Storage (`s/<planejamento>/<sessao>/<papel>-<id>.png`). |
+| `conteudo_hash` | `text` | Sim | (sem padrão) | sha256 (64 hex) do resumo canônico da sessão; outro hash no conteúdo atual = "Alterada depois de assinada". |
+| `resumo` | `jsonb` | Sim | `'{}'::jsonb` | O que foi assinado (paciente, data, sessão, áreas com linhas, total, saldo), para mostrar depois. |
+| `assinada_em` | `timestamp with time zone` | Sim | `now()` | Data e hora da assinatura. |
+| `created_by` | `uuid` | Não | `auth.uid()` | Login que colheu a assinatura. |
+| `aparelho` | `text` | Não | (sem padrão) | Navegador do celular que colheu (até 300 caracteres). |
+
+Chaves e restrições:
+
+- PK `assinaturas_sessao_pkey`: `PRIMARY KEY (id)`
+- FK `assinaturas_sessao_planejamento_id_fkey`: `planejamento_id` → `planejamentos.id` (ON DELETE CASCADE)
+- FK `assinaturas_sessao_profissional_id_fkey`: `profissional_id` → `profissionais.id` (ON DELETE SET NULL)
+- FK `assinaturas_sessao_created_by_fkey`: `created_by` → `profiles.id` (ON DELETE SET NULL)
+- Única `assinaturas_sessao_unica`: `UNIQUE (planejamento_id, sessao, papel)` (assinar de novo substitui)
+- Checks: `sessao` entre 1 e 50; `papel` em ('paciente','profissional'); `nome` não vazio até 120; `registro` até 60; `conteudo_hash ~ '^[0-9a-f]{64}$'`; `resumo` objeto; `aparelho` até 300.
+
+Segurança (RLS ligada):
+
+- Política `assinaturas_sessao_select` (SELECT, permissiva, papéis {public}): usando `pode_assinar_sessao()`
+
+Gatilhos:
+
+- `trg_somente_leitura` (BEFORE INSERT OR DELETE OR UPDATE, por comando) executa `bloquear_somente_leitura()`
+
+Funções que gravam nesta tabela: `excluir_assinatura_sessao`, `registrar_assinatura_sessao`.
+
+Arquivos que acessam direto (`.from`): `lib/assinaturas-envio.ts`.
 
 #### `bloqueios_equipamento`
 
@@ -2220,6 +2269,45 @@ Gatilhos:
 Funções que gravam nesta tabela: `delete_record_forever`, `excluir_planejamento`, `juntar_pacientes`, `salvar_paciente`, `salvar_planejamento`.
 
 Arquivos que acessam direto (`.from`): `app/(app)/planejador/[id]/page.tsx`, `app/(app)/planejador/carregar.ts`, `app/(portal)/portal/[id]/page.tsx`, `components/planejador/FichaPaciente.tsx`.
+
+#### `profissionais`
+
+Profissionais de cada clínica (cliente) que atendem os pacientes do Planejador (31/10/2026). Escolhidas no campo Profissional do planejamento, que guarda `estado.profissional` (nome), `estado.profissionalId` e `estado.profissionalRegistro`. Dono e equipe com `agenda` veem todas; login de cliente vê só as da clínica dela. Escrita só por `salvar_profissional` e `excluir_profissional`.
+
+| Nome do campo | Tipo de dado | Obrigatório | Valor padrão | Descrição / finalidade |
+|---|---|---|---|---|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | Identificador único da profissional. |
+| `client_id` | `uuid` | Sim | (sem padrão) | Clínica (cliente) da profissional; apagar a cliente apaga. |
+| `nome` | `text` | Sim | (sem padrão) | Nome (até 120), único por clínica sem acento, maiúscula nem espaço sobrando. |
+| `registro` | `text` | Não | (sem padrão) | Registro profissional (até 60), ex.: CRBM 1234. |
+| `ativo` | `boolean` | Sim | `true` | Desativada some da escolha e fica no histórico (a usada não se apaga). |
+| `created_by` | `uuid` | Não | `auth.uid()` | Login que cadastrou. |
+| `created_at` | `timestamp with time zone` | Sim | `now()` | Quando foi cadastrada. |
+| `updated_at` | `timestamp with time zone` | Sim | `now()` | Última alteração. |
+
+Chaves e restrições:
+
+- PK `profissionais_pkey`: `PRIMARY KEY (id)`
+- FK `profissionais_client_id_fkey`: `client_id` → `clients.id` (ON DELETE CASCADE)
+- FK `profissionais_created_by_fkey`: `created_by` → `profiles.id` (ON DELETE SET NULL)
+- Checks: `nome` não vazio até 120; `registro` até 60.
+
+Índices:
+
+- `profissionais_cliente_nome_uidx`: `UNIQUE INDEX em profissionais USING btree (client_id, normalizar_nome_paciente(nome))`
+
+Segurança (RLS ligada):
+
+- Política `profissionais_select` (SELECT, permissiva, papéis {public}): usando `has_module_permission('agenda')`
+- Política `profissionais_select_cliente` (SELECT, permissiva, papéis {public}): usando `(client_id = cliente_do_usuario())`
+
+Gatilhos:
+
+- `trg_somente_leitura` (BEFORE INSERT OR DELETE OR UPDATE, por comando) executa `bloquear_somente_leitura()`
+
+Funções que gravam nesta tabela: `excluir_profissional`, `salvar_profissional`.
+
+Arquivos que acessam direto (`.from`): `app/(app)/planejador/EditorPlanejamento.tsx`, `components/planejador/ColherAssinaturas.tsx`, `components/planejador/ProfissionaisCliente.tsx`.
 
 #### `profiles`
 
@@ -3538,6 +3626,31 @@ erDiagram
     numeric limite
     timestamptz created_at
   }
+  assinaturas_sessao {
+    uuid id PK
+    uuid planejamento_id FK
+    integer sessao
+    text papel
+    text nome
+    uuid profissional_id FK
+    text registro
+    text imagem
+    text conteudo_hash
+    jsonb resumo
+    timestamptz assinada_em
+    uuid created_by FK
+    text aparelho
+  }
+  profissionais {
+    uuid id PK
+    uuid client_id FK
+    text nome
+    text registro
+    boolean ativo
+    uuid created_by FK
+    timestamptz created_at
+    timestamptz updated_at
+  }
   paciente_fotos {
     uuid id PK
     uuid paciente_id FK
@@ -3824,6 +3937,9 @@ erDiagram
   pacientes ||--o{ planejamentos : "paciente_id"
   profiles ||--o{ paciente_fotos : "created_by"
   pacientes ||--|{ paciente_fotos : "paciente_id"
+  clients ||--o{ profissionais : "client_id"
+  planejamentos ||--o{ assinaturas_sessao : "planejamento_id"
+  profissionais ||--o{ assinaturas_sessao : "profissional_id"
   planejamentos ||--o{ paciente_fotos : "planejamento_id"
 ```
 
@@ -3899,6 +4015,8 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `excluir_compra_cartao` | `p_compra_grupo uuid` | `void` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `transactions` RD | Apaga uma compra inteira (todas as parcelas). Chamada em: `app/(app)/financeiro/cartoes/CartoesClient.tsx`. |
 | `excluir_conta_pix` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `contas_pix` RD, `movimentacoes` C, `rental_payments` R | Apaga só conta que nunca recebeu pagamento e não é a padrão. Chamada em: `app/(app)/configuracoes/secoes/ContasPix.tsx`. |
 | `excluir_foto_paciente` | `p_id uuid` | `jsonb` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `paciente_fotos` D, `pacientes` R | Chamada em: `lib/fotos-paciente-envio.ts`. |
+| `excluir_assinatura_sessao` | `p_id uuid` | `jsonb` | Sim | authenticated,service_role | `assinaturas_sessao` D, `movimentacoes` C | Só `pode_assinar_sessao()`; devolve o caminho da imagem para a tela apagar. Chamada em: `lib/assinaturas-envio.ts`. |
+| `excluir_profissional` | `p_id uuid` | `text` | Sim | authenticated,service_role | `assinaturas_sessao` R, `movimentacoes` C, `planejamentos` R, `profissionais` RUD | Apaga a nunca usada; a usada (planejamento pelo id ou nome, ou assinatura) fica desativada. Devolve 'excluida' ou 'desativada'. Chamada em: `components/planejador/ProfissionaisCliente.tsx`. |
 | `excluir_locacao_cascata` | `p_rental_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` RUD, `mentoring_events` U, `rentals` UD, `transactions` RD | Cascata de uma locação: quebra os ciclos de chave estrangeira (com a transação, com a taxa) antes de apagar, na ordem que o banco permite. |
 | `excluir_mentoria_cascata` | `p_mentoria_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` UD, `mentoring_events` RUD, `transactions` UD | Cascata de uma mentoria. |
 | `excluir_paciente` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `paciente_fotos` R, `pacientes` D, `planejamentos` R, `rentals` R | Chamada em: `components/planejador/FichaPaciente.tsx`. |
@@ -3934,6 +4052,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `pagar_fatura_cartao` | `p_cartao_id uuid, p_fatura_ref text, p_valor numeric, p_data date, p_forma payment_method_type` | `uuid` | Sim | authenticated,postgres,service_role | `cartoes` R, `categories` R, `movimentacoes` C, `transactions` C | Pagamento da fatura: tira o dinheiro da conta, fora do resultado. Chamada em: `app/(app)/financeiro/cartoes/CartoesClient.tsx`. |
 | `pode_mexer_emprestimo` | `p_scope text` | `boolean` | Sim | postgres | (nenhuma) | Permissão do empréstimo pelo espaço: `pessoal` exige o módulo pessoal; o resto, financeiro. Uso interno. |
 | `pode_ver_fotos_paciente` | (nenhum) | `boolean` | Sim | authenticated,postgres,service_role | `profiles` R | 1. Quem pode ver e enviar fotos: só o dono. |
+| `pode_assinar_sessao` | (nenhum) | `boolean` | Sim | authenticated,service_role | `profiles` R | Quem colhe e vê assinaturas da sessão: admin ativo, não visualização, não cliente. Chamada em: `lib/assinaturas-envio.ts`. |
 | `portal_cliente` | (nenhum) | `TABLE(client_id uuid, nome text, profissional text)` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `rentals` R | Nome e "Profissional" (tratamento + nome) da cliente logada, para o portal. Chamada em: `app/(portal)/portal/carregar.ts`. |
 | `portal_situacao` | (nenhum) | `jsonb` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `profiles` R, `rentals` R | Situação do portal para a tela da própria cliente (mesmo travada). Chamada em: `app/(portal)/layout.tsx`. |
 | `portal_ultimo_atendimento` | `p_client_id uuid` | `date` | Sim | postgres,service_role | `calendar_events` R, `rentals` R | Último dia com atendimento de HIPRO da cliente (locação ou reserva não cancelada; a futura também). |
@@ -3958,6 +4077,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `registrar_envio_agenda` | `p_client_id uuid, p_mensagem text, p_inicio date, p_fim date` | `uuid` | Sim | authenticated,postgres,service_role | `agenda_envios` C, `clients` R, `movimentacoes` C | Chamada em: `app/(app)/assistente/CartaoAgenda.tsx`. |
 | `registrar_envio_campanha` | `p_campanha uuid, p_client uuid, p_status text, p_mensagem text` | `uuid` | Sim | authenticated,postgres,service_role | `campanha_envios` CRU, `campanhas` R, `cliente_anotacoes` C, `clients` R, `movimentacoes` C | (versão da migration 2026-10-26-campanha-registra-anotacao.sql: grava anotação na cliente) Cria ou atualiza o envio de uma cliente numa campanha. 'enviado' grava a hora do envio (a primeira) e o texto exato; os outros status mantêm a hora. Campanha arquivada não recebe envio novo (só muda o que já existe). Cada mudança de status (menos 'pulado') vira anotação da cliente. Chamada em: `app/(app)/campanhas/FilaCampanha.tsx`, `app/(app)/campanhas/ResultadoCampanha.tsx`, `components/VinculoCampanha.tsx`. |
 | `registrar_foto_paciente` | `p_paciente_id uuid, p_etapa text, p_area text, p_caminho text, p_miniatura text, p_largura integer, p_altura integer, p_tamanho_bytes integer, p_tirada_em date DEFAULT NULL::date, p_planejamento_id uuid DEFAULT NULL::uuid, p_observacao text DEFAULT NULL::text` | `uuid` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `paciente_fotos` C, `pacientes` R, `planejamentos` R | Chamada em: `lib/fotos-paciente-envio.ts`. |
+| `registrar_assinatura_sessao` | `p_planejamento_id uuid, p_sessao integer, p_papel text, p_nome text, p_profissional_id uuid, p_registro text, p_imagem text, p_conteudo_hash text, p_resumo jsonb, p_aparelho text DEFAULT NULL::text` | `jsonb` | Sim | authenticated,service_role | `assinaturas_sessao` CD, `movimentacoes` C, `planejamentos` R, `profissionais` R | Registra ou substitui a assinatura de um papel na sessão; confere sessão, caminho, hash e clínica da profissional; devolve `{id, anterior}`. Chamada em: `lib/assinaturas-envio.ts`. |
 | `registrar_leitura_aplicador` | `p_aplicador_id uuid, p_contador integer, p_data date` | `void` | Sim | authenticated,postgres,service_role | `aplicadores` U, `movimentacoes` C | Leitura do contador do aplicador: passa a ser a nova base. Chamada em: `components/AplicadoresCard.tsx`. |
 | `registrar_movimentacao` | `p_acao text, p_entidade text, p_entidade_id uuid, p_descricao text, p_detalhes jsonb` | `void` | Sim | postgres,service_role | `movimentacoes` C, `profiles` R | Escreve no histórico. usuario_nome é resolvido e gravado na hora, não por referência, para o histórico continuar legível mesmo depois que o perfil for removido. |
 | `registrar_pagamento_locacao` | `p_rental_id uuid, p_forma payment_method_type, p_valor numeric, p_data date, p_pix_conta text, p_notes text` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `categories` R, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` C, `rentals` R, `rentals_situacao_pagamento` R, `tasks` R, `transactions` CR | Registrar UM pagamento (parcial ou não). Chamar de novo para dividir entre formas (ex: parte em dinheiro, parte em PIX) ou completar um saldo em aberto, pago/pago_em se ajustam sozinhos pelo trigger acima. Chamada em: `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`, `components/CalculadoraLocacaoModal.tsx`, `components/ReceberPagamentoBotao.tsx`. |
@@ -3981,6 +4101,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `salvar_orcamento_pessoal` | `p_categoria text, p_limite numeric` | `void` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `orcamentos_pessoais` CUD | Define (ou troca) o limite de uma categoria; limite nulo ou zero remove. Chamada em: `supabase/functions/assistente/index.ts`. |
 | `salvar_paciente` | `p_id uuid, p_client_id uuid, p_nome text, p_whatsapp text DEFAULT NULL::text, p_nascimento date DEFAULT NULL::date, p_observacoes text DEFAULT NULL::text` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `pacientes` CRU, `planejamentos` U, `rentals` R | 4. Ficha do paciente: criar ou editar. Trocar o nome leva junto os planejamentos dele. Chamada em: `components/planejador/FichaPaciente.tsx`. |
 | `salvar_planejamento` | `p_id uuid, p_client_id uuid, p_calendar_event_id uuid, p_estado jsonb, p_total integer DEFAULT 0` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `pacientes` CR, `planejamentos` CRU, `rentals` R | 3. Salvar planejamento: liga ao paciente (escolhido ou achado pelo nome). Chamada em: `app/(app)/planejador/EditorPlanejamento.tsx`. |
+| `salvar_profissional` | `p_id uuid, p_client_id uuid, p_nome text, p_registro text DEFAULT NULL::text, p_ativo boolean DEFAULT true` | `uuid` | Sim | authenticated,service_role | `clients` R, `movimentacoes` C, `profissionais` CRU | Cria ou edita; login de cliente sempre na clínica dela; criar com nome que já existe devolve e reativa a existente. Chamada em: `app/(app)/planejador/EditorPlanejamento.tsx`, `components/planejador/ProfissionaisCliente.tsx`. |
 | `set_became_client_at` | (nenhum) | `trigger` | Não | postgres,service_role | (nenhuma) | Função de gatilho. Preenche became_client_at quando is_client vira true sem data. |
 | `set_client_test_flag_cascade` | `p_client_id uuid, p_is_test boolean` | `jsonb` | Sim | authenticated,postgres,service_role | `calendar_events` RU, `clients` U, `mentoring_events` U, `rental_payments` U, `rentals` RU, `tasks` U, `transactions` U | Converter um cliente e tudo que está pendurado nele. Chamada em: `app/(app)/configuracoes/dados-teste/DadosTesteClient.tsx`. |
 | `set_record_test_flag` | `p_table text, p_id uuid, p_is_test boolean` | `void` | Sim | authenticated,postgres,service_role | (nenhuma) | Converter um registro: teste <-> real. Lista branca de tabelas evita que o nome vindo da tela vire porta de injeção de SQL no format(). Chamada em: `app/(app)/configuracoes/dados-teste/DadosTesteClient.tsx`. |
@@ -4007,6 +4128,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `comprovantes` | Não | 5 MB | `image/jpeg`, `image/png`, `image/webp`, `application/pdf` | Comprovantes de pagamento enviados em Receber pagamento (`locacao/<id>` ou `taxa/<id>`), `lib/comprovante.ts`. |
 | `campanhas` | Não | 5 MB | `image/jpeg`, `image/png`, `image/webp` | Arte das campanhas (`campanhas.arte_path`), reduzida a 1600 px em JPEG por `lib/campanha-arte.ts`. |
 | `fotos-pacientes` | Não | 5 MB | `image/jpeg`, `image/webp` | Fotos dos pacientes do Planejador (piloto só do dono), `p/<paciente>/<etapa>/<id>.jpg` e `_mini.jpg`, reduzidas no aparelho por `lib/fotos-paciente-envio.ts`; só `pode_ver_fotos_paciente()`. Sem backup. |
+| `assinaturas` | Não | 500 KB | `image/png` | Assinaturas da sessão do Planejador (só o dono), `s/<planejamento>/<sessao>/<papel>-<id>.png`, recortadas e reduzidas no aparelho por `components/planejador/CanvasAssinatura.tsx`; só `pode_assinar_sessao()`. Sem backup. |
 
 Políticas do Storage (`storage.objects`):
 
@@ -4026,6 +4148,9 @@ Políticas do Storage (`storage.objects`):
 - `fotos_pacientes_ler` (SELECT, permissiva): usando `((bucket_id = 'fotos-pacientes'::text) AND pode_ver_fotos_paciente())`
 - `fotos_pacientes_enviar` (INSERT, permissiva); checagem `((bucket_id = 'fotos-pacientes'::text) AND pode_ver_fotos_paciente())`
 - `fotos_pacientes_apagar` (DELETE, permissiva): usando `((bucket_id = 'fotos-pacientes'::text) AND pode_ver_fotos_paciente())`
+- `assinaturas_ler` (SELECT, permissiva): usando `((bucket_id = 'assinaturas'::text) AND pode_assinar_sessao())`
+- `assinaturas_enviar` (INSERT, permissiva); checagem `((bucket_id = 'assinaturas'::text) AND pode_assinar_sessao())`
+- `assinaturas_apagar` (DELETE, permissiva): usando `((bucket_id = 'assinaturas'::text) AND pode_assinar_sessao())`
 
 ### Vault (segredos, sem os valores)
 
@@ -4520,14 +4645,16 @@ Rotas: `/planejador`, `/planejador/[id]`, `/planejador/novo`.
 - Sessões dentro de `planejamentos.estado` (`fecharSessao`, `reabrirSessaoAnterior`); crédito do paciente fica só no planejamento.
 - Escrita só por `salvar_planejamento` e `excluir_planejamento`; excluir pede para escrever APAGAR.
 - Paciente é da cliente que o atende: `salvar_planejamento` liga ao cadastro escolhido (`estado.pacienteId`) ou ao de mesmo nome, ou cria; ficha editada por `salvar_paciente`, repetidos juntados por `juntar_pacientes`.
+- Profissional escolhida das profissionais da clínica (`profissionais`, `escolhaAutomatica` com uma ativa só; "+ Nova profissional" por `salvar_profissional`); grava `estado.profissional`, `estado.profissionalId` e `estado.profissionalRegistro`. Sem cliente ou sem o SQL, texto livre.
+- Assinatura da sessão (só o dono): "Colher assinaturas" no Resumo e na ficha do paciente; imagem na pasta `assinaturas`, registro por `registrar_assinatura_sessao` com o sha256 do resumo; selo "Alterada depois de assinada" quando o conteúdo muda; impressão com as imagens e "Conteúdo verificado".
 
 **Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/PlanejadorLista.tsx`, `app/(app)/planejador/[id]/page.tsx`, `app/(app)/planejador/carregar.ts`, `app/(app)/planejador/novo/page.tsx`, `app/(app)/planejador/page.tsx`, `components/Atalhos.tsx`, `components/BonecoCorporal.tsx`, `components/ClientPicker.tsx`, `components/ConfirmarApagarModal.tsx`, `components/Dialogos.tsx`, `components/SeletorPlanejamento.tsx`, `components/SomenteLeitura.tsx`, `components/planejador/CustoDisparos.tsx`, `components/planejador/FichaPaciente.tsx`, `components/planejador/FotosPaciente.tsx`, `components/planejador/Partes.tsx`, `components/planejador/ResumoPlano.tsx`, `components/planejador/SeloSituacao.tsx`, `lib/atalhos.ts`, `lib/availability-image.ts`, `lib/boneco-corporal.ts`, `lib/busca-cliente.ts`, `lib/corpo-foto-dados.ts`, `lib/corpo-foto.ts`, `lib/custo-disparos-imagem.ts`, `lib/custo-disparos.ts`, `lib/format.ts`, `lib/fotos-paciente-envio.ts`, `lib/fotos-paciente.ts`, `lib/historico-paciente.ts`, `lib/mensagens-modelos.ts`, `lib/meta-mes.ts`, `lib/pacientes.ts`, `lib/period.ts`, `lib/planejador-impressao.ts`, `lib/planejador.ts`, `lib/planejamento.ts`, `lib/preferencias.ts`, `lib/rental-pricing.ts`, `lib/settings.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/usar-preferencias.ts`, `lib/valor.ts`.
 
-**Funções RPC chamadas:** `definir_autorizacao_fotos`, `excluir_foto_paciente`, `excluir_paciente`, `excluir_planejamento`, `juntar_pacientes`, `registrar_foto_paciente`, `salvar_paciente`, `salvar_planejamento`, `uso_fotos_pacientes`.
+**Funções RPC chamadas:** `definir_autorizacao_fotos`, `excluir_assinatura_sessao`, `excluir_foto_paciente`, `excluir_paciente`, `excluir_planejamento`, `juntar_pacientes`, `pode_assinar_sessao`, `registrar_assinatura_sessao`, `registrar_foto_paciente`, `salvar_paciente`, `salvar_planejamento`, `salvar_profissional`, `uso_fotos_pacientes`.
 
-**Storage:** `PASTA_FOTOS`.
+**Storage:** `PASTA_FOTOS`, `PASTA_ASSINATURAS`.
 
-**Tabelas e views tocadas:** `calendar_events` (R), `clients` (CR), `movimentacoes` (C), `paciente_fotos` (CRUD), `pacientes` (CRUD), `planejamentos` (CRUD), `rentals` (R), `settings` (RU).
+**Tabelas e views tocadas:** `assinaturas_sessao` (CRD), `calendar_events` (R), `clients` (CR), `movimentacoes` (C), `paciente_fotos` (CRUD), `pacientes` (CRUD), `planejamentos` (CRUD), `profissionais` (CRU), `rentals` (R), `settings` (RU).
 
 ### Portal da cliente e formulário de cadastro público
 
@@ -5040,6 +5167,8 @@ Uma linha por par funcionalidade e tabela (ou view). X indica a operação. Leit
 | Planejador HIPRO | `clients` | X | X |  |  |
 | Planejador HIPRO | `movimentacoes` | X |  |  |  |
 | Planejador HIPRO | `paciente_fotos` | X | X | X | X |
+| Planejador HIPRO | `profissionais` | X | X | X | X |
+| Planejador HIPRO | `assinaturas_sessao` | X | X |  | X |
 | Planejador HIPRO | `pacientes` | X | X | X | X |
 | Planejador HIPRO | `planejamentos` | X | X | X | X |
 | Planejador HIPRO | `rentals` |  | X |  |  |
@@ -5051,6 +5180,7 @@ Uma linha por par funcionalidade e tabela (ou view). X indica a operação. Leit
 | Portal da cliente e formulário de cadastro público | `mentoring_events` |  | X |  |  |
 | Portal da cliente e formulário de cadastro público | `movimentacoes` | X |  |  |  |
 | Portal da cliente e formulário de cadastro público | `paciente_fotos` | X | X | X | X |
+| Portal da cliente e formulário de cadastro público | `profissionais` | X | X | X | X |
 | Portal da cliente e formulário de cadastro público | `pacientes` | X | X | X | X |
 | Portal da cliente e formulário de cadastro público | `planejamentos` | X | X | X | X |
 | Portal da cliente e formulário de cadastro público | `profiles` | X | X | X |  |
@@ -5136,6 +5266,8 @@ Resumo inverso (tabela x funcionalidades que gravam nela):
 | `movimentacoes` | Agenda (reservas, eventos, confirmação e imagem de datas livres); Assistente (IA) e Cérebro (insights); Cadastros do formulário Google (Contourline Academy); Campanhas; Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Encaixe de datas livres; Equipamentos, aplicadores, bloqueios e revisão anual; Espaço Pessoal; Estrutura global: menu, barra de baixo, "+", busca, temas, diálogos e recibo; Financeiro (lançamentos), Cartões e Empréstimos; Funil de vendas (leads e clientes); Locações (histórico de locações realizadas); Login, sessão e controle de acesso; Menu de atalhos da cliente, Anotações e Melhores datas; Nova locação, finalização com disparos e calculadora; Pendências e Receber pagamento; Planejador HIPRO; Portal da cliente e formulário de cadastro público; Próximas locações (Agenda de hoje); Relacionamento; Tarefas e Atacar a fila |
 | `orcamentos_pessoais` | Assistente (IA) e Cérebro (insights) |
 | `paciente_fotos` | Planejador HIPRO; Portal da cliente e formulário de cadastro público |
+| `profissionais` | Planejador HIPRO; Ficha da cliente; Portal da cliente e formulário de cadastro público |
+| `assinaturas_sessao` | Planejador HIPRO |
 | `pacientes` | Planejador HIPRO; Portal da cliente e formulário de cadastro público |
 | `planejamentos` | Agenda (reservas, eventos, confirmação e imagem de datas livres); Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Espaço Pessoal; Financeiro (lançamentos), Cartões e Empréstimos; Planejador HIPRO; Portal da cliente e formulário de cadastro público |
 | `profiles` | Clientes, ficha da cliente, créditos e cadastros recebidos; Configurações (central) e Dados de teste; Portal da cliente e formulário de cadastro público |
@@ -5315,6 +5447,8 @@ Tabelas acessadas direto: `cadastros_recebidos` (CU), `push_inscricoes` (RD). RP
 | `movimentacoes` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `orcamentos_pessoais` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `paciente_fotos` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
+| `profissionais` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
+| `assinaturas_sessao` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `pacientes` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `planejamentos` | `trg_somente_leitura` | BEFORE INSERT OR DELETE OR UPDATE (comando) | `bloquear_somente_leitura` | Ver função. |
 | `profiles` | `trg_profiles_lock_privileged_fields` | BEFORE UPDATE (linha) | `profiles_lock_privileged_fields` | Ninguém troca o próprio cliente_id (senão leria os planejamentos de outra). |

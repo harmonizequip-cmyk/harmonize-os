@@ -29,6 +29,9 @@ import SeloSituacao from "@/components/planejador/SeloSituacao";
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import FotosPaciente from "@/components/planejador/FotosPaciente";
 import { areasCorporaisDosPlanos } from "@/lib/fotos-paciente";
+import { normalizarPlano } from "@/lib/planejador";
+import { prepararLimpezaAssinaturas, useAssinaturasSessao } from "@/lib/assinaturas-envio";
+import AssinaturasSessoes from "@/components/planejador/AssinaturasSessoes";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -81,6 +84,8 @@ export default function FichaPaciente({
   const chave = planoIds.join(",");
 
   useEffect(() => setMontado(true), []);
+  // Assinaturas por sessão: só o dono.
+  const assinaturas = useAssinaturasSessao(planoIds, aberto && !portal && !somenteLeitura);
 
   useEffect(() => {
     setEditando(false);
@@ -134,6 +139,11 @@ export default function FichaPaciente({
   const tempo = useMemo(() => (entradas ? montarLinhaDoTempo(entradas) : []), [entradas]);
   // Só as áreas corporais separam as fotos (o facial fica todo em "Rosto").
   const areasCorporais = useMemo(() => (entradas ? areasCorporaisDosPlanos(entradas.map((e) => e.estado)) : []), [entradas]);
+  const planosNormalizados = useMemo(
+    () => new Map((entradas ?? []).map((e) => [e.id, normalizarPlano(e.estado)] as const)),
+    [entradas]
+  );
+  const mostrarAssinaturas = assinaturas.estado === "ok" || assinaturas.estado === "sem_sql";
   const paraJuntar = outros.filter((o) => o.pacienteId && o.pacienteId !== paciente?.pacienteId);
 
   if (!montado || !paciente) return null;
@@ -449,6 +459,21 @@ export default function FichaPaciente({
                                 <CalendarClock size={11} /> Retorno {formatDate(s.retorno)}
                               </p>
                             )}
+                            {mostrarAssinaturas && planosNormalizados.get(pl.id) && (
+                              <div className="mt-2 border-t border-neutral-200/70 pt-2">
+                                <AssinaturasSessoes
+                                  planoId={pl.id}
+                                  plano={planosNormalizados.get(pl.id)!}
+                                  clienteId={pl.client_id ?? paciente.client_id}
+                                  estado={assinaturas.estado}
+                                  lista={assinaturas.lista}
+                                  onMudou={assinaturas.recarregar}
+                                  sessoes={[s.n]}
+                                  titulo={false}
+                                  semNumero
+                                />
+                              </div>
+                            )}
                           </div>
                         ))}
                         <Link
@@ -526,6 +551,7 @@ export default function FichaPaciente({
           onCancelar={() => setConfirmarApagar(false)}
           onConfirmar={async () => {
             const sb = createClient();
+            const limpar = !portal ? await prepararLimpezaAssinaturas(sb, [...selecionados]) : null;
             for (const id of selecionados) {
               const { error } = await sb.rpc("excluir_planejamento", { p_id: id });
               if (error) {
@@ -533,6 +559,7 @@ export default function FichaPaciente({
                 return error.message || "Não consegui apagar. Confira a internet.";
               }
             }
+            await limpar?.().catch(() => {});
             const apagouTodos = selecionados.size >= paciente.planos.length;
             avisar(selecionados.size === 1 ? "Planejamento apagado." : `${selecionados.size} planejamentos apagados.`);
             setConfirmarApagar(false);

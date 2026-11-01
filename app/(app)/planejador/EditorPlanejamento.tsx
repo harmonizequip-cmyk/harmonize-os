@@ -30,7 +30,11 @@ import {
   type Linha,
   type Plano,
 } from "@/lib/planejador";
-import { htmlFichaPaciente, htmlProntuario, imprimir } from "@/lib/planejador-impressao";
+import { htmlFichaPaciente, htmlProntuario, imprimir, imprimirDepois } from "@/lib/planejador-impressao";
+import { ativas, escolhaAutomatica, faltaSql, profissionaisDaCliente, profissionalDoPlano, problemaProfissional, rotuloProfissional, type Profissional } from "@/lib/profissionais";
+import { assinaturasDaSessao, hashDoResumo, resumoDaSessao } from "@/lib/assinatura-sessao";
+import { paraImpressao, prepararLimpezaAssinaturas, useAssinaturasSessao } from "@/lib/assinaturas-envio";
+import AssinaturasSessoes from "@/components/planejador/AssinaturasSessoes";
 import SeletorPlanejamento from "@/components/SeletorPlanejamento";
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import { CartaoArea, Folha, FolhaModelo, FolhaNovaArea, fmt } from "@/components/planejador/Partes";
@@ -59,6 +63,7 @@ import {
   UserRound,
   CalendarDays,
   CloudOff,
+  PenLine,
 } from "lucide-react";
 import { confirmar } from "@/components/Dialogos";
 import { CircleCheck } from "lucide-react";
@@ -152,7 +157,15 @@ export default function EditorPlanejamento({
   // Cadastros de paciente da cliente (sugestões do campo "Nome do paciente").
   const [cadastros, setCadastros] = useState<PacienteCadastro[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
+  // Profissionais da clínica (null = sem cliente ou sem o SQL: campo de texto livre).
+  const [profissionais, setProfissionais] = useState<Profissional[] | null>(null);
+  const [novaProf, setNovaProf] = useState<{ nome: string; registro: string } | null>(null);
+  const [salvandoProf, setSalvandoProf] = useState(false);
+  // Uma profissional ativa só: escolhe sozinho no plano novo ("inicial") ou depois de trocar a cliente ("troca").
+  const autoEscolher = useRef<"inicial" | "troca" | null>(planoId ? null : "inicial");
   const rolagem = useRef<HTMLDivElement>(null);
+  // Assinaturas da sessão: só o dono (nunca no portal nem na visualização).
+  const assinaturas = useAssinaturasSessao(id ? [id] : [], !portal && !somenteLeitura);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repetir = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -593,10 +606,94 @@ export default function EditorPlanejamento({
     };
   }, [cliente, supabase, portal]);
 
+  // Profissionais da clínica ligada (no portal, a RLS só devolve as dela).
+  const clienteDasProfissionais = portal ? clienteId ?? "" : cliente;
+  useEffect(() => {
+    let ativo = true;
+    if (!clienteDasProfissionais) {
+      setProfissionais(null);
+      return;
+    }
+    supabase
+      .from("profissionais")
+      .select("id, client_id, nome, registro, ativo")
+      .eq("client_id", clienteDasProfissionais)
+      .then(({ data, error }) => {
+        if (!ativo) return;
+        if (error) {
+          // Sem o SQL (ou sem acesso): continua o campo de texto.
+          setProfissionais(null);
+          if (!faltaSql(error)) console.warn("profissionais:", error.message);
+          return;
+        }
+        const lista = profissionaisDaCliente((data ?? []) as Profissional[], clienteDasProfissionais);
+        setProfissionais(lista);
+        const modo = autoEscolher.current;
+        autoEscolher.current = null;
+        if (!modo || somenteLeitura) return;
+        const nomePadrao = portal ? estado.profissional : clientes.find((c) => c.id === clienteDasProfissionais)?.profissional;
+        const uma = escolhaAutomatica(lista, planoRef.current, (nomePadrao as string | undefined) ?? null);
+        if (!uma) return;
+        const ajuste = (p: Plano): Plano => ({ ...p, profissional: uma.nome, profissionalId: uma.id, profissionalRegistro: uma.registro ?? "" });
+        if (modo === "troca") mudar(ajuste);
+        else {
+          // Plano novo: só ajusta a tela (sem contar como mudança); vai junto no primeiro salvamento.
+          planoRef.current = ajuste(planoRef.current);
+          setPlano(planoRef.current);
+        }
+      });
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteDasProfissionais, supabase, portal]);
+
+  function escolherProfissional(valor: string) {
+    if (valor === "__nova") {
+      setNovaProf({ nome: "", registro: "" });
+      return;
+    }
+    if (valor === "__texto") return;
+    const p = profissionais?.find((x) => x.id === valor);
+    if (!valor) mudar((pl) => ({ ...pl, profissional: "", profissionalId: "", profissionalRegistro: "" }));
+    else if (p) mudar((pl) => ({ ...pl, profissional: p.nome, profissionalId: p.id, profissionalRegistro: p.registro ?? "" }));
+  }
+
+  async function criarProfissional() {
+    if (!novaProf || !clienteDasProfissionais) return;
+    const problema = problemaProfissional(novaProf);
+    if (problema) return mostrarAviso(problema);
+    setSalvandoProf(true);
+    const { data, error } = await supabase.rpc("salvar_profissional", {
+      p_id: null,
+      p_client_id: clienteDasProfissionais,
+      p_nome: novaProf.nome,
+      p_registro: novaProf.registro || null,
+      p_ativo: true,
+    });
+    setSalvandoProf(false);
+    if (error || !data) return mostrarAviso(error?.message || "Não consegui cadastrar. Confira a internet.", 4000);
+    const nome = novaProf.nome.replace(/\s+/g, " ").trim();
+    const registro = novaProf.registro.trim();
+    const nova: Profissional = { id: data as string, client_id: clienteDasProfissionais, nome, registro: registro || null, ativo: true };
+    setProfissionais((l) => profissionaisDaCliente([...(l ?? []).filter((x) => x.id !== nova.id), nova], clienteDasProfissionais));
+    mudar((pl) => ({ ...pl, profissional: nome, profissionalId: nova.id, profissionalRegistro: registro }));
+    setNovaProf(null);
+    mostrarAviso("Profissional cadastrada.");
+  }
+
   function mudarLigacao(novoCliente: string, novoEvento: string) {
     if (novoCliente !== ligacao.current.cliente && planoRef.current.pacienteId) {
       planoRef.current = { ...planoRef.current, pacienteId: "" };
       setPlano(planoRef.current);
+    }
+    if (novoCliente !== ligacao.current.cliente) {
+      // A profissional escolhida era da outra clínica: volta ao nome da cliente nova.
+      if (planoRef.current.profissionalId) {
+        planoRef.current = { ...planoRef.current, profissional: "", profissionalId: "", profissionalRegistro: "" };
+        setPlano(planoRef.current);
+      }
+      autoEscolher.current = "troca";
     }
     setCliente(novoCliente);
     setEvento(novoEvento);
@@ -672,8 +769,10 @@ export default function EditorPlanejamento({
     if (timer.current) clearTimeout(timer.current);
     sujo.current = false;
     if (emAndamento.current) await emAndamento.current;
+    const limpar = !portal && idRef.current ? await prepararLimpezaAssinaturas(supabase, [idRef.current]) : null;
     const { error } = await supabase.rpc("excluir_planejamento", { p_id: idRef.current });
     if (error) return error.message || "Não consegui apagar. Confira a internet.";
+    await limpar?.().catch(() => {});
     apagarRascunho();
     router.push(base);
     router.refresh();
@@ -732,20 +831,63 @@ export default function EditorPlanejamento({
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   }
 
+  // Com assinaturas colhidas na sessão, a impressão espera baixar as imagens (a janela abre já no toque).
+  function imprimirComAssinaturas(n: number, montar: (a?: Parameters<typeof htmlFichaPaciente>[5]) => string, titulo: string): boolean {
+    const daSessao = id && assinaturas.estado === "ok" ? assinaturasDaSessao(assinaturas.lista, id, n) : [];
+    if (!daSessao.length) return imprimir(montar(), titulo);
+    const atual = plano;
+    return imprimirDepois(async () => {
+      const r = resumoDaSessao(atual, n);
+      const [lista, hashAtual] = await Promise.all([paraImpressao(supabase, daSessao), r ? hashDoResumo(r).catch(() => null) : Promise.resolve(null)]);
+      return montar({ lista, hashAtual });
+    }, titulo);
+  }
+
   function pdf(tipo: "prontuario" | "paciente") {
     const origem = window.location.origin;
     const nome = plano.paciente || "paciente";
     const ok =
       tipo === "prontuario"
-        ? imprimir(htmlProntuario(plano, origem, new Date(), preferencias), `Prontuario - ${nome}`)
-        : imprimir(htmlFichaPaciente(plano, origem, new Date(), undefined, preferencias), `Ficha do paciente - ${nome}`);
+        ? imprimirComAssinaturas(plano.sessaoAtual, (a) => htmlProntuario(plano, origem, new Date(), preferencias, a), `Prontuario - ${nome}`)
+        : imprimirComAssinaturas(plano.sessaoAtual, (a) => htmlFichaPaciente(plano, origem, new Date(), undefined, preferencias, a), `Ficha do paciente - ${nome}`);
     mostrarAviso(ok ? "Abrindo para salvar em PDF…" : "O aparelho bloqueou a janela. Permita pop-ups para o Harmonize.");
   }
 
   function fichaSessao(n: number) {
     const nome = plano.paciente || "paciente";
-    const ok = imprimir(htmlFichaPaciente(plano, window.location.origin, new Date(), n, preferencias), `Ficha da Sessão ${n} - ${nome}`);
+    const ok = imprimirComAssinaturas(n, (a) => htmlFichaPaciente(plano, window.location.origin, new Date(), n, preferencias, a), `Ficha da Sessão ${n} - ${nome}`);
     mostrarAviso(ok ? "Abrindo a ficha para imprimir…" : "O aparelho bloqueou a janela. Permita pop-ups para o Harmonize.");
+  }
+
+  // Antes de colher assinaturas: o planejamento precisa estar salvo no banco.
+  async function salvarAntesDeAssinar(): Promise<boolean> {
+    if (precisaSalvar()) {
+      if (timer.current) {
+        clearTimeout(timer.current);
+        timer.current = null;
+      }
+      tentativas.current = 0;
+      await Promise.race([salvar(), new Promise((ok) => setTimeout(ok, 8000))]);
+    }
+    if (!idRef.current) {
+      mostrarAviso("Preencha o paciente antes de colher as assinaturas.", 4000);
+      return false;
+    }
+    if (sujo.current || emAndamento.current) {
+      return confirmar({
+        titulo: "Ainda não salvou no sistema",
+        texto: "A assinatura vale para o que está na tela agora. Se a internet não voltar, o banco fica com a versão anterior e a sessão aparece como alterada. Continuar?",
+        confirmar: "Continuar",
+        cancelar: "Esperar",
+      });
+    }
+    return true;
+  }
+
+  function irParaAssinaturas() {
+    setMenu(false);
+    setAba("resumo");
+    setTimeout(() => document.getElementById("assinaturas-sessao")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
   }
 
   function definirSessoes(n: number) {
@@ -793,6 +935,7 @@ export default function EditorPlanejamento({
   const nAreas = areasPreenchidas(plano);
   const nAlertas = alertas(plano).length;
   const nomeCliente = useMemo(() => clientes.find((c) => c.id === cliente)?.name, [clientes, cliente]);
+  const profDoPlano = profissionais ? profissionalDoPlano(profissionais, plano) : null;
   const quemAtende = nomeCliente || plano.profissional;
   const areas = todasAreas(plano).filter((a) => !soPreenchidas || totalArea(plano, a) > 0);
   const voltar = portal ? base : cliente ? `/planejador?cliente=${cliente}` : "/planejador";
@@ -876,6 +1019,11 @@ export default function EditorPlanejamento({
                         </button>
                       ))}
                     </>
+                  )}
+                  {assinaturas.estado !== "sem_permissao" && assinaturas.estado !== "carregando" && (
+                    <button onClick={irParaAssinaturas} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50">
+                      <PenLine size={16} /> Colher assinaturas (Sessão {plano.sessaoAtual})
+                    </button>
                   )}
                   {!somenteLeitura && (
                     <button onClick={excluir} className="flex w-full items-center gap-2.5 border-t border-neutral-100 px-4 py-3 text-left text-sm text-rose-600 active:bg-rose-50">
@@ -1082,10 +1230,54 @@ export default function EditorPlanejamento({
                     <span className={rotulo}>Queixa principal</span>
                     <input value={plano.queixa} onChange={(e) => campo("queixa", e.target.value)} placeholder="Ex.: flacidez de papada" className={entrada} />
                   </label>
-                  <label className="block">
-                    <span className={rotulo}>Profissional</span>
-                    <input value={plano.profissional} onChange={(e) => campo("profissional", e.target.value)} placeholder="Nome do profissional" className={entrada} />
-                  </label>
+                  {profissionais === null ? (
+                    <label className="block">
+                      <span className={rotulo}>Profissional</span>
+                      <input value={plano.profissional} onChange={(e) => mudar((p) => ({ ...p, profissional: e.target.value, profissionalId: "", profissionalRegistro: "" }))} placeholder="Nome do profissional" className={entrada} />
+                    </label>
+                  ) : (
+                    <div>
+                      <label className="block">
+                        <span className={rotulo}>Profissional</span>
+                        <select
+                          value={profDoPlano ? profDoPlano.id : plano.profissional.trim() ? "__texto" : ""}
+                          onChange={(e) => escolherProfissional(e.target.value)}
+                          disabled={somenteLeitura}
+                          className={entrada}
+                          aria-label="Profissional"
+                        >
+                          <option value="">{ativas(profissionais).length ? "Escolha a profissional" : "Nenhuma cadastrada"}</option>
+                          {!profDoPlano && plano.profissional.trim() && <option value="__texto">{plano.profissional} (escrito à mão)</option>}
+                          {profissionais
+                            .filter((p) => p.ativo || p.id === profDoPlano?.id)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {rotuloProfissional(p)}
+                                {p.ativo ? "" : " (desativada)"}
+                              </option>
+                            ))}
+                          {!somenteLeitura && <option value="__nova">+ Nova profissional</option>}
+                        </select>
+                      </label>
+                      {novaProf && (
+                        <div className="mt-2 space-y-2 rounded-2xl bg-neutral-50 p-3 ring-1 ring-neutral-200">
+                          <p className="text-xs font-semibold text-neutral-700">Nova profissional {portal ? "da sua clínica" : "desta clínica"}</p>
+                          <div className="grid grid-cols-[1fr_120px] gap-2">
+                            <input value={novaProf.nome} onChange={(e) => setNovaProf({ ...novaProf, nome: e.target.value })} placeholder="Nome" className={entrada} autoComplete="off" />
+                            <input value={novaProf.registro} onChange={(e) => setNovaProf({ ...novaProf, registro: e.target.value })} placeholder="Registro" className={entrada} autoComplete="off" />
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setNovaProf(null)} className="min-h-10 flex-1 rounded-xl bg-white text-sm font-semibold text-neutral-700 ring-1 ring-neutral-200">
+                              Cancelar
+                            </button>
+                            <button type="button" onClick={criarProfissional} disabled={salvandoProf} className="min-h-10 flex-1 rounded-xl bg-brand-teal text-sm font-bold text-white disabled:opacity-60">
+                              {salvandoProf ? "Salvando..." : "Cadastrar e escolher"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-[1fr_140px] gap-2">
                     <label className="block min-w-0">
                       <span className={rotulo}>Procedimento</span>
@@ -1318,6 +1510,19 @@ export default function EditorPlanejamento({
           {aba === "resumo" && (
             <div key="resumo" className="animate-[aparecer_.25s_ease-out]">
               <ResumoPlano plano={plano} onIrParaArea={irParaArea} />
+              {assinaturas.estado !== "sem_permissao" && assinaturas.estado !== "carregando" && (
+                <div id="assinaturas-sessao" className={`${cartao} mt-4 scroll-mt-4`}>
+                  <AssinaturasSessoes
+                    planoId={id}
+                    plano={plano}
+                    clienteId={cliente || null}
+                    estado={assinaturas.estado}
+                    lista={assinaturas.lista}
+                    onMudou={assinaturas.recarregar}
+                    antesDeAbrir={salvarAntesDeAssinar}
+                  />
+                </div>
+              )}
               {varias && (
                 <div className={`${cartao} mt-4`}>
                   <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Fichas para assinar</p>

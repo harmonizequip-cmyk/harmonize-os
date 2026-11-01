@@ -21,7 +21,7 @@ export default async function PortalLayout({ children }: { children: React.React
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <PortalTopo nome={cliente?.profissional ?? user.email ?? ""} />
+      <PortalTopo nome={cliente?.profissional ?? user.email ?? ""} clienteId={cliente?.client_id ?? null} />
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
         {cliente ? (
           children

@@ -21,6 +21,7 @@ import { confirmar, avisar } from "@/components/Dialogos";
 import { createClient } from "@/lib/supabase/client";
 import HistoricoClienteSection from "./HistoricoClienteSection";
 import AcessoPlanejadorCard from "@/components/AcessoPlanejadorCard";
+import ProfissionaisCliente from "@/components/planejador/ProfissionaisCliente";
 import CreditosClienteCard from "@/components/CreditosClienteCard";
 import AnotacoesFicha from "@/components/AnotacoesFicha";
 import MelhoresDatasModal from "@/components/MelhoresDatasModal";
@@ -707,6 +708,8 @@ export default function ClienteDetailClient({
       <CreditosClienteCard clientId={client.id} />
 
       <AcessoPlanejadorCard cliente={client} onCadastroAtualizado={() => router.refresh()} />
+
+      <ProfissionaisCliente clienteId={client.id} />
 
       <HistoricoClienteSection clientId={client.id} />
 

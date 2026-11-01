@@ -88,6 +88,10 @@ export interface Plano {
   dataRetorno: string;
   queixa: string;
   profissional: string;
+  /** Cadastro da profissional (tabela profissionais) escolhido na tela; "" = só o nome escrito. */
+  profissionalId: string;
+  /** Registro da profissional na época (ex.: "CRBM 1234"); sai no prontuário e na ficha. */
+  profissionalRegistro: string;
   perfil: string;
   procNome: string;
   valorProc: string;
@@ -199,6 +203,8 @@ export function normalizarPlano(e: EstadoPlanejador | null | undefined, hoje = h
     dataRetorno: txt(s.dataRetorno),
     queixa: txt(s.queixa),
     profissional: txt(s.profissional),
+    profissionalId: txt(s.profissionalId),
+    profissionalRegistro: txt(s.profissionalRegistro),
     perfil: txt(s.perfil) || "0",
     procNome: txt(s.procNome),
     valorProc: txt(s.valorProc),
@@ -261,6 +267,8 @@ export function paraEstado(p: Plano): EstadoPlanejador {
     dataRetorno: p.dataRetorno,
     queixa: p.queixa,
     profissional: p.profissional,
+    ...(p.profissionalId ? { profissionalId: p.profissionalId } : {}),
+    ...(p.profissionalRegistro ? { profissionalRegistro: p.profissionalRegistro } : {}),
     perfil: p.perfil,
     procNome: p.procNome,
     valorProc: p.valorProc,

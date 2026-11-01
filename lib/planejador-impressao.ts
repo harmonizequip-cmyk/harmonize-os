@@ -6,6 +6,24 @@
 import { urlImagemCorporal } from "./corpo-foto";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { contaDaSessao, dataBr, planoDaSessao, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
+import { dataHoraCompleta, type PapelAssinatura } from "./assinatura-sessao";
+
+/** Assinatura colhida no celular, pronta para a impressão (imagem já baixada como data URL). */
+export interface AssinaturaImpressa {
+  papel: PapelAssinatura;
+  nome: string;
+  registro: string | null;
+  assinadaEm: string;
+  /** data:image/png;base64,... (vazio se não deu para baixar). */
+  src: string;
+  hash: string;
+}
+
+/** Assinaturas de uma sessão e a conferência do conteúdo atual (hash do que está na tela agora). */
+export interface AssinaturasDaFicha {
+  lista: AssinaturaImpressa[];
+  hashAtual: string | null;
+}
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmt = (n: number) => n.toLocaleString("pt-BR");
@@ -58,6 +76,10 @@ export const CSS_PRONTUARIO = `
 .pront-sign{text-align:center}
 .pront-sign-line{border-top:1.5px solid #333;padding-top:6px;font-size:11px;color:#6e7580}
 .pront-date-foot{text-align:center;font-size:9.5px;color:#b0b8c1;margin-top:20px;padding-top:12px;border-top:1px solid #e2eaed}
+.pront-sign img{display:block;margin:0 auto 4px;max-width:100%;height:64px;object-fit:contain}
+.pront-sign-meta{font-size:9.5px;color:#6e7580;margin-top:3px;line-height:1.4}
+.pront-verif{grid-column:1/-1;text-align:center;font-size:9.5px;color:#6e7580;margin-top:-30px}
+.pront-verif.alterada{color:#b4365c;font-weight:800}
 .pront-alert{background:#fff0f3;border:2px solid #D9577E;border-radius:8px;padding:10px 14px;margin-bottom:14px;color:#b4365c;font-size:12px;font-weight:800}
 `;
 
@@ -71,7 +93,7 @@ function identificacao(p: Plano, titulo: string): string {
 ${campo("Paciente", p.paciente || "________________________")}
 ${campo("Data", dataBr(p.data))}
 ${campo("Retorno / próxima sessão", p.dataRetorno ? dataBr(p.dataRetorno) : "—")}
-${campo("Profissional", p.profissional || "________________________")}
+${campo("Profissional", p.profissional ? `${p.profissional}${p.profissionalRegistro ? ` · ${p.profissionalRegistro}` : ""}` : "________________________")}
 ${campo("Procedimento", p.procNome || "—")}
 ${campo("Valor do procedimento", p.valorProc || "—")}
 ${campo("Queixa principal", p.queixa || "—", true)}
@@ -98,8 +120,31 @@ function numerosDoPacote(p: Plano, n: number): string {
   ].join("");
 }
 
+/**
+ * Linhas de assinatura. Sem assinatura colhida, a linha em branco de sempre;
+ * com assinatura, a imagem, o nome, o registro e a data e hora, mais a
+ * conferência do conteúdo (8 primeiros caracteres do sha256).
+ */
+function blocoAssinaturas(rotuloPaciente: string, ass?: AssinaturasDaFicha, sempre = true): string {
+  const lista = ass?.lista ?? [];
+  if (!sempre && !lista.length) return "";
+  const um = (papel: PapelAssinatura, rotulo: string) => {
+    const a = lista.find((x) => x.papel === papel);
+    if (!a) return `<div class="pront-sign"><div class="pront-sign-line">${rotulo}</div></div>`;
+    const meta = [esc(a.nome), a.registro ? esc(a.registro) : "", `Assinado em ${esc(dataHoraCompleta(a.assinadaEm))}`].filter(Boolean).join("<br>");
+    return `<div class="pront-sign">${a.src ? `<img src="${a.src}" alt="Assinatura">` : ""}<div class="pront-sign-line">${rotulo}</div><div class="pront-sign-meta">${meta}</div></div>`;
+  };
+  let verif = "";
+  if (lista.length) {
+    const hash = lista[0].hash;
+    const alterada = !!ass?.hashAtual && lista.some((x) => x.hash !== ass.hashAtual);
+    verif = `<div class="pront-verif${alterada ? " alterada" : ""}">Conteúdo verificado: ${esc(hash.slice(0, 8))}${alterada ? " · ATENÇÃO: a sessão foi alterada depois de assinada" : ""}</div>`;
+  }
+  return `<div class="pront-footer">${um("profissional", "Assinatura do Profissional")}${um("paciente", rotuloPaciente)}${verif}</div>`;
+}
+
 /** Prontuário interno: tudo, linha por linha. */
-export function htmlProntuario(p: Plano, origem = "", agora = new Date(), cfg: CfgDocumentos = DEFAULT_PREFERENCIAS): string {
+export function htmlProntuario(p: Plano, origem = "", agora = new Date(), cfg: CfgDocumentos = DEFAULT_PREFERENCIAS, assinaturas?: AssinaturasDaFicha): string {
   const s = situacaoSaldo(p);
   let linhas = "";
   for (const a of todasAreas(p)) {
@@ -139,6 +184,7 @@ ${
 <thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th><th>Profund.</th><th>Direito</th><th>Esquerdo</th><th>Quad.</th><th>Total</th></tr></thead>
 <tbody>${linhas}<tr class="tot"><td colspan="6">TOTAL GERAL DE DISPAROS</td><td>${fmt(s.total)}</td></tr></tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Observações Clínicas</div><div class="pront-obs">${esc(p.obs || "—")}</div></div>
+${blocoAssinaturas(`Assinatura do Paciente${p.sessoesTotal > 1 ? ` · Sessão ${p.sessaoAtual}` : ""}`, assinaturas, false)}
 ${rodape(agora, cfg)}
 </div>`;
 }
@@ -155,6 +201,7 @@ export function htmlFichaPaciente(
   agora = new Date(),
   sessao?: number,
   cfg: CfgDocumentos = DEFAULT_PREFERENCIAS,
+  assinaturas?: AssinaturasDaFicha,
 ): string {
   const porSessao = p.sessoesTotal > 1 || sessao !== undefined;
   const n = sessao ?? p.sessaoAtual;
@@ -187,7 +234,7 @@ ${identificacao(v, "Identificação")}
 ${pacote}
 <div class="pront-section"><div class="pront-section-title">Áreas Tratadas</div><table class="pront-table"><thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th>${porSessao ? '<th style="text-align:right">Disparos</th>' : ""}</tr></thead><tbody>${linhas}</tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Recomendações</div><div class="pront-obs">${esc(p.recomendacoes || "—")}</div></div>
-<div class="pront-footer"><div class="pront-sign"><div class="pront-sign-line">Assinatura do Profissional</div></div><div class="pront-sign"><div class="pront-sign-line">Assinatura do Paciente${porSessao ? ` · Sessão ${n}` : ""}</div></div></div>
+${blocoAssinaturas(`Assinatura do Paciente${porSessao ? ` · Sessão ${n}` : ""}`, assinaturas)}
 ${rodape(agora, cfg)}
 </div>`;
 }
@@ -196,11 +243,35 @@ ${rodape(agora, cfg)}
 export function imprimir(corpo: string, titulo: string): boolean {
   const win = window.open("", "_blank");
   if (!win) return false;
+  escreverImpressao(win, corpo, titulo);
+  return true;
+}
+
+/**
+ * Impressão que precisa buscar algo antes (as imagens das assinaturas): abre a
+ * janela já no toque (senão o aparelho bloqueia), mostra "Preparando..." e
+ * escreve o documento quando ficar pronto. Falso se o aparelho bloqueou.
+ */
+export function imprimirDepois(montar: () => Promise<string>, titulo: string): boolean {
+  const win = window.open("", "_blank");
+  if (!win) return false;
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(titulo)}</title></head><body style="font-family:Arial,sans-serif;padding:24px;color:#555">Preparando o documento...</body></html>`);
+  win.document.close();
+  montar().then(
+    (corpo) => escreverImpressao(win, corpo, titulo),
+    () => {
+      win.document.body.textContent = "Não consegui preparar o documento. Confira a internet e tente de novo.";
+    }
+  );
+  return true;
+}
+
+function escreverImpressao(win: Window, corpo: string, titulo: string) {
+  win.document.open();
   win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(titulo)}</title><style>@page{size:A4;margin:12mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;padding:12px}${CSS_PRONTUARIO}</style></head><body>${corpo}</body></html>`);
   win.document.close();
   setTimeout(() => {
     win.focus();
     win.print();
   }, 600);
-  return true;
 }
