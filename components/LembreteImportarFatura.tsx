@@ -73,10 +73,10 @@ export default function LembreteImportarFatura() {
   }
 
   return (
-    <div
-      role="status"
-      className="cartao fixed bottom-20 left-4 right-20 z-20 p-4 md:bottom-24 md:left-auto md:right-6 md:w-80"
-    >
+    // A classe .cartao força position: relative (globals.css), então quem fica
+    // fixo na tela é o invólucro de fora; o de dentro só desenha o cartão.
+    <div role="status" className="fixed bottom-24 left-4 right-24 z-20 md:bottom-24 md:left-auto md:right-6 md:w-80">
+     <div className="cartao p-4">
       <div className="flex items-start gap-3">
         <IconeChip icone={FileUp} cor="roxo" />
         <div className="min-w-0 flex-1">
@@ -113,6 +113,7 @@ export default function LembreteImportarFatura() {
           Depois
         </button>
       </div>
+     </div>
     </div>
   );
 }
