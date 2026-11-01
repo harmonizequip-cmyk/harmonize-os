@@ -434,7 +434,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 #### `components/equipamentos/`
 
-- `EquipamentoCard.tsx`: Cartão de um HIPRO na tela Equipamentos (desenho aprovado pelo dono em 17/10/2026): nome, status e próxima reserva; números do período; revisão anual; aplicador montado, número de série e bloqueio de período.
+- `CuidadosHiproDia.tsx`: Bloco recolhível "Cuidados com o HIPRO" (checklist do dia: antes de sair, ao chegar, ao terminar; marca só na tela, nada é gravado), na janela da reserva/locação de HIPRO da Agenda e no topo de `/agenda-hoje` quando há atendimento hoje. Lê `manutencoes_equipamento` e `equipments` e mostra o alerta da troca de água vencida, levando a `/equipamentos#agua-<code>`.
+- `CuidadosHiproModal.tsx`: Janela "Cuidados com o HIPRO" (portal no body) com o guia resumido do e-book (água, bolhas, limpeza, mangueira, transporte, energia), de `GUIA_CUIDADOS`.
+- `EquipamentoCard.tsx`: Cartão de um HIPRO na tela Equipamentos (desenho aprovado pelo dono em 17/10/2026): nome, status e próxima reserva; números do período; revisão anual; troca de água; aplicador montado, número de série e bloqueio de período.
+- `TrocaAguaControl.tsx`: Faixa "Troca de água" do cartão do HIPRO (`id="agua-<code>"`): situação, última troca, "Troquei a água" (data, padrão hoje; `registrar_manutencao_equipamento`), "desfazer" (`excluir_manutencao_equipamento`) e "Ver cuidados". Visualização só vê; sem o SQL, avisa "Falta rodar o SQL da manutenção".
 - `SeletorPeriodo.tsx`: Seletor de período em forma de pílula ("Este mês ⌄"), do desenho aprovado da tela de Equipamentos. Mesmo contrato do FiltroBarra: o período vive na URL (period, from, to) e o servidor consulta já filtrado.
 
 #### `components/pessoal/`
@@ -451,9 +454,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `FotosPaciente.tsx`: Seção Fotos da ficha do paciente (piloto só do dono): autorização do paciente, envio por etapa e área corporal, grade de miniaturas com `loading="lazy"`, visualizador com anterior/próxima e Apagar foto, e Comparar duas etapas lado a lado.
 - `AssinaturasSessoes.tsx`: Assinaturas por sessão (só o dono): selo "Assinada por paciente e profissional em dd/mm hh:mm" ou "Alterada depois de assinada" (com o que foi assinado), lista das assinaturas com Apagar e botão "Colher assinaturas"; sem o SQL avisa "Falta rodar o SQL das assinaturas". Usado no Resumo do editor e em cada sessão da ficha do paciente.
 - `CanvasAssinatura.tsx`: Quadro para assinar com o dedo (eventos de ponteiro, fundo branco, Limpar); `exportar()` devolve PNG recortado e reduzido (até 600 x 240).
-- `ColherAssinaturas.tsx`: Tela cheia (portal no body) para colher as assinaturas da sessão: resumo, paciente, profissional (do cadastro da clínica) e Confirmar; sobe as imagens e registra com o sha256 do resumo.
+- `ColherAssinaturas.tsx`: Tela cheia (portal no body) para colher as assinaturas da sessão em 5 passos: resumo, triagem de contraindicações (absoluta só segue com a confirmação da profissional; relativa pede "Avaliado e liberado"; disparo teste), termo de consentimento com "Li e concordo", paciente, profissional (do cadastro da clínica) e Confirmar; sobe as imagens e registra com o sha256 do resumo, e a triagem e o termo vão junto da assinatura do paciente.
+- `BotaoOrientacoes.tsx`: "Mandar orientações ao paciente": abre o WhatsApp do paciente (`pacientes.whatsapp`) com os cuidados depois da sessão (`lib/orientacoes-pos.ts`) e "Copiar texto"; sem WhatsApp, botão apagado com o motivo. No Resumo do editor e em cada sessão da ficha do paciente (também no portal).
 - `ProfissionaisCliente.tsx`: Profissionais da clínica: listar, cadastrar, editar, desativar/reativar e excluir (a usada fica desativada). Cartão na ficha da cliente e painel no topo do portal.
-- `Partes.tsx`: Peças do Planejador HIPRO nativo: folha (bottom sheet), campo de disparos com - e +, cartão de área (modelo facial + linhas por profundidade), folha da modelo ampliada e folha de área manual.
+- `Partes.tsx`: Peças do Planejador HIPRO nativo: folha (bottom sheet), campo de disparos com - e +, cartão de área (modelo facial + linhas por profundidade), aviso de zona de risco (`AvisoZonaRisco`, uma linha com "ver mais"), folha da modelo ampliada e folha de área manual.
 - `ResumoPlano.tsx`: Aba Resumo: números do plano, alertas, distribuição por área (barras com a modelo de cada área) e prévia do texto, do prontuário e da ficha do paciente.
 - `SeloSituacao.tsx`: Selo de situação do Planejador (`SeloSituacao`): laranja "Pendente" (ainda há disparos para a próxima sessão, com o detalhe) ou verde "Concluído".
 
@@ -544,6 +548,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `fotos-paciente.test.ts`: Testes automatizados (Vitest) das regras de `lib/fotos-paciente.ts`.
 - `fotos-paciente.ts`: Regras puras das fotos dos pacientes: etapas (`ETAPAS_FOTO`), caminhos no Storage (`caminhosDaFoto`), medidas reduzidas, agrupamento por etapa e área (`agruparFotos`), áreas corporais dos planejamentos (`areasCorporaisDosPlanos`) e tamanho formatado.
 - `assinatura-sessao.ts`: Regras puras da assinatura da sessão: resumo da sessão (`resumoDaSessao`), JSON canônico e sha256 (`textoParaHash`, `hashDoResumo`), situação das assinaturas (`situacaoAssinaturas`), caminho do arquivo, datas de Brasília e recorte da imagem (`caixaDosTracos`, `escalaParaCaber`, `assinaturaVazia`). Testes em `assinatura-sessao.test.ts`.
+- `triagem-hipro.ts`: Regras puras da triagem do HIPRO (e-book, cap. 8 e 22): `CONTRAINDICACOES` (9 absolutas e 3 relativas), `classificarTriagem`, `registroDaTriagem` (o que vai para `assinaturas_sessao.triagem`), `lerTriagem` (coluna ou `resumo.triagem` antes do SQL) e `textoTriagemImpressao`. Testes em `triagem-hipro.test.ts`.
+- `consentimento-hipro.ts`: Texto do termo de consentimento esclarecido (`TERMO_PARAGRAFOS`, `TERMO_TEXTO`, `TERMO_RESUMO` para a impressão, `TERMO_VERSAO`: subir ao mudar o texto).
+- `orientacoes-pos.ts`: Mensagem de WhatsApp com os cuidados depois da sessão (e-book, cap. 24): `mensagemOrientacoesPos` ("Olá, <primeiro nome>", fotoproteção, 48 h, skincare, ácidos, máscaras, o que esperar, retorno se for hoje ou depois e a profissional assinando) e `primeiroNomePaciente`. Testes em `orientacoes-pos.test.ts`.
+- `zonas-risco.ts`: Avisos de zona de risco por área (e-book, cap. 21): `ZONA_POR_AREA` (áreas fixas), `ZONA_POR_PARTE` (regiões corporais), `zonaDeRisco` (área manual pelo nome), `resumoDaZona` e `AVISO_GERAL_APLICACAO`. Só informa, não mexe nos números. Testes em `zonas-risco.test.ts`.
 - `assinaturas-envio.ts`: Assinaturas no navegador: `useAssinaturasSessao` (só o dono), `enviarAssinatura` (sobe para a pasta `assinaturas` e registra; apaga o arquivo se falhar e o da assinatura substituída), `apagarAssinatura`, `prepararLimpezaAssinaturas` (antes de apagar planejamentos) e `paraImpressao` (imagens como data URL).
 - `funil-clientes.ts`: Funil de clientes: a etapa não é gravada no banco, é calculada aqui a partir de dados que já existem (reservas futuras, taxa de reserva e última locação concluída). Assim ela nunca fica desatualizada: paga a taxa, a etapa muda sozinha; passam 45 dias, cai em Reativar sozinha.
 - `grafico-fluxo.test.ts`: Testes automatizados (Vitest) das regras de `lib/grafico-fluxo.ts`.
@@ -602,6 +610,8 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `rental-calculator.test.ts`: Testes automatizados (Vitest) das regras de `lib/rental-calculator.ts`.
 - `rental-calculator.ts`: HARMONIZE OS, Calculadora unificada de locação (leva 2) Suporte de cálculo para o CalculadoraLocacaoModal: junta a fórmula real de precificação (lib/rental-pricing.ts) com os recursos novos da leva O (pagamento múltiplo/parcial, deslocamento, custo por disparo negociado) e monta o texto de resumo para copiar/enviar no WhatsApp. Substitui lib/rental-summary.ts (usado só pelos dois modais antigos, removidos nesta leva) por uma versão que também sabe de itens personalizados (+ / -) e de mais de um pagamento por locação.
 - `rental-pricing.ts`: HARMONIZE OS, Cálculo de valor da locação HIPRO Day Modelo por faixa única (não progressivo/marginal), confirmado com exemplos numéricos em conversa: - até 20.000 disparos: pacote fixo de R$ 2.500,00 - de 20.001 a 80.000 disparos: TODO o excedente acima de 20.000 é cobrado a R$ 0,10/disparo Ex: 70.000 disparos -> 2.500 + (50.000 x 0,10) = R$ 7.500,00 - acima de 80.000 disparos: R$ 0,07 por disparo sobre o TOTAL de disparos, sem o pacote fixo (como na tabela que o dono manda ao cliente;
+- `manutencao-equipamento.test.ts`: Testes automatizados (Vitest) das regras de `lib/manutencao-equipamento.ts`.
+- `manutencao-equipamento.ts`: Manutenção do HIPRO (e-book, capítulo 26): situação da troca de água a cada 15 dias (`situacaoAgua`: nunca, em dia, vence logo (até 3 dias), vence hoje, atrasada), `ultimaTrocaPorEquipamento`, textos dos avisos, detecção do SQL não rodado, guia de cuidados (`GUIA_CUIDADOS`) e checklist do dia (`CHECKLIST_DIA`).
 - `revisao.test.ts`: Testes automatizados (Vitest) das regras de `lib/revisao.ts`.
 - `revisao.ts`: Revisão anual do HIPRO: próxima = última + 1 ano. Avisa 30 dias antes.
 - `saudacao.test.ts`: Testes automatizados (Vitest) das regras de `lib/saudacao.ts`.
@@ -729,7 +739,9 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `2026-10-30-pacientes.sql`: Migration: Cadastro de pacientes do Planejador HIPRO (pedido do dono, 30/10/2026). Cada paciente pertence à cliente (profissional) que o atende: o paciente da Dra. Ana fica com a Dra. Ana, e no portal ela vê só os dela. Todo planejamento com nome de paciente fica ligado a um cadastro (planejamentos.paciente_id), então a ficha do paciente junta todas as sessões, mesmo quando o procedimento se repete ou muda de área. salvar_planejamento não muda de assinatura: o editor manda o id escolhido dentro do estado (estado.pacienteId).
 - `2026-10-31-fotos-pacientes.sql`: Migration: Fotos dos pacientes do Planejador HIPRO (piloto só para o dono, 31/10/2026). Cada foto é de um paciente (tabela pacientes), de uma etapa (antes, imediato, 30, 60 e 90 dias) e, se quiser, de uma área tratada e de um planejamento. Os arquivos ficam na pasta privada "fotos-pacientes" do Storage: p/<paciente_id>/<etapa>/<id>.jpg e p/<paciente_id>/<etapa>/<id>_mini.jpg Piloto: só o dono (administrador ativo, que não é só de visualização nem login de cliente) vê e envia. Clientes do portal e o acesso de visualização não veem nada, nem a lista, nem os arquivos.
 - `2026-10-31-profissionais-e-assinaturas.sql`: Migration: profissionais de cada clínica (tabela `profissionais`, `salvar_profissional`, `excluir_profissional`, semente pelos nomes já escritos em `planejamentos.estado->>'profissional'`) e assinatura da sessão pelo paciente e pela profissional no celular do dono (tabela `assinaturas_sessao`, `pode_assinar_sessao`, `registrar_assinatura_sessao`, `excluir_assinatura_sessao`, pasta privada `assinaturas` do Storage, PNG até 500 KB).
+- `2026-11-01-triagem-assinatura.sql`: Migration: triagem de contraindicações e termo de consentimento na assinatura do paciente (01/11/2026). Coluna `assinaturas_sessao.triagem` (jsonb, check objeto) e `registrar_assinatura_sessao` com `p_triagem jsonb default null` no fim (a versão de 10 parâmetros é apagada; revoke/grant na nova): só na do paciente, recusa absoluta sem `absolutaConfirmada` e termo sem `aceito`. Idempotente; não altera nem apaga dado existente.
 - `2026-10-31-ajuste-de-saldo.sql`: Migration: ajuste de saldo (31/10/2026). Categorias de sistema "Ajuste de saldo" (entrada e saída, Harmonize e Pessoal) e as funções `saldo_do_caixa(p_scope)` (saldo com a regra das telas) e `ajustar_saldo(p_scope, p_saldo_real, p_observacao)`, que lança a diferença como um lançamento de ajuste. Não altera nem apaga dado existente.
+- `2026-11-01-manutencao-equipamento.sql`: Migration: manutenção do HIPRO com lembretes (01/11/2026, e-book do HIPRO, capítulo 26). Tabela `manutencoes_equipamento` (hoje só `troca_agua`, a cada 15 dias; check de tipo extensível), RLS (leitura com `equipamentos`, `agenda` ou `dashboard`), gatilho `trg_somente_leitura`, funções `registrar_manutencao_equipamento`, `excluir_manutencao_equipamento` e `rotulo_manutencao_equipamento`. Idempotente; não altera nem apaga dado existente.
 - `2026-10-31-emprestimo-compra-cartao.sql`: Migration: compra no cartão da Harmonize que é da Laser Dream vira empréstimo (31/10/2026). Colunas `emprestimos.origem` ('manual' ou 'cartao') e `emprestimos.categoria_anterior`, índice único por parcela de cartão, funções `marcar_compra_emprestimo` e `desmarcar_compra_emprestimo` (mais as internas `marcar_parcela_emprestimo`, `emprestimo_cartao_descricao`, `categoria_emprestimo_concedido`), gatilhos `trg_emprestimo_cartao_sincronizar`, `trg_emprestimo_cartao_apagar` e `trg_emprestimo_cartao_parcela_nova` em `transactions`; `editar_emprestimo` e `remover_emprestimo` recusam origem cartão. Linhas que já existem ficam com origem 'manual'; não altera nem apaga dado existente.
 - `2026-10-31-pessoal-emprestimos-e-categorias.sql`: Migration: empréstimos também no Pessoal e categorias do importador no Pessoal (31/10/2026). Coluna `emprestimos.scope` ('harmonize' padrão ou 'pessoal', check, índice `emprestimos_scope_devedor_idx`), política `emprestimos_select` por espaço, categorias do Pessoal "Empréstimo concedido" e "Devolução de empréstimo" (sistema), "Juros e encargos do cartão" e "Hospedagem"; `registrar_emprestimo` ganha `p_scope` (padrão 'harmonize'); `editar_emprestimo`, `remover_emprestimo`, `marcar_compra_emprestimo` e `desmarcar_compra_emprestimo` (mesma assinatura) e os gatilhos do empréstimo no cartão passam a valer nos dois espaços; internas novas `pode_mexer_emprestimo`, `categoria_de_emprestimo`, `saldo_emprestimo_devedor`; `categoria_emprestimo_concedido` passa a receber o espaço. Linhas que já existem ficam 'harmonize'; não altera nem apaga dado existente.
 - `2026-10-31-importar-fatura-melhorias.sql`: Migration: Importar fatura do cartão, melhorias (31/10/2026). Mesma assinatura de importar_compras_cartao. Linha marcada "real" (está no arquivo) que já existe na mesma fatura recebe o valor, a descrição e o dia da compra do arquivo (categoria não muda; parcela futura gerada nunca sobrescreve; chamada sem a marca funciona como antes). Pagamento importado não entra se o cartão já tem pagamento com a mesma data e valor (importado ou do "Pagar fatura"), nem a parte dividida de um pagamento já lançado inteiro. Devolve também atualizados e pagamentos_repetidos. Não altera nem apaga dado existente.
@@ -810,7 +822,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 ## 1.2 Dicionário de dados e tabelas
 
-O banco tem **42 tabelas**, **11 views**, **6 tipos enumerados**, **150 funções** (nomes distintos), **69 gatilhos**, **97 políticas RLS** (tabelas e Storage), **4 pastas no Storage**, **3 segredos no Vault** e **3 rotinas no pg_cron**. Além do banco, o app guarda estado no navegador (localStorage, sessionStorage, Cache Storage) e em objetos de memória, listados no fim desta seção.
+O banco tem **43 tabelas**, **11 views**, **6 tipos enumerados**, **153 funções** (nomes distintos), **70 gatilhos**, **98 políticas RLS** (tabelas e Storage), **4 pastas no Storage**, **3 segredos no Vault** e **3 rotinas no pg_cron**. Além do banco, o app guarda estado no navegador (localStorage, sessionStorage, Cache Storage) e em objetos de memória, listados no fim desta seção.
 
 Convenções gerais:
 
@@ -1083,6 +1095,7 @@ Assinaturas (paciente e profissional) de cada sessão de um planejamento, colhid
 | `assinada_em` | `timestamp with time zone` | Sim | `now()` | Data e hora da assinatura. |
 | `created_by` | `uuid` | Não | `auth.uid()` | Login que colheu a assinatura. |
 | `aparelho` | `text` | Não | (sem padrão) | Navegador do celular que colheu (até 300 caracteres). |
+| `triagem` | `jsonb` | Não | (sem padrão) | Só na assinatura do paciente (01/11/2026): triagem de contraindicações (`situacao` sem/relativa/absoluta, `marcadas`, `absolutas`, `relativas`, `nomes`, `disparoTeste`, `relativaLiberada`, `absolutaConfirmada`) e termo de consentimento aceito (`termo.versao`, `termo.texto`, `termo.resumo`). Fica fora do `conteudo_hash`. Nula nas assinaturas antigas e na da profissional. |
 
 Chaves e restrições:
 
@@ -1091,7 +1104,7 @@ Chaves e restrições:
 - FK `assinaturas_sessao_profissional_id_fkey`: `profissional_id` → `profissionais.id` (ON DELETE SET NULL)
 - FK `assinaturas_sessao_created_by_fkey`: `created_by` → `profiles.id` (ON DELETE SET NULL)
 - Única `assinaturas_sessao_unica`: `UNIQUE (planejamento_id, sessao, papel)` (assinar de novo substitui)
-- Checks: `sessao` entre 1 e 50; `papel` em ('paciente','profissional'); `nome` não vazio até 120; `registro` até 60; `conteudo_hash ~ '^[0-9a-f]{64}$'`; `resumo` objeto; `aparelho` até 300.
+- Checks: `sessao` entre 1 e 50; `papel` em ('paciente','profissional'); `nome` não vazio até 120; `registro` até 60; `conteudo_hash ~ '^[0-9a-f]{64}$'`; `resumo` objeto; `aparelho` até 300; `assinaturas_sessao_triagem_objeto`: `triagem` nula ou objeto.
 
 Segurança (RLS ligada):
 
@@ -2014,6 +2027,43 @@ Gatilhos:
 Funções que gravam nesta tabela: `corrigir_contagens_locacao`, `gravar_contagens_locacao`, `registrar_contagens_locacao`.
 
 Arquivos que acessam direto (`.from`): `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`.
+
+#### `manutencoes_equipamento`
+
+Cuidados de rotina feitos em cada HIPRO (migration `2026-11-01-manutencao-equipamento.sql`, e-book do HIPRO, capítulo 26). Hoje só a troca de água do circuito, a cada 15 dias (`lib/manutencao-equipamento.ts`, `INTERVALO_TROCA_AGUA_DIAS`). Escrita só por `registrar_manutencao_equipamento` e `excluir_manutencao_equipamento` (desfazer engano), com o módulo `equipamentos`. Entra no backup (pulada se o SQL não rodou, `PODEM_FALTAR`).
+
+| Nome do campo | Tipo de dado | Obrigatório | Valor padrão | Descrição / finalidade |
+|---|---|---|---|---|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | Identificador único do registro. |
+| `equipment_id` | `uuid` | Sim | (sem padrão) | FK para `equipments.id` (`on delete cascade`): o HIPRO em que o cuidado foi feito. |
+| `tipo` | `text` | Sim | (sem padrão) | Tipo do cuidado. Valores do check: `troca_agua`. Tipo novo entra trocando o check (`manutencoes_equipamento_tipo_check`), a lista de `registrar_manutencao_equipamento`, `rotulo_manutencao_equipamento` e `TIPOS_MANUTENCAO`. |
+| `feita_em` | `date` | Sim | `hoje_local()` | Dia em que foi feito. A função recusa data futura e mais de 365 dias atrás. A próxima troca de água vence em `feita_em` + 15. |
+| `observacao` | `text` | Não | (sem padrão) | Texto livre opcional (até 500 caracteres). |
+| `created_by` | `uuid` | Não | `auth.uid()` | FK para `profiles.id`: quem registrou. |
+| `created_at` | `timestamp with time zone` | Sim | `now()` | Data e hora do registro. |
+
+Chaves e restrições:
+
+- PK `manutencoes_equipamento_pkey`: `PRIMARY KEY (id)`
+- FK `manutencoes_equipamento_created_by_fkey`: `created_by` → `profiles.id`
+- FK `manutencoes_equipamento_equipment_id_fkey`: `equipment_id` → `equipments.id` (ON DELETE CASCADE)
+- Check `manutencoes_equipamento_tipo_check`: `CHECK ((tipo = ANY (ARRAY['troca_agua'::text])))`
+
+Índices:
+
+- `manutencoes_equipamento_equip_idx`: `INDEX manutencoes_equipamento_equip_idx em manutencoes_equipamento USING btree (equipment_id, tipo, feita_em DESC)`
+
+Segurança (RLS ligada):
+
+- Política `manutencoes_equipamento_select` (SELECT, permissiva, papéis {public}): usando `(has_module_permission('equipamentos'::text) OR has_module_permission('agenda'::text) OR has_module_permission('dashboard'::text))`
+
+Gatilhos:
+
+- `trg_somente_leitura` (BEFORE INSERT OR DELETE OR UPDATE, por comando) executa `bloquear_somente_leitura()`
+
+Funções que gravam nesta tabela: `excluir_manutencao_equipamento`, `registrar_manutencao_equipamento`.
+
+Arquivos que acessam direto (`.from`): `app/(app)/equipamentos/page.tsx`, `app/(app)/dashboard/page.tsx`, `components/equipamentos/CuidadosHiproDia.tsx`, `supabase/functions/alertas/index.ts`, `app/api/backup/route.ts`.
 
 #### `mentoring_events`
 
@@ -3640,6 +3690,7 @@ erDiagram
     timestamptz assinada_em
     uuid created_by FK
     text aparelho
+    jsonb triagem
   }
   profissionais {
     uuid id PK
@@ -4018,6 +4069,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `excluir_assinatura_sessao` | `p_id uuid` | `jsonb` | Sim | authenticated,service_role | `assinaturas_sessao` D, `movimentacoes` C | Só `pode_assinar_sessao()`; devolve o caminho da imagem para a tela apagar. Chamada em: `lib/assinaturas-envio.ts`. |
 | `excluir_profissional` | `p_id uuid` | `text` | Sim | authenticated,service_role | `assinaturas_sessao` R, `movimentacoes` C, `planejamentos` R, `profissionais` RUD | Apaga a nunca usada; a usada (planejamento pelo id ou nome, ou assinatura) fica desativada. Devolve 'excluida' ou 'desativada'. Chamada em: `components/planejador/ProfissionaisCliente.tsx`. |
 | `excluir_locacao_cascata` | `p_rental_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` RUD, `mentoring_events` U, `rentals` UD, `transactions` RD | Cascata de uma locação: quebra os ciclos de chave estrangeira (com a transação, com a taxa) antes de apagar, na ordem que o banco permite. |
+| `excluir_manutencao_equipamento` | `p_id uuid` | `void` | Sim | authenticated,service_role | `equipments` R, `manutencoes_equipamento` RD, `movimentacoes` C | Desfaz um registro de manutenção feito por engano (módulo `equipamentos`). Chamada em: `components/equipamentos/TrocaAguaControl.tsx`. |
 | `excluir_mentoria_cascata` | `p_mentoria_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` UD, `mentoring_events` RUD, `transactions` UD | Cascata de uma mentoria. |
 | `excluir_paciente` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `paciente_fotos` R, `pacientes` D, `planejamentos` R, `rentals` R | Chamada em: `components/planejador/FichaPaciente.tsx`. |
 | `excluir_planejamento` | `p_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `movimentacoes` C, `planejamentos` D, `rentals` R | Chamada em: `app/(app)/planejador/EditorPlanejamento.tsx`, `components/planejador/FichaPaciente.tsx`. |
@@ -4077,8 +4129,9 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `registrar_envio_agenda` | `p_client_id uuid, p_mensagem text, p_inicio date, p_fim date` | `uuid` | Sim | authenticated,postgres,service_role | `agenda_envios` C, `clients` R, `movimentacoes` C | Chamada em: `app/(app)/assistente/CartaoAgenda.tsx`. |
 | `registrar_envio_campanha` | `p_campanha uuid, p_client uuid, p_status text, p_mensagem text` | `uuid` | Sim | authenticated,postgres,service_role | `campanha_envios` CRU, `campanhas` R, `cliente_anotacoes` C, `clients` R, `movimentacoes` C | (versão da migration 2026-10-26-campanha-registra-anotacao.sql: grava anotação na cliente) Cria ou atualiza o envio de uma cliente numa campanha. 'enviado' grava a hora do envio (a primeira) e o texto exato; os outros status mantêm a hora. Campanha arquivada não recebe envio novo (só muda o que já existe). Cada mudança de status (menos 'pulado') vira anotação da cliente. Chamada em: `app/(app)/campanhas/FilaCampanha.tsx`, `app/(app)/campanhas/ResultadoCampanha.tsx`, `components/VinculoCampanha.tsx`. |
 | `registrar_foto_paciente` | `p_paciente_id uuid, p_etapa text, p_area text, p_caminho text, p_miniatura text, p_largura integer, p_altura integer, p_tamanho_bytes integer, p_tirada_em date DEFAULT NULL::date, p_planejamento_id uuid DEFAULT NULL::uuid, p_observacao text DEFAULT NULL::text` | `uuid` | Sim | authenticated,postgres,service_role | `movimentacoes` C, `paciente_fotos` C, `pacientes` R, `planejamentos` R | Chamada em: `lib/fotos-paciente-envio.ts`. |
-| `registrar_assinatura_sessao` | `p_planejamento_id uuid, p_sessao integer, p_papel text, p_nome text, p_profissional_id uuid, p_registro text, p_imagem text, p_conteudo_hash text, p_resumo jsonb, p_aparelho text DEFAULT NULL::text` | `jsonb` | Sim | authenticated,service_role | `assinaturas_sessao` CD, `movimentacoes` C, `planejamentos` R, `profissionais` R | Registra ou substitui a assinatura de um papel na sessão; confere sessão, caminho, hash e clínica da profissional; devolve `{id, anterior}`. Chamada em: `lib/assinaturas-envio.ts`. |
+| `registrar_assinatura_sessao` | `p_planejamento_id uuid, p_sessao integer, p_papel text, p_nome text, p_profissional_id uuid, p_registro text, p_imagem text, p_conteudo_hash text, p_resumo jsonb, p_aparelho text DEFAULT NULL::text, p_triagem jsonb DEFAULT NULL::jsonb` | `jsonb` | Sim | authenticated,service_role | `assinaturas_sessao` CD, `movimentacoes` C, `planejamentos` R, `profissionais` R | Registra ou substitui a assinatura de um papel na sessão; confere sessão, caminho, hash e clínica da profissional; na do paciente guarda a triagem (recusa absoluta sem confirmação da profissional e termo não aceito); devolve `{id, anterior}`. Chamada em: `lib/assinaturas-envio.ts`. |
 | `registrar_leitura_aplicador` | `p_aplicador_id uuid, p_contador integer, p_data date` | `void` | Sim | authenticated,postgres,service_role | `aplicadores` U, `movimentacoes` C | Leitura do contador do aplicador: passa a ser a nova base. Chamada em: `components/AplicadoresCard.tsx`. |
+| `registrar_manutencao_equipamento` | `p_equipment_id uuid, p_tipo text, p_data date DEFAULT NULL::date, p_observacao text DEFAULT NULL::text` | `uuid` | Sim | authenticated,service_role | `equipments` R, `manutencoes_equipamento` C, `movimentacoes` C | Registra um cuidado feito no HIPRO (hoje só `troca_agua`); sem data = hoje; recusa data futura ou de mais de 365 dias. Módulo `equipamentos`. Chamada em: `components/equipamentos/TrocaAguaControl.tsx`. |
 | `registrar_movimentacao` | `p_acao text, p_entidade text, p_entidade_id uuid, p_descricao text, p_detalhes jsonb` | `void` | Sim | postgres,service_role | `movimentacoes` C, `profiles` R | Escreve no histórico. usuario_nome é resolvido e gravado na hora, não por referência, para o histórico continuar legível mesmo depois que o perfil for removido. |
 | `registrar_pagamento_locacao` | `p_rental_id uuid, p_forma payment_method_type, p_valor numeric, p_data date, p_pix_conta text, p_notes text` | `uuid` | Sim | authenticated,postgres,service_role | `calendar_events` R, `categories` R, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` C, `rentals` R, `rentals_situacao_pagamento` R, `tasks` R, `transactions` CR | Registrar UM pagamento (parcial ou não). Chamar de novo para dividir entre formas (ex: parte em dinheiro, parte em PIX) ou completar um saldo em aberto, pago/pago_em se ajustam sozinhos pelo trigger acima. Chamada em: `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`, `components/CalculadoraLocacaoModal.tsx`, `components/ReceberPagamentoBotao.tsx`. |
 | `registrar_pedido_confirmacao` | `p_event_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` RU, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rentals` R, `tasks` R, `transactions` R | Registra que "Pedir confirmação no WhatsApp" foi clicado para esta reserva. Só grava o timestamp e o histórico, nunca toca em calendar_events.confirmed. É a contraparte de confirmar_agendamento, que faz o oposto. Chamada em: `app/(app)/agenda/AgendaClient.tsx`, `app/(app)/funil/FunilClient.tsx`. |
@@ -4090,6 +4143,7 @@ Para cada função: argumentos, retorno, se roda como dono (`security definer`),
 | `remover_pagamento_locacao` | `p_payment_id uuid` | `void` | Sim | authenticated,postgres,service_role | `calendar_events` R, `clients` R, `equipments` R, `mentoring_events` R, `movimentacoes` C, `rental_payments` RD, `rentals` RU, `tasks` R, `transactions` RD | Chamada em: `app/(app)/clientes/[id]/EditarLocacaoModal.tsx`, `app/(app)/financeiro/EditarLancamentoModal.tsx`. |
 | `require_admin` | (nenhum) | `void` | Sim | authenticated,postgres,service_role | `profiles` R | Guarda de admin, reaproveitada por várias funções abaixo. |
 | `rotulo_bloqueio` | `p_tipo text` | `text` | Não | authenticated,postgres,service_role | (nenhuma) | Rótulo do tipo, para mensagens. |
+| `rotulo_manutencao_equipamento` | `p_tipo text` | `text` | Não | authenticated,service_role | (nenhuma) | Rótulo do tipo de manutenção ("Troca de água"), para o histórico. |
 | `saldo_credito_cliente` | `p_client_id uuid, p_tipo text` | `numeric` | Sim | authenticated,postgres,service_role | `creditos_cliente` R, `rentals` R | 7. Saldo de crédito da cliente só para quem mexe na agenda; os auxiliares do portal só são chamados por outras funções (security definer), então saem do authenticated. |
 | `salvar_anotacao_cliente` | `p_client_id uuid, p_texto text, p_origem text` | `uuid` | Sim | authenticated,postgres,service_role | `cliente_anotacoes` C, `clients` R, `movimentacoes` C | Chamada em: `components/AnotacoesCliente.tsx`, `supabase/functions/assistente/index.ts`. |
 | `salvar_aplicador` | `p_id uuid, p_nome text, p_numero_serie text, p_garantia_disparos integer, p_ativo boolean, p_contador_inicial integer` | `uuid` | Sim | authenticated,postgres,service_role | `aplicador_montagens` U, `aplicadores` CU, `movimentacoes` C | Cria (p_id nulo) ou altera um aplicador. Desativar tira da montagem. Chamada em: `components/AplicadoresCard.tsx`. |
@@ -4562,20 +4616,21 @@ Rotas: `/relatorios`.
 
 Rotas: `/equipamentos`.
 
-**O que faz (fluxo do usuário).** Cartão por HIPRO (`EquipamentoCard`): status Ativo ou Em manutenção, próxima reserva, locações e disparos, receita e pendente, locações previstas, revisão anual (`RevisaoAnualControl`, `registrar_revisao_equipamento`), aplicador montado, número de série e "Bloquear período" (`criar_bloqueio_equipamento`). Cartão Aplicadores (`AplicadoresCard`): leitura do contador, garantia, montar em outro HIPRO (`montar_aplicador`).
+**O que faz (fluxo do usuário).** Cartão por HIPRO (`EquipamentoCard`): status Ativo ou Em manutenção, próxima reserva, locações e disparos, receita e pendente, locações previstas, revisão anual (`RevisaoAnualControl`, `registrar_revisao_equipamento`), troca de água (`TrocaAguaControl`, `registrar_manutencao_equipamento`, "desfazer" por `excluir_manutencao_equipamento`, "Ver cuidados" abre `CuidadosHiproModal`), aplicador montado, número de série e "Bloquear período" (`criar_bloqueio_equipamento`). Cartão Aplicadores (`AplicadoresCard`): leitura do contador, garantia, montar em outro HIPRO (`montar_aplicador`).
 
 **Regras de negócio, cálculos, filtros, permissões e validações:**
 
 - Disparos contados por aplicador (view `aplicadores_uso`): última leitura mais disparos das locações do HIPRO onde estava montado depois da leitura; a locação do dia da troca conta para quem entrou.
 - Aviso no Dashboard com a garantia entre 90% e 100%; revisão vence 1 ano depois da última, aviso 30 dias antes.
 - Bloqueio do tipo manutenção que cobre hoje põe o equipamento em manutenção (`sincronizar_manutencao_por_bloqueio`).
+- Troca de água a cada 15 dias (`lib/manutencao-equipamento.ts`): em dia, vence em N dias (âmbar até 3), vence hoje, atrasada, nunca registrada. Aviso `agua` no Dashboard quando vence hoje ou está atrasada (ou "Registre a última troca" enquanto nenhum HIPRO tem registro), levando a `/equipamentos#agua-<code>`; push no resumo das 7h30 no dia em que vence, no 3º e 7º dia de atraso e às segundas. Checklist "Cuidados com o HIPRO" (`CuidadosHiproDia`) na janela da reserva e em `/agenda-hoje`. Visualização só vê; sem o SQL, a faixa aparece e o botão avisa "Falta rodar o SQL da manutenção".
 
-**Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/equipamentos/page.tsx`, `components/AplicadoresCard.tsx`, `components/Atalhos.tsx`, `components/BloqueiosEquipamento.tsx`, `components/Dialogos.tsx`, `components/EquipamentoInfoControl.tsx`, `components/EquipamentoPrevistasControl.tsx`, `components/EquipamentoStatusControl.tsx`, `components/RevisaoAnualControl.tsx`, `components/equipamentos/EquipamentoCard.tsx`, `components/equipamentos/SeletorPeriodo.tsx`, `components/ui/Visual.tsx`, `lib/aplicador.ts`, `lib/atalhos.ts`, `lib/format.ts`, `lib/movimentacoes.ts`, `lib/period.ts`, `lib/revisao.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`.
+**Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/equipamentos/page.tsx`, `components/AplicadoresCard.tsx`, `components/equipamentos/TrocaAguaControl.tsx`, `components/equipamentos/CuidadosHiproModal.tsx`, `lib/manutencao-equipamento.ts`, `components/Atalhos.tsx`, `components/BloqueiosEquipamento.tsx`, `components/Dialogos.tsx`, `components/EquipamentoInfoControl.tsx`, `components/EquipamentoPrevistasControl.tsx`, `components/EquipamentoStatusControl.tsx`, `components/RevisaoAnualControl.tsx`, `components/equipamentos/EquipamentoCard.tsx`, `components/equipamentos/SeletorPeriodo.tsx`, `components/ui/Visual.tsx`, `lib/aplicador.ts`, `lib/atalhos.ts`, `lib/format.ts`, `lib/movimentacoes.ts`, `lib/period.ts`, `lib/revisao.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`.
 
-**Funções RPC chamadas:** `adiar_previsao_manutencao`, `alterar_fim_bloqueio_equipamento`, `aplicar_previsoes_manutencao_vencidas`, `criar_bloqueio_equipamento`, `definir_status_equipamento`, `excluir_bloqueio_equipamento`, `montar_aplicador`, `registrar_leitura_aplicador`, `registrar_revisao_equipamento`, `salvar_aplicador`.
+**Funções RPC chamadas:** `adiar_previsao_manutencao`, `alterar_fim_bloqueio_equipamento`, `aplicar_previsoes_manutencao_vencidas`, `criar_bloqueio_equipamento`, `definir_status_equipamento`, `excluir_bloqueio_equipamento`, `excluir_manutencao_equipamento`, `montar_aplicador`, `registrar_leitura_aplicador`, `registrar_manutencao_equipamento`, `registrar_revisao_equipamento`, `salvar_aplicador`.
 
 
-**Tabelas e views tocadas:** `aplicador_montagens` (CRUD), `aplicadores` (CRU), `aplicadores_uso` (R), `bloqueios_equipamento` (CRUD), `calendar_events` (R), `equipments` (RU), `movimentacoes` (C), `rentals_contabilizaveis` (R), `rentals_situacao_pagamento` (R).
+**Tabelas e views tocadas:** `aplicador_montagens` (CRUD), `aplicadores` (CRU), `aplicadores_uso` (R), `bloqueios_equipamento` (CRUD), `calendar_events` (R), `equipments` (RU), `manutencoes_equipamento` (CRD), `movimentacoes` (C), `rentals_contabilizaveis` (R), `rentals_situacao_pagamento` (R).
 
 ### Contratos
 
@@ -4646,7 +4701,9 @@ Rotas: `/planejador`, `/planejador/[id]`, `/planejador/novo`.
 - Escrita só por `salvar_planejamento` e `excluir_planejamento`; excluir pede para escrever APAGAR.
 - Paciente é da cliente que o atende: `salvar_planejamento` liga ao cadastro escolhido (`estado.pacienteId`) ou ao de mesmo nome, ou cria; ficha editada por `salvar_paciente`, repetidos juntados por `juntar_pacientes`.
 - Profissional escolhida das profissionais da clínica (`profissionais`, `escolhaAutomatica` com uma ativa só; "+ Nova profissional" por `salvar_profissional`); grava `estado.profissional`, `estado.profissionalId` e `estado.profissionalRegistro`. Sem cliente ou sem o SQL, texto livre.
-- Assinatura da sessão (só o dono): "Colher assinaturas" no Resumo e na ficha do paciente; imagem na pasta `assinaturas`, registro por `registrar_assinatura_sessao` com o sha256 do resumo; selo "Alterada depois de assinada" quando o conteúdo muda; impressão com as imagens e "Conteúdo verificado".
+- Assinatura da sessão (só o dono): "Colher assinaturas" no Resumo e na ficha do paciente; antes da assinatura do paciente, triagem de contraindicações e termo de consentimento (guardados em `assinaturas_sessao.triagem`, fora do hash); imagem na pasta `assinaturas`, registro por `registrar_assinatura_sessao` com o sha256 do resumo; selo "Alterada depois de assinada" quando o conteúdo muda; impressão com as imagens, o bloco "Triagem e consentimento" e "Conteúdo verificado".
+- Orientações depois da sessão: "Mandar orientações ao paciente" (WhatsApp do paciente com os cuidados do e-book) no Resumo, no menu ⋯ e em cada sessão da ficha do paciente; também no portal.
+- Zonas de risco: aviso fixo por área no cartão e na foto ampliada (`lib/zonas-risco.ts`) e o aviso geral de aplicação no topo da aba Áreas; só informa.
 
 **Arquivos que executam** (entrada e tudo o que ela importa): `app/(app)/planejador/EditorPlanejamento.tsx`, `app/(app)/planejador/PlanejadorLista.tsx`, `app/(app)/planejador/[id]/page.tsx`, `app/(app)/planejador/carregar.ts`, `app/(app)/planejador/novo/page.tsx`, `app/(app)/planejador/page.tsx`, `components/Atalhos.tsx`, `components/BonecoCorporal.tsx`, `components/ClientPicker.tsx`, `components/ConfirmarApagarModal.tsx`, `components/Dialogos.tsx`, `components/SeletorPlanejamento.tsx`, `components/SomenteLeitura.tsx`, `components/planejador/CustoDisparos.tsx`, `components/planejador/FichaPaciente.tsx`, `components/planejador/FotosPaciente.tsx`, `components/planejador/Partes.tsx`, `components/planejador/ResumoPlano.tsx`, `components/planejador/SeloSituacao.tsx`, `lib/atalhos.ts`, `lib/availability-image.ts`, `lib/boneco-corporal.ts`, `lib/busca-cliente.ts`, `lib/corpo-foto-dados.ts`, `lib/corpo-foto.ts`, `lib/custo-disparos-imagem.ts`, `lib/custo-disparos.ts`, `lib/format.ts`, `lib/fotos-paciente-envio.ts`, `lib/fotos-paciente.ts`, `lib/historico-paciente.ts`, `lib/mensagens-modelos.ts`, `lib/meta-mes.ts`, `lib/pacientes.ts`, `lib/period.ts`, `lib/planejador-impressao.ts`, `lib/planejador.ts`, `lib/planejamento.ts`, `lib/preferencias.ts`, `lib/rental-pricing.ts`, `lib/settings.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/usar-preferencias.ts`, `lib/valor.ts`.
 

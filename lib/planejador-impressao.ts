@@ -7,6 +7,7 @@ import { urlImagemCorporal } from "./corpo-foto";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { contaDaSessao, dataBr, planoDaSessao, situacaoSaldo, todasAreas, totalArea, type Area, type Plano } from "./planejador";
 import { dataHoraCompleta, type PapelAssinatura } from "./assinatura-sessao";
+import { textoTriagemImpressao, type TriagemRegistro } from "./triagem-hipro";
 
 /** Assinatura colhida no celular, pronta para a impressão (imagem já baixada como data URL). */
 export interface AssinaturaImpressa {
@@ -17,6 +18,8 @@ export interface AssinaturaImpressa {
   /** data:image/png;base64,... (vazio se não deu para baixar). */
   src: string;
   hash: string;
+  /** Só na do paciente: triagem de contraindicações e termo aceito. */
+  triagem?: TriagemRegistro | null;
 }
 
 /** Assinaturas de uma sessão e a conferência do conteúdo atual (hash do que está na tela agora). */
@@ -80,6 +83,11 @@ export const CSS_PRONTUARIO = `
 .pront-sign-meta{font-size:9.5px;color:#6e7580;margin-top:3px;line-height:1.4}
 .pront-verif{grid-column:1/-1;text-align:center;font-size:9.5px;color:#6e7580;margin-top:-30px}
 .pront-verif.alterada{color:#b4365c;font-weight:800}
+.pront-triagem{font-size:11px;line-height:1.5;padding:9px 12px;border:1px solid #e2eaed;border-radius:8px;background:#fafbfc}
+.pront-triagem.absoluta{border:2px solid #D9577E;background:#fff0f3;color:#b4365c}
+.pront-triagem.relativa{border-color:#e9c46a;background:#fffaf0}
+.pront-triagem p{margin:0 0 4px}
+.pront-triagem p:last-child{margin:0}
 .pront-alert{background:#fff0f3;border:2px solid #D9577E;border-radius:8px;padding:10px 14px;margin-bottom:14px;color:#b4365c;font-size:12px;font-weight:800}
 `;
 
@@ -118,6 +126,19 @@ function numerosDoPacote(p: Plano, n: number): string {
     item(c.nesta, `Nesta sessão (${n})`),
     c.ultima ? item(c.resta, "Restante") : item(Math.max(0, c.resta), `Fica para a Sessão ${n + 1}`),
   ].join("");
+}
+
+/**
+ * Triagem e termo de consentimento (vêm com a assinatura do paciente), logo
+ * acima das assinaturas. Sem triagem guardada (assinaturas antigas), nada.
+ */
+function blocoTriagem(ass?: AssinaturasDaFicha): string {
+  const t = ass?.lista.find((x) => x.papel === "paciente")?.triagem;
+  if (!t) return "";
+  const termo = t.termo.aceito
+    ? `<p><b>Termo de consentimento${t.termo.versao ? ` (versão ${esc(t.termo.versao)})` : ""}:</b> ${esc(t.termo.resumo || "aceito pelo paciente.")}</p>`
+    : "";
+  return `<div class="pront-section"><div class="pront-section-title">Triagem e consentimento</div><div class="pront-triagem ${t.situacao}"><p><b>Triagem:</b> ${esc(textoTriagemImpressao(t))}</p>${termo}</div></div>`;
 }
 
 /**
@@ -184,6 +205,7 @@ ${
 <thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th><th>Profund.</th><th>Direito</th><th>Esquerdo</th><th>Quad.</th><th>Total</th></tr></thead>
 <tbody>${linhas}<tr class="tot"><td colspan="6">TOTAL GERAL DE DISPAROS</td><td>${fmt(s.total)}</td></tr></tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Observações Clínicas</div><div class="pront-obs">${esc(p.obs || "—")}</div></div>
+${blocoTriagem(assinaturas)}
 ${blocoAssinaturas(`Assinatura do Paciente${p.sessoesTotal > 1 ? ` · Sessão ${p.sessaoAtual}` : ""}`, assinaturas, false)}
 ${rodape(agora, cfg)}
 </div>`;
@@ -234,6 +256,7 @@ ${identificacao(v, "Identificação")}
 ${pacote}
 <div class="pront-section"><div class="pront-section-title">Áreas Tratadas</div><table class="pront-table"><thead><tr><th style="width:34px;text-align:center">✓</th><th>Área</th>${porSessao ? '<th style="text-align:right">Disparos</th>' : ""}</tr></thead><tbody>${linhas}</tbody></table></div>
 <div class="pront-section"><div class="pront-section-title">Recomendações</div><div class="pront-obs">${esc(p.recomendacoes || "—")}</div></div>
+${blocoTriagem(assinaturas)}
 ${blocoAssinaturas(`Assinatura do Paciente${porSessao ? ` · Sessão ${n}` : ""}`, assinaturas)}
 ${rodape(agora, cfg)}
 </div>`;

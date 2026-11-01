@@ -52,6 +52,8 @@ export interface AssinaturaSessao {
   conteudo_hash: string;
   resumo: Partial<ResumoSessao> | null;
   assinada_em: string;
+  /** Só na do paciente: triagem e termo (coluna nova; ler com lerTriagem de lib/triagem-hipro). */
+  triagem?: unknown;
 }
 
 /** Resumo de uma sessão (a aberta ou uma fechada). Nulo se a sessão não existe. */

@@ -21,6 +21,7 @@ import { buscarTodas } from "@/lib/buscar-todas";
 import { diasDoPeriodo } from "@/lib/period";
 import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
+import { aguaPrecisaTrocar, situacaoAgua, textoAvisoAgua, ultimaTrocaPorEquipamento } from "@/lib/manutencao-equipamento";
 import { LinkCliente } from "@/components/Atalhos";
 import { linkDiaAgenda, linkEvento } from "@/lib/atalhos";
 import { CalendarDays, HandCoins, Wallet } from "lucide-react";
@@ -353,6 +354,27 @@ export default async function DashboardPage(
     .map((e) => ({ code: e.code as string, nome: e.name as string, ...situacaoRevisao(e.ultima_revisao as string | null, todayStr) }))
     .filter((e) => e.situacao === "perto" || e.situacao === "vencida");
 
+  // Troca de água dos HIPROs (a cada 15 dias): avisa quando vence hoje ou está
+  // atrasada. Sem nenhuma troca registrada, pede uma vez para registrar a
+  // última. Se a tabela ainda não existir (SQL não rodado), nada aparece.
+  const { data: trocasAgua, error: erroTrocasAgua } = await supabase
+    .from("manutencoes_equipamento")
+    .select("equipment_id, tipo, feita_em")
+    .eq("tipo", "troca_agua")
+    .order("feita_em", { ascending: false })
+    .limit(200);
+  const ultimaAgua = ultimaTrocaPorEquipamento((trocasAgua ?? []) as { equipment_id: string; tipo: string; feita_em: string }[]);
+  const { data: equipamentosAgua } = erroTrocasAgua
+    ? { data: [] as { id: string; code: string; name: string }[] }
+    : await supabase.from("equipments").select("id, code, name").order("code");
+  const aguaEquipamentos = (equipamentosAgua ?? []).map((e) => ({
+    code: e.code as string,
+    nome: e.name as string,
+    ...situacaoAgua(ultimaAgua.get(e.id as string) ?? null, todayStr),
+  }));
+  const aguaAlerta = aguaEquipamentos.filter(aguaPrecisaTrocar);
+  const aguaNuncaRegistrada = aguaEquipamentos.length > 0 && aguaEquipamentos.every((e) => e.situacao === "nunca");
+
   const umDiaSo = fromStr === toStr;
   const ocupInicio = umDiaSo ? primeiroDiaDoMes(todayStr) : fromStr;
   const ocupFim = umDiaSo ? ultimoDiaDoMes(todayStr) : toStr;
@@ -613,6 +635,24 @@ export default async function DashboardPage(
         .join(", "),
       href: `/equipamentos#revisao-${revisoesAlerta[0].code}`,
       nivel: revisoesAlerta.some((e) => e.situacao === "vencida") ? "urgente" : "atencao",
+    });
+  if (aguaAlerta.length > 0)
+    avisos.push({
+      id: "agua",
+      icone: "agua",
+      texto: "Trocar a água do HIPRO",
+      detalhe: aguaAlerta.map((e) => textoAvisoAgua(e.nome, e)).join(", "),
+      href: `/equipamentos#agua-${aguaAlerta[0].code}`,
+      nivel: aguaAlerta.some((e) => e.situacao === "atrasada") ? "urgente" : "atencao",
+    });
+  else if (aguaNuncaRegistrada)
+    avisos.push({
+      id: "agua",
+      icone: "agua",
+      texto: "Registre a última troca de água dos HIPROs",
+      detalhe: "A troca é a cada 15 dias; com o registro, o app avisa quando vencer",
+      href: `/equipamentos#agua-${aguaEquipamentos[0].code}`,
+      nivel: "info",
     });
   if (pendingConfirmations && pendingConfirmations > 0)
     avisos.push({

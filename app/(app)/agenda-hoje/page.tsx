@@ -6,6 +6,7 @@ import Link from "next/link";
 import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import HeroTela from "@/components/ui/HeroTela";
+import CuidadosHiproDia from "@/components/equipamentos/CuidadosHiproDia";
 import { CalendarClock, Wallet } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,12 @@ export default async function AgendaHojePage() {
     a.data_inicio.localeCompare(b.data_inicio)
   );
 
+  // Atendimento de HIPRO hoje (ou locação de vários dias passando por hoje):
+  // mostra o checklist "Cuidados com o HIPRO" no topo.
+  const temHiproHoje = lista.some(
+    (l) => l.equipamento && l.data_inicio <= hojeStr && (l.data_fim ?? l.data_inicio) >= hojeStr
+  );
+
   const totalAReceber = listaRentals.reduce((acc, r) => acc + (r.saldo > 0 ? r.saldo : 0), 0);
 
   return (
@@ -110,6 +117,8 @@ export default async function AgendaHojePage() {
         />
       </div>
       <h1 className="sr-only">Próximos agendamentos</h1>
+
+      {temHiproHoje && <CuidadosHiproDia className="mb-4 bg-white" />}
 
       {lista.length === 0 && (
         <p className="text-sm text-neutral-400">Nenhum agendamento futuro.</p>

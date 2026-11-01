@@ -6,12 +6,13 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Minus, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Minus, Plus, ShieldAlert, Trash2, X } from "lucide-react";
 import BonecoCorporal from "@/components/BonecoCorporal";
 import { confirmar } from "@/components/Dialogos";
 import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
 import { imagemDaArea } from "@/lib/planejador-impressao";
 import { urlCorpoInteiro } from "@/lib/corpo-foto";
+import { resumoDaZona, zonaDeRisco } from "@/lib/zonas-risco";
 import { MOVIMENTO_DA_AREA, OPTS_PAP, linhaAbaixoDoMinimo, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
 
 export const fmt = (n: number) => n.toLocaleString("pt-BR");
@@ -152,6 +153,29 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
   );
 }
 
+/** Aviso de zona de risco da área (e-book, cap. 21): uma linha, com "ver mais" se for longo. Só informa. */
+export function AvisoZonaRisco({ area, inteiro = false }: { area: Area; inteiro?: boolean }) {
+  const [aberto, setAberto] = useState(false);
+  const texto = zonaDeRisco(area);
+  if (!texto) return null;
+  const { curto, cortado } = resumoDaZona(texto);
+  const mostrarTudo = inteiro || aberto || !cortado;
+  return (
+    <p className="flex items-start gap-1.5 rounded-xl bg-amber-50/70 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200/70">
+      <ShieldAlert size={14} className="mt-px flex-shrink-0 text-amber-600" aria-label="Zona de risco" />
+      <span className="min-w-0">
+        <b className="font-semibold">Zona de risco: </b>
+        {mostrarTudo ? texto : curto}
+        {cortado && !inteiro && (
+          <button type="button" onClick={() => setAberto((v) => !v)} className="ml-1 font-semibold text-amber-700 underline underline-offset-2">
+            {aberto ? "ver menos" : "ver mais"}
+          </button>
+        )}
+      </span>
+    </p>
+  );
+}
+
 export function CartaoArea({
   area,
   linhas,
@@ -210,6 +234,7 @@ export function CartaoArea({
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${aberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
         <div className="overflow-hidden">
           <div className="space-y-2 border-t border-neutral-100 px-3 pb-3 pt-3">
+            <AvisoZonaRisco area={area} />
             {area.hint && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">⚡ {area.hint}</p>}
             {linhas.map((l, i) => (
               <LinhaEditor
@@ -271,6 +296,7 @@ export function FolhaModelo({ area, onFechar }: { area: Area | null; onFechar: (
             </div>
           </div>
           {area.hint && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">⚡ {area.hint}</p>}
+          <AvisoZonaRisco area={area} inteiro />
         </div>
       )}
     </Folha>

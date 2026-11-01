@@ -9,6 +9,7 @@ import SeletorPeriodo from "@/components/equipamentos/SeletorPeriodo";
 import { IconeChip } from "@/components/ui/Visual";
 import { Server } from "lucide-react";
 import EquipamentoCard, { type EquipamentoDados } from "@/components/equipamentos/EquipamentoCard";
+import { faltaSqlManutencao } from "@/lib/manutencao-equipamento";
 const EQUIPMENT_COLORS: Record<string, string> = {
   hipro_1: "bg-brand-teal",
   hipro_2: "bg-brand-blue",
@@ -46,6 +47,22 @@ export default async function EquipamentosPage(
     .select("id, nome, numero_serie, garantia_disparos, contador_base, contador_base_em, ativo, equipment_id, montado_desde, disparos")
     .order("nome");
   const aplicadores = ((aplicadoresRaw ?? []) as AplicadorUso[]).map((a) => ({ ...a, disparos: Number(a.disparos) }));
+
+  // Trocas de água (manutencoes_equipamento). Sem o SQL rodado, a faixa
+  // aparece sem registro e o botão avisa que falta o SQL.
+  const { data: trocasRaw, error: erroTrocas } = await supabase
+    .from("manutencoes_equipamento")
+    .select("id, equipment_id, feita_em")
+    .eq("tipo", "troca_agua")
+    .order("feita_em", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const aguaSemSql = faltaSqlManutencao(erroTrocas);
+  const aguaErro = erroTrocas && !aguaSemSql ? erroTrocas.message : null;
+  const ultimaTroca = new Map<string, { id: string; feita_em: string }>();
+  for (const t of (trocasRaw ?? []) as { id: string; equipment_id: string; feita_em: string }[]) {
+    if (!ultimaTroca.has(t.equipment_id)) ultimaTroca.set(t.equipment_id, { id: t.id, feita_em: t.feita_em });
+  }
 
   const { data: equipments } = await supabase
     .from("equipments")
@@ -138,6 +155,12 @@ export default async function EquipamentosPage(
               previstas={eqPrevistas}
               aplicador={aplicador ?? null}
               bloqueios={bloqueios.filter((b) => b.equipment_id === eq.id)}
+              agua={{
+                ultima: ultimaTroca.get(eq.id)?.feita_em ?? null,
+                ultimaId: ultimaTroca.get(eq.id)?.id ?? null,
+                semSql: aguaSemSql,
+                erro: aguaErro,
+              }}
             />
           );
         })}

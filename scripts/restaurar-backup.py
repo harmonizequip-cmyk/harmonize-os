@@ -25,7 +25,7 @@ import sys
 ORDEM = [
     "profiles", "settings", "equipments", "categories", "contas_pix",
     "cidades_coordenadas", "tags", "cartoes",
-    "aplicadores", "aplicador_montagens", "bloqueios_equipamento", "clients",
+    "aplicadores", "aplicador_montagens", "bloqueios_equipamento", "manutencoes_equipamento", "clients",
     "client_tags", "calendar_events", "rentals", "rental_payments", "transactions",
     "emprestimos", "mentoring_events", "expense_limits", "tasks",
     "contratos_emitidos", "movimentacoes", "creditos_cliente", "locacao_contagens",

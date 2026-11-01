@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   CreditCard,
+  Droplets,
   LineChart,
   PenLine,
   TrendingUp,
@@ -40,6 +41,7 @@ const ICONES: Record<string, { icone: LucideIcon; cor: CorVisual }> = {
   tarefas: { icone: ClipboardCheck, cor: "verde" },
   conversa: { icone: MessageCircle, cor: "teal" },
   equipamento: { icone: Wrench, cor: "cinza" },
+  agua: { icone: Droplets, cor: "azul" },
   cadastro: { icone: UserPlus, cor: "rosa" },
   acesso: { icone: FileSignature, cor: "rosa" },
   // Pessoal (lib/pessoal-controle.ts)

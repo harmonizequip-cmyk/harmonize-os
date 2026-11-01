@@ -21,6 +21,7 @@ import {
   type SituacaoAssinaturas,
 } from "@/lib/assinatura-sessao";
 import { apagarAssinatura, MSG_FALTA_SQL_ASSINATURAS, type EstadoAssinaturas } from "@/lib/assinaturas-envio";
+import { lerTriagem } from "@/lib/triagem-hipro";
 import ColherAssinaturas from "./ColherAssinaturas";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
@@ -199,6 +200,17 @@ export default function AssinaturasSessoes({
                 ))}
               </ul>
             )}
+            {(() => {
+              const t = lerTriagem(daSessao.find((a) => a.papel === "paciente"));
+              if (!t) return null;
+              const cor = t.situacao === "absoluta" ? "text-rose-700" : t.situacao === "relativa" ? "text-amber-700" : "text-neutral-500";
+              return (
+                <p className={`mt-1 text-[11px] ${cor}`}>
+                  Triagem: {t.situacao === "absoluta" ? "contraindicação absoluta confirmada pela profissional" : t.situacao === "relativa" ? "relativas avaliadas pela profissional" : "sem contraindicações declaradas"}
+                  {t.termo.aceito ? " · termo aceito" : ""}
+                </p>
+              );
+            })()}
             {sit?.alterada && <OQueFoiAssinado lista={daSessao} />}
           </div>
         );

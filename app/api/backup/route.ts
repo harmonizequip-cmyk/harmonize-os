@@ -20,6 +20,7 @@ const TABELAS = [
   "aplicadores",
   "aplicador_montagens",
   "bloqueios_equipamento",
+  "manutencoes_equipamento",
   "clients",
   "client_tags",
   "calendar_events",
@@ -52,9 +53,17 @@ const TABELAS = [
 ];
 
 // Tabelas que podem ainda não existir no banco (SQL das campanhas, dos pacientes, das fotos ou das
-// profissionais e assinaturas não rodado): sem a tabela não há dado a perder, então o backup sai sem
+// profissionais e assinaturas, ou da manutenção dos HIPROs, não rodado): sem a tabela não há dado a perder, então o backup sai sem
 // ela em vez de falhar. As imagens das fotos e das assinaturas (Storage) não entram no backup.
-const PODEM_FALTAR = new Set(["campanhas", "campanha_envios", "pacientes", "paciente_fotos", "profissionais", "assinaturas_sessao"]);
+const PODEM_FALTAR = new Set([
+  "campanhas",
+  "campanha_envios",
+  "pacientes",
+  "paciente_fotos",
+  "profissionais",
+  "assinaturas_sessao",
+  "manutencoes_equipamento",
+]);
 
 function tabelaNaoExiste(error: { code?: string; message?: string }): boolean {
   return error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");

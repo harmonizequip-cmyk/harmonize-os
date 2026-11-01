@@ -145,6 +145,7 @@ export const AVISOS_DASHBOARD: { id: string; rotulo: string; dica: string }[] = 
   { id: "taxas", rotulo: "Taxas de reserva a receber", dica: "Reservas com a taxa ainda pendente." },
   { id: "sem-disparos", rotulo: "Atendimentos sem disparos lançados", dica: "Já passaram e ainda não foram cobrados." },
   { id: "revisao", rotulo: "Revisão anual dos HIPROs", dica: "30 dias antes ou vencida." },
+  { id: "agua", rotulo: "Troca de água dos HIPROs", dica: "A cada 15 dias: vence hoje ou atrasada." },
   { id: "confirmacoes", rotulo: "Atendimentos sem confirmação", dica: "Nos próximos 7 dias." },
   { id: "tarefas", rotulo: "Fila de tarefas", dica: "Tarefas de hoje e atrasadas." },
   { id: "encaixe", rotulo: "Datas livres para encaixar", dica: "Perto de onde você vai estar." },

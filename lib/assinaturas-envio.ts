@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { faltaSql } from "@/lib/profissionais";
 import { caminhoAssinatura, type AssinaturaSessao, type PapelAssinatura, type ResumoSessao } from "@/lib/assinatura-sessao";
 import type { AssinaturaImpressa } from "@/lib/planejador-impressao";
+import { lerTriagem, type TriagemRegistro } from "@/lib/triagem-hipro";
 
 export const PASTA_ASSINATURAS = "assinaturas";
 export const MSG_FALTA_SQL_ASSINATURAS = "Falta rodar o SQL das assinaturas.";
@@ -17,6 +18,14 @@ export const MSG_FALTA_SQL_ASSINATURAS = "Falta rodar o SQL das assinaturas.";
 export type EstadoAssinaturas = "carregando" | "sem_sql" | "sem_permissao" | "erro" | "ok";
 
 const COLUNAS = "id, planejamento_id, sessao, papel, nome, profissional_id, registro, imagem, conteudo_hash, resumo, assinada_em";
+// A coluna triagem só existe depois do SQL 2026-11-01-triagem-assinatura.sql.
+const COLUNAS_COM_TRIAGEM = `${COLUNAS}, triagem`;
+
+/** Erro de coluna que não existe (o SQL da triagem ainda não rodou). */
+const semColunaTriagem = (e: { code?: string; message?: string } | null) => !!e && (e.code === "42703" || /triagem/i.test(e.message ?? ""));
+/** Erro de função com o parâmetro p_triagem que não existe (o SQL da triagem ainda não rodou). */
+const semParametroTriagem = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function|does not exist/i.test(e.message ?? ""));
 
 /** Assinaturas dos planejamentos (só para o dono; para os outros, "sem_permissao"). */
 export function useAssinaturasSessao(planoIds: string[], ativo: boolean) {
@@ -42,10 +51,12 @@ export function useAssinaturasSessao(planoIds: string[], ativo: boolean) {
         setLista([]);
         return setEstado("ok");
       }
-      const { data, error } = await sb.from("assinaturas_sessao").select(COLUNAS).in("planejamento_id", ids).order("assinada_em");
+      const buscar = (colunas: string) => sb.from("assinaturas_sessao").select(colunas).in("planejamento_id", ids).order("assinada_em");
+      let { data, error } = await buscar(COLUNAS_COM_TRIAGEM);
+      if (error && semColunaTriagem(error)) ({ data, error } = await buscar(COLUNAS));
       if (!vivo) return;
       if (error) return setEstado(faltaSql(error) ? "sem_sql" : "erro");
-      setLista((data ?? []) as AssinaturaSessao[]);
+      setLista((data ?? []) as unknown as AssinaturaSessao[]);
       setEstado("ok");
     })().catch(() => vivo && setEstado("erro"));
     return () => {
@@ -75,6 +86,8 @@ export interface DadosAssinatura {
   imagem: Blob;
   hash: string;
   resumo: ResumoSessao;
+  /** Só na do paciente: triagem de contraindicações e termo aceito (fora do hash). */
+  triagem?: TriagemRegistro | null;
 }
 
 /** Sobe a imagem e registra; se o banco recusar, apaga o arquivo. Apaga também o arquivo da assinatura substituída. */
@@ -85,7 +98,7 @@ export async function enviarAssinatura(sb: SupabaseClient, d: DadosAssinatura): 
     if (/bucket not found/i.test(up.error.message)) throw new Error(MSG_FALTA_SQL_ASSINATURAS);
     throw new Error("Não consegui enviar a assinatura. Confira a internet e tente de novo.");
   }
-  const { data, error } = await sb.rpc("registrar_assinatura_sessao", {
+  const params = {
     p_planejamento_id: d.planoId,
     p_sessao: d.sessao,
     p_papel: d.papel,
@@ -96,7 +109,13 @@ export async function enviarAssinatura(sb: SupabaseClient, d: DadosAssinatura): 
     p_conteudo_hash: d.hash,
     p_resumo: d.resumo,
     p_aparelho: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : null,
-  });
+  };
+  let { data, error } = await sb.rpc("registrar_assinatura_sessao", d.triagem ? { ...params, p_triagem: d.triagem } : params);
+  // Antes do SQL da triagem: guarda a triagem dentro do resumo (o hash não muda,
+  // ele é calculado só com o atendimento) e a leitura acha lá (lerTriagem).
+  if (error && d.triagem && semParametroTriagem(error)) {
+    ({ data, error } = await sb.rpc("registrar_assinatura_sessao", { ...params, p_resumo: { ...d.resumo, triagem: d.triagem } }));
+  }
   if (error) {
     await sb.storage.from(PASTA_ASSINATURAS).remove([caminho]);
     throw new Error(faltaSql(error) ? MSG_FALTA_SQL_ASSINATURAS : error.message || "Não consegui registrar a assinatura.");
@@ -147,7 +166,7 @@ export async function paraImpressao(sb: SupabaseClient, lista: AssinaturaSessao[
       } catch {
         // sem a imagem, sai o nome, o registro e a data
       }
-      return { papel: a.papel, nome: a.nome, registro: a.registro, assinadaEm: a.assinada_em, src, hash: a.conteudo_hash };
+      return { papel: a.papel, nome: a.nome, registro: a.registro, assinadaEm: a.assinada_em, src, hash: a.conteudo_hash, triagem: lerTriagem(a) };
     })
   );
 }

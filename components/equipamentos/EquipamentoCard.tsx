@@ -1,6 +1,6 @@
 // Cartão de um HIPRO na tela Equipamentos (desenho aprovado pelo dono em
 // 17/10/2026): nome, status e próxima reserva; números do período; revisão
-// anual; aplicador montado, número de série e bloqueio de período.
+// anual; troca de água; aplicador montado, número de série e bloqueio de período.
 
 import Link from "next/link";
 import { CalendarCheck, CalendarDays, CircleDollarSign, ClipboardList } from "lucide-react";
@@ -11,6 +11,7 @@ import EquipamentoStatusControl from "@/components/EquipamentoStatusControl";
 import EquipamentoInfoControl from "@/components/EquipamentoInfoControl";
 import EquipamentoPrevistasControl from "@/components/EquipamentoPrevistasControl";
 import RevisaoAnualControl from "@/components/RevisaoAnualControl";
+import TrocaAguaControl from "@/components/equipamentos/TrocaAguaControl";
 import BloqueiosEquipamento, { type Bloqueio } from "@/components/BloqueiosEquipamento";
 import { type AplicadorUso, situacaoAplicador } from "@/lib/aplicador";
 
@@ -42,6 +43,7 @@ export default function EquipamentoCard({
   previstas,
   aplicador,
   bloqueios,
+  agua,
 }: {
   eq: EquipamentoDados;
   totalLocacoes: number;
@@ -52,6 +54,8 @@ export default function EquipamentoCard({
   previstas: { id: string; event_date: string; client_name: string | null }[];
   aplicador: (AplicadorUso & { disparos: number }) | null;
   bloqueios: Bloqueio[];
+  /** Última troca de água (manutencoes_equipamento); semSql quando a tabela ainda não existe. */
+  agua: { ultima: string | null; ultimaId: string | null; semSql: boolean; erro: string | null };
 }) {
   const situacao = aplicador ? situacaoAplicador(aplicador) : null;
   const eqPrevistas = previstas;
@@ -133,6 +137,17 @@ export default function EquipamentoCard({
           <RevisaoAnualControl equipmentId={eq.id} ultimaRevisao={eq.ultima_revisao ?? null} />
         </div>
   
+        {/* Troca de água (a cada 15 dias) e guia de cuidados */}
+        <div id={`agua-${eq.code}`} className="mt-3 scroll-mt-20">
+          <TrocaAguaControl
+            equipmentId={eq.id}
+            ultima={agua.ultima}
+            ultimaId={agua.ultimaId}
+            semSql={agua.semSql}
+            erroCarga={agua.erro}
+          />
+        </div>
+
         {/* Aplicador e número de série */}
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <a href="#aplicadores" className="block rounded-3xl bg-slate-50/80 p-3">

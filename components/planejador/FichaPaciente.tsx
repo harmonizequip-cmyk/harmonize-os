@@ -32,6 +32,7 @@ import { areasCorporaisDosPlanos } from "@/lib/fotos-paciente";
 import { normalizarPlano } from "@/lib/planejador";
 import { prepararLimpezaAssinaturas, useAssinaturasSessao } from "@/lib/assinaturas-envio";
 import AssinaturasSessoes from "@/components/planejador/AssinaturasSessoes";
+import BotaoOrientacoes from "@/components/planejador/BotaoOrientacoes";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -458,6 +459,17 @@ export default function FichaPaciente({
                               <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-neutral-600">
                                 <CalendarClock size={11} /> Retorno {formatDate(s.retorno)}
                               </p>
+                            )}
+                            {s.total > 0 && (
+                              <div className="mt-2">
+                                <BotaoOrientacoes
+                                  paciente={cad?.nome ?? paciente.nome}
+                                  whatsapp={cad?.whatsapp}
+                                  profissional={planosNormalizados.get(pl.id)?.profissional}
+                                  retorno={s.retorno}
+                                  compacto
+                                />
+                              </div>
                             )}
                             {mostrarAssinaturas && planosNormalizados.get(pl.id) && (
                               <div className="mt-2 border-t border-neutral-200/70 pt-2">

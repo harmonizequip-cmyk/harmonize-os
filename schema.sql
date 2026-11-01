@@ -14283,3 +14283,287 @@ select distinct on (pl.client_id, public.normalizar_nome_paciente(pl.estado ->> 
                       and public.normalizar_nome_paciente(pr.nome) = public.normalizar_nome_paciente(pl.estado ->> 'profissional'))
  order by pl.client_id, public.normalizar_nome_paciente(pl.estado ->> 'profissional'), pl.updated_at desc
 on conflict do nothing;
+
+-- ------------------------------------------------------------
+-- MANUTENÇÃO DO HIPRO: TROCA DE ÁGUA (migrations/2026-11-01-manutencao-equipamento.sql)
+-- ------------------------------------------------------------
+
+-- Manutenção do HIPRO com lembretes (pedido do dono, 01/11/2026; e-book do
+-- HIPRO, capítulo 26 "Manutenção e cuidados operacionais").
+--
+-- Cada linha é um cuidado de rotina feito num HIPRO. Por enquanto só a troca
+-- de água do circuito (a cada 15 dias, com água destilada, deionizada,
+-- desmineralizada ou para autoclave). O check de tipo é uma lista: tipo novo
+-- (ex.: limpeza do filtro) entra trocando o check e as telas.
+--
+-- Escrita só por registrar_manutencao_equipamento e
+-- excluir_manutencao_equipamento (desfazer engano). Idempotente.
+
+create table if not exists public.manutencoes_equipamento (
+  id uuid primary key default gen_random_uuid(),
+  equipment_id uuid not null references public.equipments(id) on delete cascade,
+  tipo text not null,
+  feita_em date not null default public.hoje_local(),
+  observacao text,
+  created_by uuid references public.profiles(id) default auth.uid(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.manutencoes_equipamento drop constraint if exists manutencoes_equipamento_tipo_check;
+alter table public.manutencoes_equipamento
+  add constraint manutencoes_equipamento_tipo_check check (tipo in ('troca_agua'));
+
+create index if not exists manutencoes_equipamento_equip_idx
+  on public.manutencoes_equipamento (equipment_id, tipo, feita_em desc);
+
+comment on table public.manutencoes_equipamento is
+  'Cuidados de rotina feitos em cada HIPRO (hoje só troca_agua, a cada 15 dias). Escrita só por registrar_manutencao_equipamento e excluir_manutencao_equipamento.';
+
+alter table public.manutencoes_equipamento enable row level security;
+drop policy if exists "manutencoes_equipamento_select" on public.manutencoes_equipamento;
+create policy "manutencoes_equipamento_select" on public.manutencoes_equipamento
+  for select using (
+    has_module_permission('equipamentos') or has_module_permission('agenda') or has_module_permission('dashboard')
+  );
+
+revoke all on public.manutencoes_equipamento from anon;
+grant select on public.manutencoes_equipamento to authenticated, service_role;
+
+drop trigger if exists trg_somente_leitura on public.manutencoes_equipamento;
+create trigger trg_somente_leitura before insert or update or delete on public.manutencoes_equipamento
+  for each statement execute function public.bloquear_somente_leitura();
+
+-- Rótulo do tipo, para mensagens.
+create or replace function public.rotulo_manutencao_equipamento(p_tipo text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select case p_tipo when 'troca_agua' then 'Troca de água' else p_tipo end;
+$$;
+revoke execute on function public.rotulo_manutencao_equipamento(text) from public, anon;
+grant execute on function public.rotulo_manutencao_equipamento(text) to authenticated, service_role;
+
+create or replace function public.registrar_manutencao_equipamento(
+  p_equipment_id uuid,
+  p_tipo text,
+  p_data date default null,
+  p_observacao text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nome text;
+  v_data date := coalesce(p_data, public.hoje_local());
+  v_obs text := nullif(btrim(coalesce(p_observacao, '')), '');
+  v_id uuid;
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos equipamentos.';
+  end if;
+  if p_tipo is null or p_tipo not in ('troca_agua') then
+    raise exception 'Tipo de manutenção desconhecido.';
+  end if;
+  if v_data > public.hoje_local() then
+    raise exception 'A manutenção não pode ser numa data futura.';
+  end if;
+  if v_data < public.hoje_local() - 365 then
+    raise exception 'Data muito antiga. Confira o dia.';
+  end if;
+  if v_obs is not null and length(v_obs) > 500 then
+    raise exception 'Observação muito longa (máximo 500 caracteres).';
+  end if;
+
+  select name into v_nome from equipments where id = p_equipment_id;
+  if v_nome is null then
+    raise exception 'Equipamento não encontrado.';
+  end if;
+
+  insert into manutencoes_equipamento (equipment_id, tipo, feita_em, observacao)
+  values (p_equipment_id, p_tipo, v_data, v_obs)
+  returning id into v_id;
+
+  perform public.registrar_movimentacao(
+    'editado', 'equipments', p_equipment_id, 'Equipamento ' || v_nome,
+    jsonb_build_object(
+      'acao_detalhada', rotulo_manutencao_equipamento(p_tipo) || ' feita em ' || to_char(v_data, 'DD/MM/YYYY'),
+      'manutencao_id', v_id,
+      'observacao', v_obs
+    )
+  );
+  return v_id;
+end;
+$$;
+revoke execute on function public.registrar_manutencao_equipamento(uuid, text, date, text) from public, anon;
+grant execute on function public.registrar_manutencao_equipamento(uuid, text, date, text) to authenticated, service_role;
+
+create or replace function public.excluir_manutencao_equipamento(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_m record;
+  v_nome text;
+begin
+  if not has_module_permission('equipamentos') then
+    raise exception 'Sem permissão para mexer nos equipamentos.';
+  end if;
+  select * into v_m from manutencoes_equipamento where id = p_id;
+  if v_m.id is null then
+    raise exception 'Registro não encontrado.';
+  end if;
+  select name into v_nome from equipments where id = v_m.equipment_id;
+
+  delete from manutencoes_equipamento where id = p_id;
+
+  perform public.registrar_movimentacao(
+    'excluido', 'equipments', v_m.equipment_id, 'Equipamento ' || coalesce(v_nome, ''),
+    jsonb_build_object(
+      'acao_detalhada', rotulo_manutencao_equipamento(v_m.tipo) || ' de ' || to_char(v_m.feita_em, 'DD/MM/YYYY') || ' desfeita'
+    )
+  );
+end;
+$$;
+revoke execute on function public.excluir_manutencao_equipamento(uuid) from public, anon;
+grant execute on function public.excluir_manutencao_equipamento(uuid) to authenticated, service_role;
+
+-- ===== 2026-11-01-triagem-assinatura.sql =====
+-- Triagem de contraindicações e termo de consentimento na assinatura do
+-- paciente (Planejador HIPRO, "Colher assinaturas"; pedido do dono a partir
+-- do e-book do HIPRO, cap. 8, 22 e 24). 01/11/2026.
+--
+-- 1) assinaturas_sessao.triagem (jsonb, nulo nas assinaturas antigas e na da
+--    profissional): condições marcadas (absolutas e relativas), confirmação
+--    da profissional, disparo teste, versão e texto do termo aceito.
+--    Fica FORA do conteudo_hash (o hash continua só do atendimento).
+-- 2) registrar_assinatura_sessao ganha p_triagem jsonb default null no fim.
+--    Chamada sem ele funciona como antes. A assinatura antiga (10 parâmetros)
+--    é apagada para não haver duas versões; revoke/grant na nova.
+-- Pode rodar mais de uma vez.
+
+alter table public.assinaturas_sessao add column if not exists triagem jsonb;
+alter table public.assinaturas_sessao drop constraint if exists assinaturas_sessao_triagem_objeto;
+alter table public.assinaturas_sessao add constraint assinaturas_sessao_triagem_objeto
+  check (triagem is null or jsonb_typeof(triagem) = 'object');
+comment on column public.assinaturas_sessao.triagem is
+  'Só na assinatura do paciente: triagem de contraindicações (situacao sem/relativa/absoluta, marcadas, absolutas, relativas, nomes, disparoTeste, relativaLiberada, absolutaConfirmada) e termo de consentimento aceito (termo.versao, termo.texto, termo.resumo). Fora do conteudo_hash.';
+
+drop function if exists public.registrar_assinatura_sessao(uuid, int, text, text, uuid, text, text, text, jsonb, text);
+
+-- Registra (ou substitui) a assinatura de um papel numa sessão. Devolve o id
+-- novo e o caminho da imagem anterior (para a tela apagar o arquivo).
+create or replace function public.registrar_assinatura_sessao(
+  p_planejamento_id uuid,
+  p_sessao int,
+  p_papel text,
+  p_nome text,
+  p_profissional_id uuid,
+  p_registro text,
+  p_imagem text,
+  p_conteudo_hash text,
+  p_resumo jsonb,
+  p_aparelho text default null,
+  p_triagem jsonb default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_plano planejamentos%rowtype;
+  v_prof profissionais%rowtype;
+  v_nome text := nullif(btrim(regexp_replace(coalesce(p_nome, ''), '\s+', ' ', 'g')), '');
+  v_registro text := nullif(btrim(regexp_replace(coalesce(p_registro, ''), '\s+', ' ', 'g')), '');
+  v_prof_id uuid;
+  v_max int;
+  v_prefixo text;
+  v_anterior text;
+  v_id uuid;
+  v_triagem jsonb;
+begin
+  if not pode_assinar_sessao() then
+    raise exception 'Sem permissão para colher assinaturas.';
+  end if;
+  select * into v_plano from planejamentos where id = p_planejamento_id;
+  if v_plano.id is null then raise exception 'Planejamento não encontrado.'; end if;
+  if p_papel is null or p_papel not in ('paciente', 'profissional') then
+    raise exception 'Papel inválido.';
+  end if;
+  begin
+    v_max := greatest(coalesce(nullif(v_plano.estado ->> 'sessoesTotal', '')::int, 1),
+                      coalesce(nullif(v_plano.estado ->> 'sessaoAtual', '')::int, 1), 1);
+  exception when others then v_max := 1;
+  end;
+  if p_sessao is null or p_sessao < 1 or p_sessao > least(v_max, 50) then
+    raise exception 'Sessão inválida.';
+  end if;
+  if v_nome is null then raise exception 'Escreva o nome de quem assina.'; end if;
+  if length(v_nome) > 120 then raise exception 'Nome grande demais.'; end if;
+  if length(coalesce(v_registro, '')) > 60 then raise exception 'Registro grande demais.'; end if;
+  v_prefixo := 's/' || p_planejamento_id::text || '/' || p_sessao::text || '/' || p_papel || '-';
+  if p_imagem is null or left(p_imagem, length(v_prefixo)) <> v_prefixo or right(p_imagem, 4) <> '.png' then
+    raise exception 'Caminho da assinatura inválido.';
+  end if;
+  if p_conteudo_hash is null or p_conteudo_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'Conferência do conteúdo inválida.';
+  end if;
+  if p_resumo is null or jsonb_typeof(p_resumo) <> 'object' or pg_column_size(p_resumo) > 200000 then
+    raise exception 'Resumo da sessão inválido.';
+  end if;
+
+  if p_papel = 'profissional' and p_profissional_id is not null then
+    select * into v_prof from profissionais where id = p_profissional_id;
+    if v_prof.id is null or v_prof.client_id is distinct from v_plano.client_id then
+      raise exception 'Esta profissional não é da clínica deste planejamento.';
+    end if;
+    v_prof_id := v_prof.id;
+    v_registro := coalesce(v_registro, v_prof.registro);
+  end if;
+  if p_papel = 'paciente' then v_registro := null; end if;
+
+  -- Triagem de contraindicações e termo de consentimento: só na assinatura
+  -- do paciente. Absoluta marcada exige a confirmação da profissional.
+  if p_papel = 'paciente' and p_triagem is not null then
+    if jsonb_typeof(p_triagem) <> 'object' or pg_column_size(p_triagem) > 50000 then
+      raise exception 'Triagem inválida.';
+    end if;
+    v_triagem := p_triagem;
+    if jsonb_typeof(v_triagem -> 'absolutas') = 'array' and jsonb_array_length(v_triagem -> 'absolutas') > 0
+       and coalesce(v_triagem ->> 'absolutaConfirmada', 'false') <> 'true' then
+      raise exception 'Contraindicação absoluta marcada: falta a confirmação da profissional.';
+    end if;
+    if coalesce(v_triagem #>> '{termo,aceito}', 'false') <> 'true' then
+      raise exception 'Falta o paciente concordar com o termo de consentimento.';
+    end if;
+  end if;
+
+  delete from assinaturas_sessao
+   where planejamento_id = p_planejamento_id and sessao = p_sessao and papel = p_papel
+   returning imagem into v_anterior;
+
+  insert into assinaturas_sessao (planejamento_id, sessao, papel, nome, profissional_id, registro,
+                                  imagem, conteudo_hash, resumo, aparelho, triagem)
+  values (p_planejamento_id, p_sessao, p_papel, v_nome, v_prof_id, v_registro,
+          p_imagem, p_conteudo_hash, p_resumo, nullif(left(btrim(coalesce(p_aparelho, '')), 300), ''), v_triagem)
+  returning id into v_id;
+
+  perform registrar_movimentacao('criado', 'assinatura_sessao', v_id,
+    case when p_papel = 'paciente' then 'Assinatura do paciente ' else 'Assinatura da profissional ' end
+      || v_nome || ' na Sessão ' || p_sessao
+      || coalesce(' de ' || nullif(v_plano.paciente, ''), '')
+      || case when v_anterior is not null then ' (substituiu a anterior)' else '' end,
+    jsonb_build_object('planejamento_id', p_planejamento_id, 'sessao', p_sessao, 'papel', p_papel,
+                       'conteudo_hash', p_conteudo_hash, 'profissional_id', v_prof_id,
+                       'triagem', v_triagem ->> 'situacao', 'termo_versao', v_triagem #>> '{termo,versao}'));
+  return jsonb_build_object('id', v_id, 'anterior', v_anterior);
+end;
+$$;
+revoke execute on function public.registrar_assinatura_sessao(uuid, int, text, text, uuid, text, text, text, jsonb, text, jsonb) from public, anon;
+grant execute on function public.registrar_assinatura_sessao(uuid, int, text, text, uuid, text, text, text, jsonb, text, jsonb) to authenticated, service_role;

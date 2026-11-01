@@ -1,15 +1,19 @@
 "use client";
 
 // Colher assinaturas da sessão (só o dono, no celular dele): tela cheia por
-// portal no <body>. Passo 1: resumo da sessão. Passo 2: o paciente assina com
-// o dedo (nome já preenchido, dá para corrigir). Passo 3: a profissional
-// (escolhida no cadastro da clínica: nome e registro vêm de lá) assina.
-// Confirmar sobe as duas imagens para a pasta privada "assinaturas" e
-// registra cada uma com o sha256 do resumo da sessão.
+// portal no <body>. Passo 1: resumo da sessão. Passo 2: triagem de
+// contraindicações (absoluta só segue com a confirmação da profissional;
+// relativa pede "avaliado e liberado"). Passo 3: termo de consentimento, que
+// o paciente lê e marca "Li e concordo". Passo 4: o paciente assina com o dedo
+// (nome já preenchido, dá para corrigir). Passo 5: a profissional (escolhida
+// no cadastro da clínica: nome e registro vêm de lá) assina. Confirmar sobe as
+// duas imagens para a pasta privada "assinaturas" e registra cada uma com o
+// sha256 do resumo da sessão; a triagem e o termo vão junto da assinatura do
+// paciente (fora do hash).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, Check, Loader2, PenLine, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, OctagonAlert, PenLine, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { avisar } from "@/components/Dialogos";
 import { type Plano } from "@/lib/planejador";
@@ -17,10 +21,24 @@ import { formatDate } from "@/lib/format";
 import { hashDoResumo, resumoDaSessao } from "@/lib/assinatura-sessao";
 import { enviarAssinatura } from "@/lib/assinaturas-envio";
 import { ativas, faltaSql, profissionaisDaCliente, profissionalDoPlano, rotuloProfissional, type Profissional } from "@/lib/profissionais";
+import { CONTRAINDICACOES, RESPOSTAS_VAZIAS, classificarTriagem, registroDaTriagem, type Contraindicacao, type RespostasTriagem } from "@/lib/triagem-hipro";
+import { TERMO_PARAGRAFOS, TERMO_TITULO, TERMO_VERSAO } from "@/lib/consentimento-hipro";
 import CanvasAssinatura, { type CanvasAssinaturaApi } from "./CanvasAssinatura";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
-type Passo = "resumo" | "paciente" | "profissional";
+type Passo = "resumo" | "triagem" | "termo" | "paciente" | "profissional";
+const PASSOS: Passo[] = ["resumo", "triagem", "termo", "paciente", "profissional"];
+
+/** Caixinha grande, boa para o dedo. */
+function Caixa({ marcada, onMudar, children, tom = "neutro" }: { marcada: boolean; onMudar: (v: boolean) => void; children: React.ReactNode; tom?: "neutro" | "absoluta" | "relativa" }) {
+  const anel = marcada ? (tom === "absoluta" ? "ring-rose-300 bg-rose-50" : tom === "relativa" ? "ring-amber-300 bg-amber-50" : "ring-brand-teal/50 bg-brand-teal/5") : "ring-neutral-200 bg-white";
+  return (
+    <label className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 ring-1 ${anel}`}>
+      <input type="checkbox" checked={marcada} onChange={(e) => onMudar(e.target.checked)} className="mt-0.5 h-5 w-5 flex-shrink-0 accent-brand-teal" />
+      <span className="min-w-0 text-sm text-neutral-800">{children}</span>
+    </label>
+  );
+}
 
 export default function ColherAssinaturas({
   planoId,
@@ -48,6 +66,9 @@ export default function ColherAssinaturas({
   const [nomeProf, setNomeProf] = useState(plano.profissional);
   const [registroProf, setRegistroProf] = useState(plano.profissionalRegistro);
   const [enviando, setEnviando] = useState(false);
+  const [triagem, setTriagem] = useState<RespostasTriagem>(RESPOSTAS_VAZIAS);
+  const [termoAceito, setTermoAceito] = useState(false);
+  const classe = useMemo(() => classificarTriagem(triagem), [triagem]);
   const canvasPaciente = useRef<CanvasAssinaturaApi>(null);
   const canvasProf = useRef<CanvasAssinaturaApi>(null);
 
@@ -111,6 +132,8 @@ export default function ColherAssinaturas({
 
   async function confirmar() {
     if (!resumo || !blobPaciente) return;
+    if (!classe.podeSeguir) return avisar(classe.falta ?? "Confira a triagem.", "erro");
+    if (!termoAceito) return avisar("Falta o paciente marcar \"Li e concordo\" no termo.", "erro");
     if (!nomeProf.trim()) return avisar("Escolha ou escreva o nome da profissional.", "erro");
     const bProf = await canvasProf.current?.exportar();
     if (!bProf) return avisar("Falta a assinatura da profissional.", "erro");
@@ -118,7 +141,8 @@ export default function ColherAssinaturas({
     try {
       const hash = await hashDoResumo(resumo);
       const sb = createClient();
-      await enviarAssinatura(sb, { planoId, sessao, papel: "paciente", nome: nomePaciente, imagem: blobPaciente, hash, resumo });
+      const regTriagem = registroDaTriagem(triagem, termoAceito);
+      await enviarAssinatura(sb, { planoId, sessao, papel: "paciente", nome: nomePaciente, imagem: blobPaciente, hash, resumo, triagem: regTriagem });
       await enviarAssinatura(sb, {
         planoId,
         sessao,
@@ -143,7 +167,15 @@ export default function ColherAssinaturas({
   const entrada = "w-full rounded-xl bg-white px-3.5 py-3 text-[15px] text-neutral-900 ring-1 ring-neutral-200 outline-none focus:ring-2 focus:ring-brand-teal";
   const rotulo = "mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500";
   const ativasLista = profissionais ? ativas(profissionais) : [];
-  const numeroPasso = passo === "resumo" ? 1 : passo === "paciente" ? 2 : 3;
+  const numeroPasso = PASSOS.indexOf(passo) + 1;
+  const marcar = (id: string, v: boolean) => setTriagem((t) => ({ ...t, marcadas: { ...t.marcadas, [id]: v } }));
+  const listaCondicoes = (tipo: Contraindicacao["tipo"]) =>
+    CONTRAINDICACOES.filter((c) => c.tipo === tipo).map((c) => (
+      <Caixa key={c.id} marcada={!!triagem.marcadas[c.id]} onMudar={(v) => marcar(c.id, v)} tom={tipo}>
+        {c.texto}
+        {c.detalhe && <span className="block text-xs text-neutral-500">{c.detalhe}</span>}
+      </Caixa>
+    ));
 
   return createPortal(
     <div className="fixed inset-0 z-[85] flex flex-col bg-[#F3F6F7]" role="dialog" aria-label="Colher assinaturas">
@@ -155,7 +187,7 @@ export default function ColherAssinaturas({
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-extrabold text-neutral-900">Assinaturas da Sessão {sessao}</p>
             <p className="truncate text-xs text-neutral-500">
-              Passo {numeroPasso} de 3 · {plano.paciente || "paciente"}
+              Passo {numeroPasso} de {PASSOS.length} · {plano.paciente || "paciente"}
             </p>
           </div>
           <button onClick={onFechar} aria-label="Fechar" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
@@ -209,6 +241,67 @@ export default function ColherAssinaturas({
                   <p className="text-xl font-black tabular-nums text-brand-teal-dark">{fmt(resumo.saldo)}</p>
                 </div>
               </div>
+            </section>
+          )}
+
+          {resumo && passo === "triagem" && (
+            <section className="cartao space-y-3 p-4">
+              <div>
+                <p className="text-sm font-bold text-neutral-900">Triagem de contraindicações</p>
+                <p className="text-xs text-neutral-500">Pergunte ao paciente e marque o que ele tiver. Nada marcado = sem contraindicações declaradas.</p>
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700">Absolutas</p>
+              <div className="space-y-1.5">{listaCondicoes("absoluta")}</div>
+              <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-amber-700">Relativas</p>
+              <div className="space-y-1.5">{listaCondicoes("relativa")}</div>
+              <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Antes de começar</p>
+              <Caixa marcada={triagem.disparoTeste} onMudar={(v) => setTriagem((t) => ({ ...t, disparoTeste: v }))}>
+                Disparo teste realizado
+              </Caixa>
+
+              {classe.situacao === "absoluta" && (
+                <div className="space-y-2 rounded-2xl bg-rose-50 p-3 ring-2 ring-rose-300">
+                  <p className="flex items-start gap-2 text-sm font-bold text-rose-800">
+                    <OctagonAlert size={18} className="mt-0.5 flex-shrink-0" /> Contraindicação absoluta: o procedimento não deve ser feito.
+                  </p>
+                  <p className="text-xs text-rose-800">{classe.absolutas.map((c) => c.texto).join("; ")}.</p>
+                  <Caixa marcada={triagem.absolutaConfirmada} onMudar={(v) => setTriagem((t) => ({ ...t, absolutaConfirmada: v }))} tom="absoluta">
+                    <b>A profissional avaliou e decidiu prosseguir mesmo assim.</b> Fica registrado junto da assinatura.
+                  </Caixa>
+                </div>
+              )}
+              {classe.situacao === "relativa" && (
+                <div className="space-y-2 rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-300">
+                  <p className="flex items-start gap-2 text-sm font-bold text-amber-900">
+                    <TriangleAlert size={17} className="mt-0.5 flex-shrink-0" /> Contraindicação relativa: {classe.relativas.map((c) => c.texto.toLowerCase()).join("; ")}.
+                  </p>
+                  <Caixa marcada={triagem.relativaLiberada} onMudar={(v) => setTriagem((t) => ({ ...t, relativaLiberada: v }))} tom="relativa">
+                    Avaliado e liberado pela profissional
+                  </Caixa>
+                </div>
+              )}
+              {classe.situacao === "sem" && (
+                <p className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                  <ShieldCheck size={16} /> Sem contraindicações declaradas
+                </p>
+              )}
+              {!triagem.disparoTeste && <p className="text-xs text-amber-700">O disparo teste ainda não foi marcado.</p>}
+            </section>
+          )}
+
+          {resumo && passo === "termo" && (
+            <section className="cartao space-y-3 p-4">
+              <p className="text-sm font-bold text-neutral-900">{TERMO_TITULO}</p>
+              <p className="text-xs text-neutral-500">Entregue o celular ao paciente para ler.</p>
+              <div className="space-y-2.5 rounded-xl bg-neutral-50 p-3 text-[14px] leading-relaxed text-neutral-800 ring-1 ring-neutral-200">
+                {TERMO_PARAGRAFOS.map((t, i) => (
+                  <p key={i}>{t}</p>
+                ))}
+              </div>
+              <Caixa marcada={termoAceito} onMudar={setTermoAceito}>
+                <b>Li e concordo</b> ({nomePaciente.trim() || "paciente"})
+              </Caixa>
+              <p className="text-[11px] text-neutral-400">Versão do termo: {TERMO_VERSAO}</p>
             </section>
           )}
 
@@ -268,7 +361,7 @@ export default function ColherAssinaturas({
             {passo !== "resumo" && (
               <button
                 type="button"
-                onClick={() => setPasso(passo === "profissional" ? "paciente" : "resumo")}
+                onClick={() => setPasso(PASSOS[Math.max(0, PASSOS.indexOf(passo) - 1)])}
                 disabled={enviando}
                 className="flex items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-3.5 text-sm font-bold text-neutral-700 ring-1 ring-neutral-200"
               >
@@ -276,8 +369,22 @@ export default function ColherAssinaturas({
               </button>
             )}
             {passo === "resumo" && (
-              <button type="button" onClick={() => setPasso("paciente")} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
-                Conferido, assinar <ArrowRight size={17} />
+              <button type="button" onClick={() => setPasso("triagem")} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
+                Conferido, seguir <ArrowRight size={17} />
+              </button>
+            )}
+            {passo === "triagem" && (
+              <button
+                type="button"
+                onClick={() => (classe.podeSeguir ? setPasso("termo") : avisar(classe.falta ?? "Confira a triagem.", "erro"))}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white ${classe.podeSeguir ? "bg-brand-gradient shadow-glow-teal" : "bg-neutral-300"}`}
+              >
+                Próximo: termo <ArrowRight size={17} />
+              </button>
+            )}
+            {passo === "termo" && (
+              <button type="button" onClick={() => setPasso("paciente")} disabled={!termoAceito} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal disabled:opacity-50">
+                Assinar <ArrowRight size={17} />
               </button>
             )}
             {passo === "paciente" && (

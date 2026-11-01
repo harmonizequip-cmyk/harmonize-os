@@ -39,9 +39,13 @@ import SeletorPlanejamento from "@/components/SeletorPlanejamento";
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import { CartaoArea, Folha, FolhaModelo, FolhaNovaArea, fmt } from "@/components/planejador/Partes";
 import ResumoPlano from "@/components/planejador/ResumoPlano";
+import BotaoOrientacoes from "@/components/planejador/BotaoOrientacoes";
+import { mensagemOrientacoesPos } from "@/lib/orientacoes-pos";
+import { AVISO_GERAL_APLICACAO } from "@/lib/zonas-risco";
+import { hojeLocal } from "@/lib/period";
 import CustoDisparos from "@/components/planejador/CustoDisparos";
 import { aplicarQuantidades } from "@/lib/custo-disparos";
-import { formatDate } from "@/lib/format";
+import { buildWhatsAppLink, formatDate } from "@/lib/format";
 import { pacienteDeMesmoNome, sugerirPacientes, type PacienteCadastro } from "@/lib/pacientes";
 import { chaveRascunho, decidirRascunho, impressao, lerRascunho, proximaEspera, type Rascunho } from "@/lib/rascunho-planejamento";
 import {
@@ -64,6 +68,8 @@ import {
   CalendarDays,
   CloudOff,
   PenLine,
+  MessageCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { confirmar } from "@/components/Dialogos";
 import { CircleCheck } from "lucide-react";
@@ -931,6 +937,9 @@ export default function EditorPlanejamento({
 
   const s = situacaoSaldo(plano);
   const varias = plano.sessoesTotal > 1;
+  // Cadastro do paciente (para o WhatsApp das orientações depois da sessão).
+  const cadastroPaciente = plano.pacienteId ? cadastros.find((c) => c.id === plano.pacienteId) : pacienteDeMesmoNome(cadastros, plano.paciente);
+  const whatsPaciente = cadastroPaciente?.whatsapp ?? null;
   const naoUltima = plano.sessaoAtual < plano.sessoesTotal;
   const nAreas = areasPreenchidas(plano);
   const nAlertas = alertas(plano).length;
@@ -1008,6 +1017,21 @@ export default function EditorPlanejamento({
                   <button onClick={() => (setMenu(false), pdf("paciente"))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50">
                     <UserRound size={16} /> PDF do paciente
                   </button>
+                  {whatsPaciente ? (
+                    <a
+                      href={buildWhatsAppLink(whatsPaciente, mensagemOrientacoesPos({ paciente: plano.paciente, profissional: plano.profissional, retorno: plano.dataRetorno, hoje: hojeLocal() })) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setMenu(false)}
+                      className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50"
+                    >
+                      <MessageCircle size={16} /> Mandar orientações ao paciente
+                    </a>
+                  ) : (
+                    <button onClick={() => (setMenu(false), irPara("resumo"))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-400 active:bg-neutral-50">
+                      <MessageCircle size={16} /> Orientações ao paciente (sem WhatsApp)
+                    </button>
+                  )}
                   {varias && (
                     <>
                       <button onClick={() => (setMenu(false), fichaSessao(plano.sessaoAtual))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-semibold text-neutral-800 active:bg-neutral-50">
@@ -1476,6 +1500,9 @@ export default function EditorPlanejamento({
                   {abertas.size ? "Fechar todas" : "Abrir todas"}
                 </button>
               </div>
+              <p className="flex items-start gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-200">
+                <ShieldAlert size={15} className="mt-0.5 flex-shrink-0 text-amber-600" /> {AVISO_GERAL_APLICACAO}
+              </p>
               {areas.length === 0 && <p className="rounded-3xl bg-white p-6 text-center text-sm text-neutral-500 ring-1 ring-neutral-200">Nenhuma área com disparos ainda.</p>}
               <div className="gap-3 md:columns-2 [&>*]:mb-3 [&>*]:break-inside-avoid">
                 {areas.map((a) => (
@@ -1510,6 +1537,11 @@ export default function EditorPlanejamento({
           {aba === "resumo" && (
             <div key="resumo" className="animate-[aparecer_.25s_ease-out]">
               <ResumoPlano plano={plano} onIrParaArea={irParaArea} />
+              <div className={`${cartao} mt-4`}>
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Depois da sessão</p>
+                <p className="mb-3 text-xs text-neutral-500">Cuidados, o que esperar{plano.dataRetorno ? " e o próximo retorno" : ""}, já escritos para o WhatsApp do paciente.</p>
+                <BotaoOrientacoes paciente={plano.paciente} whatsapp={whatsPaciente} profissional={plano.profissional} retorno={plano.dataRetorno} />
+              </div>
               {assinaturas.estado !== "sem_permissao" && assinaturas.estado !== "carregando" && (
                 <div id="assinaturas-sessao" className={`${cartao} mt-4 scroll-mt-4`}>
                   <AssinaturasSessoes

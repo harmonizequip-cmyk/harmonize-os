@@ -486,6 +486,37 @@ async function avisosDoDia(hoje: string): Promise<Aviso[]> {
     }
   }
 
+  // 7. Troca de água do HIPRO (a cada 15 dias): no dia em que vence e, se
+  // ficar atrasada, no 3º e 7º dia de atraso e às segundas. Sem nenhuma troca
+  // registrada não avisa (o Dashboard pede o registro). Se a tabela ainda não
+  // existir (SQL não rodado), a consulta falha e nada é avisado.
+  const { data: trocas, error: erroTrocas } = await admin
+    .from("manutencoes_equipamento")
+    .select("equipment_id, feita_em")
+    .eq("tipo", "troca_agua")
+    .order("feita_em", { ascending: false })
+    .limit(200);
+  if (!erroTrocas && trocas?.length) {
+    const ultima = new Map<string, string>();
+    for (const t of trocas as any[]) if (!ultima.has(t.equipment_id)) ultima.set(t.equipment_id, String(t.feita_em));
+    const { data: eqs } = await admin.from("equipments").select("id, code, name").order("code");
+    const segunda = new Date(hoje + "T12:00:00Z").getUTCDay() === 1;
+    for (const e of (eqs ?? []) as any[]) {
+      const feita = ultima.get(e.id);
+      if (!feita) continue;
+      const vence = somarDias(feita, 15);
+      const atraso = Math.round((Date.parse(hoje + "T12:00:00Z") - Date.parse(vence + "T12:00:00Z")) / 86400000);
+      if (atraso < 0) continue;
+      if (atraso > 0 && atraso !== 3 && atraso !== 7 && !segunda) continue;
+      avisos.push({
+        title: atraso === 0 ? `Trocar a água do ${e.name} hoje` : `Água do ${e.name} atrasada há ${atraso} ${atraso === 1 ? "dia" : "dias"}`,
+        body: "Só água destilada ou deionizada, cerca de 1,5 litro. Depois toque em Troquei a água.",
+        url: `/equipamentos#agua-${e.code}`,
+        tag: `agua-${e.id}`,
+      });
+    }
+  }
+
   return avisos.slice(0, MAX_AVISOS_EXTRAS);
 }
 

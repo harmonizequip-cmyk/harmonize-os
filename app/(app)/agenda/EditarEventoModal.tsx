@@ -14,6 +14,7 @@ import ReceberPagamentoBotao from "@/components/ReceberPagamentoBotao";
 import TaxaRecebidaBotao from "@/components/TaxaRecebidaBotao";
 import GerarContratoModal, { type OrigemContrato } from "@/components/GerarContratoModal";
 import ArteDivulgacaoModal from "@/components/ArteDivulgacaoModal";
+import CuidadosHiproDia from "@/components/equipamentos/CuidadosHiproDia";
 import { Atalho, Atalhos } from "@/components/Atalhos";
 import { linkCliente, linkLancamentosCliente, linkLocacao, linkNovoPlanejamento } from "@/lib/atalhos";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -625,6 +626,10 @@ export default function EditarEventoModal({
             </Atalhos>
           )}
 
+          {!event.is_mentoria && event.equipment_id && (
+            <CuidadosHiproDia equipmentId={event.equipment_id} className="mb-4" />
+          )}
+
           {cancelError && <p className="mb-3 text-sm text-red-600">{cancelError}</p>}
 
           {showCancelForm ? (
@@ -1097,6 +1102,10 @@ export default function EditarEventoModal({
                 <Atalho href={linkNovoPlanejamento(event.client_id, event.id)} emoji="📋">Planejamento</Atalho>
               )}
             </Atalhos>
+          )}
+
+          {!event.is_mentoria && event.equipment_id && (event.date_end ?? event.date_start) >= hojeLocal() && (
+            <CuidadosHiproDia equipmentId={event.equipment_id} className="mb-4" />
           )}
 
           {saldoLocacao !== null && (
