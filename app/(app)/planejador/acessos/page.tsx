@@ -76,9 +76,20 @@ export default async function AcessosPage(props: { searchParams: Promise<{ acao?
       fotos: c.portal_fotos ?? null,
     }));
     const grupos = separarAcessos(base, perfis, Object.fromEntries(validadesLista), convites, hojeLocal());
-    return <AcessosClient grupos={grupos} abrirFormulario={sp.acao === "formulario"} erro={null} />;
+    // "Preencher o formulário" é só do dono (administrador que não é só de visualização).
+    const { data: auth } = await supabase.auth.getUser();
+    const { data: eu } = auth.user
+      ? await supabase.from("profiles").select("is_admin, somente_leitura, cliente_id").eq("id", auth.user.id).maybeSingle()
+      : { data: null };
+    const dono = !!eu?.is_admin && !eu?.somente_leitura && !eu?.cliente_id;
+    const paraEscolher = dono
+      ? clientes
+          .map((c) => ({ id: c.id, name: c.clinic_name ? `${c.name} · ${c.clinic_name}` : c.name, city: c.city, whatsapp: c.whatsapp }))
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      : [];
+    return <AcessosClient grupos={grupos} abrirFormulario={sp.acao === "formulario"} erro={null} dono={dono} paraEscolher={paraEscolher} />;
   } catch (e) {
     erro = (e as Error).message;
   }
-  return <AcessosClient grupos={{ comAcesso: [], semAcesso: [], semCadastro: [] }} abrirFormulario={false} erro={erro} />;
+  return <AcessosClient grupos={{ comAcesso: [], semAcesso: [], semCadastro: [] }} abrirFormulario={false} erro={erro} dono={false} paraEscolher={[]} />;
 }

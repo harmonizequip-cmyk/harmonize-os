@@ -14812,6 +14812,10 @@ $fotosportal$;
 --    informado (sem acento nem maiúscula); senão fica só na anotação;
 --  - criar uma anotação da cliente (origem nova 'formulario') com a resposta.
 -- Mesma assinatura e mesmas permissões (só service_role). Não altera dado existente.
+--
+-- convite_cadastro_abrir passa a devolver também nome completo, documento,
+-- clínica, endereço, cidade e UF da ficha ligada ao link, para o formulário
+-- já vir preenchido quando o dono puxa um lead ou cliente que já existe.
 
 alter table public.cliente_anotacoes drop constraint if exists cliente_anotacoes_origem_check;
 alter table public.cliente_anotacoes add constraint cliente_anotacoes_origem_check
@@ -14931,3 +14935,28 @@ $$;
 
 revoke execute on function public.convite_cadastro_receber(text, jsonb, text) from public, anon, authenticated;
 grant execute on function public.convite_cadastro_receber(text, jsonb, text) to service_role;
+
+create or replace function public.convite_cadastro_abrir(p_token text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when cv.id is null then jsonb_build_object('valido', false, 'motivo', 'Link inválido.')
+    when cv.preenchido_em is not null then jsonb_build_object('valido', false, 'motivo', 'Este cadastro já foi enviado. Fale com a Harmonize se precisar mudar algo.')
+    when cv.expira_em <= now() then jsonb_build_object('valido', false, 'motivo', 'Este link venceu. Peça um novo para a Harmonize.')
+    else jsonb_build_object('valido', true,
+           'tratamento', c.treatment, 'nome_exibicao', c.display_name, 'whatsapp', c.whatsapp, 'email', c.email,
+           -- O resto da ficha, para o formulário já vir preenchido (02/11/2026).
+           'nome_completo', c.name, 'documento', c.document, 'clinica', c.clinic_name,
+           'endereco', c.address, 'cidade', c.city, 'uf', c.state)
+  end
+  from (select 1) x
+  left join convites_cadastro cv on cv.token = p_token
+  left join clients c on c.id = cv.client_id;
+$$;
+
+revoke execute on function public.convite_cadastro_abrir(text) from public, anon, authenticated;
+grant execute on function public.convite_cadastro_abrir(text) to service_role;

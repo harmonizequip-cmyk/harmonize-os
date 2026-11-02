@@ -9,12 +9,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, CheckCircle2, ChevronRight, KeyRound, Link2, Loader2, MessageCircle, PauseCircle, PlayCircle, Search, UserX } from "lucide-react";
+import { Camera, CheckCircle2, ChevronRight, ClipboardPen, KeyRound, Link2, Loader2, MessageCircle, PauseCircle, PlayCircle, Search, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { avisar, confirmar, pedirTexto } from "@/components/Dialogos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { IconeChip } from "@/components/ui/Visual";
 import LiberarAcademy from "@/components/LiberarAcademy";
+import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { buildWhatsAppLink } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
 import { mensagemFormulario, textoMotivo, type GruposAcesso, type LinhaAcesso } from "@/lib/acessos-planejador";
@@ -49,13 +50,29 @@ async function compartilharTexto(texto: string, link: string) {
   }
 }
 
-export default function AcessosClient({ grupos, abrirFormulario, erro }: { grupos: GruposAcesso; abrirFormulario: boolean; erro: string | null }) {
+export default function AcessosClient({
+  grupos,
+  abrirFormulario,
+  erro,
+  dono,
+  paraEscolher,
+}: {
+  grupos: GruposAcesso;
+  abrirFormulario: boolean;
+  erro: string | null;
+  /** Só o dono preenche o formulário por alguém. */
+  dono: boolean;
+  /** Clientes e leads para puxar os dados no formulário. */
+  paraEscolher: ClientOption[];
+}) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const [aba, setAba] = useState<Aba>(abrirFormulario ? "cadastro" : grupos.semAcesso.some((l) => l.motivo === "preencheu") ? "sem" : "com");
   const [busca, setBusca] = useState("");
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [liberada, setLiberada] = useState<LinhaAcesso | null>(null);
+  const [preenchendo, setPreenchendo] = useState(false);
+  const [escolhida, setEscolhida] = useState("");
 
   const lista = aba === "com" ? grupos.comAcesso : aba === "sem" ? grupos.semAcesso : grupos.semCadastro;
   const filtrada = useMemo(() => {
@@ -112,6 +129,17 @@ export default function AcessosClient({ grupos, abrirFormulario, erro }: { grupo
       if (!sim) return;
     }
     await rodar(`fotos-${l.cliente.id}`, () => createClient().rpc("definir_fotos_portal", { p_client_id: l.cliente.id, p_liberado: liberar }), liberar ? "Fotos liberadas no portal." : "Fotos retiradas do portal.");
+  }
+
+  /** Abre o formulário aqui mesmo: ligado à ficha escolhida (já vem com os dados dela) ou do zero. */
+  async function preencherFormulario(clienteId: string | null) {
+    setOcupado(clienteId ? "preencher" : "zero");
+    const { data, error } = await createClient().rpc("criar_convite_cadastro", { p_client_id: clienteId });
+    if (error || !data) {
+      setOcupado(null);
+      return avisar(error?.message ?? "Não consegui abrir o formulário.", "erro");
+    }
+    window.location.href = `/cadastro/${data as string}`;
   }
 
   async function mandarFormulario(l: LinhaAcesso | null) {
@@ -173,6 +201,54 @@ export default function AcessosClient({ grupos, abrirFormulario, erro }: { grupo
           >
             {ocupado === "geral" ? <Loader2 size={16} className="animate-spin" /> : <Link2 size={16} />} Link do formulário (quem ainda não tem ficha)
           </button>
+        )}
+        {dono && !somenteLeitura && (
+          <div className="mt-3">
+            {!preenchendo ? (
+              <button
+                type="button"
+                onClick={() => setPreenchendo(true)}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-neutral-800 ring-1 ring-neutral-200"
+              >
+                <ClipboardPen size={16} /> Preencher o formulário eu mesmo
+              </button>
+            ) : (
+              <div className="space-y-3 rounded-2xl bg-neutral-50 p-3 ring-1 ring-neutral-200">
+                <p className="text-xs text-neutral-600">
+                  Abre o formulário aqui no seu celular. Puxe um lead ou cliente que já existe (os dados dela já vêm preenchidos) ou comece do zero. Depois de enviar, ela aparece em &quot;Sem acesso&quot; para você liberar.
+                </p>
+                <ClientPicker
+                  clients={paraEscolher}
+                  value={escolhida}
+                  onChange={setEscolhida}
+                  onClientCreated={() => undefined}
+                  label="Lead ou cliente"
+                  allowCreate={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => (escolhida ? preencherFormulario(escolhida) : avisar("Escolha o lead ou cliente, ou toque em Começar do zero.", "erro"))}
+                  disabled={ocupado === "preencher"}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-brand-teal px-4 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {ocupado === "preencher" ? <Loader2 size={16} className="animate-spin" /> : <ClipboardPen size={16} />} Abrir o formulário com os dados dela
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => preencherFormulario(null)}
+                    disabled={ocupado === "zero"}
+                    className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-xs font-bold text-neutral-700 ring-1 ring-neutral-200 disabled:opacity-60"
+                  >
+                    {ocupado === "zero" && <Loader2 size={14} className="animate-spin" />} Começar do zero
+                  </button>
+                  <button type="button" onClick={() => setPreenchendo(false)} className="min-h-10 px-3 text-xs font-semibold text-neutral-500">
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         {abrirFormulario && (
           <p className="mt-2 text-xs text-neutral-500">Para uma cliente que já tem ficha, toque em &quot;Mandar formulário&quot; ao lado do nome dela, abaixo: o link já vai ligado à ficha.</p>

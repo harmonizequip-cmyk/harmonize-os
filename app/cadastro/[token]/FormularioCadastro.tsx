@@ -69,6 +69,13 @@ export default function FormularioCadastro({ token }: { token: string }) {
           nome_exibicao: r.nome_exibicao ?? "",
           whatsapp: r.whatsapp ?? "",
           email: r.email ?? "",
+          // Ficha que já existe: o resto dos dados também vem preenchido (quem preenche pode corrigir).
+          nome_completo: r.nome_completo ?? "",
+          documento: r.documento ?? "",
+          clinica: r.clinica ?? "",
+          endereco: r.endereco ?? "",
+          cidade: r.cidade ?? "",
+          uf: r.uf ?? "",
         }));
         if (Array.isArray(r.origens) && r.origens.length) setOrigens(r.origens as Origem[]);
         setEstado("form");
