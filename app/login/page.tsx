@@ -56,12 +56,7 @@ export default function LoginPage() {
       {/* Tema HIPRO: o aparelho como herói, como na capa do e-book. */}
       <div className="so-hipro mb-4 w-full max-w-sm text-center">
         <img src="/harmonize-logo-full-dark.png" alt="" aria-hidden className="mx-auto h-14 w-auto" />
-        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-neutral-700">
-          <span className="mr-2 inline-block h-px w-8 bg-[#51d3da]/70 align-middle" />
-          Locação HIPRO 1 e HIPRO 2
-          <span className="ml-2 inline-block h-px w-8 bg-[#51d3da]/70 align-middle" />
-        </p>
-        <AparelhoHipro className="mx-auto -mb-6 mt-2 w-[min(19rem,80vw)]" />
+        <AparelhoHipro className="mx-auto -mb-6 mt-4 w-[min(19rem,80vw)]" />
       </div>
       <form
         onSubmit={handleSubmit}
