@@ -24,7 +24,7 @@ export default function LinkCadastroBotao({ className }: { className?: string })
     setOcupado(false);
     if (error || !data) return setAviso(error?.message ?? "Não consegui gerar o link.");
     const link = `${window.location.origin}/cadastro/${data as string}`;
-    const texto = `Para liberar seu acesso ao Planejador HIPRO da Harmonize, preencha seu cadastro neste link (você mesma cria a senha):\n\n${link}\n\nAssim que você enviar, eu libero e te aviso.`;
+    const texto = `Para liberar seu acesso ao Planejador HIPRO da Harmonize e à Contourline Academy, preencha seu cadastro neste link (você mesma cria a senha):\n\n${link}\n\nAssim que você enviar, eu libero e te aviso.`;
     try {
       if (navigator.share) {
         await navigator.share({ text: texto });

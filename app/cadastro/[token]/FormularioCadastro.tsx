@@ -2,8 +2,9 @@
 
 // Formulário que a cliente preenche sozinha (link /cadastro/<token>, sem login).
 // Fala com a Edge Function "cadastro-cliente", que confere o token, cria o
-// login com a senha dela e atualiza o cadastro. O acesso ao Planejador só
-// abre quando a Harmonize liberar.
+// login com a senha dela e atualiza o cadastro. O cadastro serve para o
+// Planejador HIPRO e para a Contourline Academy; os dois só abrem quando a
+// Harmonize liberar. Pergunta também como conheceu a Harmonize (e quem indicou).
 
 import CampoSenha from "@/components/CampoSenha";
 import { useEffect, useState } from "react";
@@ -23,9 +24,24 @@ type Dados = {
   endereco: string;
   cidade: string;
   uf: string;
+  como_conheceu: string;
+  como_conheceu_rotulo: string;
+  indicado_por: string;
 };
 
-const VAZIO: Dados = { tratamento: "", nome_completo: "", nome_exibicao: "", whatsapp: "", email: "", documento: "", clinica: "", endereco: "", cidade: "", uf: "" };
+type Origem = { valor: string; rotulo: string };
+// Reserva enquanto a função não manda a lista de Configurações.
+const ORIGENS_PADRAO: Origem[] = [
+  { valor: "indicacao", rotulo: "Indicação" },
+  { valor: "instagram", rotulo: "Instagram" },
+  { valor: "whatsapp", rotulo: "WhatsApp" },
+  { valor: "outro", rotulo: "Outro" },
+];
+
+const VAZIO: Dados = {
+  tratamento: "", nome_completo: "", nome_exibicao: "", whatsapp: "", email: "", documento: "", clinica: "", endereco: "", cidade: "", uf: "",
+  como_conheceu: "", como_conheceu_rotulo: "", indicado_por: "",
+};
 
 export default function FormularioCadastro({ token }: { token: string }) {
   const [estado, setEstado] = useState<"carregando" | "invalido" | "form" | "enviado">("carregando");
@@ -36,6 +52,7 @@ export default function FormularioCadastro({ token }: { token: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [jaTinha, setJaTinha] = useState(false);
+  const [origens, setOrigens] = useState<Origem[]>(ORIGENS_PADRAO);
 
   useEffect(() => {
     fetch(`${URL_FUNCAO}?token=${encodeURIComponent(token)}`, { headers: CABECALHOS })
@@ -53,6 +70,7 @@ export default function FormularioCadastro({ token }: { token: string }) {
           whatsapp: r.whatsapp ?? "",
           email: r.email ?? "",
         }));
+        if (Array.isArray(r.origens) && r.origens.length) setOrigens(r.origens as Origem[]);
         setEstado("form");
       })
       .catch(() => {
@@ -68,6 +86,8 @@ export default function FormularioCadastro({ token }: { token: string }) {
     setErro(null);
     if (!d.nome_completo.trim() || !d.whatsapp.trim() || !d.email.trim()) return setErro("Preencha nome completo, WhatsApp e e-mail.");
     if (d.whatsapp.replace(/\D/g, "").length < 10) return setErro("Coloque o WhatsApp com DDD.");
+    if (!d.como_conheceu) return setErro("Conte como você conheceu a Harmonize.");
+    if (d.como_conheceu === "indicacao" && !d.indicado_por.trim()) return setErro("Coloque o nome de quem indicou a Harmonize.");
     const ruim = problemaSenha(senha);
     if (ruim) return setErro(ruim);
     if (senha !== senha2) return setErro("As duas senhas não são iguais.");
@@ -108,9 +128,10 @@ export default function FormularioCadastro({ token }: { token: string }) {
             <p className="text-3xl">✅</p>
             <p className="text-base font-semibold text-neutral-900">Cadastro enviado!</p>
             <p className="text-sm text-neutral-600">
-              Assim que a Harmonize liberar, você entra em <b>harmonize-os.vercel.app</b> com o e-mail <b>{d.email.trim().toLowerCase()}</b>{" "}
+              Assim que a Harmonize liberar, você entra no Planejador em <b>harmonize-os.vercel.app</b> com o e-mail <b>{d.email.trim().toLowerCase()}</b>{" "}
               {jaTinha ? "e a senha que você já tinha." : "e a senha que acabou de criar."}
             </p>
+            <p className="text-sm text-neutral-600">O acesso à Contourline Academy também é liberado pela Harmonize, com este mesmo e-mail.</p>
           </div>
         )}
 
@@ -118,7 +139,10 @@ export default function FormularioCadastro({ token }: { token: string }) {
           <form onSubmit={enviar} className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5">
             <div>
               <h1 className="text-lg font-bold text-neutral-900">Cadastro</h1>
-              <p className="text-sm text-neutral-500">Preencha seus dados e crie sua senha para acessar o Planejador HIPRO.</p>
+              <p className="text-sm text-neutral-500">Preencha seus dados e crie sua senha.</p>
+              <p className="mt-2 rounded-xl bg-brand-teal/10 px-3 py-2 text-sm text-neutral-700">
+                Este cadastro libera o seu acesso ao <b>Planejador HIPRO</b> e à <b>Contourline Academy</b>.
+              </p>
             </div>
             <div className="grid grid-cols-[100px_1fr] gap-3">
               <label className={rotulo}>
@@ -167,6 +191,31 @@ export default function FormularioCadastro({ token }: { token: string }) {
                 UF
                 <input value={d.uf} onChange={mudar("uf")} maxLength={2} autoComplete="address-level1" className={campo} />
               </label>
+            </div>
+            <div className="space-y-2">
+              <p className={rotulo}>Como você conheceu a Harmonize? *</p>
+              <div className="grid grid-cols-2 gap-2">
+                {origens.map((o) => {
+                  const marcada = d.como_conheceu === o.valor;
+                  return (
+                    <button
+                      key={o.valor}
+                      type="button"
+                      aria-pressed={marcada}
+                      onClick={() => setD((x) => ({ ...x, como_conheceu: o.valor, como_conheceu_rotulo: o.rotulo, indicado_por: o.valor === "indicacao" ? x.indicado_por : "" }))}
+                      className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-medium ${marcada ? "border-brand-teal bg-brand-teal/10 text-neutral-900 ring-1 ring-brand-teal" : "border-neutral-300 bg-white text-neutral-700"}`}
+                    >
+                      {o.rotulo}
+                    </button>
+                  );
+                })}
+              </div>
+              {d.como_conheceu === "indicacao" && (
+                <label className={rotulo}>
+                  Quem indicou? *
+                  <input value={d.indicado_por} onChange={mudar("indicado_por")} placeholder="Nome de quem indicou" autoComplete="off" className={campo} />
+                </label>
+              )}
             </div>
             <div className="space-y-3 rounded-xl bg-neutral-50 p-3">
               <label className={rotulo}>

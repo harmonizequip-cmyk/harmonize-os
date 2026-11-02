@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { avisar, confirmar, pedirTexto } from "@/components/Dialogos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { IconeChip } from "@/components/ui/Visual";
+import LiberarAcademy from "@/components/LiberarAcademy";
 import { buildWhatsAppLink } from "@/lib/format";
 import { saudacaoCurta } from "@/lib/saudacao";
 import { mensagemFormulario, textoMotivo, type GruposAcesso, type LinhaAcesso } from "@/lib/acessos-planejador";
@@ -198,6 +199,9 @@ export default function AcessosClient({ grupos, abrirFormulario, erro }: { grupo
               Fechar
             </button>
           </div>
+          <div className="border-t border-neutral-200/70 pt-3">
+            <LiberarAcademy nome={liberada.cliente.nomeCompleto ?? liberada.cliente.nome} email={liberada.email} />
+          </div>
         </section>
       )}
 
@@ -242,6 +246,7 @@ export default function AcessosClient({ grupos, abrirFormulario, erro }: { grupo
                     <ChevronRight size={14} className="flex-shrink-0 text-neutral-400" />
                   </Link>
                   <p className="truncate text-xs text-neutral-500">{[l.cliente.cidade, l.email].filter(Boolean).join(" · ") || "Sem cidade"}</p>
+                  {l.comoConheceu && <p className="mt-0.5 text-[11px] text-neutral-500">Conheceu por {l.comoConheceu}</p>}
                   {l.perfil && l.cliente.fotos && <p className="mt-0.5 text-[11px] font-semibold text-violet-700">Pode incluir fotos dos pacientes</p>}
                   {status && <p className={`mt-0.5 text-xs font-semibold ${espera ? "text-amber-700" : aba === "com" ? "text-emerald-700" : "text-neutral-600"}`}>{status}</p>}
                 </div>

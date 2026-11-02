@@ -226,7 +226,7 @@ export default function AcessoPlanejadorCard({ cliente, onCadastroAtualizado }: 
 
   const mensagemConvite = linkConvite
     ? [
-        `${saudacaoCurta({ name: cliente.name, treatment: cliente.treatment, displayName: cliente.display_name })} Para liberar seu acesso ao Planejador HIPRO da Harmonize, preencha seu cadastro neste link (você mesma cria a senha):`,
+        `${saudacaoCurta({ name: cliente.name, treatment: cliente.treatment, displayName: cliente.display_name })} Para liberar seu acesso ao Planejador HIPRO da Harmonize e à Contourline Academy, preencha seu cadastro neste link (você mesma cria a senha):`,
         "",
         linkConvite,
         "",

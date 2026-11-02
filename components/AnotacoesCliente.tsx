@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bot, Keyboard, Loader2, Megaphone, Mic, Send, Square, StickyNote, Trash2, X } from "lucide-react";
+import { Bot, Keyboard, Loader2, Megaphone, Mic, Send, Square, StickyNote, Trash2, X, ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ROTULO_ORIGEM_ANOTACAO, origemDaAnotacao, type OrigemAnotacao } from "@/lib/anotacoes";
 import { escutar, podeReconhecerFala } from "@/lib/reconhecer-fala";
@@ -30,6 +30,7 @@ const ICONE_ORIGEM: Record<OrigemAnotacao, typeof Mic> = {
   voz: Mic,
   assistente: Bot,
   campanha: Megaphone,
+  formulario: ClipboardList,
 };
 
 function quando(iso: string) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mensagemFormulario, separarAcessos, textoMotivo, type ClienteBase } from "./acessos-planejador";
+import { mensagemFormulario, separarAcessos, textoComoConheceu, textoMotivo, type ClienteBase } from "./acessos-planejador";
 
 const c = (id: string, nome: string, ehCliente = true): ClienteBase => ({ id, nome, whatsapp: null, cidade: null, ehCliente });
 
@@ -41,5 +41,18 @@ describe("textos", () => {
     expect(textoMotivo("vencido", "2026-10-01")).toBe("Venceu em 01/10/2026");
     expect(textoMotivo(null, "2026-12-01")).toBe("Até 01/12/2026");
     expect(mensagemFormulario("https://x/cadastro/t")).toContain("https://x/cadastro/t");
+  });
+});
+
+describe("textoComoConheceu", () => {
+  it("mostra a indicação com o nome ou o rótulo", () => {
+    expect(textoComoConheceu({ como_conheceu: "indicacao", como_conheceu_rotulo: "Indicação", indicado_por: " Bia " })).toBe("indicação de Bia");
+    expect(textoComoConheceu({ como_conheceu: "instagram", como_conheceu_rotulo: "Instagram" })).toBe("Instagram");
+    expect(textoComoConheceu({})).toBeNull();
+    expect(textoComoConheceu(null)).toBeNull();
+  });
+  it("leva o formulário junto na linha de quem preencheu", () => {
+    const g = separarAcessos([{ id: "e", nome: "Eva", whatsapp: null, cidade: null, ehCliente: true }], [], {}, [{ client_id: "e", email_login: "e@x", preenchido_em: "2026-11-01", comoConheceu: "Instagram" }], "2026-11-02");
+    expect(g.semAcesso[0].comoConheceu).toBe("Instagram");
   });
 });

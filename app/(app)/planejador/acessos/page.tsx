@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { hojeLocal } from "@/lib/period";
 import { buscarTodas } from "@/lib/buscar-todas";
-import { separarAcessos, type ClienteBase, type ConvitePreenchido, type PerfilCliente } from "@/lib/acessos-planejador";
+import { separarAcessos, textoComoConheceu, type ClienteBase, type ConvitePreenchido, type PerfilCliente } from "@/lib/acessos-planejador";
 import AcessosClient from "./AcessosClient";
 
 // Acessos ao Planejador: quem tem acesso, quem está sem (pausado, vencido ou
@@ -44,7 +44,7 @@ export default async function AcessosPage(props: { searchParams: Promise<{ acao?
     const [clientes, perfisR, convitesR] = await Promise.all([
       carregarClientes(supabase),
       supabase.from("profiles").select("id, email, active, cliente_id").not("cliente_id", "is", null),
-      supabase.from("convites_cadastro").select("client_id, resultado_client_id, email_login, preenchido_em").not("preenchido_em", "is", null),
+      supabase.from("convites_cadastro").select("client_id, resultado_client_id, email_login, preenchido_em, dados").not("preenchido_em", "is", null),
     ]);
     if (perfisR.error) throw new Error(perfisR.error.message);
     if (convitesR.error) throw new Error(convitesR.error.message);
@@ -56,8 +56,13 @@ export default async function AcessosPage(props: { searchParams: Promise<{ acao?
         return [id, ((data as { valido_ate?: string | null } | null)?.valido_ate ?? null) as string | null] as const;
       })
     );
-    const convites: ConvitePreenchido[] = ((convitesR.data ?? []) as { client_id: string | null; resultado_client_id: string | null; email_login: string | null; preenchido_em: string }[])
-      .map((c) => ({ client_id: (c.resultado_client_id ?? c.client_id) as string, email_login: c.email_login, preenchido_em: c.preenchido_em }))
+    const convites: ConvitePreenchido[] = ((convitesR.data ?? []) as { client_id: string | null; resultado_client_id: string | null; email_login: string | null; preenchido_em: string; dados: Record<string, unknown> | null }[])
+      .map((c) => ({
+        client_id: (c.resultado_client_id ?? c.client_id) as string,
+        email_login: c.email_login,
+        preenchido_em: c.preenchido_em,
+        comoConheceu: textoComoConheceu(c.dados),
+      }))
       .filter((c) => !!c.client_id);
     const base: (ClienteBase & { tratamento: string | null; nomeExibicao: string | null; nomeCompleto: string })[] = clientes.map((c) => ({
       id: c.id,

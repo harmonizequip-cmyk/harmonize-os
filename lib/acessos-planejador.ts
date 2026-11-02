@@ -32,6 +32,8 @@ export interface ConvitePreenchido {
   client_id: string;
   email_login: string | null;
   preenchido_em: string;
+  /** "Instagram" ou "indicação de Fulana" (resposta do formulário). */
+  comoConheceu?: string | null;
 }
 
 export type MotivoSemAcesso = "pausado" | "vencido" | "preencheu";
@@ -45,6 +47,8 @@ export interface LinhaAcesso {
   motivo: MotivoSemAcesso | null;
   /** E-mail para liberar (do login ou do formulário). */
   email: string | null;
+  /** Como conheceu a Harmonize, quando veio do formulário. */
+  comoConheceu?: string | null;
 }
 
 export interface GruposAcesso {
@@ -87,7 +91,7 @@ export function separarAcessos(
     }
     const convite = conviteDe.get(cliente.id);
     if (convite?.email_login) {
-      grupos.semAcesso.push({ cliente, perfil: null, validoAte: null, motivo: "preencheu", email: convite.email_login });
+      grupos.semAcesso.push({ cliente, perfil: null, validoAte: null, motivo: "preencheu", email: convite.email_login, comoConheceu: convite.comoConheceu ?? null });
       continue;
     }
     // Sem cadastro: só clientes (lead fica fora, para a lista não crescer sem fim).
@@ -108,7 +112,16 @@ export function textoMotivo(m: MotivoSemAcesso | null, validoAte: string | null)
   return validoAte ? `Até ${br(validoAte)}` : "";
 }
 
+/** Resposta do "Como conheceu a Harmonize?" guardada em convites_cadastro.dados. */
+export function textoComoConheceu(dados: Record<string, unknown> | null | undefined): string | null {
+  if (!dados) return null;
+  const rotulo = typeof dados.como_conheceu_rotulo === "string" ? dados.como_conheceu_rotulo.trim() : "";
+  const indicou = typeof dados.indicado_por === "string" ? dados.indicado_por.trim() : "";
+  if (dados.como_conheceu === "indicacao" && indicou) return `indicação de ${indicou}`;
+  return rotulo || null;
+}
+
 /** Mensagem com o link do formulário (a mesma do botão "Link de cadastro"). */
 export function mensagemFormulario(link: string): string {
-  return `Para liberar seu acesso ao Planejador HIPRO da Harmonize, preencha seu cadastro neste link (você mesma cria a senha):\n\n${link}\n\nAssim que você enviar, eu libero e te aviso.`;
+  return `Para liberar seu acesso ao Planejador HIPRO da Harmonize e à Contourline Academy, preencha seu cadastro neste link (você mesma cria a senha):\n\n${link}\n\nAssim que você enviar, eu libero e te aviso.`;
 }

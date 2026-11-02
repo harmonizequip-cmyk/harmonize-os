@@ -1,6 +1,6 @@
 // Função "cadastro-cliente" (Supabase Edge Function, sem login): o formulário
 // que a cliente preenche sozinha em /cadastro/<token> para ganhar acesso ao
-// Planejador.
+// Planejador e à Contourline Academy (quem cadastra na Academy é o dono).
 //
 //   GET  ?token=...                      -> o link vale? + o que já se sabe dela
 //   POST { token, dados: {...}, senha }  -> cria o login dela e atualiza/cria o cadastro
@@ -37,9 +37,35 @@ function problemaSenha(s: string): string | null {
   return null;
 }
 
-const CAMPOS = ["nome_completo", "tratamento", "nome_exibicao", "whatsapp", "email", "documento", "clinica", "endereco", "cidade", "uf"];
+const CAMPOS = [
+  "nome_completo", "tratamento", "nome_exibicao", "whatsapp", "email", "documento", "clinica", "endereco", "cidade", "uf",
+  // Como conheceu a Harmonize (código e rótulo da lista de origens) e quem indicou.
+  "como_conheceu", "como_conheceu_rotulo", "indicado_por",
+];
 
-async function avisar(nome: string, clientId: string, novo: boolean) {
+// Opções de "Como conheceu a Harmonize?": as origens de Configurações > Listas
+// (settings.preferencias.listas.origens), sem "Formulário". Padrão = lib/preferencias.ts.
+const ORIGENS_PADRAO = [
+  { valor: "indicacao", rotulo: "Indicação" },
+  { valor: "instagram", rotulo: "Instagram" },
+  { valor: "whatsapp", rotulo: "WhatsApp" },
+  { valor: "outro", rotulo: "Outro" },
+];
+async function origensDoFormulario(): Promise<{ valor: string; rotulo: string }[]> {
+  try {
+    const { data } = await admin.from("settings").select("preferencias").eq("id", true).maybeSingle();
+    const lista = (data as any)?.preferencias?.listas?.origens;
+    if (!Array.isArray(lista)) return ORIGENS_PADRAO;
+    const ok = lista
+      .map((o: any) => ({ valor: String(o?.valor ?? "").trim(), rotulo: String(o?.rotulo ?? "").trim().slice(0, 40) }))
+      .filter((o) => /^[a-z0-9_]{1,40}$/.test(o.valor) && o.rotulo && o.valor !== "formulario");
+    return ok.length ? ok : ORIGENS_PADRAO;
+  } catch {
+    return ORIGENS_PADRAO;
+  }
+}
+
+async function avisar(nome: string, clientId: string, novo: boolean, comoConheceu: string | null, indicou: string | null) {
   const { data: seg } = await admin.rpc("alertas_segredos").single();
   if (!(seg as any)?.vapid_private) return;
   webpush.setVapidDetails(SITE, VAPID_PUBLIC, (seg as any).vapid_private);
@@ -47,7 +73,7 @@ async function avisar(nome: string, clientId: string, novo: boolean) {
   const url = `/clientes/${clientId}`;
   const aviso = {
     title: `📋 ${nome} preencheu o cadastro`,
-    body: `${novo ? "Cadastro novo criado" : "Cadastro atualizado"}. Toque para liberar o acesso ao Planejador.`,
+    body: `${novo ? "Cadastro novo criado" : "Cadastro atualizado"}${comoConheceu ? `. Conheceu por ${indicou ? `indicação de ${indicou}` : comoConheceu}` : ""}. Toque para liberar o Planejador e a Academy.`,
     url,
     tag: `cadastro-cliente-${clientId}`,
     actions: [{ action: "ver", title: "Liberar acesso", url }],
@@ -69,7 +95,8 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f]{64}$/.test(token)) return json({ valido: false, motivo: "Link inválido." });
     const { data, error } = await admin.rpc("convite_cadastro_abrir", { p_token: token });
     if (error) return json({ valido: false, motivo: "Não consegui abrir o cadastro agora. Tente de novo." }, 500);
-    return json(data);
+    if (!(data as any)?.valido) return json(data);
+    return json({ ...(data as object), origens: await origensDoFormulario() });
   }
   if (req.method !== "POST") return json({ erro: "Use POST." }, 405);
 
@@ -111,9 +138,9 @@ Deno.serve(async (req) => {
     if (criado) await admin.auth.admin.deleteUser(criado);
     return json({ erro: error.message || "Não consegui salvar o cadastro." }, 400);
   }
-  const r = res as { client_id: string; nome: string; tratamento: string | null; novo: boolean };
+  const r = res as { client_id: string; nome: string; tratamento: string | null; novo: boolean; como_conheceu?: string | null; indicado_por?: string | null };
   try {
-    await avisar([r.tratamento, r.nome].filter(Boolean).join(" "), r.client_id, r.novo);
+    await avisar([r.tratamento, r.nome].filter(Boolean).join(" "), r.client_id, r.novo, r.como_conheceu ?? null, r.indicado_por ?? null);
   } catch (e) {
     console.error("aviso", (e as Error).message);
   }
