@@ -47,6 +47,8 @@ export default function PrefsEmpresa({ preferencias }: { preferencias: Preferenc
     const vazio = OBRIGATORIOS.find((c) => !limpo[c.k]);
     if (vazio) return setErro(`Preencha: ${vazio.rotulo}.`);
     if (!/^\S+@\S+\.\S+$/.test(limpo.email)) return setErro("Confira o e-mail.");
+    limpo.whatsapp = limpo.whatsapp.replace(/\D/g, "");
+    if (limpo.whatsapp && (limpo.whatsapp.length < 10 || limpo.whatsapp.length > 13)) return setErro("Confira o WhatsApp (com DDD).");
     setSalvando(true);
     setErro(null);
     const r = await salvarPreferencias(createClient(), { empresa: limpo });
@@ -76,6 +78,13 @@ export default function PrefsEmpresa({ preferencias }: { preferencias: Preferenc
             maxLength={L.empresaCurto}
           />
           <CampoTexto rotulo="E-mail" tipo="email" valor={e.email} onChange={muda("email")} padrao={PADRAO.email} maxLength={L.empresaCurto} />
+          <CampoTexto
+            rotulo="WhatsApp da Harmonize (com DDD; botão no formulário de cadastro)"
+            valor={e.whatsapp}
+            onChange={muda("whatsapp")}
+            placeholder="83 99999-9999"
+            maxLength={20}
+          />
           <CampoTexto
             rotulo="Cidade do foro (também a cidade da data do contrato)"
             valor={e.cidadeForo}

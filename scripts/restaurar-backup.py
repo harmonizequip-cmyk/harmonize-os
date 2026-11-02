@@ -33,6 +33,7 @@ ORDEM = [
     "assinaturas_sessao",
     "convites_cadastro", "cadastros_recebidos", "agenda_envios", "orcamentos_pessoais", "insights",
     "assistente_memoria", "cliente_anotacoes", "campanhas", "campanha_envios",
+    "descontos_indicacao",
 ]
 # Tabelas que o schema.sql já semeia com linhas padrão: saem antes da carga.
 SEMEADAS = ["settings", "equipments", "categories", "tags", "contas_pix", "cidades_coordenadas"]

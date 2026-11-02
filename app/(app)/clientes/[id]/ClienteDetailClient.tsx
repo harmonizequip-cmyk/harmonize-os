@@ -1,5 +1,6 @@
 "use client";
 
+import IndicacaoFicha from "@/components/IndicacaoFicha";
 import RelacaoFicha from "@/components/RelacaoFicha";
 import type { PessoaClassificada } from "@/lib/relacionamento";
 import { useEffect, useState } from "react";
@@ -706,6 +707,8 @@ export default function ClienteDetailClient({
       {melhoresDatasOpen && <MelhoresDatasModal clienteId={client.id} nome={client.name} onClose={() => setMelhoresDatasOpen(false)} />}
 
       <CreditosClienteCard clientId={client.id} />
+
+      <IndicacaoFicha cliente={client} />
 
       <AcessoPlanejadorCard cliente={client} onCadastroAtualizado={() => router.refresh()} />
 

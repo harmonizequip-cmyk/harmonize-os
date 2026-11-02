@@ -97,6 +97,8 @@ export interface Preferencias {
     rodapeDocumentos: string;
     /** Rodapé da imagem do recibo. */
     rodapeRecibo: string;
+    /** WhatsApp da Harmonize (só números, com DDD): botão "Falar com a Harmonize" no formulário de cadastro. Vazio = sem botão. */
+    whatsapp: string;
   };
   /** Números do contrato de locação (o texto jurídico continua fixo). */
   contrato: {
@@ -152,6 +154,7 @@ export const AVISOS_DASHBOARD: { id: string; rotulo: string; dica: string }[] = 
   { id: "relacionamento", rotulo: "Pessoas para chamar hoje", dica: "Clientes e leads na hora de uma conversa." },
   { id: "aplicadores", rotulo: "Garantia de aplicador acabando", dica: "Entre 90% e 100% da garantia." },
   { id: "cadastros", rotulo: "Cadastros novos do formulário", dica: "Conferir e liberar na Academy." },
+  { id: "indicacoes", rotulo: "Indicações para ligar", dica: "Nome de quem indicou que não bateu com um cadastro só." },
   { id: "importar-fatura", rotulo: "Importar fatura do cartão", dica: "Depois do fechamento, até importar o OFX." },
 ];
 
@@ -211,6 +214,7 @@ export const DEFAULT_PREFERENCIAS: Preferencias = {
     cidadeForo: "João Pessoa/PB",
     rodapeDocumentos: "Harmonize · Locação de Equipamentos Médicos e Estéticos",
     rodapeRecibo: "Obrigado pela confiança! Harmonize · Locação de equipamentos",
+    whatsapp: "",
   },
   contrato: { multaPercentual: 20, avisoRescisaoHoras: 48 },
   tabelaPrecos: {
@@ -399,6 +403,10 @@ export function lerPreferencias(bruto: unknown): Preferencias {
       // Rodapés podem ficar vazios (o dono tirou a frase).
       rodapeDocumentos: texto(emp.rodapeDocumentos, d.empresa.rodapeDocumentos, L.empresaLongo),
       rodapeRecibo: texto(emp.rodapeRecibo, d.empresa.rodapeRecibo, L.empresaLongo),
+      whatsapp: (() => {
+        const n = (typeof emp.whatsapp === "string" ? emp.whatsapp : "").replace(/\D/g, "");
+        return n.length >= 10 && n.length <= 13 ? n : d.empresa.whatsapp;
+      })(),
     },
     contrato: {
       multaPercentual: num(ctr.multaPercentual, d.contrato.multaPercentual, 0, 100),

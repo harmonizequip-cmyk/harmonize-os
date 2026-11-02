@@ -50,6 +50,7 @@ const TABELAS = [
   "cliente_anotacoes",
   "campanhas",
   "campanha_envios",
+  "descontos_indicacao",
 ];
 
 // Tabelas que podem ainda não existir no banco (SQL das campanhas, dos pacientes, das fotos ou das
@@ -63,6 +64,7 @@ const PODEM_FALTAR = new Set([
   "profissionais",
   "assinaturas_sessao",
   "manutencoes_equipamento",
+  "descontos_indicacao",
 ]);
 
 function tabelaNaoExiste(error: { code?: string; message?: string }): boolean {

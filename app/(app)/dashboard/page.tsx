@@ -441,6 +441,15 @@ export default async function DashboardPage(
     .select("id", { count: "exact", head: true })
     .eq("status", "pendente");
 
+  // Programa de indicação: nome de quem indicou que não bateu com um cadastro só
+  // (sem o SQL, a coluna não existe e o aviso não aparece).
+  const { count: indicacoesParaLigar } = await supabase
+    .from("clients")
+    .select("id", { count: "exact", head: true })
+    .not("indicacao_nome", "is", null)
+    .is("indicado_por", null)
+    .eq("is_test", false);
+
   // Clientes que preencheram o formulário do Planejador e ainda esperam o acesso.
   const { data: convitesPreenchidos } = await supabase
     .from("convites_cadastro")
@@ -751,6 +760,15 @@ export default async function DashboardPage(
       texto: `${cadastrosNovos} ${cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"}`,
       detalhe: "Conferir e liberar na Academy",
       href: "/clientes/cadastros",
+      nivel: "info",
+    });
+  if (indicacoesParaLigar && indicacoesParaLigar > 0)
+    avisos.push({
+      id: "indicacoes",
+      icone: "cadastro",
+      texto: `${indicacoesParaLigar} ${indicacoesParaLigar === 1 ? "indicação para ligar" : "indicações para ligar"}`,
+      detalhe: "Quem indicou não bateu com um cadastro só",
+      href: "/clientes/indicacoes",
       nivel: "info",
     });
   for (const c of acessosParaLiberar)

@@ -68,6 +68,7 @@ import { avisar as avisarApp, confirmar as confirmarApp } from "@/components/Dia
 import { somarContagens, creditoUsavel, disparosCobrados, type Contagem } from "@/lib/creditos";
 import { codigoPadrao, contasParaEscolha } from "@/lib/contas-pix";
 import { useContasPix } from "@/lib/usar-contas-pix";
+import { descontoParaUsar, rotuloTipo, type DescontoIndicacao } from "@/lib/indicacao";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -632,6 +633,35 @@ export default function CalculadoraLocacaoModal({
   const [descontoValor, setDescontoValor] = useState("");
   const [descontoTipo, setDescontoTipo] = useState<"valor" | "percentual">("valor");
   const [itensPersonalizados, setItensPersonalizados] = useState<ItemAjuste[]>([]);
+
+  // Programa de indicação: desconto de 10% disponível da cliente entra sozinho no
+  // campo de desconto (com opção de tirar). Só locação de HIPRO, não mentoria.
+  const [descontoIndicacao, setDescontoIndicacao] = useState<DescontoIndicacao | null>(null);
+  const [indicacaoTirada, setIndicacaoTirada] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setDescontoIndicacao(null);
+    setIndicacaoTirada(false);
+    if (!activeClientId || isMentoria) return;
+    supabase
+      .from("descontos_indicacao")
+      .select("id, client_id, tipo, outro_client_id, percentual, valido_ate, usado_em, usado_rental_id, created_at")
+      .eq("client_id", activeClientId)
+      .is("usado_em", null)
+      .then(({ data, error }) => {
+        if (!vivo || error) return; // sem o SQL do programa: nada muda
+        const d = descontoParaUsar((data ?? []) as DescontoIndicacao[], hojeLocal());
+        setDescontoIndicacao(d);
+        if (d) {
+          setDescontoTipo("percentual");
+          setDescontoValor((v) => (v.trim() ? v : String(Number(d.percentual))));
+        }
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, isMentoria]);
   const [novoItemDesc, setNovoItemDesc] = useState("");
   const [novoItemValor, setNovoItemValor] = useState("");
   const [novoItemTipo, setNovoItemTipo] = useState<"mais" | "menos">("mais");
@@ -649,7 +679,11 @@ export default function CalculadoraLocacaoModal({
   const descontoRawNumero = parseDecimal(descontoValor);
   const descontoNumero =
     descontoTipo === "percentual" ? Math.round(subtotalParaDesconto * (descontoRawNumero / 100) * 100) / 100 : descontoRawNumero;
-  const descontoDescricaoEfetiva = descontoTipo === "percentual" ? `${descontoRawNumero}% de desconto` : "Desconto";
+  // O desconto de indicação só conta como usado se o campo ficou nos 10% dela.
+  const indicacaoAplicada =
+    !!descontoIndicacao && !indicacaoTirada && descontoTipo === "percentual" && descontoRawNumero === Number(descontoIndicacao.percentual);
+  const descontoDescricaoEfetiva =
+    descontoTipo === "percentual" ? (indicacaoAplicada ? `${descontoRawNumero}% de desconto (indicação)` : `${descontoRawNumero}% de desconto`) : "Desconto";
 
   const itens: ItemAjuste[] = useMemo(() => {
     const lista: ItemAjuste[] = [];
@@ -1131,6 +1165,11 @@ export default function CalculadoraLocacaoModal({
     setSavedRentalId(rentalId);
 
     const avisos: string[] = [];
+
+    if (indicacaoAplicada && descontoIndicacao) {
+      const { error: eInd } = await supabase.rpc("usar_desconto_indicacao", { p_desconto_id: descontoIndicacao.id, p_rental_id: rentalId });
+      if (eInd) avisos.push(`o desconto de indicação não foi marcado como usado (${eInd.message}); marque na ficha da cliente`);
+    }
 
     if (campanhaId && activeClientId) {
       const erroCampanha = await vincularCampanha(supabase, campanhaId, activeClientId);
@@ -2044,6 +2083,37 @@ export default function CalculadoraLocacaoModal({
                   />
                 </div>
               </div>
+              {descontoIndicacao && (
+                <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs ${indicacaoAplicada ? "bg-emerald-50 text-emerald-800" : "bg-neutral-50 text-neutral-600"}`}>
+                  <span>
+                    {indicacaoAplicada ? "Desconto de indicação aplicado" : "Tem desconto de indicação"}: {Number(descontoIndicacao.percentual)}% ({rotuloTipo(descontoIndicacao.tipo).toLowerCase()}), vale até {formatDate(descontoIndicacao.valido_ate)}
+                  </span>
+                  {indicacaoAplicada ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIndicacaoTirada(true);
+                        setDescontoValor("");
+                      }}
+                      className="font-semibold underline"
+                    >
+                      Não usar agora
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIndicacaoTirada(false);
+                        setDescontoTipo("percentual");
+                        setDescontoValor(String(Number(descontoIndicacao.percentual)));
+                      }}
+                      className="font-semibold underline"
+                    >
+                      Usar o desconto
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Itens personalizados */}
               <div className="mt-3">

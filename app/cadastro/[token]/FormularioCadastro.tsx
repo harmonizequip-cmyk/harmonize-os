@@ -8,6 +8,9 @@
 
 import CampoSenha from "@/components/CampoSenha";
 import { useEffect, useState } from "react";
+import { Gift, MessageCircle } from "lucide-react";
+import { buildWhatsAppLink } from "@/lib/format";
+import { tempoRestante, PERCENTUAL_INDICACAO } from "@/lib/indicacao";
 import { problemaSenha, REGRA_SENHA } from "@/lib/senha";
 
 const URL_FUNCAO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/cadastro-cliente`;
@@ -53,6 +56,16 @@ export default function FormularioCadastro({ token }: { token: string }) {
   const [enviando, setEnviando] = useState(false);
   const [jaTinha, setJaTinha] = useState(false);
   const [origens, setOrigens] = useState<Origem[]>(ORIGENS_PADRAO);
+  // Link de indicação: quem indicou e até quando vale (contagem regressiva).
+  const [indicacao, setIndicacao] = useState<{ nome: string | null; expira: string } | null>(null);
+  const [agora, setAgora] = useState(() => Date.now());
+  // WhatsApp da Harmonize (Configurações > Empresa): botão depois de enviar.
+  const [zapHarmonize, setZapHarmonize] = useState<string | null>(null);
+  useEffect(() => {
+    if (!indicacao) return;
+    const t = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [indicacao]);
 
   useEffect(() => {
     fetch(`${URL_FUNCAO}?token=${encodeURIComponent(token)}`, { headers: CABECALHOS })
@@ -78,6 +91,8 @@ export default function FormularioCadastro({ token }: { token: string }) {
           uf: r.uf ?? "",
         }));
         if (Array.isArray(r.origens) && r.origens.length) setOrigens(r.origens as Origem[]);
+        if (r.indicacao && r.expira_em) setIndicacao({ nome: r.indicador_nome ?? null, expira: r.expira_em });
+        if (typeof r.whatsapp_harmonize === "string" && r.whatsapp_harmonize) setZapHarmonize(r.whatsapp_harmonize);
         setEstado("form");
       })
       .catch(() => {
@@ -93,7 +108,7 @@ export default function FormularioCadastro({ token }: { token: string }) {
     setErro(null);
     if (!d.nome_completo.trim() || !d.whatsapp.trim() || !d.email.trim()) return setErro("Preencha nome completo, WhatsApp e e-mail.");
     if (d.whatsapp.replace(/\D/g, "").length < 10) return setErro("Coloque o WhatsApp com DDD.");
-    if (!d.como_conheceu) return setErro("Conte como você conheceu a Harmonize.");
+    if (!indicacao && !d.como_conheceu) return setErro("Conte como você conheceu a Harmonize.");
     if (d.como_conheceu === "indicacao" && !d.indicado_por.trim()) return setErro("Coloque o nome de quem indicou a Harmonize.");
     const ruim = problemaSenha(senha);
     if (ruim) return setErro(ruim);
@@ -134,15 +149,71 @@ export default function FormularioCadastro({ token }: { token: string }) {
           <div className="space-y-3 rounded-2xl border border-emerald-200 bg-white p-6 text-center">
             <p className="text-3xl">✅</p>
             <p className="text-base font-semibold text-neutral-900">Cadastro enviado!</p>
+            {indicacao && (
+              <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                Desconto garantido: {PERCENTUAL_INDICACAO}% na sua primeira locação do HIPRO.
+              </p>
+            )}
             <p className="text-sm text-neutral-600">
               Assim que a Harmonize liberar, você entra no Planejador em <b>harmonize-os.vercel.app</b> com o e-mail <b>{d.email.trim().toLowerCase()}</b>{" "}
               {jaTinha ? "e a senha que você já tinha." : "e a senha que acabou de criar."}
             </p>
             <p className="text-sm text-neutral-600">O acesso à Contourline Academy também é liberado pela Harmonize, com este mesmo e-mail.</p>
+            {zapHarmonize && (() => {
+              const primeiro = (d.nome_exibicao || d.nome_completo).trim().split(/\s+/)[0] ?? "";
+              const texto = indicacao
+                ? `Olá! Sou ${primeiro}, acabei de fazer meu cadastro pela indicação de ${indicacao.nome ?? "uma cliente"} e quero agendar minha primeira locação do HIPRO com ${PERCENTUAL_INDICACAO}% de desconto.`
+                : `Olá! Sou ${primeiro} e acabei de fazer meu cadastro na Harmonize.`;
+              const link = buildWhatsAppLink(zapHarmonize, texto);
+              return link ? (
+                <a href={link} target="_blank" rel="noopener noreferrer" className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white">
+                  <MessageCircle size={18} /> Falar com a Harmonize no WhatsApp
+                </a>
+              ) : null;
+            })()}
           </div>
         )}
 
         {estado === "form" && (
+          <>
+          {indicacao && (() => {
+            const t = tempoRestante(indicacao.expira, agora);
+            const caixa = (n: number, rotulo: string) => (
+              <div className="min-w-0 flex-1 rounded-xl bg-white/15 px-1 py-2 text-center">
+                <p className="text-2xl font-black tabular-nums leading-none">{String(n).padStart(2, "0")}</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-white/80">{rotulo}</p>
+              </div>
+            );
+            return (
+              <section className="relative mb-4 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e7a84] via-[#2eb4c0] to-[#7c5cc4] p-5 text-white shadow-lg">
+                <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
+                <div className="pointer-events-none absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-white/10" />
+                <div className="relative">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                    <Gift size={26} />
+                  </span>
+                  <p className="mt-3 text-sm font-semibold text-white/90">{indicacao.nome ? `Presente de ${indicacao.nome}` : "Você foi indicada(o)"}</p>
+                  <h1 className="mt-1 text-2xl font-black leading-tight">
+                    Você acaba de ganhar {PERCENTUAL_INDICACAO}% de desconto na sua primeira locação do HIPRO!
+                  </h1>
+                  <p className="mt-2 text-sm text-white/90">
+                    {t.acabou ? "O prazo acabou." : "Preencha o cadastro abaixo em até 7 dias para garantir o seu desconto."}
+                  </p>
+                  {!t.acabou && (
+                    <>
+                      <p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-white/80">O desconto expira em</p>
+                      <div className="mt-1.5 flex gap-2">
+                        {caixa(t.dias, "dias")}
+                        {caixa(t.horas, "horas")}
+                        {caixa(t.minutos, "min")}
+                        {caixa(t.segundos, "seg")}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </section>
+            );
+          })()}
           <form onSubmit={enviar} className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5">
             <div>
               <h1 className="text-lg font-bold text-neutral-900">Cadastro</h1>
@@ -199,6 +270,7 @@ export default function FormularioCadastro({ token }: { token: string }) {
                 <input value={d.uf} onChange={mudar("uf")} maxLength={2} autoComplete="address-level1" className={campo} />
               </label>
             </div>
+            {!indicacao && (
             <div className="space-y-2">
               <p className={rotulo}>Como você conheceu a Harmonize? *</p>
               <div className="grid grid-cols-2 gap-2">
@@ -224,6 +296,7 @@ export default function FormularioCadastro({ token }: { token: string }) {
                 </label>
               )}
             </div>
+            )}
             <div className="space-y-3 rounded-xl bg-neutral-50 p-3">
               <label className={rotulo}>
                 Crie sua senha *
@@ -237,9 +310,10 @@ export default function FormularioCadastro({ token }: { token: string }) {
             </div>
             {erro && <p className="text-sm text-rose-600">{erro}</p>}
             <button type="submit" disabled={enviando} className="w-full rounded-xl bg-brand-gradient px-4 py-3 text-base font-semibold text-white disabled:opacity-60">
-              {enviando ? "Enviando..." : "Enviar cadastro"}
+              {enviando ? "Enviando..." : indicacao ? "Garantir meu desconto" : "Enviar cadastro"}
             </button>
           </form>
+          </>
         )}
       </div>
     </div>

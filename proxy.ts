@@ -33,6 +33,8 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
   // Formulário que a cliente preenche sozinha pelo link (token): abre sem login.
   if (request.nextUrl.pathname.startsWith("/cadastro/")) return response;
+  // Link de indicação da cliente (programa de indicação): página pública.
+  if (request.nextUrl.pathname.startsWith("/indicacao/")) return response;
 
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();

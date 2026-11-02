@@ -1,6 +1,7 @@
 // Função "cadastro-cliente" (Supabase Edge Function, sem login): o formulário
 // que a cliente preenche sozinha em /cadastro/<token> para ganhar acesso ao
 // Planejador e à Contourline Academy (quem cadastra na Academy é o dono).
+// Também atende o link de indicação de cada cliente (POST { acao: "indicacao", codigo }).
 //
 //   GET  ?token=...                      -> o link vale? + o que já se sabe dela
 //   POST { token, dados: {...}, senha }  -> cria o login dela e atualiza/cria o cadastro
@@ -51,17 +52,21 @@ const ORIGENS_PADRAO = [
   { valor: "whatsapp", rotulo: "WhatsApp" },
   { valor: "outro", rotulo: "Outro" },
 ];
-async function origensDoFormulario(): Promise<{ valor: string; rotulo: string }[]> {
+// Também o WhatsApp da Harmonize (Configurações > Empresa), para o botão "Falar com a Harmonize".
+async function configDoFormulario(): Promise<{ origens: { valor: string; rotulo: string }[]; whatsapp: string | null }> {
   try {
     const { data } = await admin.from("settings").select("preferencias").eq("id", true).maybeSingle();
-    const lista = (data as any)?.preferencias?.listas?.origens;
-    if (!Array.isArray(lista)) return ORIGENS_PADRAO;
+    const prefs = (data as any)?.preferencias;
+    const zap = String(prefs?.empresa?.whatsapp ?? "").replace(/\D/g, "");
+    const whatsapp = zap.length >= 10 && zap.length <= 13 ? zap : null;
+    const lista = prefs?.listas?.origens;
+    if (!Array.isArray(lista)) return { origens: ORIGENS_PADRAO, whatsapp };
     const ok = lista
       .map((o: any) => ({ valor: String(o?.valor ?? "").trim(), rotulo: String(o?.rotulo ?? "").trim().slice(0, 40) }))
       .filter((o) => /^[a-z0-9_]{1,40}$/.test(o.valor) && o.rotulo && o.valor !== "formulario");
-    return ok.length ? ok : ORIGENS_PADRAO;
+    return { origens: ok.length ? ok : ORIGENS_PADRAO, whatsapp };
   } catch {
-    return ORIGENS_PADRAO;
+    return { origens: ORIGENS_PADRAO, whatsapp: null };
   }
 }
 
@@ -96,11 +101,22 @@ Deno.serve(async (req) => {
     const { data, error } = await admin.rpc("convite_cadastro_abrir", { p_token: token });
     if (error) return json({ valido: false, motivo: "Não consegui abrir o cadastro agora. Tente de novo." }, 500);
     if (!(data as any)?.valido) return json(data);
-    return json({ ...(data as object), origens: await origensDoFormulario() });
+    const cfg = await configDoFormulario();
+    return json({ ...(data as object), origens: cfg.origens, whatsapp_harmonize: cfg.whatsapp });
   }
   if (req.method !== "POST") return json({ erro: "Use POST." }, 405);
 
   const corpo = await req.json().catch(() => null);
+
+  // Link de indicação (/indicacao/<codigo>): abre um formulário de 7 dias amarrado a quem indicou.
+  if (corpo?.acao === "indicacao") {
+    const codigo = String(corpo?.codigo ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9]{6,16}$/.test(codigo)) return json({ erro: "Link de indicação inválido." }, 400);
+    const { data: tok, error: eTok } = await admin.rpc("indicacao_criar_convite", { p_codigo: codigo });
+    if (eTok || !tok) return json({ erro: eTok?.message || "Link de indicação inválido." }, 400);
+    return json({ token: tok });
+  }
+
   const token = String(corpo?.token ?? "");
   const senha = String(corpo?.senha ?? "");
   if (!/^[0-9a-f]{64}$/.test(token)) return json({ erro: "Link inválido." }, 400);
