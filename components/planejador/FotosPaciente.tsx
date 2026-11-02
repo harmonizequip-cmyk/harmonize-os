@@ -11,6 +11,7 @@ import {
   AREA_ROSTO,
   ETAPAS_FOTO,
   agruparFotos,
+  paresParaComparar,
   areasParaFoto,
   faltaSqlDasFotos,
   formatarTamanho,
@@ -503,7 +504,11 @@ function Visualizador({
   );
 }
 
-/** Duas etapas lado a lado (empilhadas no celular), a primeira foto de cada na área escolhida. */
+/**
+ * Duas etapas lado a lado, TODAS as fotos de cada uma, em pares na ordem em que
+ * foram tiradas (1ª com 1ª, 2ª com 2ª: frente com frente, perfil com perfil).
+ * Se a ordem não bater, as setas de cada lado trocam a foto daquele lado.
+ */
 function Comparar({ fotos, onFechar }: { fotos: FotoPaciente[]; onFechar: () => void }) {
   const grupos = useMemo(() => agruparFotos(fotos), [fotos]);
   const comFoto = grupos.filter((g) => g.total > 0);
@@ -524,14 +529,22 @@ function Comparar({ fotos, onFechar }: { fotos: FotoPaciente[]; onFechar: () => 
   const [etapaA, setEtapaA] = useState<EtapaFoto>(etapaA0);
   const [etapaB, setEtapaB] = useState<EtapaFoto>(etapaB0);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  // Troca manual de foto: "A-0" -> índice escolhido no lado A do par 0.
+  const [escolha, setEscolha] = useState<Record<string, number>>({});
 
-  const primeira = (et: EtapaFoto) => grupos.find((g) => g.etapa === et)?.areas.find((a) => a.area === area)?.fotos[0] ?? null;
-  const fotoA = primeira(etapaA);
-  const fotoB = primeira(etapaB);
-  const chave = `${fotoA?.caminho ?? ""}|${fotoB?.caminho ?? ""}`;
+  const daEtapa = (et: EtapaFoto) => grupos.find((g) => g.etapa === et)?.areas.find((a) => a.area === area)?.fotos ?? [];
+  const listaA = daEtapa(etapaA);
+  const listaB = daEtapa(etapaB);
+  const pares = paresParaComparar(listaA, listaB);
+  const chave = `${area}|${listaA.map((f) => f.caminho).join(",")}|${listaB.map((f) => f.caminho).join(",")}`;
+
+  // Mudou área ou etapa: volta ao pareamento automático.
+  useEffect(() => {
+    setEscolha({});
+  }, [area, etapaA, etapaB]);
 
   useEffect(() => {
-    const caminhos = [fotoA?.caminho, fotoB?.caminho].filter((c): c is string => !!c);
+    const caminhos = [...listaA, ...listaB].map((f) => f.caminho);
     if (!caminhos.length) return;
     let ativo = true;
     urlsAssinadas(createClient(), caminhos)
@@ -553,11 +566,18 @@ function Comparar({ fotos, onFechar }: { fotos: FotoPaciente[]; onFechar: () => 
     return () => window.removeEventListener("keydown", tecla, true);
   }, [onFechar]);
 
-  const lado = (f: FotoPaciente | null, et: EtapaFoto) => {
+  const lado = (lista: FotoPaciente[], padrao: number, et: EtapaFoto, chaveLado: string) => {
+    const idx = escolha[chaveLado] ?? padrao;
+    const f = idx >= 0 && idx < lista.length ? lista[idx] : null;
     const url = f ? urls.get(f.caminho) : null;
+    const mudar = (passo: number) => {
+      if (!lista.length) return;
+      const base = f ? idx : passo > 0 ? -1 : lista.length;
+      setEscolha((e) => ({ ...e, [chaveLado]: (base + passo + lista.length) % lista.length }));
+    };
     return (
       <figure className="min-w-0 flex-1">
-        <div className="flex h-[34vh] items-center justify-center overflow-hidden rounded-2xl bg-neutral-100 sm:aspect-[3/4] sm:h-auto">
+        <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl bg-neutral-100">
           {f ? (
             url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -568,10 +588,21 @@ function Comparar({ fotos, onFechar }: { fotos: FotoPaciente[]; onFechar: () => 
           ) : (
             <p className="px-3 text-center text-xs text-neutral-500">Sem foto{comCorporal ? ` de ${area}` : ""} em {rotuloDaEtapa(et).toLowerCase()}.</p>
           )}
+          {lista.length > 1 && (
+            <>
+              <button type="button" onClick={() => mudar(-1)} aria-label="Foto anterior desta etapa" className="absolute left-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white active:bg-black/60">
+                <ChevronLeft size={16} />
+              </button>
+              <button type="button" onClick={() => mudar(1)} aria-label="Próxima foto desta etapa" className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white active:bg-black/60">
+                <ChevronRight size={16} />
+              </button>
+            </>
+          )}
         </div>
-        <figcaption className="mt-1.5 text-center text-xs">
+        <figcaption className="mt-1.5 text-center text-[11px] leading-tight">
           <span className="font-bold text-neutral-800">{rotuloDaEtapa(et)}</span>
-          {f && <span className="text-neutral-500"> · {formatDate(f.tirada_em)}</span>}
+          {f && lista.length > 1 && <span className="text-neutral-500"> · {idx + 1} de {lista.length}</span>}
+          {f && <span className="block text-neutral-500">{formatDate(f.tirada_em)}</span>}
         </figcaption>
       </figure>
     );
@@ -623,10 +654,25 @@ function Comparar({ fotos, onFechar }: { fotos: FotoPaciente[]; onFechar: () => 
               </select>
             </label>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            {lado(fotoA, etapaA)}
-            {lado(fotoB, etapaB)}
-          </div>
+          {pares.length === 0 ? (
+            <p className="rounded-2xl bg-white p-4 text-center text-sm text-neutral-500 ring-1 ring-neutral-200/80">
+              Nenhuma foto{comCorporal ? ` de ${area}` : ""} em {rotuloDaEtapa(etapaA).toLowerCase()} nem em {rotuloDaEtapa(etapaB).toLowerCase()}.
+            </p>
+          ) : (
+            <>
+              {pares.length > 1 && (
+                <p className="px-1 text-xs text-neutral-500">
+                  {pares.length} pares, na ordem em que as fotos foram tiradas. Se uma dupla não bater, use as setas da foto.
+                </p>
+              )}
+              {pares.map((_, i) => (
+                <div key={i} className="flex gap-2 rounded-2xl bg-white p-2 ring-1 ring-neutral-200/80">
+                  {lado(listaA, i, etapaA, `A-${i}`)}
+                  {lado(listaB, i, etapaB, `B-${i}`)}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>,

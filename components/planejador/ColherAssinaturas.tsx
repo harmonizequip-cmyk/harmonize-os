@@ -1,9 +1,9 @@
 "use client";
 
 // Colher assinaturas da sessão (só o dono, no celular dele): tela cheia por
-// portal no <body>. Passo 1: resumo da sessão. Passo 2: triagem de
+// portal no <body>. Passo 1 (antes de tudo, pedido do dono): triagem de
 // contraindicações (absoluta só segue com a confirmação da profissional;
-// relativa pede "avaliado e liberado"). Passo 3: termo de consentimento, que
+// relativa pede "avaliado e liberado"). Passo 2: resumo da sessão. Passo 3: termo de consentimento, que
 // o paciente lê e marca "Li e concordo". Passo 4: o paciente assina com o dedo
 // (nome já preenchido, dá para corrigir). Passo 5: a profissional (escolhida
 // no cadastro da clínica: nome e registro vêm de lá) assina. Confirmar sobe as
@@ -27,7 +27,7 @@ import CanvasAssinatura, { type CanvasAssinaturaApi } from "./CanvasAssinatura";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 type Passo = "resumo" | "triagem" | "termo" | "paciente" | "profissional";
-const PASSOS: Passo[] = ["resumo", "triagem", "termo", "paciente", "profissional"];
+const PASSOS: Passo[] = ["triagem", "resumo", "termo", "paciente", "profissional"];
 
 /** Caixinha grande, boa para o dedo. */
 function Caixa({ marcada, onMudar, children, tom = "neutro" }: { marcada: boolean; onMudar: (v: boolean) => void; children: React.ReactNode; tom?: "neutro" | "absoluta" | "relativa" }) {
@@ -56,7 +56,7 @@ export default function ColherAssinaturas({
   onConcluiu: () => void;
 }) {
   const resumo = useMemo(() => resumoDaSessao(plano, sessao), [plano, sessao]);
-  const [passo, setPasso] = useState<Passo>("resumo");
+  const [passo, setPasso] = useState<Passo>("triagem");
   const [nomePaciente, setNomePaciente] = useState(plano.paciente);
   const [blobPaciente, setBlobPaciente] = useState<Blob | null>(null);
   const [temPaciente, setTemPaciente] = useState(false);
@@ -358,7 +358,7 @@ export default function ColherAssinaturas({
       {resumo && (
         <div className="border-t border-neutral-200/70 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto flex max-w-2xl gap-2">
-            {passo !== "resumo" && (
+            {passo !== "triagem" && (
               <button
                 type="button"
                 onClick={() => setPasso(PASSOS[Math.max(0, PASSOS.indexOf(passo) - 1)])}
@@ -368,18 +368,18 @@ export default function ColherAssinaturas({
                 <ArrowLeft size={16} /> Voltar
               </button>
             )}
-            {passo === "resumo" && (
-              <button type="button" onClick={() => setPasso("triagem")} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
-                Conferido, seguir <ArrowRight size={17} />
-              </button>
-            )}
             {passo === "triagem" && (
               <button
                 type="button"
-                onClick={() => (classe.podeSeguir ? setPasso("termo") : avisar(classe.falta ?? "Confira a triagem.", "erro"))}
+                onClick={() => (classe.podeSeguir ? setPasso("resumo") : avisar(classe.falta ?? "Confira a triagem.", "erro"))}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white ${classe.podeSeguir ? "bg-brand-gradient shadow-glow-teal" : "bg-neutral-300"}`}
               >
-                Próximo: termo <ArrowRight size={17} />
+                Próximo: resumo da sessão <ArrowRight size={17} />
+              </button>
+            )}
+            {passo === "resumo" && (
+              <button type="button" onClick={() => setPasso("termo")} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
+                Conferido, próximo: termo <ArrowRight size={17} />
               </button>
             )}
             {passo === "termo" && (

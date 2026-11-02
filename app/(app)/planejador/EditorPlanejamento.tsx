@@ -1552,6 +1552,7 @@ export default function EditorPlanejamento({
                     lista={assinaturas.lista}
                     onMudou={assinaturas.recarregar}
                     antesDeAbrir={salvarAntesDeAssinar}
+                    whatsappPaciente={whatsPaciente}
                   />
                 </div>
               )}

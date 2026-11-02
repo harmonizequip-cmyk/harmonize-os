@@ -483,6 +483,7 @@ export default function FichaPaciente({
                                   sessoes={[s.n]}
                                   titulo={false}
                                   semNumero
+                                  whatsappPaciente={cad?.whatsapp}
                                 />
                               </div>
                             )}

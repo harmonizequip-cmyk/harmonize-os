@@ -2,7 +2,8 @@
 
 // Assinaturas por sessão de um planejamento (só o dono): selo "Assinada por
 // paciente e profissional em dd/mm hh:mm" ou o alerta "Alterada depois de
-// assinada" (com o que foi assinado), e o botão "Colher assinaturas".
+// assinada" (com o que foi assinado), o botão "Colher assinaturas" e, com as
+// duas assinaturas, "Mandar ficha assinada ao paciente" (PDF pelo Compartilhar).
 // Sem o SQL rodado, o botão avisa "Falta rodar o SQL das assinaturas".
 
 import { useEffect, useMemo, useState } from "react";
@@ -23,6 +24,7 @@ import {
 import { apagarAssinatura, MSG_FALTA_SQL_ASSINATURAS, type EstadoAssinaturas } from "@/lib/assinaturas-envio";
 import { lerTriagem } from "@/lib/triagem-hipro";
 import ColherAssinaturas from "./ColherAssinaturas";
+import EnviarFichaAssinada from "./EnviarFichaAssinada";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -113,6 +115,7 @@ export default function AssinaturasSessoes({
   antesDeAbrir,
   titulo = true,
   semNumero = false,
+  whatsappPaciente,
 }: {
   planoId: string | null;
   plano: Plano;
@@ -127,6 +130,8 @@ export default function AssinaturasSessoes({
   titulo?: boolean;
   /** Dentro da linha da sessão (a ficha do paciente já mostra o número). */
   semNumero?: boolean;
+  /** WhatsApp do paciente (reserva quando o celular não compartilha arquivo). */
+  whatsappPaciente?: string | null;
 }) {
   const numeros = useMemo(() => sessoes ?? sessoesDoPlano(plano), [sessoes, plano]);
   const hashes = useHashesAtuais(plano, numeros);
@@ -212,6 +217,11 @@ export default function AssinaturasSessoes({
               );
             })()}
             {sit?.alterada && <OQueFoiAssinado lista={daSessao} />}
+            {sit?.completa && (
+              <div className="mt-2">
+                <EnviarFichaAssinada plano={plano} sessao={n} assinaturas={daSessao} hashAtual={hashes[n] ?? null} whatsapp={whatsappPaciente} />
+              </div>
+            )}
           </div>
         );
       })}

@@ -127,3 +127,19 @@ describe("areasCorporaisDosPlanos", () => {
     expect(areasCorporaisDosPlanos([{ customAreas: [] } as never])).toEqual([]);
   });
 });
+
+import { paresParaComparar } from "./fotos-paciente";
+
+describe("paresParaComparar", () => {
+  it("junta na ordem e completa o lado que tem menos", () => {
+    expect(paresParaComparar(["a1", "a2"], ["b1", "b2"])).toEqual([
+      { a: "a1", b: "b1" },
+      { a: "a2", b: "b2" },
+    ]);
+    expect(paresParaComparar(["a1", "a2"], ["b1"])).toEqual([
+      { a: "a1", b: "b1" },
+      { a: "a2", b: null },
+    ]);
+    expect(paresParaComparar([], [])).toEqual([]);
+  });
+});

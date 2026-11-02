@@ -168,3 +168,13 @@ export function areasCorporaisDosPlanos(estados: (EstadoPlanejador | null | unde
   }
   return nomes;
 }
+
+/**
+ * Pares para o Comparar: a 1ª foto de uma etapa com a 1ª da outra, a 2ª com a
+ * 2ª, e assim por diante (na ordem em que foram tiradas). Etapa com menos fotos
+ * deixa o lado vazio (null). Sem foto nas duas, nenhum par.
+ */
+export function paresParaComparar<T>(a: T[], b: T[]): { a: T | null; b: T | null }[] {
+  const n = Math.max(a.length, b.length);
+  return Array.from({ length: n }, (_, i) => ({ a: a[i] ?? null, b: b[i] ?? null }));
+}
