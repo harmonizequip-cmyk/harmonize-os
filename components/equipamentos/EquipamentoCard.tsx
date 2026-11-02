@@ -14,6 +14,7 @@ import RevisaoAnualControl from "@/components/RevisaoAnualControl";
 import TrocaAguaControl from "@/components/equipamentos/TrocaAguaControl";
 import BloqueiosEquipamento, { type Bloqueio } from "@/components/BloqueiosEquipamento";
 import { type AplicadorUso, situacaoAplicador } from "@/lib/aplicador";
+import AparelhoHipro from "@/components/ui/AparelhoHipro";
 
 const EQUIPMENT_COLORS: Record<string, string> = {
   hipro_1: "bg-brand-teal",
@@ -64,8 +65,10 @@ export default function EquipamentoCard({
         {/* Nome, status e próxima reserva */}
         <div className="grid grid-cols-[1.05fr_auto_1fr] gap-x-3">
           <div className="min-w-0">
-            <p className="flex items-center gap-2.5 text-xl font-extrabold leading-none text-slate-900">
-              <span className={`h-3 w-3 flex-shrink-0 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-slate-400"}`} />
+            <p className="flex items-center gap-2.5 whitespace-nowrap text-xl font-extrabold leading-none text-slate-900">
+              <span className={`fora-hipro h-3 w-3 flex-shrink-0 rounded-full ${EQUIPMENT_COLORS[eq.code] ?? "bg-slate-400"}`} />
+              {/* Tema HIPRO: o aparelho pequeno no lugar do ponto colorido, ao lado do nome. */}
+              <AparelhoHipro className="-my-2 -ml-1 w-10 flex-shrink-0" />
               {eq.name}
             </p>
             <EquipamentoStatusControl

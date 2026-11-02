@@ -28,20 +28,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                if (localStorage.getItem('harmonize-tema') === 'aurora') {
-                  document.documentElement.classList.add('tema-aurora');
-                }
-              } catch (e) {}
-              try {
                 var p = location.pathname;
-                if (p === '/pessoal' || p.indexOf('/pessoal/') === 0) {
+                var pessoal = p === '/pessoal' || p.indexOf('/pessoal/') === 0;
+                if (pessoal) {
                   document.documentElement.classList.add('espaco-pessoal');
+                }
+                var t = localStorage.getItem('harmonize-tema');
+                if (t === 'aurora') {
+                  document.documentElement.classList.add('tema-aurora');
+                } else if (t === 'hipro' && !pessoal) {
+                  document.documentElement.classList.add('tema-hipro');
                 }
               } catch (e) {}
             `,

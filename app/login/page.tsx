@@ -5,6 +5,8 @@ import { Fingerprint } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { digitalSuportada, mensagemErroDigital } from "@/lib/digital";
+import { aplicarTema, lerTemaGuardado } from "@/lib/tema";
+import AparelhoHipro from "@/components/ui/AparelhoHipro";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +19,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     setTemDigital(digitalSuportada());
+    // O tema é do aparelho: vale já no login (cor da barra do celular inclusa).
+    aplicarTema(lerTemaGuardado());
   }, []);
 
   async function entrarComDigital() {
@@ -48,13 +52,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-brand-mesh flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+    <div className="bg-brand-mesh flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4 py-8">
+      {/* Tema HIPRO: o aparelho como herói, como na capa do e-book. */}
+      <div className="so-hipro mb-4 w-full max-w-sm text-center">
+        <img src="/harmonize-logo-full-dark.png" alt="" aria-hidden className="mx-auto h-14 w-auto" />
+        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-neutral-700">
+          <span className="mr-2 inline-block h-px w-8 bg-[#51d3da]/70 align-middle" />
+          Locação HIPRO 1 e HIPRO 2
+          <span className="ml-2 inline-block h-px w-8 bg-[#51d3da]/70 align-middle" />
+        </p>
+        <AparelhoHipro className="mx-auto -mb-6 mt-2 w-[min(19rem,80vw)]" />
+      </div>
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 rounded-3xl border border-white/60 bg-white p-8 shadow-2xl shadow-brand-teal/10"
       >
         <div className="mb-2 flex flex-col items-center text-center">
-          <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-16 w-auto" />
+          <img src="/harmonize-logo-full.png" alt="Harmonize" className="fora-hipro h-16 w-auto" />
+          <p className="so-hipro pilula-hipro rounded-full px-5 py-1 text-sm font-bold uppercase tracking-[0.12em] text-white">Harmonize OS</p>
           <p className="mt-2 text-sm text-neutral-500">Entre para continuar</p>
         </div>
 

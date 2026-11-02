@@ -101,7 +101,9 @@ h1 {
    Clássico (padrão): cinzas neutros do Tailwind.
    Aurora (classe tema-aurora no <html>): cinzas frios, brilho da marca no
    topo, cartões brancos com sombra e barra de baixo flutuante.
-   Trocado no botão do menu (components/ThemeToggle.tsx).
+   HIPRO (classe tema-hipro): escuro, bloco "TEMA HIPRO" mais abaixo.
+   Trocado no botão de paleta (components/ThemeToggle.tsx) ou em
+   Configurações > Aparência; regras de escolha em lib/tema.ts.
    ============================================================ */
 :root {
   /* Cinzas frios (ardósia), como no padrão aprovado. */
@@ -189,6 +191,671 @@ h1 {
 .tema-aurora nav .text-neutral-900 {
   color: #1f7a75;
 }
+
+/* ============================================================
+   TEMA HIPRO (classe tema-hipro no <html>; opção ao lado de Clássico e
+   Aurora, pedido do dono em 02/11/2026 a partir da capa do e-book do HIPRO).
+   Escuro azul-petróleo com gradiente radial, linhas finas de luz turquesa
+   nos cantos, cartões em vidro escuro com borda turquesa suave e o aparelho
+   nas telas de destaque (classe so-hipro). Não vale no Pessoal: a classe só
+   entra fora de /pessoal (lib/tema.ts e script do app/layout.tsx).
+   Regras só aqui (nada de classes dark:). Desenhos em canvas, PDF e
+   impressão não leem este CSS.
+   ============================================================ */
+.so-hipro { display: none !important; }
+.tema-hipro .so-hipro { display: block !important; }
+.tema-hipro .fora-hipro { display: none !important; }
+.tema-hipro img.logo-claro { display: none; }
+.tema-hipro img.logo-escuro { display: block; }
+
+.tema-hipro {
+  color-scheme: dark;
+  /* Escala de cinzas invertida: 50 é o mais escuro, 950 o mais claro. */
+  --n-50: 5 40 52;
+  --n-100: 10 52 66;
+  --n-200: 25 74 90;
+  --n-300: 40 92 110;
+  --n-400: 138 169 180;
+  --n-500: 163 188 197;
+  --n-600: 184 204 211;
+  --n-700: 206 221 226;
+  --n-800: 226 236 240;
+  --n-900: 240 247 249;
+  --n-950: 250 253 254;
+  --hipro-fundo: #01222e;
+  --hipro-vidro: rgb(6 48 61 / 0.8);
+  --hipro-vidro-forte: #07323f;
+  --hipro-borda: rgb(81 211 218 / 0.18);
+  --hipro-ciano: #51d3da;
+  --hipro-brilho: #2eb4c0;
+}
+.tema-hipro body {
+  background-color: var(--hipro-fundo);
+  color: rgb(var(--n-900));
+}
+/* Fundo: gradiente radial mais claro no centro e ondas de luz nos cantos,
+   numa camada fixa atrás de tudo (não rola junto, não pega toque). */
+.tema-hipro body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="%2351d3da" stroke-width="0.7"%3E%3Cpath d="M0 250 C 60 170, 110 70, 190 0" stroke-opacity="0.21"/%3E%3Cpath d="M0 259 C 63 175, 116 72, 202 0" stroke-opacity="0.25"/%3E%3Cpath d="M0 268 C 66 180, 122 74, 214 0" stroke-opacity="0.29"/%3E%3Cpath d="M0 277 C 69 185, 128 76, 226 0" stroke-opacity="0.33"/%3E%3Cpath d="M0 286 C 72 190, 134 78, 238 0" stroke-opacity="0.37"/%3E%3Cpath d="M0 295 C 75 195, 140 80, 250 0" stroke-opacity="0.41"/%3E%3Cpath d="M0 304 C 78 200, 146 82, 262 0" stroke-opacity="0.45"/%3E%3Cpath d="M0 313 C 81 205, 152 84, 274 0" stroke-opacity="0.47"/%3E%3Cpath d="M0 322 C 84 210, 158 86, 286 0" stroke-opacity="0.43"/%3E%3Cpath d="M0 331 C 87 215, 164 88, 298 0" stroke-opacity="0.39"/%3E%3Cpath d="M0 340 C 90 220, 170 90, 310 0" stroke-opacity="0.35"/%3E%3Cpath d="M0 349 C 93 225, 176 92, 322 0" stroke-opacity="0.31"/%3E%3Cpath d="M0 358 C 96 230, 182 94, 334 0" stroke-opacity="0.27"/%3E%3Cpath d="M0 367 C 99 235, 188 96, 346 0" stroke-opacity="0.23"/%3E%3Cpath d="M0 376 C 102 240, 194 98, 358 0" stroke-opacity="0.19"/%3E%3Cpath d="M0 385 C 105 245, 200 100, 370 0" stroke-opacity="0.15"/%3E%3C/svg%3E'),
+    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="%2351d3da" stroke-width="0.7"%3E%3Cpath d="M60 400 C 200 330, 300 250, 400 150" stroke-opacity="0.21"/%3E%3Cpath d="M71 400 C 204 326, 303 247, 400 158" stroke-opacity="0.25"/%3E%3Cpath d="M82 400 C 208 322, 306 244, 400 166" stroke-opacity="0.29"/%3E%3Cpath d="M93 400 C 212 318, 309 241, 400 174" stroke-opacity="0.33"/%3E%3Cpath d="M104 400 C 216 314, 312 238, 400 182" stroke-opacity="0.37"/%3E%3Cpath d="M115 400 C 220 310, 315 235, 400 190" stroke-opacity="0.41"/%3E%3Cpath d="M126 400 C 224 306, 318 232, 400 198" stroke-opacity="0.45"/%3E%3Cpath d="M137 400 C 228 302, 321 229, 400 206" stroke-opacity="0.47"/%3E%3Cpath d="M148 400 C 232 298, 324 226, 400 214" stroke-opacity="0.43"/%3E%3Cpath d="M159 400 C 236 294, 327 223, 400 222" stroke-opacity="0.39"/%3E%3Cpath d="M170 400 C 240 290, 330 220, 400 230" stroke-opacity="0.35"/%3E%3Cpath d="M181 400 C 244 286, 333 217, 400 238" stroke-opacity="0.31"/%3E%3Cpath d="M192 400 C 248 282, 336 214, 400 246" stroke-opacity="0.27"/%3E%3Cpath d="M203 400 C 252 278, 339 211, 400 254" stroke-opacity="0.23"/%3E%3Cpath d="M214 400 C 256 274, 342 208, 400 262" stroke-opacity="0.19"/%3E%3Cpath d="M225 400 C 260 270, 345 205, 400 270" stroke-opacity="0.15"/%3E%3C/svg%3E'),
+    radial-gradient(70% 55% at 50% 42%, rgb(0 64 82 / 0.85) 0%, rgb(0 46 61 / 0.6) 45%, transparent 80%),
+    linear-gradient(180deg, #002a39 0%, #00222e 55%, #001b25 100%);
+  background-repeat: no-repeat;
+  background-position: left top, right bottom, center, center;
+  background-size: min(520px, 110vw) auto, min(520px, 110vw) auto, cover, cover;
+}
+.tema-hipro .bg-brand-mesh { background-image: none; }
+/* Fundos de tela inteira (min-h-screen bg-neutral-50) deixam ver o fundo da
+   capa; dentro dos cartões o neutral-50 fica um vidro mais fundo. */
+.tema-hipro .bg-neutral-50 { background-color: rgb(var(--n-50) / 0.6); }
+.tema-hipro .min-h-screen.bg-neutral-50,
+.tema-hipro .min-h-screen[class*="bg-neutral-"],
+.tema-hipro .min-h-screen[class*="bg-white"] { background-color: transparent; }
+.tema-hipro ::selection { background: rgb(81 211 218 / 0.35); color: #fff; }
+
+/* Base de bordas e formulários sem peso: qualquer classe do Tailwind ganha. */
+:where(.tema-hipro) *,
+:where(.tema-hipro) ::before,
+:where(.tema-hipro) ::after { border-color: rgb(81 211 218 / 0.16); }
+:where(.tema-hipro) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), textarea, select) {
+  background-color: rgb(2 30 41 / 0.75);
+  color: rgb(var(--n-900));
+}
+.tema-hipro input::placeholder,
+.tema-hipro textarea::placeholder { color: rgb(138 169 180 / 0.9); }
+.tema-hipro input:focus-visible,
+.tema-hipro textarea:focus-visible,
+.tema-hipro select:focus-visible { outline-color: var(--hipro-ciano); }
+.tema-hipro select option { background-color: #06303d; color: #f0f7f9; }
+.tema-hipro input[type="checkbox"],
+.tema-hipro input[type="radio"],
+.tema-hipro input[type="range"] { accent-color: var(--hipro-brilho); }
+
+/* Cartões em vidro escuro (sem backdrop-filter, que prenderia janelas fixas). */
+.tema-hipro .cartao,
+.tema-hipro .bg-white\/70,
+.tema-hipro .bg-white\/80,
+.tema-hipro .bg-white\/60,
+.tema-hipro .bg-white\/50 {
+  background-color: var(--hipro-vidro);
+  border-color: var(--hipro-borda);
+}
+.tema-hipro .cartao {
+  border: 1px solid var(--hipro-borda);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 18px 40px -24px rgb(0 0 0 / 0.75), 0 0 32px -18px rgb(46 180 192 / 0.45);
+}
+.tema-hipro .bg-white,
+.tema-hipro .bg-white\/90,
+.tema-hipro .bg-white\/95,
+.tema-hipro .hover\:bg-white:hover { background-color: var(--hipro-vidro-forte); }
+.tema-hipro .bg-\[\#F3F6F7\],
+.tema-hipro .bg-\[\#f4f6f9\],
+.tema-hipro .bg-\[\#e7f7ee\] { background-color: rgb(10 52 66 / 0.9); }
+.tema-hipro .border-white\/60,
+.tema-hipro .border-white\/50 { border-color: var(--hipro-borda); }
+.tema-hipro .shadow-sm,
+.tema-hipro .shadow,
+.tema-hipro .shadow-md {
+  box-shadow: 0 14px 32px -22px rgb(0 0 0 / 0.8), 0 0 24px -16px rgb(46 180 192 / 0.4);
+}
+.tema-hipro .shadow-lg,
+.tema-hipro .shadow-xl,
+.tema-hipro .shadow-2xl { box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.85), 0 0 40px -20px rgb(46 180 192 / 0.45); }
+.tema-hipro .ring-neutral-200\/80 {
+  box-shadow: 0 14px 32px -22px rgb(0 0 0 / 0.8), 0 0 0 1px var(--hipro-borda) !important;
+}
+.tema-hipro [class*="ring-neutral-"] { --tw-ring-color: var(--hipro-borda); }
+.tema-hipro h1 { letter-spacing: -0.02em; font-weight: 300; }
+
+/* Fundos escuros fixos (botões e faixas que eram pretos) viram turquesa fundo,
+   com contraste para o texto branco (>= 4,5:1). */
+.tema-hipro .bg-neutral-900,
+.tema-hipro .bg-neutral-800,
+.tema-hipro .hover\:bg-neutral-800:hover {
+  background-color: #0e7a84;
+  box-shadow: 0 0 0 1px rgb(81 211 218 / 0.35), 0 8px 22px -12px rgb(46 180 192 / 0.8);
+}
+.tema-hipro [class*="bg-neutral-900/"],
+.tema-hipro [class*="bg-neutral-800/"] { background-color: rgb(0 18 26 / 0.92); }
+.tema-hipro .bg-neutral-900\/40 { background-color: rgb(0 12 18 / 0.6); }
+.tema-hipro .bg-black\/40,
+.tema-hipro .bg-black\/50 { background-color: rgb(0 10 16 / 0.65); }
+
+/* Acento turquesa da capa (#51d3da / #2eb4c0). */
+.tema-hipro .text-brand-teal,
+.tema-hipro .text-brand-teal-dark,
+.tema-hipro [class*="text-teal-500"],
+.tema-hipro [class*="text-teal-600"],
+.tema-hipro [class*="text-teal-700"],
+.tema-hipro [class*="text-teal-800"],
+.tema-hipro [class*="text-teal-900"],
+.tema-hipro [class*="text-cyan-600"],
+.tema-hipro [class*="text-cyan-700"] { color: var(--hipro-ciano); }
+.tema-hipro .text-\[\#167a74\] { color: var(--hipro-ciano); }
+.tema-hipro .text-\[\#b03e63\] { color: #f7a8bf; }
+.tema-hipro .text-\[\#7a5fa0\] { color: #d4c2ec; }
+.tema-hipro [class~="bg-teal-50"],
+.tema-hipro [class*="bg-teal-50/"],
+.tema-hipro [class*="bg-teal-100"],
+.tema-hipro .bg-brand-teal\/5,
+.tema-hipro .bg-brand-teal\/10,
+.tema-hipro .hover\:bg-teal-50:hover { background-color: rgb(81 211 218 / 0.13); }
+.tema-hipro [class*="border-teal-1"],
+.tema-hipro [class*="border-teal-2"],
+.tema-hipro [class*="border-teal-3"],
+.tema-hipro .border-brand-teal\/30,
+.tema-hipro .border-brand-teal\/40 { border-color: rgb(81 211 218 / 0.4); }
+.tema-hipro .border-brand-teal { border-color: var(--hipro-ciano); }
+.tema-hipro [class*="ring-teal-"],
+.tema-hipro .ring-brand-teal { --tw-ring-color: rgb(81 211 218 / 0.7); }
+.tema-hipro .bg-brand-teal,
+.tema-hipro .bg-teal-500,
+.tema-hipro .bg-teal-600 { background-color: #0e7a84; }
+.tema-hipro .bg-brand-gradient {
+  background-image: linear-gradient(135deg, #0b6f79 0%, #0e8590 55%, #0b6f79 100%);
+  box-shadow: 0 0 0 1px rgb(81 211 218 / 0.45), 0 10px 26px -12px rgb(46 180 192 / 0.85);
+}
+.tema-hipro .shadow-glow-teal { box-shadow: 0 0 0 1px rgb(81 211 218 / 0.45), 0 10px 26px -12px rgb(46 180 192 / 0.85); }
+.tema-hipro .accent-brand-teal { accent-color: var(--hipro-brilho); }
+.tema-hipro a.underline,
+.tema-hipro .hover\:decoration-brand-teal:hover { text-decoration-color: var(--hipro-ciano); }
+
+/* Topo do celular, chave de espaço e barra lateral. */
+.tema-hipro header.bg-white\/75 {
+  background-color: rgb(0 34 46 / 0.72);
+  border-color: transparent;
+}
+.tema-hipro .barra-espaco { background-color: rgb(0 34 46 / 0.88); }
+.tema-hipro aside.bg-white\/70 { background-color: rgb(0 30 41 / 0.85); border-color: var(--hipro-borda); }
+.tema-hipro aside .bg-neutral-900 { background-color: rgb(81 211 218 / 0.16); box-shadow: inset 0 0 0 1px rgb(81 211 218 / 0.45); color: #fff; }
+
+/* Barra de baixo: vidro escuro, item ativo com brilho turquesa. */
+.tema-hipro nav.fixed.bottom-0 {
+  background-color: rgb(0 30 41 / 0.94);
+  border-top: 1px solid rgb(81 211 218 / 0.22);
+  box-shadow: 0 -12px 30px -18px rgb(46 180 192 / 0.5);
+}
+.tema-hipro nav.fixed.bottom-0 .bg-teal-50 {
+  background-color: rgb(81 211 218 / 0.16);
+  box-shadow: inset 0 0 0 1px rgb(81 211 218 / 0.5), 0 0 16px -2px rgb(81 211 218 / 0.55);
+}
+.tema-hipro nav.fixed.bottom-0 .text-teal-600 { color: #7fe7ec; }
+
+/* Pílulas e selos com borda turquesa, como o "E-BOOK" da capa. */
+.tema-hipro .rounded-full[class*="bg-teal-50"],
+.tema-hipro .rounded-full[class*="bg-brand-teal/10"] { box-shadow: inset 0 0 0 1px rgb(81 211 218 / 0.55); }
+.tema-hipro .pilula-hipro {
+  border: 1.5px solid var(--hipro-ciano);
+  box-shadow: 0 0 14px -4px rgb(81 211 218 / 0.7), inset 0 0 10px -6px rgb(81 211 218 / 0.8);
+}
+
+/* Destaques escuros (destaque do mês e HeroTela): azul-petróleo da capa. */
+.tema-hipro .destaque-hipro {
+  background-image:
+    radial-gradient(80% 70% at 78% 30%, rgb(46 180 192 / 0.28) 0%, transparent 60%),
+    linear-gradient(160deg, #003544 0%, #01283a 55%, #001e2a 100%);
+  border: 1px solid rgb(81 211 218 / 0.3);
+  box-shadow: 0 0 40px -18px rgb(46 180 192 / 0.6), 0 24px 50px -28px rgb(0 0 0 / 0.9);
+}
+.tema-hipro .destaque-hipro > span[aria-hidden] { display: none; }
+.tema-hipro .aparelho-hipro { filter: drop-shadow(0 10px 18px rgb(46 180 192 / 0.35)); }
+
+/* Faixa do modo teste (bg-amber-500) continua âmbar; texto branco tem contraste baixo, então escurece o texto. */
+.tema-hipro .bg-amber-500.text-white { color: #1c1300; }
+
+/* --- Gerado: cores fixas do Tailwind no tema HIPRO (fundos claros viram
+   vidro colorido escuro, textos escuros viram o tom claro da mesma cor). --- */
+.tema-hipro [class~="bg-slate-50"],
+.tema-hipro [class*="bg-slate-50/"],
+.tema-hipro .hover\:bg-slate-50:hover,
+.tema-hipro .active\:bg-slate-50:active { background-color: rgb(148 163 184 / 0.12); }
+.tema-hipro [class*="bg-slate-100"],
+.tema-hipro .hover\:bg-slate-100:hover,
+.tema-hipro .active\:bg-slate-100:active { background-color: rgb(148 163 184 / 0.18); }
+.tema-hipro [class*="bg-slate-200"] { background-color: rgb(148 163 184 / 0.26); }
+.tema-hipro [class*="text-slate-400"],
+.tema-hipro [class*="text-slate-500"] { color: #94a3b8; }
+.tema-hipro [class*="text-slate-600"] { color: #cbd5e1; }
+.tema-hipro [class*="text-slate-700"] { color: #e2e8f0; }
+.tema-hipro [class*="text-slate-800"] { color: #f1f5f9; }
+.tema-hipro [class*="text-slate-900"],
+.tema-hipro [class*="text-slate-950"] { color: #f8fafc; }
+.tema-hipro [class*="border-slate-100"],
+.tema-hipro [class*="border-slate-200"],
+.tema-hipro [class*="border-slate-300"],
+.tema-hipro [class*="divide-slate-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-slate-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(148 163 184 / 0.35); }
+.tema-hipro [class*="ring-slate-100"],
+.tema-hipro [class*="ring-slate-200"],
+.tema-hipro [class*="ring-slate-300"] { --tw-ring-color: rgb(148 163 184 / 0.4); }
+.tema-hipro [class~="bg-gray-50"],
+.tema-hipro [class*="bg-gray-50/"],
+.tema-hipro .hover\:bg-gray-50:hover,
+.tema-hipro .active\:bg-gray-50:active { background-color: rgb(156 163 175 / 0.12); }
+.tema-hipro [class*="bg-gray-100"],
+.tema-hipro .hover\:bg-gray-100:hover,
+.tema-hipro .active\:bg-gray-100:active { background-color: rgb(156 163 175 / 0.18); }
+.tema-hipro [class*="bg-gray-200"] { background-color: rgb(156 163 175 / 0.26); }
+.tema-hipro [class*="text-gray-400"],
+.tema-hipro [class*="text-gray-500"] { color: #9ca3af; }
+.tema-hipro [class*="text-gray-600"] { color: #d1d5db; }
+.tema-hipro [class*="text-gray-700"] { color: #e5e7eb; }
+.tema-hipro [class*="text-gray-800"] { color: #f3f4f6; }
+.tema-hipro [class*="text-gray-900"],
+.tema-hipro [class*="text-gray-950"] { color: #f9fafb; }
+.tema-hipro [class*="border-gray-100"],
+.tema-hipro [class*="border-gray-200"],
+.tema-hipro [class*="border-gray-300"],
+.tema-hipro [class*="divide-gray-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-gray-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(156 163 175 / 0.35); }
+.tema-hipro [class*="ring-gray-100"],
+.tema-hipro [class*="ring-gray-200"],
+.tema-hipro [class*="ring-gray-300"] { --tw-ring-color: rgb(156 163 175 / 0.4); }
+.tema-hipro [class~="bg-zinc-50"],
+.tema-hipro [class*="bg-zinc-50/"],
+.tema-hipro .hover\:bg-zinc-50:hover,
+.tema-hipro .active\:bg-zinc-50:active { background-color: rgb(161 161 170 / 0.12); }
+.tema-hipro [class*="bg-zinc-100"],
+.tema-hipro .hover\:bg-zinc-100:hover,
+.tema-hipro .active\:bg-zinc-100:active { background-color: rgb(161 161 170 / 0.18); }
+.tema-hipro [class*="bg-zinc-200"] { background-color: rgb(161 161 170 / 0.26); }
+.tema-hipro [class*="text-zinc-400"],
+.tema-hipro [class*="text-zinc-500"] { color: #a1a1aa; }
+.tema-hipro [class*="text-zinc-600"] { color: #d4d4d8; }
+.tema-hipro [class*="text-zinc-700"] { color: #e4e4e7; }
+.tema-hipro [class*="text-zinc-800"] { color: #f4f4f5; }
+.tema-hipro [class*="text-zinc-900"],
+.tema-hipro [class*="text-zinc-950"] { color: #fafafa; }
+.tema-hipro [class*="border-zinc-100"],
+.tema-hipro [class*="border-zinc-200"],
+.tema-hipro [class*="border-zinc-300"],
+.tema-hipro [class*="divide-zinc-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-zinc-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(161 161 170 / 0.35); }
+.tema-hipro [class*="ring-zinc-100"],
+.tema-hipro [class*="ring-zinc-200"],
+.tema-hipro [class*="ring-zinc-300"] { --tw-ring-color: rgb(161 161 170 / 0.4); }
+.tema-hipro [class~="bg-stone-50"],
+.tema-hipro [class*="bg-stone-50/"],
+.tema-hipro .hover\:bg-stone-50:hover,
+.tema-hipro .active\:bg-stone-50:active { background-color: rgb(168 162 158 / 0.12); }
+.tema-hipro [class*="bg-stone-100"],
+.tema-hipro .hover\:bg-stone-100:hover,
+.tema-hipro .active\:bg-stone-100:active { background-color: rgb(168 162 158 / 0.18); }
+.tema-hipro [class*="bg-stone-200"] { background-color: rgb(168 162 158 / 0.26); }
+.tema-hipro [class*="text-stone-400"],
+.tema-hipro [class*="text-stone-500"] { color: #a8a29e; }
+.tema-hipro [class*="text-stone-600"] { color: #d6d3d1; }
+.tema-hipro [class*="text-stone-700"] { color: #e7e5e4; }
+.tema-hipro [class*="text-stone-800"] { color: #f5f5f4; }
+.tema-hipro [class*="text-stone-900"],
+.tema-hipro [class*="text-stone-950"] { color: #fafaf9; }
+.tema-hipro [class*="border-stone-100"],
+.tema-hipro [class*="border-stone-200"],
+.tema-hipro [class*="border-stone-300"],
+.tema-hipro [class*="divide-stone-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-stone-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(168 162 158 / 0.35); }
+.tema-hipro [class*="ring-stone-100"],
+.tema-hipro [class*="ring-stone-200"],
+.tema-hipro [class*="ring-stone-300"] { --tw-ring-color: rgb(168 162 158 / 0.4); }
+.tema-hipro [class~="bg-red-50"],
+.tema-hipro [class*="bg-red-50/"],
+.tema-hipro .hover\:bg-red-50:hover,
+.tema-hipro .active\:bg-red-50:active { background-color: rgb(248 113 113 / 0.12); }
+.tema-hipro [class*="bg-red-100"],
+.tema-hipro .hover\:bg-red-100:hover,
+.tema-hipro .active\:bg-red-100:active { background-color: rgb(248 113 113 / 0.18); }
+.tema-hipro [class*="bg-red-200"] { background-color: rgb(248 113 113 / 0.26); }
+.tema-hipro [class*="text-red-500"] { color: #f87171; }
+.tema-hipro [class*="text-red-600"],
+.tema-hipro [class*="text-red-700"] { color: #fca5a5; }
+.tema-hipro [class*="text-red-800"] { color: #fecaca; }
+.tema-hipro [class*="text-red-900"],
+.tema-hipro [class*="text-red-950"] { color: #fee2e2; }
+.tema-hipro [class*="border-red-100"],
+.tema-hipro [class*="border-red-200"],
+.tema-hipro [class*="border-red-300"],
+.tema-hipro [class*="divide-red-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-red-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(248 113 113 / 0.35); }
+.tema-hipro [class*="ring-red-100"],
+.tema-hipro [class*="ring-red-200"],
+.tema-hipro [class*="ring-red-300"] { --tw-ring-color: rgb(248 113 113 / 0.4); }
+.tema-hipro [class~="bg-orange-50"],
+.tema-hipro [class*="bg-orange-50/"],
+.tema-hipro .hover\:bg-orange-50:hover,
+.tema-hipro .active\:bg-orange-50:active { background-color: rgb(251 146 60 / 0.12); }
+.tema-hipro [class*="bg-orange-100"],
+.tema-hipro .hover\:bg-orange-100:hover,
+.tema-hipro .active\:bg-orange-100:active { background-color: rgb(251 146 60 / 0.18); }
+.tema-hipro [class*="bg-orange-200"] { background-color: rgb(251 146 60 / 0.26); }
+.tema-hipro [class*="text-orange-500"] { color: #fb923c; }
+.tema-hipro [class*="text-orange-600"],
+.tema-hipro [class*="text-orange-700"] { color: #fdba74; }
+.tema-hipro [class*="text-orange-800"] { color: #fed7aa; }
+.tema-hipro [class*="text-orange-900"],
+.tema-hipro [class*="text-orange-950"] { color: #ffedd5; }
+.tema-hipro [class*="border-orange-100"],
+.tema-hipro [class*="border-orange-200"],
+.tema-hipro [class*="border-orange-300"],
+.tema-hipro [class*="divide-orange-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-orange-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(251 146 60 / 0.35); }
+.tema-hipro [class*="ring-orange-100"],
+.tema-hipro [class*="ring-orange-200"],
+.tema-hipro [class*="ring-orange-300"] { --tw-ring-color: rgb(251 146 60 / 0.4); }
+.tema-hipro [class~="bg-amber-50"],
+.tema-hipro [class*="bg-amber-50/"],
+.tema-hipro .hover\:bg-amber-50:hover,
+.tema-hipro .active\:bg-amber-50:active { background-color: rgb(251 191 36 / 0.12); }
+.tema-hipro [class*="bg-amber-100"],
+.tema-hipro .hover\:bg-amber-100:hover,
+.tema-hipro .active\:bg-amber-100:active { background-color: rgb(251 191 36 / 0.18); }
+.tema-hipro [class*="bg-amber-200"] { background-color: rgb(251 191 36 / 0.26); }
+.tema-hipro [class*="text-amber-500"] { color: #fbbf24; }
+.tema-hipro [class*="text-amber-600"],
+.tema-hipro [class*="text-amber-700"] { color: #fcd34d; }
+.tema-hipro [class*="text-amber-800"] { color: #fde68a; }
+.tema-hipro [class*="text-amber-900"],
+.tema-hipro [class*="text-amber-950"] { color: #fef3c7; }
+.tema-hipro [class*="border-amber-100"],
+.tema-hipro [class*="border-amber-200"],
+.tema-hipro [class*="border-amber-300"],
+.tema-hipro [class*="divide-amber-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-amber-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(251 191 36 / 0.35); }
+.tema-hipro [class*="ring-amber-100"],
+.tema-hipro [class*="ring-amber-200"],
+.tema-hipro [class*="ring-amber-300"] { --tw-ring-color: rgb(251 191 36 / 0.4); }
+.tema-hipro [class~="bg-yellow-50"],
+.tema-hipro [class*="bg-yellow-50/"],
+.tema-hipro .hover\:bg-yellow-50:hover,
+.tema-hipro .active\:bg-yellow-50:active { background-color: rgb(250 204 21 / 0.12); }
+.tema-hipro [class*="bg-yellow-100"],
+.tema-hipro .hover\:bg-yellow-100:hover,
+.tema-hipro .active\:bg-yellow-100:active { background-color: rgb(250 204 21 / 0.18); }
+.tema-hipro [class*="bg-yellow-200"] { background-color: rgb(250 204 21 / 0.26); }
+.tema-hipro [class*="text-yellow-500"] { color: #facc15; }
+.tema-hipro [class*="text-yellow-600"],
+.tema-hipro [class*="text-yellow-700"] { color: #fde047; }
+.tema-hipro [class*="text-yellow-800"] { color: #fef08a; }
+.tema-hipro [class*="text-yellow-900"],
+.tema-hipro [class*="text-yellow-950"] { color: #fef9c3; }
+.tema-hipro [class*="border-yellow-100"],
+.tema-hipro [class*="border-yellow-200"],
+.tema-hipro [class*="border-yellow-300"],
+.tema-hipro [class*="divide-yellow-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-yellow-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(250 204 21 / 0.35); }
+.tema-hipro [class*="ring-yellow-100"],
+.tema-hipro [class*="ring-yellow-200"],
+.tema-hipro [class*="ring-yellow-300"] { --tw-ring-color: rgb(250 204 21 / 0.4); }
+.tema-hipro [class~="bg-lime-50"],
+.tema-hipro [class*="bg-lime-50/"],
+.tema-hipro .hover\:bg-lime-50:hover,
+.tema-hipro .active\:bg-lime-50:active { background-color: rgb(163 230 53 / 0.12); }
+.tema-hipro [class*="bg-lime-100"],
+.tema-hipro .hover\:bg-lime-100:hover,
+.tema-hipro .active\:bg-lime-100:active { background-color: rgb(163 230 53 / 0.18); }
+.tema-hipro [class*="bg-lime-200"] { background-color: rgb(163 230 53 / 0.26); }
+.tema-hipro [class*="text-lime-500"] { color: #a3e635; }
+.tema-hipro [class*="text-lime-600"],
+.tema-hipro [class*="text-lime-700"] { color: #bef264; }
+.tema-hipro [class*="text-lime-800"] { color: #d9f99d; }
+.tema-hipro [class*="text-lime-900"],
+.tema-hipro [class*="text-lime-950"] { color: #ecfccb; }
+.tema-hipro [class*="border-lime-100"],
+.tema-hipro [class*="border-lime-200"],
+.tema-hipro [class*="border-lime-300"],
+.tema-hipro [class*="divide-lime-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-lime-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(163 230 53 / 0.35); }
+.tema-hipro [class*="ring-lime-100"],
+.tema-hipro [class*="ring-lime-200"],
+.tema-hipro [class*="ring-lime-300"] { --tw-ring-color: rgb(163 230 53 / 0.4); }
+.tema-hipro [class~="bg-green-50"],
+.tema-hipro [class*="bg-green-50/"],
+.tema-hipro .hover\:bg-green-50:hover,
+.tema-hipro .active\:bg-green-50:active { background-color: rgb(74 222 128 / 0.12); }
+.tema-hipro [class*="bg-green-100"],
+.tema-hipro .hover\:bg-green-100:hover,
+.tema-hipro .active\:bg-green-100:active { background-color: rgb(74 222 128 / 0.18); }
+.tema-hipro [class*="bg-green-200"] { background-color: rgb(74 222 128 / 0.26); }
+.tema-hipro [class*="text-green-500"] { color: #4ade80; }
+.tema-hipro [class*="text-green-600"],
+.tema-hipro [class*="text-green-700"] { color: #86efac; }
+.tema-hipro [class*="text-green-800"] { color: #bbf7d0; }
+.tema-hipro [class*="text-green-900"],
+.tema-hipro [class*="text-green-950"] { color: #dcfce7; }
+.tema-hipro [class*="border-green-100"],
+.tema-hipro [class*="border-green-200"],
+.tema-hipro [class*="border-green-300"],
+.tema-hipro [class*="divide-green-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-green-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(74 222 128 / 0.35); }
+.tema-hipro [class*="ring-green-100"],
+.tema-hipro [class*="ring-green-200"],
+.tema-hipro [class*="ring-green-300"] { --tw-ring-color: rgb(74 222 128 / 0.4); }
+.tema-hipro [class~="bg-emerald-50"],
+.tema-hipro [class*="bg-emerald-50/"],
+.tema-hipro .hover\:bg-emerald-50:hover,
+.tema-hipro .active\:bg-emerald-50:active { background-color: rgb(52 211 153 / 0.12); }
+.tema-hipro [class*="bg-emerald-100"],
+.tema-hipro .hover\:bg-emerald-100:hover,
+.tema-hipro .active\:bg-emerald-100:active { background-color: rgb(52 211 153 / 0.18); }
+.tema-hipro [class*="bg-emerald-200"] { background-color: rgb(52 211 153 / 0.26); }
+.tema-hipro [class*="text-emerald-500"] { color: #34d399; }
+.tema-hipro [class*="text-emerald-600"],
+.tema-hipro [class*="text-emerald-700"] { color: #6ee7b7; }
+.tema-hipro [class*="text-emerald-800"] { color: #a7f3d0; }
+.tema-hipro [class*="text-emerald-900"],
+.tema-hipro [class*="text-emerald-950"] { color: #d1fae5; }
+.tema-hipro [class*="border-emerald-100"],
+.tema-hipro [class*="border-emerald-200"],
+.tema-hipro [class*="border-emerald-300"],
+.tema-hipro [class*="divide-emerald-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-emerald-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(52 211 153 / 0.35); }
+.tema-hipro [class*="ring-emerald-100"],
+.tema-hipro [class*="ring-emerald-200"],
+.tema-hipro [class*="ring-emerald-300"] { --tw-ring-color: rgb(52 211 153 / 0.4); }
+.tema-hipro [class~="bg-cyan-50"],
+.tema-hipro [class*="bg-cyan-50/"],
+.tema-hipro .hover\:bg-cyan-50:hover,
+.tema-hipro .active\:bg-cyan-50:active { background-color: rgb(34 211 238 / 0.12); }
+.tema-hipro [class*="bg-cyan-100"],
+.tema-hipro .hover\:bg-cyan-100:hover,
+.tema-hipro .active\:bg-cyan-100:active { background-color: rgb(34 211 238 / 0.18); }
+.tema-hipro [class*="bg-cyan-200"] { background-color: rgb(34 211 238 / 0.26); }
+.tema-hipro [class*="text-cyan-500"] { color: #22d3ee; }
+.tema-hipro [class*="text-cyan-600"],
+.tema-hipro [class*="text-cyan-700"] { color: #67e8f9; }
+.tema-hipro [class*="text-cyan-800"] { color: #a5f3fc; }
+.tema-hipro [class*="text-cyan-900"],
+.tema-hipro [class*="text-cyan-950"] { color: #cffafe; }
+.tema-hipro [class*="border-cyan-100"],
+.tema-hipro [class*="border-cyan-200"],
+.tema-hipro [class*="border-cyan-300"],
+.tema-hipro [class*="divide-cyan-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-cyan-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(34 211 238 / 0.35); }
+.tema-hipro [class*="ring-cyan-100"],
+.tema-hipro [class*="ring-cyan-200"],
+.tema-hipro [class*="ring-cyan-300"] { --tw-ring-color: rgb(34 211 238 / 0.4); }
+.tema-hipro [class~="bg-sky-50"],
+.tema-hipro [class*="bg-sky-50/"],
+.tema-hipro .hover\:bg-sky-50:hover,
+.tema-hipro .active\:bg-sky-50:active { background-color: rgb(56 189 248 / 0.12); }
+.tema-hipro [class*="bg-sky-100"],
+.tema-hipro .hover\:bg-sky-100:hover,
+.tema-hipro .active\:bg-sky-100:active { background-color: rgb(56 189 248 / 0.18); }
+.tema-hipro [class*="bg-sky-200"] { background-color: rgb(56 189 248 / 0.26); }
+.tema-hipro [class*="text-sky-500"] { color: #38bdf8; }
+.tema-hipro [class*="text-sky-600"],
+.tema-hipro [class*="text-sky-700"] { color: #7dd3fc; }
+.tema-hipro [class*="text-sky-800"] { color: #bae6fd; }
+.tema-hipro [class*="text-sky-900"],
+.tema-hipro [class*="text-sky-950"] { color: #e0f2fe; }
+.tema-hipro [class*="border-sky-100"],
+.tema-hipro [class*="border-sky-200"],
+.tema-hipro [class*="border-sky-300"],
+.tema-hipro [class*="divide-sky-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-sky-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(56 189 248 / 0.35); }
+.tema-hipro [class*="ring-sky-100"],
+.tema-hipro [class*="ring-sky-200"],
+.tema-hipro [class*="ring-sky-300"] { --tw-ring-color: rgb(56 189 248 / 0.4); }
+.tema-hipro [class~="bg-blue-50"],
+.tema-hipro [class*="bg-blue-50/"],
+.tema-hipro .hover\:bg-blue-50:hover,
+.tema-hipro .active\:bg-blue-50:active { background-color: rgb(96 165 250 / 0.12); }
+.tema-hipro [class*="bg-blue-100"],
+.tema-hipro .hover\:bg-blue-100:hover,
+.tema-hipro .active\:bg-blue-100:active { background-color: rgb(96 165 250 / 0.18); }
+.tema-hipro [class*="bg-blue-200"] { background-color: rgb(96 165 250 / 0.26); }
+.tema-hipro [class*="text-blue-500"] { color: #60a5fa; }
+.tema-hipro [class*="text-blue-600"],
+.tema-hipro [class*="text-blue-700"] { color: #93c5fd; }
+.tema-hipro [class*="text-blue-800"] { color: #bfdbfe; }
+.tema-hipro [class*="text-blue-900"],
+.tema-hipro [class*="text-blue-950"] { color: #dbeafe; }
+.tema-hipro [class*="border-blue-100"],
+.tema-hipro [class*="border-blue-200"],
+.tema-hipro [class*="border-blue-300"],
+.tema-hipro [class*="divide-blue-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-blue-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(96 165 250 / 0.35); }
+.tema-hipro [class*="ring-blue-100"],
+.tema-hipro [class*="ring-blue-200"],
+.tema-hipro [class*="ring-blue-300"] { --tw-ring-color: rgb(96 165 250 / 0.4); }
+.tema-hipro [class~="bg-indigo-50"],
+.tema-hipro [class*="bg-indigo-50/"],
+.tema-hipro .hover\:bg-indigo-50:hover,
+.tema-hipro .active\:bg-indigo-50:active { background-color: rgb(129 140 248 / 0.12); }
+.tema-hipro [class*="bg-indigo-100"],
+.tema-hipro .hover\:bg-indigo-100:hover,
+.tema-hipro .active\:bg-indigo-100:active { background-color: rgb(129 140 248 / 0.18); }
+.tema-hipro [class*="bg-indigo-200"] { background-color: rgb(129 140 248 / 0.26); }
+.tema-hipro [class*="text-indigo-500"] { color: #818cf8; }
+.tema-hipro [class*="text-indigo-600"],
+.tema-hipro [class*="text-indigo-700"] { color: #a5b4fc; }
+.tema-hipro [class*="text-indigo-800"] { color: #c7d2fe; }
+.tema-hipro [class*="text-indigo-900"],
+.tema-hipro [class*="text-indigo-950"] { color: #e0e7ff; }
+.tema-hipro [class*="border-indigo-100"],
+.tema-hipro [class*="border-indigo-200"],
+.tema-hipro [class*="border-indigo-300"],
+.tema-hipro [class*="divide-indigo-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-indigo-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(129 140 248 / 0.35); }
+.tema-hipro [class*="ring-indigo-100"],
+.tema-hipro [class*="ring-indigo-200"],
+.tema-hipro [class*="ring-indigo-300"] { --tw-ring-color: rgb(129 140 248 / 0.4); }
+.tema-hipro [class~="bg-violet-50"],
+.tema-hipro [class*="bg-violet-50/"],
+.tema-hipro .hover\:bg-violet-50:hover,
+.tema-hipro .active\:bg-violet-50:active { background-color: rgb(167 139 250 / 0.12); }
+.tema-hipro [class*="bg-violet-100"],
+.tema-hipro .hover\:bg-violet-100:hover,
+.tema-hipro .active\:bg-violet-100:active { background-color: rgb(167 139 250 / 0.18); }
+.tema-hipro [class*="bg-violet-200"] { background-color: rgb(167 139 250 / 0.26); }
+.tema-hipro [class*="text-violet-500"] { color: #a78bfa; }
+.tema-hipro [class*="text-violet-600"],
+.tema-hipro [class*="text-violet-700"] { color: #c4b5fd; }
+.tema-hipro [class*="text-violet-800"] { color: #ddd6fe; }
+.tema-hipro [class*="text-violet-900"],
+.tema-hipro [class*="text-violet-950"] { color: #ede9fe; }
+.tema-hipro [class*="border-violet-100"],
+.tema-hipro [class*="border-violet-200"],
+.tema-hipro [class*="border-violet-300"],
+.tema-hipro [class*="divide-violet-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-violet-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(167 139 250 / 0.35); }
+.tema-hipro [class*="ring-violet-100"],
+.tema-hipro [class*="ring-violet-200"],
+.tema-hipro [class*="ring-violet-300"] { --tw-ring-color: rgb(167 139 250 / 0.4); }
+.tema-hipro [class~="bg-purple-50"],
+.tema-hipro [class*="bg-purple-50/"],
+.tema-hipro .hover\:bg-purple-50:hover,
+.tema-hipro .active\:bg-purple-50:active { background-color: rgb(192 132 252 / 0.12); }
+.tema-hipro [class*="bg-purple-100"],
+.tema-hipro .hover\:bg-purple-100:hover,
+.tema-hipro .active\:bg-purple-100:active { background-color: rgb(192 132 252 / 0.18); }
+.tema-hipro [class*="bg-purple-200"] { background-color: rgb(192 132 252 / 0.26); }
+.tema-hipro [class*="text-purple-500"] { color: #c084fc; }
+.tema-hipro [class*="text-purple-600"],
+.tema-hipro [class*="text-purple-700"] { color: #d8b4fe; }
+.tema-hipro [class*="text-purple-800"] { color: #e9d5ff; }
+.tema-hipro [class*="text-purple-900"],
+.tema-hipro [class*="text-purple-950"] { color: #f3e8ff; }
+.tema-hipro [class*="border-purple-100"],
+.tema-hipro [class*="border-purple-200"],
+.tema-hipro [class*="border-purple-300"],
+.tema-hipro [class*="divide-purple-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-purple-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(192 132 252 / 0.35); }
+.tema-hipro [class*="ring-purple-100"],
+.tema-hipro [class*="ring-purple-200"],
+.tema-hipro [class*="ring-purple-300"] { --tw-ring-color: rgb(192 132 252 / 0.4); }
+.tema-hipro [class~="bg-fuchsia-50"],
+.tema-hipro [class*="bg-fuchsia-50/"],
+.tema-hipro .hover\:bg-fuchsia-50:hover,
+.tema-hipro .active\:bg-fuchsia-50:active { background-color: rgb(232 121 249 / 0.12); }
+.tema-hipro [class*="bg-fuchsia-100"],
+.tema-hipro .hover\:bg-fuchsia-100:hover,
+.tema-hipro .active\:bg-fuchsia-100:active { background-color: rgb(232 121 249 / 0.18); }
+.tema-hipro [class*="bg-fuchsia-200"] { background-color: rgb(232 121 249 / 0.26); }
+.tema-hipro [class*="text-fuchsia-500"] { color: #e879f9; }
+.tema-hipro [class*="text-fuchsia-600"],
+.tema-hipro [class*="text-fuchsia-700"] { color: #f0abfc; }
+.tema-hipro [class*="text-fuchsia-800"] { color: #f5d0fe; }
+.tema-hipro [class*="text-fuchsia-900"],
+.tema-hipro [class*="text-fuchsia-950"] { color: #fae8ff; }
+.tema-hipro [class*="border-fuchsia-100"],
+.tema-hipro [class*="border-fuchsia-200"],
+.tema-hipro [class*="border-fuchsia-300"],
+.tema-hipro [class*="divide-fuchsia-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-fuchsia-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(232 121 249 / 0.35); }
+.tema-hipro [class*="ring-fuchsia-100"],
+.tema-hipro [class*="ring-fuchsia-200"],
+.tema-hipro [class*="ring-fuchsia-300"] { --tw-ring-color: rgb(232 121 249 / 0.4); }
+.tema-hipro [class~="bg-pink-50"],
+.tema-hipro [class*="bg-pink-50/"],
+.tema-hipro .hover\:bg-pink-50:hover,
+.tema-hipro .active\:bg-pink-50:active { background-color: rgb(244 114 182 / 0.12); }
+.tema-hipro [class*="bg-pink-100"],
+.tema-hipro .hover\:bg-pink-100:hover,
+.tema-hipro .active\:bg-pink-100:active { background-color: rgb(244 114 182 / 0.18); }
+.tema-hipro [class*="bg-pink-200"] { background-color: rgb(244 114 182 / 0.26); }
+.tema-hipro [class*="text-pink-500"] { color: #f472b6; }
+.tema-hipro [class*="text-pink-600"],
+.tema-hipro [class*="text-pink-700"] { color: #f9a8d4; }
+.tema-hipro [class*="text-pink-800"] { color: #fbcfe8; }
+.tema-hipro [class*="text-pink-900"],
+.tema-hipro [class*="text-pink-950"] { color: #fce7f3; }
+.tema-hipro [class*="border-pink-100"],
+.tema-hipro [class*="border-pink-200"],
+.tema-hipro [class*="border-pink-300"],
+.tema-hipro [class*="divide-pink-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-pink-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(244 114 182 / 0.35); }
+.tema-hipro [class*="ring-pink-100"],
+.tema-hipro [class*="ring-pink-200"],
+.tema-hipro [class*="ring-pink-300"] { --tw-ring-color: rgb(244 114 182 / 0.4); }
+.tema-hipro [class~="bg-rose-50"],
+.tema-hipro [class*="bg-rose-50/"],
+.tema-hipro .hover\:bg-rose-50:hover,
+.tema-hipro .active\:bg-rose-50:active { background-color: rgb(251 113 133 / 0.12); }
+.tema-hipro [class*="bg-rose-100"],
+.tema-hipro .hover\:bg-rose-100:hover,
+.tema-hipro .active\:bg-rose-100:active { background-color: rgb(251 113 133 / 0.18); }
+.tema-hipro [class*="bg-rose-200"] { background-color: rgb(251 113 133 / 0.26); }
+.tema-hipro [class*="text-rose-500"] { color: #fb7185; }
+.tema-hipro [class*="text-rose-600"],
+.tema-hipro [class*="text-rose-700"] { color: #fda4af; }
+.tema-hipro [class*="text-rose-800"] { color: #fecdd3; }
+.tema-hipro [class*="text-rose-900"],
+.tema-hipro [class*="text-rose-950"] { color: #ffe4e6; }
+.tema-hipro [class*="border-rose-100"],
+.tema-hipro [class*="border-rose-200"],
+.tema-hipro [class*="border-rose-300"],
+.tema-hipro [class*="divide-rose-100"] > :not([hidden]) ~ :not([hidden]),
+.tema-hipro [class*="divide-rose-200"] > :not([hidden]) ~ :not([hidden]) { border-color: rgb(251 113 133 / 0.35); }
+.tema-hipro [class*="ring-rose-100"],
+.tema-hipro [class*="ring-rose-200"],
+.tema-hipro [class*="ring-rose-300"] { --tw-ring-color: rgb(251 113 133 / 0.4); }
+
 
 /* ============================================================
    Gráficos do Dashboard (components/DashboardCharts.tsx): entrada animada.

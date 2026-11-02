@@ -2,12 +2,14 @@ import Link from "next/link";
 import { CalendarClock, CheckCircle2, FileText, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import type { MetaDoMes } from "@/lib/meta-mes";
+import AparelhoHipro from "@/components/ui/AparelhoHipro";
 
 /**
  * Destaque do topo do Dashboard: o mês, no mesmo estilo do "Meu dinheiro" do
  * Pessoal (cartão escuro com rosca), mas no verde-turquesa da borboleta da
  * marca (pedido do dono, 19/10/2026). Locações contra a meta (com as reservas
  * que ainda podem virar locação), faturado e contas fixas. Leva às locações do mês.
+ * No tema HIPRO ganha o fundo azul-petróleo (destaque-hipro) e o aparelho.
  */
 export default function MesCard({
   saudacao,
@@ -41,13 +43,19 @@ export default function MesCard({
   return (
     <Link
       href="/locacoes?period=mes"
-      className="relative block overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#05302d] via-[#0b6b63] to-[#1fae9f] p-5 text-white shadow-[0_24px_50px_-24px_rgb(13_110_100/0.9)] active:opacity-95"
+      className="destaque-hipro relative block overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#05302d] via-[#0b6b63] to-[#1fae9f] p-5 text-white shadow-[0_24px_50px_-24px_rgb(13_110_100/0.9)] active:opacity-95"
     >
       <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-emerald-300/25 blur-2xl" />
       <span aria-hidden className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-sky-300/20 blur-2xl" />
 
-      <p className="relative text-[11px] font-bold uppercase tracking-[0.18em] text-teal-100">Seu mês · {rotuloMes}</p>
-      <p className="relative mt-1 text-[13px] leading-snug text-teal-50/90">{saudacao}</p>
+      <div className="relative flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-teal-100">Seu mês · {rotuloMes}</p>
+          <p className="mt-1 text-[13px] leading-snug text-teal-50/90">{saudacao}</p>
+        </div>
+        {/* Tema HIPRO: o aparelho à direita, como na capa do e-book. */}
+        <AparelhoHipro className="-mb-3 -mr-3 -mt-2 w-36 flex-shrink-0" />
+      </div>
 
       <div className="relative mt-3 flex items-center justify-between gap-3">
         <div className="min-w-0">

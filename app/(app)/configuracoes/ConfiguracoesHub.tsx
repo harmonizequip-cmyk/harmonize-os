@@ -66,6 +66,7 @@ import Cidades from "./secoes/Cidades";
 import Tags, { type TagRow } from "./secoes/Tags";
 import MinhaConta from "./secoes/MinhaConta";
 import Aparencia from "./secoes/Aparencia";
+import { lerTemaGuardado, nomeDoTema } from "@/lib/tema";
 import { TITULOS_SECAO as TITULOS, type SecaoId } from "./secoes-ids";
 import { modelosDiferentes } from "@/lib/mensagens-modelos";
 
@@ -86,7 +87,7 @@ interface Saude {
   backupDias: number | null | undefined; // undefined = ainda lendo
   avisos: Situacao;
   digital: number | null; // null = lendo
-  tema: "Clássico" | "Aurora";
+  tema: string;
 }
 
 function useSaude(): Saude {
@@ -100,7 +101,7 @@ function useSaude(): Saude {
     } catch {
       // sem armazenamento
     }
-    const tema = document.documentElement.classList.contains("tema-aurora") ? "Aurora" : "Clássico";
+    const tema = nomeDoTema(lerTemaGuardado());
     setS((x) => ({ ...x, backupDias, tema }));
 
     (async () => {

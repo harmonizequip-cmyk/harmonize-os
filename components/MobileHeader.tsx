@@ -26,9 +26,9 @@ export default function MobileHeader() {
   }
 
   return (
-    <header className="flex items-center justify-between bg-white/75 px-4 py-2.5 backdrop-blur-xl md:hidden">
+    <header className="relative z-30 flex items-center justify-between bg-white/75 px-4 py-2.5 backdrop-blur-xl md:hidden">
       <div className="flex w-fit items-center gap-2">
-        <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-8 w-auto" />
+        <img src="/harmonize-logo-full.png" alt="Harmonize" className="logo-claro h-8 w-auto" />
         {pessoal && (
           <span className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white">
             Pessoal
@@ -36,8 +36,9 @@ export default function MobileHeader() {
         )}
         <img
           src="/harmonize-logo-full-dark.png"
-          alt="Harmonize"
-          className="hidden h-8 w-auto"
+          alt=""
+          aria-hidden
+          className="logo-escuro hidden h-8 w-auto"
         />
       </div>
       <div className="flex items-center gap-1">

@@ -100,6 +100,7 @@ export default async function AgendaHojePage() {
     <div className="min-h-screen bg-neutral-50 p-4">
       <div className="mb-4">
         <HeroTela
+          aparelho
           etiqueta="Próximos agendamentos"
           rotulo="Atendimentos pela frente"
           valor={lista.length}

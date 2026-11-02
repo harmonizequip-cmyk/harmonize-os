@@ -52,5 +52,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // manifest, service worker e ícones precisam abrir sem login (o navegador busca
   // sem os cookies da sessão para instalar o app e para receber avisos).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|sem-internet.html|icone-).*)"],
+  // As logos (harmonize-logo-*) e o aparelho do tema HIPRO (hipro/) aparecem na
+  // tela de login, antes de entrar.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|sem-internet.html|icone-|harmonize-logo-|hipro/).*)"],
 };

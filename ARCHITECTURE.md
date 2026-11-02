@@ -77,7 +77,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `next.config.js`: @type {import('next').NextConfig}
 - `package.json`: Manifesto do projeto "harmonize-os" 0.1.0, privado. Scripts: dev (`next dev`), build (`next build`), start (`next start`), test (`vitest run`). Next 16.3.8, React e React DOM 19.3.0 fixos, Supabase, date-fns, fflate, lucide-react, @dnd-kit/core, @react-pdf/renderer, Tailwind 3.4, TypeScript 5.5 e Vitest 1.6.
 - `postcss.config.js`: Configuração do PostCSS com dois plugins: `tailwindcss` e `autoprefixer`.
-- `proxy.ts`: Proxy do Next 16 (`proxy`): confere o login Supabase. Libera /login e /cadastro/ sem sessão, manda quem não tem login para /login e quem já está logado de /login para /dashboard. O matcher exclui _next/static, _next/image, favicon.ico, manifest.webmanifest, sw.js, sem-internet.html e arquivos icone-.
+- `proxy.ts`: Proxy do Next 16 (`proxy`): confere o login Supabase. Libera /login e /cadastro/ sem sessão, manda quem não tem login para /login e quem já está logado de /login para /dashboard. O matcher exclui _next/static, _next/image, favicon.ico, manifest.webmanifest, sw.js, sem-internet.html, arquivos icone-, as logos harmonize-logo- e a pasta hipro/ (imagens da tela de login).
 - `schema.sql`: HARMONIZE OS, Schema consolidado (estado atual) Alvo: Supabase (Postgres + Auth + RLS) Gerado em: 2026-09-25 O QUE É ESTE ARQUIVO Este arquivo substitui a versão "Fase 1" original: aquela nunca mais foi re-rodada desde 21/09/2026, e toda mudança depois disso virou uma migration incremental própria (pasta migrations/, 21 arquivos entre 21/09 e 25/09). Isso deixou o schema.sql documentando um estado que a base de produção não tem mais há dias.
 - `tailwind.config.ts`: Configuração do Tailwind: darkMode "class", conteúdo em app e components, cinzas `neutral` por variáveis `--n-*`, cores `brand` (teal, pink, blue, lilac), gradientes `brand-gradient`, sombras `glow-teal` e `glow-brand` e raios xl, 2xl e 3xl.
 - `tsconfig.json`: Configuração do TypeScript: target es2017, modo strict, noEmit, moduleResolution "bundler", jsx react-jsx, plugin "next", alias @/* para a raiz do projeto, inclui todos os .ts e .tsx e exclui node_modules e supabase.
@@ -88,8 +88,8 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 #### `app/`
 
-- `globals.css`: Estilos globais: camadas do Tailwind, bloqueio de zoom por toque, padrão visual (fundo, classe `.cartao`, regras para cartões de vidro antigos), cores do espaço Pessoal (`.espaco-pessoal`), variáveis de cinza `--n-50` a `--n-950` e tema Aurora (`.tema-aurora`).
-- `layout.tsx`: Layout raiz (`RootLayout`): metadata, manifest e ícones, viewport sem zoom, script que aplica as classes de tema Aurora e do espaço Pessoal e o `DialogosHost`.
+- `globals.css`: Estilos globais: camadas do Tailwind, bloqueio de zoom por toque, padrão visual (fundo, classe `.cartao`, regras para cartões de vidro antigos), cores do espaço Pessoal (`.espaco-pessoal`), variáveis de cinza `--n-50` a `--n-950`, tema Aurora (`.tema-aurora`) e tema HIPRO (`.tema-hipro`: escuro azul-petróleo, cinzas invertidos, cartões em vidro escuro, ondas de luz turquesa em SVG no fundo fixo, classes `so-hipro`/`fora-hipro`/`logo-claro`/`logo-escuro`/`destaque-hipro`/`pilula-hipro` e um bloco gerado que escurece os fundos claros e clareia os textos escuros das cores fixas do Tailwind).
+- `layout.tsx`: Layout raiz (`RootLayout`): metadata, manifest e ícones, viewport sem zoom, script que aplica as classes de tema (Aurora ou HIPRO; o HIPRO nunca dentro de /pessoal) e do espaço Pessoal, `suppressHydrationWarning` no `<html>` (as classes entram antes do React) e o `DialogosHost`.
 - `page.tsx` (rota `/`): Página / (`Home`): redireciona para /dashboard.
 
 #### `app/(app)/`
@@ -178,7 +178,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 #### `app/(app)/configuracoes/secoes/`
 
-- `Aparencia.tsx`: Aparência: escolher entre o tema Clássico e o Aurora vendo como fica. Mesma chave do botão de paleta do topo (localStorage harmonize-tema).
+- `Aparencia.tsx`: Aparência: escolher entre os temas Clássico, Aurora e HIPRO, cada um com miniatura. Mesma chave do botão de paleta do topo (localStorage harmonize-tema, `lib/tema.ts`).
 - `Automacoes.tsx`: Automações: tarefas que a agenda cria sozinha e as regras do funil de clientes (recontato e Reativar).
 - `Categorias.tsx`: Categorias de lançamento (24/10/2026): Harmonize e Pessoal, entradas e saídas. As do sistema (cadeado) não se renomeiam, arquivam nem apagam. Arquivar tira da lista de escolha sem mexer nos lançamentos antigos; apagar só vale para categoria sem nenhum lançamento.
 - `Cidades.tsx`: Cidades do encaixe de datas livres (24/10/2026): posição de cada cidade para medir a distância em linha reta. Cidade que não está aqui não entra no encaixe; o aviso no topo lista as cidades do cadastro de clientes que faltam.
@@ -391,7 +391,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `EquipamentoPrevistasControl.tsx`: Contador de locações previstas (`EquipamentoPrevistasControl`): mostra o número e, ao tocar, abre lista de clientes e datas. Não acessa o banco.
 - `EquipamentoStatusControl.tsx`: Controle de status do equipamento (`EquipamentoStatusControl`): muda entre ativo e manutenção e adia a previsão de retorno. Usa as RPCs `definir_status_equipamento` e `adiar_previsao_manutencao`.
 - `EspacoSwitch.tsx`: Chave do topo: Harmonize (o negócio) ou Pessoal (o dinheiro do dono). O menu muda junto (Sidebar e BottomNav leem o mesmo endereço). A chave muda na hora do toque e mostra "abrindo" enquanto a tela carrega (o Dashboard da Harmonize leva alguns segundos e, sem isso, o toque parecia não ter feito nada).
-- `EspacoTema.tsx`: Marca o <html> com "espaco-pessoal" enquanto o endereço for /pessoal: o Pessoal tem paleta e destaque próprios (app/globals.css), para nunca ser confundido com a Harmonize. O primeiro desenho já vem marcado pelo script do app/layout.tsx; este componente cuida da troca de espaço sem recarregar.
+- `EspacoTema.tsx`: Marca o <html> com "espaco-pessoal" enquanto o endereço for /pessoal: o Pessoal tem paleta e destaque próprios (app/globals.css), para nunca ser confundido com a Harmonize. O primeiro desenho já vem marcado pelo script do app/layout.tsx; este componente cuida da troca de espaço sem recarregar e tira/põe o tema HIPRO (`aplicarTema`), que não vale no Pessoal.
 - `FiltroBarra.tsx`: BARRA DE FILTROS POR QUE O ESTADO FICA NA URL, E NÃO NO COMPONENTE Com o filtro na URL, a página é um server component que lê searchParams e consulta o banco já filtrado: a tela nunca baixa mil linhas para esconder novecentas no navegador. De lambuja, o link fica compartilhável, o botão voltar funciona e recarregar não perde o filtro. Se o estado morasse aqui dentro, cada tela precisaria de um caminho próprio para chegar aos dados. POR QUE O PERÍODO É OBRIGATÓRIO Não existe opção "todos".
 - `FiltroComBusca.tsx`: Filtro de lista longa (ex: "Todos os clientes") com campo de busca, no lugar do select nativo, que no celular vira uma roleta de 200 nomes.
 - `GerarContratoModal.tsx`: Janela de gerar contrato (`GerarContratoModal`, tipos `RentalParaContrato`, `ReservaParaContrato`, `OrigemContrato`): monta e baixa o PDF a partir de locação ou reserva e registra pela RPC `registrar_contrato_emitido`.
@@ -423,7 +423,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `SomenteLeitura.tsx`: Acesso só de visualização (profiles.somente_leitura): o banco já recusa qualquer gravação; aqui as telas escondem os botões de alterar.
 - `TabelaPrecosModal.tsx`: Arte da tabela de preços do HIPRO, com os valores de Configurações. Abre pelo "+" e pelo cartão do cliente no Funil (já com a mensagem para aquele cliente). Desenho em lib/tabela-precos-arte.ts.
 - `TaxaRecebidaBotao.tsx`: Botão da taxa de reserva (`TaxaRecebidaBotao`): dá baixa ou isenta pela RPC `definir_taxa_agendamento`.
-- `ThemeToggle.tsx`: Troca entre o tema Clássico (padrão) e o Aurora (brilho da marca no topo, cartões brancos e barra flutuante). A escolha fica guardada no aparelho; o script do app/layout.tsx aplica antes da tela aparecer, sem piscar.
+- `ThemeToggle.tsx`: Botão de paleta que abre a lista dos três temas (Clássico, Aurora, HIPRO) com o ativo marcado; `posicao` "baixo" (topo do celular), "cima" (pé da barra lateral) ou "ciclar" (barra lateral recolhida, cada toque passa ao próximo). Usa `useTema` de `lib/tema.ts`.
 - `VinculoCampanha.tsx`: "Veio de campanha?" na hora de agendar: o dono liga à mão a reserva/locação à campanha que a pessoa recebeu. Só aparece quando a pessoa recebeu alguma campanha e ainda não está marcada como "agendou" nela. Ligar = registrar_envio_campanha(status 'agendou'), que entra na contagem "Agendaram" da campanha e vira anotação na ficha da pessoa.
 
 #### `components/dashboard/`
@@ -463,7 +463,8 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 #### `components/ui/`
 
-- `HeroTela.tsx`: Destaque escuro do topo das telas da Harmonize (pedido do dono, 19/10/2026): mesmo desenho do "Meu dinheiro" do Pessoal e do destaque do mês do Dashboard, no verde-turquesa da borboleta. Uma tela usa este cartão para o número que mais importa nela; o resto (filtros, listas) fica logo abaixo. - `anel`: opcional, 0 a 1 (fração preenchida) com rótulo curto no meio. - `chips`: fatos rápidos em pílulas (cada um com ícone opcional). - `tom`: cor do número e do anel quando há alerta ("ok" turquesa, "alerta" âmbar, "ruim" rosa).
+- `HeroTela.tsx`: Destaque escuro do topo das telas da Harmonize (pedido do dono, 19/10/2026): mesmo desenho do "Meu dinheiro" do Pessoal e do destaque do mês do Dashboard, no verde-turquesa da borboleta. Uma tela usa este cartão para o número que mais importa nela; o resto (filtros, listas) fica logo abaixo. - `anel`: opcional, 0 a 1 (fração preenchida) com rótulo curto no meio. - `chips`: fatos rápidos em pílulas (cada um com ícone opcional). - `tom`: cor do número e do anel quando há alerta ("ok" turquesa, "alerta" âmbar, "ruim" rosa). - `aparelho`: no tema HIPRO mostra o aparelho à direita (sem anel; usado na Agenda de hoje). Classe `destaque-hipro` (fundo azul-petróleo no tema HIPRO).
+- `AparelhoHipro.tsx`: Imagem do aparelho HIPRO recortado da capa do e-book (`public/hipro/aparelho-600.webp`), só visível no tema HIPRO (classe `so-hipro`, lazy: nos outros temas nem é baixada). Usada no destaque do mês, na HeroTela, no cartão de cada HIPRO em Equipamentos e no login.
 - `Visual.tsx`: Peças visuais do padrão do app (aprovado pelo dono em 17/10/2026, a partir do Dashboard): cartão branco com sombra suave, ícone num quadradinho de cor clara, selo com ícone e a onda da marca no canto dos destaques. Use estas peças em tela nova em vez de emoji solto ou cartão de vidro.
 
 #### `docs/`
@@ -539,6 +540,7 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 - `emprestimos.ts`: Empréstimos a terceiros: dinheiro que sai do caixa e deve voltar. Os lançamentos espelho ficam nestas categorias, e as telas os deixam fora de Entradas/Saídas/Resultado e do faturamento (continuam no Saldo do caixa).
 - `encaixe.test.ts`: Testes automatizados (Vitest) das regras de `lib/encaixe.ts`.
 - `encaixe.ts`: Encaixe de datas livres (pedido do dono, 23/10/2026): dia livre (os dois HIPROs sem evento e sem bloqueio, fora domingo) que tem atendimento no dia anterior ou no seguinte vira oportunidade; a cidade das clientes desses atendimentos diz onde o Eder vai estar, e entram as clientes e leads até RAIO_KM dali, sem reserva marcada. Ordem: quem já está na hora de conversar, depois a prioridade do Relacionamento, depois a distância.
+- `tema.ts`: Temas do aparelho (Clássico, Aurora, HIPRO): `TEMAS`, `CHAVE_TEMA` (`harmonize-tema`), `lerTemaGuardado`, `aplicarTema` (classes `tema-aurora`/`tema-hipro` e a cor da barra `meta theme-color`; o HIPRO nunca dentro de /pessoal), `escolherTema` (guarda, aplica e avisa pelo evento `harmonize:tema`) e o hook `useTema`. Teste em `tema.test.ts`.
 - `espaco.ts`: Dois espaços no app: Harmonize (o negócio) e Pessoal (o dinheiro do dono). O espaço sai do endereço: tudo em /pessoal é o Pessoal.
 - `exportar-planilha.ts`: EXPORTAR PLANILHA (.xlsx com o layout da Harmonize) Substitui o CSV em todas as telas. Monta o arquivo com as linhas que estão na tela (lib/planilha-xlsx.ts) e tenta abrir o Compartilhar do celular, onde basta escolher Drive. Quando o aparelho não aceita compartilhar esse tipo de arquivo, baixa e avisa como mandar ao Drive.
 - `falar.ts`: Leitura em voz alta com a voz do próprio aparelho (speechSynthesis do navegador, grátis). No Android usa a voz do Google em português. Texto longo vai em pedaços de frase: o Chrome corta falas muito longas.
@@ -749,6 +751,8 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 #### `public/`
 
 - `harmonize-borboleta.png`: Imagem estática do app (logotipo ou ícone do app instalável).
+- `hipro/aparelho.png`: O aparelho HIPRO recortado da capa do e-book (fundo transparente, com o brilho turquesa do chão), 747 x 526; original para novos recortes.
+- `hipro/aparelho-600.webp`: Versão leve (600 px, webp) usada nas telas pelo `components/ui/AparelhoHipro.tsx` no tema HIPRO.
 - `harmonize-logo-full-dark.png`: Imagem estática do app (logotipo ou ícone do app instalável).
 - `harmonize-logo-full.png`: Imagem estática do app (logotipo ou ícone do app instalável).
 - `icone-180.png`: Imagem estática do app (logotipo ou ícone do app instalável).
@@ -4218,7 +4222,7 @@ Segredos das Edge Functions (Supabase > Edge Functions > Secrets): `ANTHROPIC_AP
 
 | Onde | Chave / nome | Valor guardado | Arquivo |
 |---|---|---|---|
-| localStorage | `harmonize-tema` | `aurora` quando o tema Aurora está ligado; ausente = Clássico. | `components/ThemeToggle.tsx`, `app/layout.tsx`, `app/(app)/configuracoes/secoes/Aparencia.tsx` |
+| localStorage | `harmonize-tema` | `classico`, `aurora` ou `hipro` (tema do aparelho; ausente = Clássico). O HIPRO não é aplicado dentro de /pessoal. | `lib/tema.ts`, `components/ThemeToggle.tsx`, `components/EspacoTema.tsx`, `app/layout.tsx`, `app/login/page.tsx`, `app/(app)/configuracoes/secoes/Aparencia.tsx` |
 | localStorage | `harmonize-agenda-offline` | Atendimentos de hoje a 7 dias para ver sem internet. | `components/GuardarAgendaOffline.tsx` |
 | localStorage | `harmonize-ultimo-backup` | Data e hora do último backup baixado neste aparelho (lembrete do Check-up). | `components/BackupCard.tsx`, `app/(app)/configuracoes/ConfiguracoesHub.tsx` |
 | localStorage | `harmonize-avisos-desligados` | Marca de que a pessoa desligou os avisos neste aparelho. | `lib/push.ts` |
@@ -4273,7 +4277,7 @@ Rotas: `/`, `/login`.
 **Regras de negócio, cálculos, filtros, permissões e validações:**
 
 - No Pessoal o "+" da Harmonize some e o menu troca para Início, Lançamentos, Cartões e Relatórios.
-- Tema: `localStorage` `harmonize-tema` = `aurora` aplica a classe `tema-aurora` no `<html>`; o espaço Pessoal aplica `espaco-pessoal` (violeta e fúcsia). Não existe tema escuro.
+- Tema: `localStorage` `harmonize-tema` = `aurora` aplica a classe `tema-aurora` e `hipro` aplica `tema-hipro` (escuro azul-petróleo da capa do e-book, opção; fora do Pessoal) no `<html>`; o espaço Pessoal aplica `espaco-pessoal` (violeta e fúcsia). Não existem classes `dark:`: o escuro do HIPRO é todo em `app/globals.css`.
 - Quem é só de visualização não vê o "+", não recebe recibo nem inscrição de avisos.
 - Os modais do "+" são carregados só quando abertos (import dinâmico), para não pesar todas as páginas.
 - `AvisosDesligadosFaixa` mostra "Ativar avisos" no topo quando o celular não deu permissão de notificação; adiar fica em `localStorage` `harmonize-faixa-avisos-adiada`.

@@ -141,11 +141,12 @@ export default function Sidebar({
       <div className={`mb-8 flex items-center ${collapsed ? "flex-col gap-2" : "justify-between gap-2 px-2"}`}>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <img src="/harmonize-logo-full.png" alt="Harmonize" className="h-11 w-auto" />
+            <img src="/harmonize-logo-full.png" alt="Harmonize" className="logo-claro h-11 w-auto" />
             <img
               src="/harmonize-logo-full-dark.png"
-              alt="Harmonize"
-              className="hidden h-11 w-auto"
+              alt=""
+              aria-hidden
+              className="logo-escuro hidden h-11 w-auto"
             />
             <p className="mt-2 truncate text-xs font-medium text-neutral-400">{name}</p>
           </div>
@@ -194,7 +195,7 @@ export default function Sidebar({
       </nav>
 
       <div className="mt-2 space-y-0.5 border-t border-neutral-200 pt-2">
-        <ThemeToggle compact={collapsed} className={collapsed ? "mx-auto h-8 w-8" : undefined} />
+        <ThemeToggle compact={collapsed} posicao={collapsed ? "ciclar" : "cima"} className={collapsed ? "mx-auto h-8 w-8" : undefined} />
         <button
           onClick={handleLogout}
           title={collapsed ? "Sair" : undefined}
