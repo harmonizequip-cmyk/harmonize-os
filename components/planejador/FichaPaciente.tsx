@@ -87,6 +87,18 @@ export default function FichaPaciente({
   useEffect(() => setMontado(true), []);
   // Assinaturas por sessão: só o dono.
   const assinaturas = useAssinaturasSessao(planoIds, aberto && !portal && !somenteLeitura);
+  // No portal, as fotos só aparecem para a cliente que o dono liberou (clients.portal_fotos).
+  const [fotosNoPortal, setFotosNoPortal] = useState(false);
+  useEffect(() => {
+    if (!portal || !aberto) return;
+    let vivo = true;
+    createClient()
+      .rpc("portal_fotos_liberadas")
+      .then(({ data, error }) => vivo && setFotosNoPortal(!error && data === true));
+    return () => {
+      vivo = false;
+    };
+  }, [portal, aberto]);
 
   useEffect(() => {
     setEditando(false);
@@ -354,8 +366,8 @@ export default function FichaPaciente({
             </section>
           )}
 
-          {/* Fotos (só o dono; dado sensível, pede autorização do paciente). */}
-          {!portal && paciente.pacienteId && !somenteLeitura && (
+          {/* Fotos (o dono, ou a cliente que ele liberou no portal; dado sensível, pede autorização do paciente). */}
+          {(!portal || fotosNoPortal) && paciente.pacienteId && !somenteLeitura && (
             <FotosPaciente
               key={paciente.pacienteId}
               pacienteId={paciente.pacienteId}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ehEspacoPessoal } from "@/lib/espaco";
-import { Banknote, CalendarDays, CalendarPlus, ClipboardList, ListChecks, type LucideIcon, Megaphone, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, ClipboardList, KeyRound, ListChecks, type LucideIcon, Megaphone, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
 import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 import { createClient } from "@/lib/supabase/client";
 import dynamic from "next/dynamic";
@@ -53,6 +53,7 @@ type ActionKey =
   | "despesa_voz"
   | "tabela"
   | "planejador"
+  | "acesso_planejador"
   | "campanha";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
@@ -65,6 +66,7 @@ const VISUAL_ACAO: Record<ActionKey, { icone: LucideIcon; cor: CorVisual }> = {
   locacao_disparos: { icone: Target, cor: "teal" },
   evento: { icone: CalendarDays, cor: "azul" },
   planejador: { icone: ClipboardList, cor: "roxo" },
+  acesso_planejador: { icone: KeyRound, cor: "roxo" },
   lancamento: { icone: Wallet, cor: "ambar" },
   despesa_voz: { icone: Mic, cor: "ambar" },
   lead: { icone: UserPlus, cor: "rosa" },
@@ -89,6 +91,7 @@ const ACTIONS: { key: ActionKey; label: string; dica: string; emoji: string; mod
   { key: "lead", label: "Novo lead", dica: "Ou cliente", emoji: "🧲", module: "clientes", grupo: "Clientes" },
   { key: "tarefa", label: "Tarefa", dica: "Lembrete com data", emoji: "🗒️", module: "clientes", grupo: "Clientes" },
   { key: "tabela", label: "Tabela de preços", dica: "Arte para mandar", emoji: "🏷️", module: "clientes", grupo: "Clientes" },
+  { key: "acesso_planejador", label: "Formulário do Planejador", dica: "Acesso da cliente", emoji: "🔑", module: "configuracoes", grupo: "Clientes" },
   { key: "campanha", label: "Campanha", dica: "Arte + mensagem, um a um", emoji: "📣", module: "clientes", grupo: "Clientes" },
 ];
 
@@ -159,6 +162,11 @@ export default function QuickActionsButton({
       return;
     }
     // Campanhas também é tela: abre a lista (criar ou continuar enviando).
+    if (key === "acesso_planejador") {
+      setMenuOpen(false);
+      router.push("/planejador/acessos?acao=formulario");
+      return;
+    }
     if (key === "campanha") {
       router.push("/campanhas");
       return;

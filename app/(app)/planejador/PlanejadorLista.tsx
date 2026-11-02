@@ -8,7 +8,7 @@ import { LinkCliente } from "@/components/Atalhos";
 import { linkNovoPlanejamento } from "@/lib/atalhos";
 import { diasAte, type PlanejamentoLinha } from "@/lib/planejamento";
 import { formatDate } from "@/lib/format";
-import { ArrowLeft, CalendarClock, CalendarDays, CircleCheck, ChevronRight, ClipboardList, Clock3, Plus, Search, UserRound, Users, X } from "lucide-react";
+import { ArrowLeft, CalendarClock, CalendarDays, CircleCheck, ChevronRight, ClipboardList, Clock3, KeyRound, Plus, Search, UserRound, Users, X } from "lucide-react";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import FichaPaciente from "@/components/planejador/FichaPaciente";
 import SeloSituacao from "@/components/planejador/SeloSituacao";
@@ -367,11 +367,16 @@ export default function PlanejadorLista({
           </p>
           {usoFotos !== null && <p className="text-[11px] text-neutral-400">Fotos: {formatarTamanho(usoFotos)} de 1 GB do plano gratuito</p>}
         </div>
-        {!somenteLeitura && (
-          <Link href={linkNovoPlanejamento(null)} className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2.5 text-sm font-semibold text-white">
-            <Plus size={16} /> Novo
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Link href="/planejador/acessos" className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-neutral-700 ring-1 ring-neutral-200">
+            <KeyRound size={15} /> Acessos
           </Link>
-        )}
+          {!somenteLeitura && (
+            <Link href={linkNovoPlanejamento(null)} className="flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2.5 text-sm font-semibold text-white">
+              <Plus size={16} /> Novo
+            </Link>
+          )}
+        </div>
       </div>
 
       {erro && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{erro}</p>}
