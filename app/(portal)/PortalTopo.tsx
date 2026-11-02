@@ -1,5 +1,6 @@
 "use client";
 
+import CampoSenha from "@/components/CampoSenha";
 import { useState } from "react";
 import { problemaSenha, REGRA_SENHA } from "@/lib/senha";
 import { useRouter } from "next/navigation";
@@ -69,14 +70,15 @@ export default function PortalTopo({ nome, clienteId }: { nome: string; clienteI
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pb-2.5 md:px-8">
           {trocando && (
             <>
-              <input
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                placeholder="Nova senha"
-                autoComplete="new-password"
-                className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
-              />
+              <span className="min-w-0 flex-1">
+                <CampoSenha
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  placeholder="Nova senha"
+                  autoComplete="new-password"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
+                />
+              </span>
               <button onClick={salvarSenha} className="rounded-lg bg-brand-gradient px-3 py-1.5 text-sm font-semibold text-white">
                 Salvar
               </button>

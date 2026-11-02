@@ -5,6 +5,7 @@
 // login com a senha dela e atualiza o cadastro. O acesso ao Planejador só
 // abre quando a Harmonize liberar.
 
+import CampoSenha from "@/components/CampoSenha";
 import { useEffect, useState } from "react";
 import { problemaSenha, REGRA_SENHA } from "@/lib/senha";
 
@@ -170,11 +171,11 @@ export default function FormularioCadastro({ token }: { token: string }) {
             <div className="space-y-3 rounded-xl bg-neutral-50 p-3">
               <label className={rotulo}>
                 Crie sua senha *
-                <input value={senha} onChange={(e) => setSenha(e.target.value)} type="password" autoComplete="new-password" className={campo} />
+                <CampoSenha value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" className={campo} />
               </label>
               <label className={rotulo}>
                 Repita a senha *
-                <input value={senha2} onChange={(e) => setSenha2(e.target.value)} type="password" autoComplete="new-password" className={campo} />
+                <CampoSenha value={senha2} onChange={(e) => setSenha2(e.target.value)} autoComplete="new-password" className={campo} />
               </label>
               <p className="text-xs text-neutral-500">{REGRA_SENHA}</p>
             </div>

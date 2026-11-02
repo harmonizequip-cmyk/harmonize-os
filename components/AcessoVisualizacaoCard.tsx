@@ -4,6 +4,7 @@
 // senha e libera o perfil marcado somente_leitura. Ela vê tudo, menos
 // Configurações, e o banco recusa qualquer alteração vinda dela.
 
+import CampoSenha from "@/components/CampoSenha";
 import { useCallback, useEffect, useState } from "react";
 import { problemaSenha } from "@/lib/senha";
 import { Eye } from "lucide-react";
@@ -138,11 +139,10 @@ export default function AcessoVisualizacaoCard() {
         <div className="mt-3 space-y-2">
           <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className={campo} />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" inputMode="email" className={campo} />
-          <input
+          <CampoSenha
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             placeholder="Senha (8+, maiúscula e número)"
-            type="password"
             className={campo}
           />
           <p className="text-[11px] text-neutral-400">Se o login já existir, deixe a senha em branco.</p>

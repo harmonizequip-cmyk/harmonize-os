@@ -33,6 +33,7 @@ Antes de publicar, sempre: `npx tsc --noEmit`, `npx vitest run` e `npx next buil
 - Datas: sempre `hojeLocal`, `primeiroDiaDoMes`, `ultimoDiaDoMes`, `somarDias` de `lib/period.ts` (fuso de Brasília); nunca `toISOString().slice(0,10)`.
 - Dinheiro: somas leem de `rentals_contabilizaveis`, `transactions_contabilizaveis`, `rentals_situacao_pagamento` e `rentals_lucro`. `rentals.pago` nunca é gravado à mão.
 - Valores configuráveis: campo em `Preferencias` + `DEFAULT_PREFERENCIAS` + `lerPreferencias` (`lib/preferencias.ts`), lidos por `usePreferencias()` (navegador) ou `fetchPreferencias` (servidor), editados numa seção `Prefs*` de Configurações.
+- Senha: todo campo de senha usa `components/CampoSenha.tsx` (olho para mostrar, pedido do dono em 02/11/2026).
 - Interface: padrão visual do Dashboard (classe `.cartao`, `IconeChip`, `Pilula`, `OndaMarca` em `components/ui/Visual.tsx`), ícones `lucide-react`, sem emoji como ícone em tela nova, sem classes `dark:`. Diálogos só por `confirmar`, `avisar` e `pedirTexto` de `components/Dialogos.tsx`. Janela dentro de algo com `backdrop-filter` abre por portal no `<body>`.
 - Atalhos entre telas: endereços em `lib/atalhos.ts`, peças em `components/Atalhos.tsx` e o menu ⋮ `components/MenuAtalhosCliente.tsx` em todo cartão de cliente ou lead.
 - WhatsApp sempre por link montado (`buildWhatsAppLink`); nada é enviado sozinho. Mensagens ao cliente com `saudacaoCurta` (`lib/saudacao.ts`).

@@ -1,5 +1,6 @@
 "use client";
 
+import CampoSenha from "@/components/CampoSenha";
 import { useEffect, useState, type FormEvent } from "react";
 import { Fingerprint } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -81,9 +82,9 @@ export default function LoginPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-neutral-700">Senha</label>
-          <input
-            type="password"
+          <CampoSenha
             required
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"

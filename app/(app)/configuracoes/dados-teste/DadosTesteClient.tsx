@@ -1,5 +1,6 @@
 "use client";
 
+import CampoSenha from "@/components/CampoSenha";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -492,8 +493,7 @@ export default function DadosTesteClient({
             <label className="mt-4 block text-xs font-medium text-neutral-700">
               Digite sua senha de acesso para confirmar
             </label>
-            <input
-              type="password"
+            <CampoSenha
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
