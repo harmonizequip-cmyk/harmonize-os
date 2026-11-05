@@ -135,6 +135,17 @@ Deno.serve(async (req) => {
   const { data: aberto } = await admin.rpc("convite_cadastro_abrir", { p_token: token });
   if (!(aberto as any)?.valido) return json({ erro: (aberto as any)?.motivo ?? "Link inválido." }, 400);
 
+  // Segurança: e-mail de login da equipe (dono, funcionário, visualização) ou de outra
+  // cliente não serve para este cadastro. Sem o SQL de 05/11, confere direto no perfil.
+  const { data: recusa, error: eRecusa } = await admin.rpc("cadastro_email_recusado", { p_token: token, p_email: email });
+  if (!eRecusa && typeof recusa === "string" && recusa) return json({ erro: recusa }, 400);
+  if (eRecusa) {
+    const { data: perfis } = await admin.from("profiles").select("cliente_id").eq("email", email).limit(1);
+    if ((perfis ?? []).some((p: any) => !p.cliente_id)) {
+      return json({ erro: "Este e-mail já é usado num acesso da equipe da Harmonize. Use outro e-mail." }, 400);
+    }
+  }
+
   // Login dela (sem acesso até o dono liberar). E-mail que já tem login: não troca a senha.
   let criado: string | null = null;
   let jaTinha = false;

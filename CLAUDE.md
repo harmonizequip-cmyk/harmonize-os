@@ -384,12 +384,21 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - `profiles.somente_leitura`. Configurações > "Acesso só de visualização" (`components/AcessoVisualizacaoCard.tsx`) cria o login (signUp num cliente sem sessão) e chama `liberar_acesso_visualizacao(email, nome)`: vê tudo menos Configurações. `remover_acesso_visualizacao` desliga.
 - O gatilho `trg_somente_leitura` (em toda tabela de public, por comando) recusa gravação de quem é só de visualização, inclusive por funções `security definer`; no Storage, políticas restritivas. Na tela (`useSomenteLeitura`, `components/SomenteLeitura.tsx`): faixa "Modo visualização", sem "+", sem avisos/inscrição de push, sem recibo; o Financeiro esconde "Novo lançamento" e não abre edição.
 
+## Segurança: quem entra no app (05/11/2026, CRÍTICO; migration `2026-11-05-seguranca-acesso.sql`)
+
+- O dono preencheu o formulário de cadastro com o próprio e-mail de administrador e com o de visualização e, ao entrar, caiu na conta normal (o formulário mantinha a senha antiga de quem já tinha login). Além disso, login sem perfil (criado pelo formulário com e-mail novo ou pelo cadastro aberto do Auth) via a casca da Harmonize com o menu inteiro (os dados vinham vazios porque o banco nega).
+- Regra única em `lib/acesso.ts` (`destinoDoLogin`, testada): sem perfil, erro ao ler o perfil, perfil desligado ou sem nenhuma permissão vai para `/sem-acesso` (`app/sem-acesso`, fora dos grupos protegidos: "aguardando liberação" ou "desligado", "Pedir acesso à Harmonize no WhatsApp" e Sair); login de cliente vai ao portal; só perfil ativo com `is_admin` ou alguma permissão entra. Aplicada no layout de `(app)` (antes, perfil que não carregava mostrava o menu inteiro) e no do `(portal)` (sem perfil de cliente vai para `/sem-acesso`, não mais para `/dashboard`). Na dúvida, não entra.
+- Formulário de cadastro: `cadastro_email_recusado(token, email)` (só service_role, chamada pela função `cadastro-cliente` antes de criar o login) recusa e-mail de login da equipe (perfil sem `cliente_id`) e o login de outra cliente. `liberar_acesso_planejador` já recusava login com acesso à Harmonize.
+- Portal pausado/desligado: botão "Pedir novo acesso no WhatsApp" com a mensagem pronta (`mensagemPedirAcesso`); o número vem de `contato_harmonize()` (só o WhatsApp de Configurações > Empresa; qualquer login lê). `nome_curto_cliente`, `categoria_nome_reservado` e `valor_taxa_atual` ficaram só para uso interno (service_role).
+- Varredura do banco real em 05/11/2026: todas as tabelas com RLS, nenhuma leitura para `anon`, todas as views com `security_invoker`, políticas por `has_module_permission`/dono do registro, funções de apagar e de dados de teste com `require_admin`, Storage por permissão. O que garante os dados é o banco; o app só não pode abrir tela para quem não tem perfil.
+- Backup: só administrador ativo, que não é visualização nem cliente.
+
 ## Segurança (checklist de 24 pontos, 14/10/2026)
 
 - Cabeçalhos em `next.config.js`: CSP (só o próprio site e `*.supabase.co`; `wasm-unsafe-eval` pelo PDF do contrato), HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy e Permissions-Policy (microfone só `self`). Serviço externo novo precisa entrar na CSP, senão é bloqueado sem aviso.
 - Banco: funções de gatilho sem EXECUTE para `authenticated`, `disponibilidade_publica` fechada, `anon` sem acesso a tabelas/views (também para tabelas futuras), `search_path` fixo (migration `2026-10-14-endurecer-seguranca.sql`).
 - Senhas (Auth > Providers > Email, 16/10/2026): mínimo 8 caracteres com minúscula, maiúscula e número; as telas conferem antes por `problemaSenha` (`lib/senha.ts`). "Leaked password protection" só existe no plano Pro (o projeto é gratuito).
-- Next.js atualizado para 16.3.8 em 14/10/2026 (`npm audit` sem vulnerabilidades). Em aberto: cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso).
+- Next.js atualizado para 16.3.8 em 14/10/2026 (`npm audit` sem vulnerabilidades). Em aberto: cadastro público do Auth fica aberto por causa do acesso de visualização (conta nova nasce sem acesso e, desde 05/11/2026, cai em `/sem-acesso`).
 
 ## Assistente (IA)
 

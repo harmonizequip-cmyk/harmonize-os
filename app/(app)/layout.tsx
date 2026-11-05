@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { destinoDoLogin } from "@/lib/acesso";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSettings } from "@/lib/settings";
@@ -31,13 +32,18 @@ export default async function AppLayout({
   // Perfil, faixa do modo teste e configurações de preço saem juntos (antes eram três idas
   // ao banco em fila, a cada tela).
   const [{ data: profile, error: profileError }, { data: testModeRow }, settings] = await Promise.all([
-    supabase.from("profiles").select("name, permissions, is_admin, somente_leitura, cliente_id").eq("id", user.id).single(),
+    supabase.from("profiles").select("name, permissions, is_admin, somente_leitura, cliente_id, active").eq("id", user.id).maybeSingle(),
     supabase.from("settings").select("test_mode").eq("id", true).single(),
     fetchSettings(supabase),
   ]);
 
-  // Login de cliente só tem o Planejador dela (/portal).
-  if (profile?.cliente_id) redirect("/portal");
+  // SEGURANÇA (crítico, 05/11/2026): só entra na Harmonize quem tem perfil ativo
+  // com permissão. Login sem perfil (formulário ou cadastro aberto do Auth),
+  // desligado, sem permissão ou com erro ao ler o perfil vai para /sem-acesso;
+  // login de cliente só tem o Planejador dela (/portal). Ver lib/acesso.ts.
+  const destino = destinoDoLogin(profile, !!profileError);
+  if (destino === "portal") redirect("/portal");
+  if (destino === "sem_acesso") redirect("/sem-acesso");
 
   const permissions = (profile?.permissions as Record<string, boolean>) ?? {};
   const isAdmin = !!profile?.is_admin;

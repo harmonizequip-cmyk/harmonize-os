@@ -84,8 +84,8 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
 
-  const { data: perfil } = await supabase.from("profiles").select("is_admin, active").eq("id", user.id).single();
-  if (!perfil?.is_admin || !perfil.active) return NextResponse.json({ erro: "Só administrador pode baixar o backup." }, { status: 403 });
+  const { data: perfil } = await supabase.from("profiles").select("is_admin, active, somente_leitura, cliente_id").eq("id", user.id).single();
+  if (!perfil?.is_admin || !perfil.active || perfil.somente_leitura || perfil.cliente_id) return NextResponse.json({ erro: "Só administrador pode baixar o backup." }, { status: 403 });
 
   const tabelas: Record<string, unknown[]> = {};
   const contagens: Record<string, number> = {};
