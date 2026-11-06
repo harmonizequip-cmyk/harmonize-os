@@ -73,9 +73,8 @@ export default function LembreteImportarFatura() {
   }
 
   return (
-    // A classe .cartao força position: relative (globals.css), então quem fica
-    // fixo na tela é o invólucro de fora; o de dentro só desenha o cartão.
-    <div role="status" className="fixed bottom-24 left-4 right-24 z-20 md:bottom-24 md:left-auto md:right-6 md:w-80">
+    // Fica dentro da pilha fixa de balões do layout de (app).
+    <div role="status" className="pointer-events-auto">
      <div className="cartao p-4">
       <div className="flex items-start gap-3">
         <IconeChip icone={FileUp} cor="roxo" />

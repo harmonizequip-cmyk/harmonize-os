@@ -19,6 +19,7 @@ import AjustarSaldoLink from "@/components/AjustarSaldoLink";
 import { foraDoResultadoPorCartao, foraDoSaldo } from "@/lib/cartao";
 import { buscarTodas } from "@/lib/buscar-todas";
 import { diasDoPeriodo } from "@/lib/period";
+import { DIAS_AVISO_VENCIMENTO, descontosVencendo } from "@/lib/indicacao";
 import { situacaoAplicador } from "@/lib/aplicador";
 import { situacaoRevisao } from "@/lib/revisao";
 import { aguaPrecisaTrocar, situacaoAgua, textoAvisoAgua, ultimaTrocaPorEquipamento } from "@/lib/manutencao-equipamento";
@@ -450,6 +451,15 @@ export default async function DashboardPage(
     .is("indicado_por", null)
     .eq("is_test", false);
 
+  // Descontos de indicação que vencem em até 3 dias (sem o SQL, a tabela não existe e nada aparece).
+  const { data: descontosPerto } = await supabase
+    .from("descontos_indicacao")
+    .select("valido_ate, usado_em")
+    .is("usado_em", null)
+    .gte("valido_ate", hojeLocal())
+    .lte("valido_ate", somarDias(hojeLocal(), DIAS_AVISO_VENCIMENTO));
+  const descontosVencendoLista = descontosVencendo((descontosPerto ?? []) as { valido_ate: string; usado_em: string | null }[], hojeLocal());
+
   // Clientes que preencheram o formulário do Planejador e ainda esperam o acesso.
   const { data: convitesPreenchidos } = await supabase
     .from("convites_cadastro")
@@ -771,6 +781,18 @@ export default async function DashboardPage(
       href: "/clientes/indicacoes",
       nivel: "info",
     });
+  if (descontosVencendoLista.length > 0) {
+    const n = descontosVencendoLista.length;
+    const maisPerto = descontosVencendoLista[0].dias;
+    avisos.push({
+      id: "descontos-vencendo",
+      icone: "cadastro",
+      texto: `${n} ${n === 1 ? "desconto de indicação vencendo" : "descontos de indicação vencendo"}`,
+      detalhe: maisPerto <= 0 ? "Um vence hoje: chamar no WhatsApp" : maisPerto === 1 ? "Um vence amanhã: chamar no WhatsApp" : "Chamar antes que expire",
+      href: "/clientes/indicacoes?aba=descontos",
+      nivel: maisPerto <= 1 ? "urgente" : "atencao",
+    });
+  }
   for (const c of acessosParaLiberar)
     avisos.push({
       id: `acesso-${c.clientId}`,

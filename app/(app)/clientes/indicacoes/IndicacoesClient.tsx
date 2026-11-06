@@ -8,20 +8,22 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Gift, Link2, Loader2, UserPlus, Users } from "lucide-react";
+import { AlarmClock, Gift, Link2, Loader2, MessageCircle, UserPlus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { avisar, confirmar } from "@/components/Dialogos";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import { IconeChip } from "@/components/ui/Visual";
 import ClientPicker from "@/components/ClientPicker";
-import { formatDate, toUpperTrim } from "@/lib/format";
+import { buildWhatsAppLink, formatDate, toUpperTrim } from "@/lib/format";
+import { saudacaoCurta } from "@/lib/saudacao";
 import { hojeLocal } from "@/lib/period";
-import { candidatosIndicacao, rotuloTipo, situacaoDesconto, type DescontoIndicacao } from "@/lib/indicacao";
+import { candidatosIndicacao, descontosVencendo, mensagemDescontoVencendo, rotuloTipo, situacaoDesconto, textoVencimento, type DescontoIndicacao } from "@/lib/indicacao";
 
 export interface ClienteIndicacao {
   id: string;
   name: string;
   display_name: string | null;
+  treatment?: string | null;
   city: string | null;
   whatsapp: string | null;
   indicado_por: string | null;
@@ -35,11 +37,13 @@ export default function IndicacoesClient({
   descontos,
   alugaram,
   erro,
+  abaInicial = null,
 }: {
   clientes: ClienteIndicacao[];
   descontos: DescontoIndicacao[];
   alugaram: string[];
   erro: string | null;
+  abaInicial?: Aba | null;
 }) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
@@ -52,8 +56,21 @@ export default function IndicacoesClient({
   const pendentes = clientes.filter((c) => c.indicacao_nome && !c.indicado_por);
   const disponiveis = descontos.filter((d) => situacaoDesconto(d, hoje) === "disponivel");
   const indicadas = clientes.filter((c) => c.indicado_por);
+  const vencendo = descontosVencendo(descontos, hoje);
+  function linkVencendo(d: DescontoIndicacao & { dias: number }): string | null {
+    const c = porId.get(d.client_id);
+    if (!c?.whatsapp) return null;
+    const msg = mensagemDescontoVencendo({
+      saudacao: saudacaoCurta({ name: c.name, treatment: c.treatment, displayName: c.display_name }),
+      tipo: d.tipo,
+      dias: d.dias,
+      validoAte: d.valido_ate,
+      outroNome: d.outro_client_id ? nome(d.outro_client_id) : null,
+    });
+    return buildWhatsAppLink(c.whatsapp, msg);
+  }
   const alugou = new Set(alugaram);
-  const [aba, setAba] = useState<Aba>(pendentes.length ? "ligar" : "descontos");
+  const [aba, setAba] = useState<Aba>(abaInicial ?? (pendentes.length ? "ligar" : "descontos"));
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [escolha, setEscolha] = useState<Record<string, string>>({});
   const opcoes = useMemo(() => clientes.map((c) => ({ id: c.id, name: c.name, city: c.city, whatsapp: c.whatsapp })), [clientes]);
@@ -196,6 +213,42 @@ export default function IndicacoesClient({
             );
           })}
         </div>
+      )}
+
+      {aba === "descontos" && vencendo.length > 0 && (
+        <section className="cartao space-y-2 p-4 ring-2 ring-rose-200">
+          <div className="flex items-center gap-2">
+            <IconeChip icone={AlarmClock} cor="rosa" />
+            <div>
+              <h2 className="text-sm font-bold text-neutral-900">Vencendo: chame antes que expire</h2>
+              <p className="text-xs text-neutral-500">A mensagem já vai pronta, com o prazo e um convite para marcar a data.</p>
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {vencendo.map((d) => {
+              const link = linkVencendo(d);
+              return (
+                <li key={d.id} className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-neutral-200">
+                  <div className="min-w-0">
+                    <Link href={`/clientes/${d.client_id}`} className="truncate text-sm font-bold text-neutral-900 underline">
+                      {nome(d.client_id)}
+                    </Link>
+                    <p className={`text-xs font-semibold ${d.dias <= 1 ? "text-rose-600" : "text-amber-700"}`}>
+                      {Number(d.percentual)}% · {rotuloTipo(d.tipo)} · {textoVencimento(d.dias, d.valido_ate)}
+                    </p>
+                  </div>
+                  {link ? (
+                    <a href={link} target="_blank" rel="noreferrer" className="inline-flex min-h-10 flex-shrink-0 items-center gap-1.5 rounded-full bg-brand-teal px-3 text-xs font-bold text-white">
+                      <MessageCircle size={14} /> WhatsApp
+                    </a>
+                  ) : (
+                    <span className="flex-shrink-0 text-[11px] text-neutral-400">Sem WhatsApp</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {aba === "descontos" && (

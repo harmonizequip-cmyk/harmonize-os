@@ -12,6 +12,7 @@ import AvisosDesligadosFaixa from "@/components/AvisosDesligadosFaixa";
 import GuardarAgendaOffline from "@/components/GuardarAgendaOffline";
 import ReciboHost from "@/components/ReciboHost";
 import LembreteImportarFatura from "@/components/LembreteImportarFatura";
+import LembreteIndicacaoNova from "@/components/LembreteIndicacaoNova";
 import { SomenteLeituraProvider } from "@/components/SomenteLeitura";
 import EspacoSwitch from "@/components/EspacoSwitch";
 import EspacoTema from "@/components/EspacoTema";
@@ -74,7 +75,13 @@ export default async function AppLayout({
       <EspacoTema />
       <GuardarAgendaOffline />
       {!somenteLeitura && <ReciboHost />}
-      {!somenteLeitura && <LembreteImportarFatura />}
+      {!somenteLeitura && (
+        // Pilha de balões (fatura e indicação): um embaixo do outro, nunca por cima.
+        <div className="pointer-events-none fixed bottom-24 left-4 right-24 z-20 flex flex-col gap-2 md:left-auto md:right-6 md:w-80">
+          <LembreteIndicacaoNova />
+          <LembreteImportarFatura />
+        </div>
+      )}
       <Sidebar name={profile?.name ?? user.email ?? ""} permissions={permissions} isAdmin={isAdmin} />
       <main className="min-w-0 flex-1 pb-36 md:pb-0">
         <MobileHeader />

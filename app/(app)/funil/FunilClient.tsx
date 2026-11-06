@@ -89,6 +89,9 @@ export interface LeadRow {
   data_evento: string | null;
   tags: TagOption[];
   origem: string | null;
+  // Quem indicou (etiqueta "Indicação · <nome>" que abre a ficha dela).
+  indicado_por?: string | null;
+  indicadorNome?: string | null;
   notes: string | null;
   parceiro?: boolean;
   isento_taxa?: boolean;
@@ -1252,9 +1255,20 @@ function LeadCardContent({
         </span>
       )}
 
-      {lead.tags.length > 0 && (
+      {(lead.tags.length > 0 || lead.indicado_por) && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {lead.tags.map((t) => (
+          {lead.indicado_por && (
+            <Link
+              href={`/clientes/${lead.indicado_por}`}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="rounded-full bg-[#E8789A1A] px-2 py-0.5 text-[10px] font-semibold text-[#C2456E] underline decoration-dotted underline-offset-2"
+              title="Abrir a ficha de quem indicou"
+            >
+              Indicação · {lead.indicadorNome ?? "ver quem indicou"}
+            </Link>
+          )}
+          {lead.tags.filter((t) => !(lead.indicado_por && t.name === "Indicação")).map((t) => (
             <span
               key={t.id}
               className="rounded-full px-2 py-0.5 text-[10px] font-medium"

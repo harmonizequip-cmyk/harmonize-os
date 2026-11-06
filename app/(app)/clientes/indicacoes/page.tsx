@@ -7,13 +7,15 @@ import IndicacoesClient, { type ClienteIndicacao } from "./IndicacoesClient";
 // não bateu com um cadastro só), descontos de 10% e quem indicou quem.
 export const dynamic = "force-dynamic";
 
-export default async function IndicacoesPage() {
+export default async function IndicacoesPage(props: { searchParams: Promise<{ aba?: string }> }) {
+  const { aba } = await props.searchParams;
+  const abaInicial = aba === "descontos" || aba === "indicacoes" || aba === "ligar" ? aba : null;
   const supabase = createClient();
   try {
     const clientes = await buscarTodas<ClienteIndicacao>((de, ate) =>
       supabase
         .from("clients")
-        .select("id, name, display_name, city, whatsapp, indicado_por, indicacao_nome, is_test")
+        .select("id, name, display_name, treatment, city, whatsapp, indicado_por, indicacao_nome, is_test")
         .eq("is_test", false)
         .order("id")
         .range(de, ate) as unknown as PromiseLike<{ data: ClienteIndicacao[] | null; error: { message: string } | null }>
@@ -29,10 +31,10 @@ export default async function IndicacoesPage() {
       const { data: r } = await supabase.from("rentals_contabilizaveis").select("client_id").in("client_id", indicadasIds);
       for (const x of (r ?? []) as { client_id: string }[]) alugaram.add(x.client_id);
     }
-    return <IndicacoesClient clientes={clientes} descontos={(desc ?? []) as DescontoIndicacao[]} alugaram={[...alugaram]} erro={null} />;
+    return <IndicacoesClient clientes={clientes} descontos={(desc ?? []) as DescontoIndicacao[]} alugaram={[...alugaram]} erro={null} abaInicial={abaInicial} />;
   } catch (e) {
     const msg = (e as Error).message;
     const faltaSql = /indicacao_nome|descontos_indicacao/.test(msg);
-    return <IndicacoesClient clientes={[]} descontos={[]} alugaram={[]} erro={faltaSql ? "Falta rodar o SQL do programa de indicação." : msg} />;
+    return <IndicacoesClient clientes={[]} descontos={[]} alugaram={[]} erro={faltaSql ? "Falta rodar o SQL do programa de indicação." : msg} abaInicial={null} />;
   }
 }

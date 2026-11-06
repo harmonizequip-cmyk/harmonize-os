@@ -121,6 +121,10 @@ export default async function FunilPage() {
     vencidasPorCliente.set(e.client_id, (vencidasPorCliente.get(e.client_id) ?? 0) + 1);
   }
 
+  // Nome de quem indicou, para a etiqueta "Indicação · <nome>" do cartão.
+  const nomePorId = new Map<string, string>();
+  for (const c of clients ?? []) nomePorId.set((c as any).id, (c as any).name);
+
   const clientsWithEvents = (clients ?? []).map((c: any) => {
     const t = taxaPorCliente.get(c.id);
     const ultimaLocacao = ultimaPorCliente.get(c.id) ?? null;
@@ -136,6 +140,7 @@ export default async function FunilPage() {
           })
         : null,
       tags: (c.client_tags ?? []).map((ct: any) => ct.tags).filter(Boolean),
+      indicadorNome: c.indicado_por ? nomePorId.get(c.indicado_por) ?? null : null,
       nextEvent: nextEventByClient.get(c.id) ?? null,
       taxasVencidas: vencidasPorCliente.get(c.id) ?? 0,
       taxasPendentes: Number(t?.taxas_pendentes ?? 0),
