@@ -83,6 +83,12 @@ async function avisar(nome: string, clientId: string, novo: boolean, comoConhece
     tag: `cadastro-cliente-${clientId}`,
     actions: [{ action: "ver", title: "Liberar acesso", url }],
   };
+  // Histórico das notificações (tela Avisos). Sem o SQL do histórico, só não grava.
+  try {
+    await admin.from("notificacoes").insert({ tipo: "cadastro", titulo: aviso.title, texto: aviso.body, url });
+  } catch (e) {
+    console.error("historico", (e as Error).message);
+  }
   for (const i of inscricoes ?? []) {
     try {
       await webpush.sendNotification({ endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } }, JSON.stringify(aviso), { TTL: 86400 });

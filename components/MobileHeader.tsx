@@ -5,6 +5,7 @@ import { ehEspacoPessoal } from "@/lib/espaco";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
+import SinoAvisos from "./SinoAvisos";
 import Link from "next/link";
 import { LogOut, Sparkles } from "lucide-react";
 import { useSomenteLeitura } from "./SomenteLeitura";
@@ -51,6 +52,7 @@ export default function MobileHeader() {
             <Sparkles size={18} strokeWidth={1.75} />
           </Link>
         )}
+        <SinoAvisos />
         <GlobalSearch compact />
         <ThemeToggle compact className="h-8 w-8" />
         <button

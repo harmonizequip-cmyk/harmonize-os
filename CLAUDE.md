@@ -77,6 +77,7 @@ Todos os campos, tipos, padrões, chaves, índices, políticas e gatilhos estão
 | `manutencoes_equipamento` | Cuidados de rotina feitos em cada HIPRO; hoje só a troca de água (`tipo = 'troca_agua'`), a cada 15 dias. | `id`, `equipment_id`, `tipo`, `feita_em`, `observacao`, `created_by`, `created_at` |
 | `mentoring_events` | Registro de mentoria avulsa (mentorada, data, horário, valor e forma de pagamento), ligado opcionalmente a um evento da agenda e a um lançamento financeiro. | `id`, `calendar_event_id`, `mentee_name`, `date`, `time_start`, `value`, `payment_method`, `notes`, `transaction_id`, `created_by`, `created_at`, `is_test` |
 | `movimentacoes` | Histórico de movimentações (auditoria): quem fez o quê e quando. | `id`, `ocorrido_em`, `usuario_id`, `usuario_nome`, `acao`, `entidade`, `entidade_id`, `descricao`, `detalhes` |
+| `notificacoes` | Histórico das notificações enviadas ao celular (gravadas pelas funções `alertas` e `cadastro-cliente`), mostradas na tela Avisos; guarda 90 dias. | `id`, `tipo`, `titulo`, `texto`, `url`, `criada_em`, `lida_em` |
 | `orcamentos_pessoais` | Limite mensal de gasto por categoria do espaço Pessoal. | `id`, `categoria`, `limite`, `created_at` |
 | `pacientes` | Pacientes do Planejador HIPRO, cada um da cliente (profissional) que o atende; a ficha junta todas as sessões. | `id`, `client_id`, `nome`, `whatsapp`, `nascimento`, `observacoes`, `fotos_autorizadas_em`, `created_by`, `created_at`, `updated_at` |
 | `paciente_fotos` | Fotos dos pacientes do Planejador por etapa (antes, imediato, 30, 60 e 90 dias) e área corporal; piloto só do dono. | `id`, `paciente_id`, `planejamento_id`, `etapa`, `area`, `caminho`, `miniatura`, `largura`, `altura`, `tamanho_bytes`, `tirada_em`, `observacao`, `created_by`, `created_at` |
@@ -195,6 +196,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Sem internet: `components/GuardarAgendaOffline.tsx` guarda no localStorage (`harmonize-agenda-offline`) os atendimentos de hoje a 7 dias; o `sw.js` mostra `public/sem-internet.html` quando uma tela não abre por falta de rede.
 - Entrar com a digital: passkey nativa do Supabase Auth (`supabase.auth.registerPasskey`/`signInWithPasskey`, `lib/digital.ts`, cartão em Configurações, botão no login). Precisa estar ligada no painel do Supabase (Authentication > Passkeys) com RP ID `harmonize-os.vercel.app`; mudar o RP ID invalida as digitais cadastradas. A tabela antiga `webauthn_credentials` não é usada.
 - Atalhos do ícone (manifest `shortcuts`, no máximo 5): Receber, Nova reserva, Hoje e Dias livres (`/agenda?acao=datas`, imagem de datas). Usam `?acao=`. Pendências saiu a pedido do dono (12/10/2026).
+
+## Sino e histórico de notificações (05/11/2026; migration `2026-11-06-historico-notificacoes.sql`)
+
+- Sino (`components/SinoAvisos.tsx`) no topo do celular (`MobileHeader`) e na barra lateral: número = quantos avisos do "Precisa de você" estão abertos (vermelho se há urgente; ponto turquesa quando não há pendência mas há notificação não lida). A conta vem de `/api/pendencias`, que usa `carregarDashboard` (`app/(app)/dashboard/dados.tsx`; `page.tsx` só reexporta), a MESMA função do Dashboard, então o número nunca diverge. Guardado 5 minutos na aba (`sessionStorage` `harmonize-pendencias`); evento `harmonize:pendencias-mudou` força recontar. Fora do Pessoal e da visualização; só quem abre o Dashboard (`podeVerAvisos` em `lib/carregar-pendencias.ts`).
+- Tela `/avisos` (`app/(app)/avisos/`): "Precisa de você" inteiro e "Histórico do celular" por dia (`lib/notificacoes.ts`, testado), não lidas em destaque; tocar abre o endereço (só caminho interno, `enderecoInterno`) e marca como lida; "Marcar todas como lidas" (`marcar_notificacoes_lidas`).
+- Tabela `notificacoes` (RLS: lê quem tem `dashboard`; grava só service_role; limpa o que passa de 90 dias a cada gravação). As funções `alertas` (uma linha por aviso enviado, não por aparelho; o teste de Configurações não entra) e `cadastro-cliente` gravam; sem o SQL, só não gravam. Aviso novo do celular entra no histórico sozinho.
 
 ## Menu do celular
 

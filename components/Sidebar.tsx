@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
+import SinoAvisos from "./SinoAvisos";
 import GlobalSearch from "./GlobalSearch";
 import {
   HeartHandshake,
@@ -195,6 +196,7 @@ export default function Sidebar({
       </nav>
 
       <div className="mt-2 space-y-0.5 border-t border-neutral-200 pt-2">
+        <SinoAvisos variante="lateral" recolhido={collapsed} />
         <ThemeToggle compact={collapsed} posicao={collapsed ? "ciclar" : "cima"} className={collapsed ? "mx-auto h-8 w-8" : undefined} />
         <button
           onClick={handleLogout}

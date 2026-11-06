@@ -585,6 +585,18 @@ Deno.serve(async (req) => {
   if (somenteUsuario) consulta = consulta.eq("user_id", somenteUsuario);
   const { data: inscricoes } = await consulta;
 
+  // Histórico das notificações (tela Avisos): uma linha por aviso, não por aparelho.
+  // Teste de um usuário só não entra. Sem o SQL do histórico, só não grava.
+  if (!somenteUsuario) {
+    try {
+      await admin.from("notificacoes").insert(
+        avisos.map((a) => ({ tipo: `alerta-${tipo}`, titulo: a.title.slice(0, 300), texto: (a.body ?? "").slice(0, 2000), url: a.url ?? null }))
+      );
+    } catch (e) {
+      console.error("historico", (e as Error).message);
+    }
+  }
+
   let enviados = 0;
   let removidos = 0;
   const falhas: string[] = [];
