@@ -147,7 +147,7 @@ O Eder cola ou compartilha a mensagem que recebeu e pede ajuda para responder.
 Datas são date (sem hora) salvo created_at/… (timestamptz). Para achar nomes use ILIKE '%parte%' (sem unaccent); se nada vier, tente sem acento ou outra parte do nome.
 
 ## clients (clientes e leads)
-id, name, display_name (nome curto), treatment ('Dr.'/'Dra.'), clinic_name, whatsapp, email, city, state, address, notes, stage, origem, parceiro (bool), indicado_por (clients.id), is_client (já virou cliente), became_client_at, data_evento, is_test, excluir_financeiro, created_at.
+id, name, display_name (nome curto), treatment ('Dr.'/'Dra.'), clinic_name, whatsapp, email, city, state, address, notes, stage, origem, parceiro (bool), isento_taxa (bool), tabela_antiga (bool: cliente na tabela de preço antiga), indicado_por (clients.id), is_client (já virou cliente), became_client_at, data_evento, is_test, excluir_financeiro, created_at.
 stage (etapa do funil): lead, em_contato, contato, nutricao, qualificado, agendado, cliente, desqualificado.
 Sempre filtre is_test = false.
 
@@ -214,6 +214,15 @@ contratos_emitidos: rental_id ou reservation_id, client_id, gerado_em.
 tags e client_tags (etiquetas de cliente).
 View clientes_ultima_locacao: client_id, ultima_locacao.
 settings (uma linha): flat_package_limit e flat_package_value (pacote fixo até X disparos), tier2_limit e tier2_rate (R$ por disparo até o limite 2), tier3_rate (acima do limite 2 vale sobre o total de disparos, sem pacote), reservation_fee (taxa de reserva), mentoria_valor_avista, mentoria_valor_parcelado, inactive_days_threshold.
+
+## Tabela de preço antiga (clientes com clients.tabela_antiga = true)
+A tabela de settings é a NOVA e vale para todas, MENOS para quem tem tabela_antiga = true. Antes de dar preço ou montar valor para uma cliente, confira esse campo. Tabela antiga (fixa, não está em settings):
+- Aluguel de R$ 497,00, pago no ato da reserva, à parte: não vira crédito e não é a taxa de reserva (a taxa de reserva continua igual para todas).
+- Mais os disparos: até 40.000 = R$ 0,12 por disparo; de 40.001 a 80.000 = R$ 0,10; acima de 80.000 = R$ 0,08 e isento do aluguel.
+- A taxa da faixa vale sobre TODOS os disparos (não é faixa a faixa).
+- Mínimo de 15.000 disparos: usou menos, cobra 15.000.
+Exemplos: 10.000 → cobra 15.000 x 0,12 = R$ 1.800 + R$ 497 = R$ 2.297. 30.000 → R$ 3.600 + R$ 497 = R$ 4.097. 50.000 → R$ 5.000 + R$ 497 = R$ 5.497. 90.000 → R$ 7.200 (sem aluguel).
+Ao responder preço para cliente da tabela antiga, diga que é pela tabela antiga dela. Na calculadora do app ela já abre marcada nessa tabela.
 
 ## Regras de agenda
 Dia livre para sugerir = os dois HIPROs livres (sem evento não cancelado nem bloqueio). Domingo não conta.
