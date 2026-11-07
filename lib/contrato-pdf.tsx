@@ -15,6 +15,7 @@
 // sujeita a ajuste; quando é uma pré-reserva sem disparos definidos
 // ainda, o texto descreve só a tabela de tarifas.
 import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer";
+import { TABELA_ANTIGA } from "./rental-pricing";
 import {
   contratadoDoContrato,
   termosDoContrato,
@@ -62,6 +63,8 @@ export interface ContratoDados {
     tier2Limit: number;
     tier2Rate: number;
     tier3Rate: number;
+    // "antiga": a 2ª cláusula sai pela tabela antiga (aluguel + disparo). Sem o campo, a de Configurações.
+    tabela?: "antiga";
   };
   gerado_em: string;
   // Retrato dos dados da Harmonize e dos números das cláusulas
@@ -224,18 +227,45 @@ function ContratoDocument({ dados }: { dados: ContratoDados }) {
           O valor da locação é calculado com base na quantidade de disparos realizados durante o período de locação,
           conforme a tabela vigente:
         </Text>
-        <Text style={styles.bullet}>
-          • Até {flatPackageLimit.toLocaleString("pt-BR")} disparos: pacote fixo de {formatCurrencyBR(flatPackageValue)};
-        </Text>
-        <Text style={styles.bullet}>
-          • De {(flatPackageLimit + 1).toLocaleString("pt-BR")} a {tier2Limit.toLocaleString("pt-BR")} disparos: pacote
-          fixo de {formatCurrencyBR(flatPackageValue)} acrescido de R$ {formatRatePerShot(tier2Rate)} por disparo que
-          exceder {flatPackageLimit.toLocaleString("pt-BR")};
-        </Text>
-        <Text style={styles.bullet}>
-          • Acima de {tier2Limit.toLocaleString("pt-BR")} disparos: R$ {formatRatePerShot(tier3Rate)} por disparo sobre o
-          total de disparos realizados.
-        </Text>
+        {dados.precificacao.tabela === "antiga" ? (
+          <>
+            <Text style={styles.bullet}>
+              • Aluguel do equipamento de {formatCurrencyBR(TABELA_ANTIGA.aluguel)}, pago no ato da reserva, acrescido do valor
+              dos disparos;
+            </Text>
+            <Text style={styles.bullet}>
+              • Até {TABELA_ANTIGA.faixa1Ate.toLocaleString("pt-BR")} disparos: R$ {formatRatePerShot(TABELA_ANTIGA.faixa1Taxa)} por
+              disparo;
+            </Text>
+            <Text style={styles.bullet}>
+              • De {(TABELA_ANTIGA.faixa1Ate + 1).toLocaleString("pt-BR")} a {TABELA_ANTIGA.faixa2Ate.toLocaleString("pt-BR")} disparos: R${" "}
+              {formatRatePerShot(TABELA_ANTIGA.faixa2Taxa)} por disparo;
+            </Text>
+            <Text style={styles.bullet}>
+              • Acima de {TABELA_ANTIGA.faixa2Ate.toLocaleString("pt-BR")} disparos: R$ {formatRatePerShot(TABELA_ANTIGA.faixa3Taxa)} por
+              disparo, isento do aluguel;
+            </Text>
+            <Text style={styles.bullet}>
+              • O valor por disparo da faixa alcançada vale sobre o total de disparos, com mínimo de{" "}
+              {TABELA_ANTIGA.minimo.toLocaleString("pt-BR")} disparos por locação.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.bullet}>
+              • Até {flatPackageLimit.toLocaleString("pt-BR")} disparos: pacote fixo de {formatCurrencyBR(flatPackageValue)};
+            </Text>
+            <Text style={styles.bullet}>
+              • De {(flatPackageLimit + 1).toLocaleString("pt-BR")} a {tier2Limit.toLocaleString("pt-BR")} disparos: pacote
+              fixo de {formatCurrencyBR(flatPackageValue)} acrescido de R$ {formatRatePerShot(tier2Rate)} por disparo que
+              exceder {flatPackageLimit.toLocaleString("pt-BR")};
+            </Text>
+            <Text style={styles.bullet}>
+              • Acima de {tier2Limit.toLocaleString("pt-BR")} disparos: R$ {formatRatePerShot(tier3Rate)} por disparo sobre o
+              total de disparos realizados.
+            </Text>
+          </>
+        )}
         <Text style={styles.paragraph}>{paragrafoValorFinal}</Text>
 
         <Text style={styles.clauseTitle}>3ª CLÁUSULA. DAS OBRIGAÇÕES DO CONTRATANTE</Text>

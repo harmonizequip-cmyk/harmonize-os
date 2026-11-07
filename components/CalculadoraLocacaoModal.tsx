@@ -35,7 +35,8 @@ import { createClient } from "@/lib/supabase/client";
 import { paraEscolha } from "@/lib/categorias";
 import ClientPicker from "@/components/ClientPicker";
 import {
-  calculateRentalValue,
+  calcularLocacao,
+  TABELA_ANTIGA,
   calculateMentoriaValue,
   DEFAULT_MENTORIA_PRICING,
   RentalPricingError,
@@ -578,15 +579,41 @@ export default function CalculadoraLocacaoModal({
   // Tudo coberto pelo crédito: valor dos disparos é zero, mas dá para salvar.
   const tudoNoCredito = !isMentoria && todasContagensPreenchidas && totalDisparos > 0 && shots === 0;
 
+  // Tabela antiga (aluguel R$ 497 + valor por disparo): vem marcada para quem tem
+  // clients.tabela_antiga e pode ser trocada só nesta locação. Sem o SQL, nasce desmarcada.
+  const [tabelaAntiga, setTabelaAntiga] = useState(false);
+  const [tabelaAntigaDaCliente, setTabelaAntigaDaCliente] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setTabelaAntigaDaCliente(false);
+    setTabelaAntiga(false);
+    if (!activeClientId || isMentoria) return;
+    supabase
+      .from("clients")
+      .select("tabela_antiga")
+      .eq("id", activeClientId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!vivo || error || !data) return;
+        const marcada = !!(data as { tabela_antiga?: boolean }).tabela_antiga;
+        setTabelaAntigaDaCliente(marcada);
+        setTabelaAntiga(marcada);
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, isMentoria]);
+
   const pricing = useMemo(() => {
     if (isMentoria || !shots || shots <= 0) return null;
     try {
-      return calculateRentalValue(shots, pricingConfig);
+      return calcularLocacao(shots, pricingConfig, tabelaAntiga);
     } catch (e) {
       if (e instanceof RentalPricingError) return null;
       throw e;
     }
-  }, [isMentoria, shots, pricingConfig]);
+  }, [isMentoria, shots, pricingConfig, tabelaAntiga]);
 
   // Linhas de pagamento (forma/valor/conta pix). Declarado antes do cálculo da
   // mentoria porque a forma da primeira linha decide à vista ou parcelado; do
@@ -675,7 +702,8 @@ export default function CalculadoraLocacaoModal({
     mentoriaPricing: mentoriaCalc,
     custoManualPorDisparo,
   });
-  const aluguelNumero = parseDecimal(aluguelValor);
+  // Na tabela antiga o aluguel é o da tabela (R$ 497, ou isento acima de 80.000).
+  const aluguelNumero = tabelaAntiga && pricing?.antiga ? pricing.antiga.aluguel : parseDecimal(aluguelValor);
   const descontoRawNumero = parseDecimal(descontoValor);
   const descontoNumero =
     descontoTipo === "percentual" ? Math.round(subtotalParaDesconto * (descontoRawNumero / 100) * 100) / 100 : descontoRawNumero;
@@ -1954,18 +1982,36 @@ export default function CalculadoraLocacaoModal({
                       <p className="mt-1 text-xs text-neutral-500">Todos os disparos foram cobertos pelo crédito da cliente.</p>
                     </div>
                   )}
+                {!tudoNoCredito && (
+                  <label className="mb-2 flex items-start gap-2 rounded-xl border border-neutral-200 bg-white p-2.5 text-xs text-neutral-600">
+                    <input
+                      type="checkbox"
+                      checked={tabelaAntiga}
+                      onChange={(e) => setTabelaAntiga(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-brand-teal"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-neutral-800">Usar a tabela antiga</span>
+                      Aluguel {formatCurrency(TABELA_ANTIGA.aluguel)} + R$ 0,12 / 0,10 / 0,08 por disparo, mínimo{" "}
+                      {TABELA_ANTIGA.minimo.toLocaleString("pt-BR")}.
+                      {tabelaAntigaDaCliente && <span className="block text-neutral-400">Esta cliente está marcada com a tabela antiga no cadastro.</span>}
+                    </span>
+                  </label>
+                )}
                 {pricing && (
                   <>
                     <div className="rounded-xl bg-brand-teal/10 p-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-neutral-600">Valor dos disparos (tabela)</span>
+                        <span className="text-neutral-600">{pricing.antiga ? "Valor dos disparos (tabela antiga)" : "Valor dos disparos (tabela)"}</span>
                         <span className="font-semibold text-brand-teal">{formatCurrency(pricing.totalValue)}</span>
                       </div>
                       <p className="mt-1 text-xs text-neutral-500">
-                        {pricing.tier3Portion > 0
+                        {pricing.antiga
+                          ? `${pricing.antiga.minimoAplicado ? `Usou ${pricing.antiga.disparosUsados.toLocaleString("pt-BR")}, cobrado o mínimo · ` : ""}${pricing.antiga.disparosCobrados.toLocaleString("pt-BR")} disparos x R$ ${pricing.antiga.taxa.toFixed(2).replace(".", ",")} (faixa ${pricing.antiga.faixa}) · ${pricing.antiga.aluguel > 0 ? `aluguel ${formatCurrency(pricing.antiga.aluguel)} nos ajustes` : "isento do aluguel"}`
+                          : pricing.tier3Portion > 0
                           ? `Acima de ${pricing.config.tier2Limit.toLocaleString("pt-BR")}: ${pricing.tier3Portion.toLocaleString("pt-BR")} disparos x R$ ${pricing.config.tier3Rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 3 })} (sobre o total)`
                           : `Pacote fixo até ${pricing.config.flatPackageLimit.toLocaleString("pt-BR")}: ${formatCurrency(pricing.flatPackageValue)}`}
-                        {pricing.tier2Portion > 0 && ` · +${pricing.tier2Portion.toLocaleString("pt-BR")} a R$${pricing.config.tier2Rate.toFixed(2)}`}
+                        {!pricing.antiga && pricing.tier2Portion > 0 && ` · +${pricing.tier2Portion.toLocaleString("pt-BR")} a R$${pricing.config.tier2Rate.toFixed(2)}`}
                       </p>
                     </div>
 
@@ -2046,13 +2092,22 @@ export default function CalculadoraLocacaoModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-amber-600">+ Aluguel</label>
-                  <input
-                    inputMode="decimal"
-                    value={aluguelValor}
-                    onChange={(e) => setAluguelValor(e.target.value)}
-                    placeholder="R$ 0,00"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                  />
+                  {tabelaAntiga && pricing?.antiga ? (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      {pricing.antiga.aluguel > 0 ? formatCurrency(pricing.antiga.aluguel) : "Isento"}
+                      <span className="block text-[11px] text-amber-700">
+                        {pricing.antiga.aluguel > 0 ? "Tabela antiga, à parte" : `Acima de ${TABELA_ANTIGA.faixa2Ate.toLocaleString("pt-BR")}`}
+                      </span>
+                    </p>
+                  ) : (
+                    <input
+                      inputMode="decimal"
+                      value={aluguelValor}
+                      onChange={(e) => setAluguelValor(e.target.value)}
+                      placeholder="R$ 0,00"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                    />
+                  )}
                 </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between">

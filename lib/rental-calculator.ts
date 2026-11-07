@@ -15,7 +15,7 @@ import type {
   RentalPricingBreakdown,
   MentoriaPricingBreakdown,
 } from "./rental-pricing";
-import { RESERVATION_FEE } from "./rental-pricing";
+import { RESERVATION_FEE, TABELA_ANTIGA } from "./rental-pricing";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { CONTAS_PIX_PADRAO, contaPorCodigo, type ContaPix } from "./contas-pix";
 
@@ -284,6 +284,13 @@ export interface ResumoWhatsAppInput extends ResumoLocacaoInput {
 function linhasDaTabela(pricing: RentalPricingBreakdown): string[] {
   const { config } = pricing;
   const out: string[] = [];
+  const a = pricing.antiga;
+  if (a) {
+    if (a.minimoAplicado) out.push(`  Mínimo de ${fmtInt(TABELA_ANTIGA.minimo)} disparos (usou ${fmtInt(a.disparosUsados)})`);
+    out.push(`  Tabela antiga, faixa ${a.faixa}: ${fmtInt(a.disparosCobrados)} x R$ ${fmtRate(a.taxa)} = ${fmtMoney(a.valorDisparos)}`);
+    if (a.faixa === 3) out.push(`  Acima de ${fmtInt(TABELA_ANTIGA.faixa2Ate)}: isento do aluguel`);
+    return out;
+  }
   if (pricing.tier3Portion === 0) {
     out.push(`  Pacote fixo (até ${fmtInt(config.flatPackageLimit)}): ${fmtMoney(pricing.flatPackageValue)}`);
   }

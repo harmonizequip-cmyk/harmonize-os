@@ -110,6 +110,9 @@ export interface RentalPricingBreakdown {
   tier2Value: number;
   tier3Value: number;
   totalValue: number;
+  // Tabela antiga (aluguel + valor por disparo), quando a locação usa ela.
+  // Sem este campo, é a tabela nova (a de Configurações).
+  antiga?: DetalheTabelaAntiga;
   // Carrega a config usada neste cálculo, para quem só tem o breakdown
   // em mãos (ex: montagem do resumo de WhatsApp) conseguir descrever as
   // faixas corretamente sem precisar receber o config de novo.
@@ -170,4 +173,74 @@ export function calculateRentalValue(shots: number, config: PricingConfig = DEFA
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+// ------------------------------------------------------------
+// TABELA ANTIGA (pedido do dono, 07/11/2026): ainda vale para algumas
+// clientes (clients.tabela_antiga) e pode ser marcada na calculadora.
+//   - aluguel de R$ 497,00, à parte (não vira crédito), mais os disparos;
+//   - até 40.000: R$ 0,12; de 40.001 a 80.000: R$ 0,10; acima de 80.000:
+//     R$ 0,08 e isento do aluguel;
+//   - a taxa da faixa vale sobre TODOS os disparos (não é faixa a faixa);
+//   - mínimo de 15.000: usou menos, cobra 15.000.
+// Fixa no código de propósito (é tabela legada, não editável).
+// ------------------------------------------------------------
+
+export const TABELA_ANTIGA = {
+  aluguel: 497,
+  minimo: 15_000,
+  faixa1Ate: 40_000,
+  faixa1Taxa: 0.12,
+  faixa2Ate: 80_000,
+  faixa2Taxa: 0.1,
+  faixa3Taxa: 0.08,
+} as const;
+
+export interface DetalheTabelaAntiga {
+  /** Disparos feitos (antes do mínimo). */
+  disparosUsados: number;
+  /** Disparos cobrados (o mínimo, se usou menos). */
+  disparosCobrados: number;
+  minimoAplicado: boolean;
+  faixa: 1 | 2 | 3;
+  taxa: number;
+  /** Aluguel desta locação: R$ 497,00, ou 0 acima de 80.000 (isento). */
+  aluguel: number;
+  /** Valor só dos disparos (sem o aluguel). */
+  valorDisparos: number;
+}
+
+export function calcularTabelaAntiga(shots: number, config: PricingConfig = DEFAULT_PRICING): RentalPricingBreakdown {
+  if (!Number.isFinite(shots) || shots <= 0) {
+    throw new RentalPricingError("Quantidade de disparos deve ser um número positivo.");
+  }
+  const t = TABELA_ANTIGA;
+  const cobrados = Math.max(shots, t.minimo);
+  const faixa: 1 | 2 | 3 = cobrados <= t.faixa1Ate ? 1 : cobrados <= t.faixa2Ate ? 2 : 3;
+  const taxa = faixa === 1 ? t.faixa1Taxa : faixa === 2 ? t.faixa2Taxa : t.faixa3Taxa;
+  const valorDisparos = round2(cobrados * taxa);
+  const aluguel = faixa === 3 ? 0 : t.aluguel;
+  return {
+    shots,
+    flatPackagePortion: 0,
+    tier2Portion: 0,
+    tier3Portion: 0,
+    flatPackageValue: 0,
+    tier2Value: 0,
+    tier3Value: 0,
+    // Só os disparos: o aluguel entra à parte (campo Aluguel da calculadora).
+    totalValue: valorDisparos,
+    antiga: { disparosUsados: shots, disparosCobrados: cobrados, minimoAplicado: cobrados > shots, faixa, taxa, aluguel, valorDisparos },
+    config,
+  };
+}
+
+/** Calcula pela tabela escolhida: a nova (Configurações) ou a antiga. */
+export function calcularLocacao(shots: number, config: PricingConfig = DEFAULT_PRICING, tabelaAntiga = false): RentalPricingBreakdown {
+  return tabelaAntiga ? calcularTabelaAntiga(shots, config) : calculateRentalValue(shots, config);
+}
+
+/** Valor total pela tabela, já com o aluguel da tabela antiga. */
+export function valorTotalDaTabela(b: RentalPricingBreakdown): number {
+  return round2(b.totalValue + (b.antiga?.aluguel ?? 0));
 }

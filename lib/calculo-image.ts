@@ -1,6 +1,7 @@
 import { roundedRectPath } from "./availability-image";
 import type { ItemAjuste, ResumoLocacao } from "./rental-calculator";
 import type { MentoriaPricingBreakdown, RentalPricingBreakdown } from "./rental-pricing";
+import { TABELA_ANTIGA } from "./rental-pricing";
 
 // ============================================================
 // IMAGEM DO CÁLCULO DOS DISPAROS
@@ -110,6 +111,25 @@ export function descreverFaixa(
       negociado.tabelaValor = tabela.valorDisparos;
     }
     return negociado;
+  }
+
+  const a = pricing.antiga;
+  if (a) {
+    const faixaTxt =
+      a.faixa === 1
+        ? `Até ${inteiro(TABELA_ANTIGA.faixa1Ate)} disparos`
+        : a.faixa === 2
+          ? `De ${inteiro(TABELA_ANTIGA.faixa1Ate + 1)} a ${inteiro(TABELA_ANTIGA.faixa2Ate)} disparos`
+          : `Acima de ${inteiro(TABELA_ANTIGA.faixa2Ate)} disparos, isento do aluguel`;
+    const linhasA = [`${inteiro(a.disparosCobrados)} disparos x ${taxaPorDisparo(a.taxa)} = ${reais(a.valorDisparos)}`];
+    if (a.minimoAplicado) linhasA.unshift(`Usou ${inteiro(a.disparosUsados)}: cobrado o mínimo de ${inteiro(TABELA_ANTIGA.minimo)}`);
+    return {
+      faixaTitulo: `TABELA ANTIGA · FAIXA ${a.faixa}`,
+      faixaSubtitulo: faixaTxt,
+      faixaChip: taxaPorDisparo(a.taxa),
+      faixaLinhas: linhasA,
+      valorDisparos: pricing.totalValue,
+    };
   }
 
   const cfg = pricing.config;

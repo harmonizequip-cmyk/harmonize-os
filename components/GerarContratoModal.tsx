@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { ContratoDados } from "@/lib/contrato-pdf";
@@ -105,6 +105,23 @@ export default function GerarContratoModal({
   // (para mudar, edita a locação e gera de novo — leva Y não mexeu nisso).
   const [reservaPaymentMethod, setReservaPaymentMethod] = useState("");
   const [gerando, setGerando] = useState(false);
+  // Cláusula de valor pela tabela antiga: vem marcada para quem tem clients.tabela_antiga.
+  const [tabelaAntiga, setTabelaAntiga] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    supabase
+      .from("clients")
+      .select("tabela_antiga")
+      .eq("id", client.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (vivo && !error && data) setTabelaAntiga(!!(data as { tabela_antiga?: boolean }).tabela_antiga);
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id]);
   const [error, setError] = useState<string | null>(null);
 
   const equipamento = origem.kind === "rental" ? origem.rental.equipments : origem.reserva.equipments;
@@ -169,6 +186,7 @@ export default function GerarContratoModal({
         tier2Limit: (pricingConfig ?? DEFAULT_PRICING).tier2Limit,
         tier2Rate: (pricingConfig ?? DEFAULT_PRICING).tier2Rate,
         tier3Rate: (pricingConfig ?? DEFAULT_PRICING).tier3Rate,
+        ...(tabelaAntiga ? { tabela: "antiga" as const } : {}),
       },
       gerado_em: new Date().toISOString(),
       // Dados da Harmonize e números das cláusulas (Configurações > Empresa e
@@ -282,6 +300,10 @@ export default function GerarContratoModal({
             />
           </div>
 
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
+            <input type="checkbox" checked={tabelaAntiga} onChange={(e) => setTabelaAntiga(e.target.checked)} className="h-4 w-4 accent-brand-teal" />
+            Cláusula de valor pela tabela antiga (aluguel R$ 497 + disparo)
+          </label>
           {origem.kind === "reserva" && (
             <div>
               <label className="mb-1 block text-xs font-medium text-neutral-600">

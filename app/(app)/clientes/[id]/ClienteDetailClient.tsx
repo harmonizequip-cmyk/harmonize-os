@@ -456,6 +456,9 @@ export default function ClienteDetailClient({
             Isenta de taxa de reserva
           </span>
         )}
+        {(client as { tabela_antiga?: boolean }).tabela_antiga && (
+          <span className="rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-800">Tabela antiga de preço</span>
+        )}
       </div>
 
       {preReservas.length > 0 && (

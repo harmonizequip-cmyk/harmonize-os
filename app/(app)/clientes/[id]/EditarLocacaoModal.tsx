@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { paraEscolha } from "@/lib/categorias";
-import { calculateRentalValue, type PricingConfig } from "@/lib/rental-pricing";
+import { calcularLocacao, valorTotalDaTabela, type PricingConfig } from "@/lib/rental-pricing";
 import { formatCurrency } from "@/lib/format";
 import ClientPicker, { type ClientOption } from "@/components/ClientPicker";
 import { valorParaNumero } from "@/lib/valor";
@@ -435,14 +435,34 @@ export default function EditarLocacaoModal({
     setContagens(nova);
   }
 
+  // Cliente com a tabela antiga (clients.tabela_antiga): o sugerido sai por ela, com o aluguel.
+  const [tabelaAntiga, setTabelaAntiga] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setTabelaAntiga(false);
+    if (!clientId) return;
+    supabase
+      .from("clients")
+      .select("tabela_antiga")
+      .eq("id", clientId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (vivo && !error && data) setTabelaAntiga(!!(data as { tabela_antiga?: boolean }).tabela_antiga);
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
   const suggestedValue = useMemo(() => {
     if (!shotsCobrados || shotsCobrados <= 0) return null;
     try {
-      return calculateRentalValue(shotsCobrados, pricingConfig).totalValue;
+      return valorTotalDaTabela(calcularLocacao(shotsCobrados, pricingConfig, tabelaAntiga));
     } catch {
       return null;
     }
-  }, [shotsCobrados, pricingConfig]);
+  }, [shotsCobrados, pricingConfig, tabelaAntiga]);
 
   function usarValorSugerido() {
     if (suggestedValue !== null) setValor(String(suggestedValue));
@@ -779,7 +799,7 @@ export default function EditarLocacaoModal({
                   onClick={usarValorSugerido}
                   className="text-xs text-brand-teal underline underline-offset-2"
                 >
-                  Usar sugerido: {formatCurrency(suggestedValue)}
+                  Usar sugerido{tabelaAntiga ? " (tabela antiga, com aluguel)" : ""}: {formatCurrency(suggestedValue)}
                 </button>
               )}
             </div>

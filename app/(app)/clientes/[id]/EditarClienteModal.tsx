@@ -19,6 +19,8 @@ interface Client {
   notes: string | null;
   parceiro?: boolean;
   isento_taxa?: boolean;
+  // Tabela de preço antiga (aluguel R$ 497 + disparo), migration 2026-11-07-tabela-antiga.
+  tabela_antiga?: boolean;
   indicado_por?: string | null;
   treatment?: string | null;
   display_name?: string | null;
@@ -76,6 +78,7 @@ export default function EditarClienteModal({
   const [notes, setNotes] = useState(client.notes ?? "");
   const [parceiro, setParceiro] = useState(client.parceiro ?? false);
   const [isentoTaxa, setIsentoTaxa] = useState(client.isento_taxa ?? false);
+  const [tabelaAntiga, setTabelaAntiga] = useState(client.tabela_antiga ?? false);
   const [indicadoPor, setIndicadoPor] = useState<string | null>(client.indicado_por ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +109,8 @@ export default function EditarClienteModal({
         parceiro,
         isento_taxa: isentoTaxa,
         indicado_por: indicadoPor,
+        // Só manda quando mudou: sem o SQL da tabela antiga, a coluna não existe.
+        ...(tabelaAntiga !== (client.tabela_antiga ?? false) ? { tabela_antiga: tabelaAntiga } : {}),
       })
       .eq("id", client.id);
     setSaving(false);
@@ -288,6 +293,19 @@ export default function EditarClienteModal({
             </span>
           </label>
           <CaixaIsencaoTaxa checked={isentoTaxa} onChange={setIsentoTaxa} parceiro={parceiro} />
+          <label className="flex items-start gap-2.5 rounded-lg border border-neutral-300 p-3">
+            <input
+              type="checkbox"
+              checked={tabelaAntiga}
+              onChange={(e) => setTabelaAntiga(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-teal"
+            />
+            <span className="text-xs text-neutral-600">
+              <span className="block text-sm font-medium text-neutral-800">Tabela antiga de preço</span>
+              Aluguel R$ 497,00 + R$ 0,12 até 40.000, R$ 0,10 até 80.000 e R$ 0,08 acima (isento do aluguel); mínimo de 15.000
+              disparos. A calculadora já abre nela para esta cliente, com opção de trocar na hora.
+            </span>
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
