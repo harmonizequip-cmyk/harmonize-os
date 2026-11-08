@@ -36,7 +36,7 @@ import ReservarHiproModal from "./ReservarHiproModal";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import { avisar } from "@/components/Dialogos";
 import HeroTela from "@/components/ui/HeroTela";
-import { CalendarCheck, Clock3 } from "lucide-react";
+import { CalendarCheck, Clock3, MapPin } from "lucide-react";
 
 // `hex` é a mesma cor de `dot`, só que em valor puro — necessário porque o
 // indicador do dia no calendário (abaixo) usa conic-gradient via style
@@ -73,6 +73,9 @@ interface EventRow {
   clients?: {
     name: string;
     whatsapp?: string | null;
+    // Cidade da cliente, mostrada no cartão para reconhecer quem é (pedido do dono, 08/11/2026).
+    city?: string | null;
+    state?: string | null;
     // Usados só na mensagem de "pedir confirmação" (ver
     // buildPedidoConfirmacaoMessage), nunca no card em si — o card
     // continua mostrando clients.name, que pode ter mais coisa
@@ -574,6 +577,16 @@ export default function AgendaClient({
                     {" · "}
                     <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
                   </>
+                )}
+                {e.clients?.city && (
+                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                    <MapPin size={10} />
+                    {e.clients.city}
+                    {e.clients.state ? ` - ${e.clients.state}` : ""}
+                  </span>
+                )}
+                {e.clients?.name && !e.clients.city && (
+                  <span className="ml-1.5 text-[10px] italic text-neutral-400">sem cidade no cadastro</span>
                 )}
                 {/* "sem disparos ainda" é sobre a contagem de disparos do
                     HIPRO (preço/procedimento), não tem relação com

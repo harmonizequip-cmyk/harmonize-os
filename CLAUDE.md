@@ -304,6 +304,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 ## Agenda: Atendimentos e Compromissos (30/10/2026, pedido do dono)
 
 - Eventos do tipo "Outro" (`event_type = 'outros'`) são compromissos pessoais, não atendimentos. A Agenda (`AgendaClient.tsx`) tem abas "Atendimentos" (HIPRO 1, HIPRO 2 e mentoria) e "Compromissos" (outros); a aba fica em `?aba=compromissos`, e `?evento=<id>` abre na aba certa. O destaque conta só a aba aberta ("Atendimentos no mês" ou "Compromissos no mês"); confirmação (aviso dos 7 dias, filtro de confirmado) só existe em Atendimentos. Na aba Atendimentos, o dia com compromisso mostra "Você tem N compromissos pessoais neste dia". O aviso "atendimentos sem confirmação" do Dashboard e o "próximo evento" do Funil ignoram `outros`; a função `alertas` já olhava só HIPRO.
+- Cidade no cartão (08/11/2026, pedido do dono): cada atendimento da Agenda mostra a cidade e a UF da cliente (`clients.city`/`state`) num selo com alfinete ao lado do nome; sem cidade, "sem cidade no cadastro" em cinza.
 
 ## Aplicadores (desgaste por disparos)
 
