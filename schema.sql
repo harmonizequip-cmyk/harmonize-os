@@ -15663,3 +15663,11 @@ grant execute on function public.marcar_notificacoes_lidas(uuid) to authenticate
 alter table public.clients add column if not exists tabela_antiga boolean not null default false;
 comment on column public.clients.tabela_antiga is
   'Cliente ainda na tabela de preço antiga (aluguel R$ 497 + disparo). A calculadora abre nela, com opção de trocar na locação.';
+
+-- Correção (09/11/2026): a migration 2026-11-05-seguranca-acesso.sql tirou de
+-- authenticated o direito de executar valor_taxa_atual(), mas a view
+-- clientes_taxas (security_invoker) chama essa função. Resultado: a leitura da
+-- view voltava 403 e Funil, Clientes e Relatórios mostravam "Não consegui
+-- carregar esta tela". A função só devolve o valor da taxa de reserva de
+-- Configurações; quem não está logado (anon) continua sem acesso.
+grant execute on function public.valor_taxa_atual() to authenticated;
