@@ -132,3 +132,14 @@ describe("cidades do banco (mapa)", () => {
     ]);
   });
 });
+
+describe("cidades extras no encaixe", () => {
+  it("cliente de Natal que também atende em Gravatá entra pelo mais perto", () => {
+    const lista = candidatasPerto([{ dia: "2026-11-10", cidade: "Caruaru" }], [
+      pessoa("duas", "Natal", { cidadesExtras: ["Gravatá"] }),
+      pessoa("so-natal", "Natal"),
+    ]);
+    expect(lista.map((c) => c.pessoa.id)).toEqual(["duas"]);
+    expect(lista[0].cidadeDela).toBe("Gravatá");
+  });
+});

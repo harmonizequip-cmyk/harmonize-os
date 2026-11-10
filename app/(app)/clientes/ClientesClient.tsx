@@ -136,6 +136,12 @@ export default function ClientesClient({
           Indicações
         </Link>
         <Link
+          href="/clientes/cidades"
+          className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+        >
+          Completar cidades
+        </Link>
+        <Link
           href="/clientes/creditos"
           className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
         >

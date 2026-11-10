@@ -7,6 +7,8 @@ import { extractCityFromAddress, toUpperOrNull, toUpperTrim } from "@/lib/format
 import ConfirmarExclusaoModal from "@/components/ConfirmarExclusaoModal";
 import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 import { confirmar } from "@/components/Dialogos";
+import { adicionarCidadeExtra } from "@/lib/cidades-cliente";
+import { X } from "lucide-react";
 
 interface Client {
   id: string;
@@ -15,6 +17,8 @@ interface Client {
   whatsapp: string | null;
   email: string | null;
   city: string | null;
+  // Outras cidades onde ela atende (migration 2026-11-10-cidades-extras).
+  cidades_extras?: string[] | null;
   address: string | null;
   notes: string | null;
   parceiro?: boolean;
@@ -63,6 +67,13 @@ export default function EditarClienteModal({
   const [whatsapp, setWhatsapp] = useState(client.whatsapp ?? "");
   const [email, setEmail] = useState(client.email ?? "");
   const [city, setCity] = useState(client.city ?? "");
+  const extrasOriginais = client.cidades_extras ?? [];
+  const [cidadesExtras, setCidadesExtras] = useState<string[]>(extrasOriginais);
+  const [novaCidade, setNovaCidade] = useState("");
+  function adicionarExtra() {
+    setCidadesExtras((l) => adicionarCidadeExtra(city, l, novaCidade));
+    setNovaCidade("");
+  }
   const [address, setAddress] = useState(client.address ?? "");
   // Nome evita sombrear o `document` global do navegador (usado em outros
   // arquivos do projeto, aqui não, mas é hábito seguro).
@@ -109,6 +120,8 @@ export default function EditarClienteModal({
         parceiro,
         isento_taxa: isentoTaxa,
         indicado_por: indicadoPor,
+        // Cidades extras: só manda quando mudou (sem o SQL de 10/11, a coluna não existe).
+        ...(JSON.stringify(cidadesExtras) !== JSON.stringify(extrasOriginais) ? { cidades_extras: cidadesExtras } : {}),
         // Só manda quando mudou: sem o SQL da tabela antiga, a coluna não existe.
         ...(tabelaAntiga !== (client.tabela_antiga ?? false) ? { tabela_antiga: tabelaAntiga } : {}),
       })
@@ -196,6 +209,39 @@ export default function EditarClienteModal({
               onChange={(e) => setCity(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Atende também em (outras cidades)</label>
+            {cidadesExtras.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {cidadesExtras.map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 py-1 pl-3 pr-1 text-xs font-semibold text-brand-teal-dark">
+                    {c}
+                    <button type="button" aria-label={`Tirar ${c}`} onClick={() => setCidadesExtras((l) => l.filter((x) => x !== c))} className="rounded-full p-0.5 hover:bg-white">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={novaCidade}
+                onChange={(e) => setNovaCidade(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    adicionarExtra();
+                  }
+                }}
+                placeholder="Ex.: Campina Grande"
+                className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <button type="button" onClick={adicionarExtra} disabled={!novaCidade.trim()} className="rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 disabled:opacity-40">
+                Adicionar
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] text-neutral-400">Nas Melhores datas você escolhe para qual cidade olhar; o Encaixe usa a mais perto.</p>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600">Endereço (opcional)</label>

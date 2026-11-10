@@ -30,6 +30,8 @@ export interface Candidata {
   km: number;
   /** Cidade de referência (onde ele vai estar) mais perto dela. */
   perto: string;
+  /** Cidade dela usada na conta (a principal ou uma das extras, a mais perto). */
+  cidadeDela?: string | null;
 }
 
 export interface Oportunidade {
@@ -114,12 +116,15 @@ export function candidatasPerto(
   const lista: Candidata[] = [];
   for (const p of pessoas) {
     if (p.proximaReserva || p.stage === "desqualificado") continue;
-    const c = coordenadasDaCidade(p.cidade, mapa);
-    if (!c) continue;
+    // Cliente que atende em mais de uma cidade: vale a mais perto de onde ele vai estar.
     let melhor: Candidata | null = null;
-    for (const { a, c: ca } of pontos) {
-      const km = distanciaKm(c, ca);
-      if (km <= raioKm && (!melhor || km < melhor.km)) melhor = { pessoa: p, km, perto: a.cidade };
+    for (const cidadeDela of [p.cidade, ...(p.cidadesExtras ?? [])]) {
+      const c = coordenadasDaCidade(cidadeDela, mapa);
+      if (!c) continue;
+      for (const { a, c: ca } of pontos) {
+        const km = distanciaKm(c, ca);
+        if (km <= raioKm && (!melhor || km < melhor.km)) melhor = { pessoa: p, km, perto: a.cidade, cidadeDela };
+      }
     }
     if (melhor) lista.push(melhor);
   }

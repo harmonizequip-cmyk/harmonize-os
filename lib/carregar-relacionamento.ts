@@ -112,6 +112,16 @@ export async function carregarRelacionamento(
   for (const e of confirmacoesRows)
     contato.set(e.client_id, maior(contato.get(e.client_id), dataLocal(e.confirmation_message_sent_at)) as string);
 
+  // Cidades extras (clients.cidades_extras, 10/11/2026): leitura à parte e sem
+  // derrubar a carga, porque antes do SQL a coluna não existe.
+  const extras = new Map<string, string[]>();
+  try {
+    const { data } = await supabase.from("clients").select("id, cidades_extras").neq("cidades_extras", "{}");
+    for (const c of (data ?? []) as { id: string; cidades_extras: string[] | null }[]) if (c.cidades_extras?.length) extras.set(c.id, c.cidades_extras);
+  } catch {
+    // sem as extras, vale só a cidade principal
+  }
+
   let deve = new Map<string, number>();
   try {
     const p = await buscarPendencias(supabase, hoje);
@@ -127,6 +137,7 @@ export async function carregarRelacionamento(
     displayName: c.display_name,
     whatsapp: c.whatsapp,
     cidade: c.city,
+    cidadesExtras: extras.get(c.id) ?? [],
     stage: c.stage,
     ehCliente: !!c.is_client,
     parceiro: !!c.parceiro,

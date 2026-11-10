@@ -460,6 +460,14 @@ export async function carregarDashboard(recebidos: { period?: string; from?: str
     .lte("valido_ate", somarDias(hojeLocal(), DIAS_AVISO_VENCIMENTO));
   const descontosVencendoLista = descontosVencendo((descontosPerto ?? []) as { valido_ate: string; usado_em: string | null }[], hojeLocal());
 
+  // Cadastros sem cidade (ficam fora do Encaixe e das Melhores datas).
+  const { count: semCidadeCount } = await supabase
+    .from("clients")
+    .select("id", { count: "exact", head: true })
+    .eq("is_test", false)
+    .neq("stage", "desqualificado")
+    .or("city.is.null,city.eq.");
+
   // Clientes que preencheram o formulário do Planejador e ainda esperam o acesso.
   const { data: convitesPreenchidos } = await supabase
     .from("convites_cadastro")
@@ -770,6 +778,15 @@ export async function carregarDashboard(recebidos: { period?: string; from?: str
       texto: `${cadastrosNovos} ${cadastrosNovos === 1 ? "cadastro novo do formulário" : "cadastros novos do formulário"}`,
       detalhe: "Conferir e liberar na Academy",
       href: "/clientes/cadastros",
+      nivel: "info",
+    });
+  if (semCidadeCount && semCidadeCount > 0)
+    avisos.push({
+      id: "sem-cidade",
+      icone: "agenda",
+      texto: `${semCidadeCount} ${semCidadeCount === 1 ? "cadastro sem cidade" : "cadastros sem cidade"}`,
+      detalhe: "Ficam fora do Encaixe e das Melhores datas: completar",
+      href: "/clientes/cidades",
       nivel: "info",
     });
   if (indicacoesParaLigar && indicacoesParaLigar > 0)

@@ -156,6 +156,8 @@ export const AVISOS_DASHBOARD: { id: string; rotulo: string; dica: string }[] = 
   { id: "cadastros", rotulo: "Cadastros novos do formulário", dica: "Conferir e liberar na Academy." },
   { id: "indicacoes", rotulo: "Indicações para ligar", dica: "Nome de quem indicou que não bateu com um cadastro só." },
   { id: "importar-fatura", rotulo: "Importar fatura do cartão", dica: "Depois do fechamento, até importar o OFX." },
+  { id: "descontos-vencendo", rotulo: "Descontos de indicação vencendo", dica: "Faltam 3 dias ou menos." },
+  { id: "sem-cidade", rotulo: "Cadastros sem cidade", dica: "Ficam fora do Encaixe e das Melhores datas." },
 ];
 
 /** Blocos do Dashboard que podem ser escondidos (o destaque do mês e "Precisa de você" ficam sempre). */

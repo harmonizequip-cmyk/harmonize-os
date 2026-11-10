@@ -341,6 +341,9 @@ export default function ClienteDetailClient({
         <div>
           <p className="text-xs text-neutral-500">Cidade</p>
           <p className="mt-0.5 text-sm text-neutral-900">{client.city ?? "-"}</p>
+          {((client as { cidades_extras?: string[] | null }).cidades_extras ?? []).length > 0 && (
+            <p className="text-xs text-neutral-500">Atende também em {((client as { cidades_extras?: string[] | null }).cidades_extras ?? []).join(", ")}</p>
+          )}
         </div>
         <div>
           <p className="text-xs text-neutral-500">Endereço</p>

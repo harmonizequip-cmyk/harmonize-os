@@ -112,7 +112,7 @@ export default async function EncaixePage(props: { searchParams: Promise<{ data?
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-neutral-500">
                       <span className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${classe.cor}`}>{classe.rotulo}</span>
                       <span>
-                        {c.pessoa.cidade} · ~{Math.round(c.km)} km de {c.perto}
+                        {c.cidadeDela ?? c.pessoa.cidade} · ~{Math.round(c.km)} km de {c.perto}
                       </span>
                       {c.pessoa.devida && <span className="font-semibold text-amber-600">hora de conversar</span>}
                     </p>

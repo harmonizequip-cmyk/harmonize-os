@@ -27,6 +27,7 @@ import { buscarTodas } from "@/lib/buscar-todas";
 import { carregarMapaCidades } from "@/lib/carregar-cidades";
 import { agendaDoEncaixe, type EventoComCidade } from "@/lib/encaixe";
 import type { MapaCidades } from "@/lib/cidades-coordenadas";
+import { cidadesDaCliente } from "@/lib/cidades-cliente";
 import { buildWhatsAppLink } from "@/lib/format";
 import { hojeLocal, somarDias } from "@/lib/period";
 import { saudacaoCurta } from "@/lib/saudacao";
@@ -76,6 +77,8 @@ interface Pessoa {
   tratamento: string | null;
   whatsapp: string | null;
   cidade: string | null;
+  /** Principal e as extras (clients.cidades_extras), sem repetir. */
+  cidades: string[];
 }
 
 interface AgendaMes {
@@ -154,7 +157,9 @@ export default function MelhoresDatasModal({
     Promise.all([
       supabase.from("clients").select("name, display_name, treatment, whatsapp, city").eq("id", clienteId).maybeSingle(),
       carregarMapaCidades(supabase),
-    ]).then(([{ data, error }, m]) => {
+      // Cidades extras: sem o SQL de 10/11 a coluna não existe e fica só a principal.
+      supabase.from("clients").select("cidades_extras").eq("id", clienteId).maybeSingle(),
+    ]).then(([{ data, error }, m, extras]) => {
       if (!vivo) return;
       if (error) {
         setErro(`Não consegui carregar o cadastro: ${error.message}`);
@@ -166,6 +171,10 @@ export default function MelhoresDatasModal({
         tratamento: (data?.treatment as string | null) ?? null,
         whatsapp: (data?.whatsapp as string | null) ?? null,
         cidade: (data?.city as string | null) ?? null,
+        cidades: cidadesDaCliente(
+          (data?.city as string | null) ?? null,
+          extras.error ? [] : (((extras.data as { cidades_extras?: string[] | null } | null)?.cidades_extras ?? []) as string[])
+        ),
       });
       setMapa(m);
     });
@@ -214,12 +223,16 @@ export default function MelhoresDatasModal({
     };
   }, [fechar]);
 
+  // Cliente que atende em mais de uma cidade: escolhe para qual olhar (padrão: a principal).
+  const [cidadeEscolhida, setCidadeEscolhida] = useState<string | null>(null);
+  const cidadeAtual = (cidadeEscolhida && pessoa?.cidades.includes(cidadeEscolhida) ? cidadeEscolhida : pessoa?.cidades[0]) ?? pessoa?.cidade ?? null;
+
   const agenda = agendas[mes];
   const datas: DataLogistica[] | null = useMemo(() => {
     if (!agenda || !pessoa || !mapa) return null;
     const ocupados = visao === "ambos" ? agenda.ocupados : ocupadosDaVisao(agenda.porEquip, visao);
-    return melhoresDatas({ mes, hoje, ocupados, eventos: agenda.eventos, cidadePessoa: pessoa.cidade, pertoKm, raioKm, mapa });
-  }, [agenda, pessoa, mapa, mes, hoje, pertoKm, raioKm, visao]);
+    return melhoresDatas({ mes, hoje, ocupados, eventos: agenda.eventos, cidadePessoa: cidadeAtual, pertoKm, raioKm, mapa });
+  }, [agenda, pessoa, mapa, mes, hoje, pertoKm, raioKm, visao, cidadeAtual]);
 
   const chaveMarcadas = `${mes}|${visao}`;
 
@@ -290,7 +303,7 @@ export default function MelhoresDatasModal({
                 {pessoa && (
                   <>
                     {" · "}
-                    <MapPin size={11} className="-mt-0.5 inline" /> {pessoa.cidade?.trim() || "sem cidade no cadastro"}
+                    <MapPin size={11} className="-mt-0.5 inline" /> {cidadeAtual?.trim() || "sem cidade no cadastro"}
                   </>
                 )}
               </p>
@@ -299,6 +312,29 @@ export default function MelhoresDatasModal({
               <X size={16} />
             </button>
           </div>
+
+          {/* Cidade: só aparece para quem atende em mais de uma */}
+          {pessoa && pessoa.cidades.length > 1 && (
+            <div className="mt-3">
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Para qual cidade?</p>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Cidade da cliente">
+                {pessoa.cidades.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={c === cidadeAtual}
+                    onClick={() => setCidadeEscolhida(c)}
+                    className={`inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-xs font-semibold ${
+                      c === cidadeAtual ? "bg-brand-teal text-white" : "bg-neutral-100 text-neutral-700"
+                    }`}
+                  >
+                    <MapPin size={12} /> {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Mês */}
           <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-neutral-50 p-1">

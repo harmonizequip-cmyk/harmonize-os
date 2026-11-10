@@ -46,6 +46,8 @@ export interface PessoaBase {
   displayName: string | null;
   whatsapp: string | null;
   cidade: string | null;
+  /** Outras cidades onde ela atende (clients.cidades_extras). */
+  cidadesExtras?: string[];
   stage: string;
   ehCliente: boolean;
   parceiro: boolean;

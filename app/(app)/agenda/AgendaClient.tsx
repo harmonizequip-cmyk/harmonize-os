@@ -586,7 +586,13 @@ export default function AgendaClient({
                   </span>
                 )}
                 {e.clients?.name && !e.clients.city && (
-                  <span className="ml-1.5 text-[10px] italic text-neutral-400">sem cidade no cadastro</span>
+                  <Link
+                    href={`/clientes/cidades?cliente=${e.client_id}`}
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="ml-1.5 text-[10px] italic text-neutral-400 underline decoration-dotted"
+                  >
+                    sem cidade no cadastro · completar
+                  </Link>
                 )}
                 {/* "sem disparos ainda" é sobre a contagem de disparos do
                     HIPRO (preço/procedimento), não tem relação com
