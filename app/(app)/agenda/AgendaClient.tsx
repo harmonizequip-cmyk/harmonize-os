@@ -18,7 +18,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
-import { buildWhatsAppLink, formatDate } from "@/lib/format";
+import { buildWazeLink, buildWhatsAppLink, formatDate } from "@/lib/format";
 import { buildPedidoConfirmacaoMessage } from "@/lib/confirmacao";
 import { usePreferencias } from "@/lib/usar-preferencias";
 import { exportarTabela } from "@/lib/exportar-planilha";
@@ -36,7 +36,7 @@ import ReservarHiproModal from "./ReservarHiproModal";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import { avisar } from "@/components/Dialogos";
 import HeroTela from "@/components/ui/HeroTela";
-import { CalendarCheck, Clock3, MapPin } from "lucide-react";
+import { CalendarCheck, Clock3, MapPin, MessageCircle, Navigation } from "lucide-react";
 
 // `hex` é a mesma cor de `dot`, só que em valor puro — necessário porque o
 // indicador do dia no calendário (abaixo) usa conic-gradient via style
@@ -76,6 +76,8 @@ interface EventRow {
     // Cidade da cliente, mostrada no cartão para reconhecer quem é (pedido do dono, 08/11/2026).
     city?: string | null;
     state?: string | null;
+    // Endereço do cadastro, para o botão do Waze (pedido do dono, 11/11/2026).
+    address?: string | null;
     // Usados só na mensagem de "pedir confirmação" (ver
     // buildPedidoConfirmacaoMessage), nunca no card em si — o card
     // continua mostrando clients.name, que pode ter mais coisa
@@ -572,12 +574,7 @@ export default function AgendaClient({
                     Taxa vencida
                   </span>
                 )}
-                {e.clients?.name && (
-                  <>
-                    {" · "}
-                    <LinkCliente id={e.client_id}>{e.clients.name}</LinkCliente>
-                  </>
-                )}
+                {/* O nome da cliente já está no título do cartão: aqui fica só o HIPRO. */}
                 {e.clients?.city && (
                   <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
                     <MapPin size={10} />
@@ -623,19 +620,53 @@ export default function AgendaClient({
               )}
             </div>
           </div>
-          <button
-            onClick={(ev) => {
-              ev.stopPropagation();
-              toggleConfirmed(e);
-            }}
-            className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
-              e.confirmed
-                ? "bg-brand-teal/10 text-brand-teal"
-                : "bg-amber-100 text-amber-700"
-            }`}
-          >
-            {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
-          </button>
+          <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+            <button
+              onClick={(ev) => {
+                ev.stopPropagation();
+                toggleConfirmed(e);
+              }}
+              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
+                e.confirmed
+                  ? "bg-brand-teal/10 text-brand-teal"
+                  : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
+            </button>
+            {/* WhatsApp e Waze do cadastro, só quando existem. */}
+            {(() => {
+              const zap = buildWhatsAppLink(e.clients?.whatsapp);
+              const waze = buildWazeLink(e.clients?.address);
+              if (!zap && !waze) return null;
+              return (
+                <div className="flex gap-1.5" onClick={(ev) => ev.stopPropagation()}>
+                  {zap && (
+                    <a
+                      href={zap}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Abrir conversa no WhatsApp"
+                      className="inline-flex min-h-9 items-center gap-1 rounded-full bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"
+                    >
+                      <MessageCircle size={14} /> WhatsApp
+                    </a>
+                  )}
+                  {waze && (
+                    <a
+                      href={waze}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Abrir o endereço no Waze"
+                      className="inline-flex min-h-9 items-center gap-1 rounded-full bg-sky-50 px-2.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200"
+                    >
+                      <Navigation size={14} /> Waze
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
           {e.client_id && (
             <MenuAtalhosCliente
               clienteId={e.client_id}

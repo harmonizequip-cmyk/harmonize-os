@@ -14,7 +14,7 @@ export default async function AgendaPage() {
       supabase
         .from("calendar_events")
         .select(
-          "id, event_type, title, date_start, date_end, status, confirmed, value, client_id, equipment_id, clients(name, whatsapp, treatment, display_name, city, state), rental_id, notes, taxa_status, confirmation_message_sent_at, is_mentoria, created_at, contagem_inicial, contagem_inicial_em"
+          "id, event_type, title, date_start, date_end, status, confirmed, value, client_id, equipment_id, clients(name, whatsapp, treatment, display_name, city, state, address), rental_id, notes, taxa_status, confirmation_message_sent_at, is_mentoria, created_at, contagem_inicial, contagem_inicial_em"
         )
         .neq("status", "cancelada")
         .order("date_start", { ascending: true })
