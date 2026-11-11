@@ -545,11 +545,23 @@ export default function AgendaClient({
         onClick={() => setEditingEvent(e)}
         className="cursor-pointer rounded-xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl transition hover:border-brand-teal hover:shadow-glow-brand"
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-start gap-2">
-            <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${meta.dot}`} />
-            <div>
-              <p className="text-sm font-medium text-neutral-900">{e.title}</p>
+        <div className="flex items-start gap-2">
+          <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${meta.dot}`} />
+          <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-neutral-900">{e.title}</p>
+          {e.client_id && (
+            <MenuAtalhosCliente
+              clienteId={e.client_id}
+              nome={e.clients?.name ?? null}
+              nomeCurto={e.clients?.display_name ?? null}
+              tratamento={e.clients?.treatment ?? null}
+              eventoId={e.id}
+              className="-mr-2 -mt-2 flex-shrink-0"
+            />
+          )}
+        </div>
+
+        {/* Informações em toda a largura do cartão, abaixo do título. */}
+        <div className="mt-1 pl-4">
               {/* Na lista de confirmação os cartões são de dias diferentes,
                   então a data do atendimento aparece em destaque. */}
               {comData && !(e.date_end && e.date_end > e.date_start) && (
@@ -562,21 +574,21 @@ export default function AgendaClient({
                   {formatDate(e.date_start)} a {formatDate(e.date_end)} ({duracaoEmDias(e.date_start, e.date_end)} dias, uma reserva só)
                 </p>
               )}
-              <p className="mt-0.5 text-xs text-neutral-500">
-                {meta.label}
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
+                <span className="font-medium text-neutral-700">{meta.label}</span>
                 {ehPreReserva(e) && (
-                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                     Pré-reserva
                   </span>
                 )}
                 {ehPreReserva(e) && taxaVencida(e.created_at, hojeLocal(), diasTaxa) && (
-                  <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
+                  <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
                     Taxa vencida
                   </span>
                 )}
                 {/* O nome da cliente já está no título do cartão: aqui fica só o HIPRO. */}
                 {e.clients?.city && (
-                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
                     <MapPin size={10} />
                     {e.clients.city}
                     {e.clients.state ? ` - ${e.clients.state}` : ""}
@@ -586,7 +598,7 @@ export default function AgendaClient({
                   <Link
                     href={`/clientes/cidades?cliente=${e.client_id}`}
                     onClick={(ev) => ev.stopPropagation()}
-                    className="ml-1.5 text-[10px] italic text-neutral-400 underline decoration-dotted"
+                    className="text-[10px] italic text-neutral-400 underline decoration-dotted"
                   >
                     sem cidade no cadastro · completar
                   </Link>
@@ -594,9 +606,9 @@ export default function AgendaClient({
                 {/* "sem disparos ainda" é sobre a contagem de disparos do
                     HIPRO (preço/procedimento), não tem relação com
                     mensagem de confirmação — por isso continua igual. */}
-                {isPending ? " · sem disparos ainda" : ""}
+                {isPending && <span className="text-neutral-400">sem disparos ainda</span>}
                 {credito && (
-                  <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
                     tem crédito
                   </span>
                 )}
@@ -618,66 +630,54 @@ export default function AgendaClient({
                   Contagem inicial: {Number(e.contagem_inicial).toLocaleString("pt-BR")}
                 </p>
               )}
-            </div>
-          </div>
-          <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-            <button
-              onClick={(ev) => {
-                ev.stopPropagation();
-                toggleConfirmed(e);
-              }}
-              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
-                e.confirmed
-                  ? "bg-brand-teal/10 text-brand-teal"
-                  : "bg-amber-100 text-amber-700"
-              }`}
-            >
-              {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
-            </button>
-            {/* WhatsApp e Waze do cadastro, só quando existem. */}
-            {(() => {
-              const zap = buildWhatsAppLink(e.clients?.whatsapp);
-              const waze = buildWazeLink(e.clients?.address);
-              if (!zap && !waze) return null;
-              return (
-                <div className="flex gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-                  {zap && (
-                    <a
-                      href={zap}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="Abrir conversa no WhatsApp"
-                      className="inline-flex min-h-9 items-center gap-1 rounded-full bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"
-                    >
-                      <MessageCircle size={14} /> WhatsApp
-                    </a>
-                  )}
-                  {waze && (
-                    <a
-                      href={waze}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="Abrir o endereço no Waze"
-                      className="inline-flex min-h-9 items-center gap-1 rounded-full bg-sky-50 px-2.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200"
-                    >
-                      <Navigation size={14} /> Waze
-                    </a>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          {e.client_id && (
-            <MenuAtalhosCliente
-              clienteId={e.client_id}
-              nome={e.clients?.name ?? null}
-              nomeCurto={e.clients?.display_name ?? null}
-              tratamento={e.clients?.treatment ?? null}
-              eventoId={e.id}
-              className="-mr-2 -mt-2 flex-shrink-0"
-            />
-          )}
         </div>
+
+        <button
+          onClick={(ev) => {
+            ev.stopPropagation();
+            toggleConfirmed(e);
+          }}
+          className={`mt-2 w-full rounded-lg py-2 text-xs font-semibold ${
+            e.confirmed ? "bg-brand-teal/10 text-brand-teal" : "bg-amber-100 text-amber-700"
+          }`}
+        >
+          {e.confirmed ? "Confirmado ✓" : isPending ? "Confirmar reserva" : "Não confirmado"}
+        </button>
+
+        {/* Atalhos da cliente: WhatsApp e Waze do cadastro, lado a lado e só quando existem. */}
+        {(() => {
+          const zap = buildWhatsAppLink(e.clients?.whatsapp);
+          const waze = buildWazeLink(e.clients?.address);
+          if (!zap && !waze) return null;
+          return (
+            <div className="mt-2 grid grid-cols-2 gap-2" onClick={(ev) => ev.stopPropagation()}>
+              {zap ? (
+                <a
+                  href={zap}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"
+                >
+                  <MessageCircle size={15} /> WhatsApp
+                </a>
+              ) : (
+                <span />
+              )}
+              {waze ? (
+                <a
+                  href={waze}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-sky-50 text-xs font-semibold text-sky-700 ring-1 ring-sky-200"
+                >
+                  <Navigation size={15} /> Waze
+                </a>
+              ) : (
+                <span />
+              )}
+            </div>
+          );
+        })()}
 
         {/* Ação independente da confirmação: manda a mensagem, nunca
             confirma sozinha (seção 2/3 do pedido). Só faz sentido
