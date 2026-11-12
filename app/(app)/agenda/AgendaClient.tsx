@@ -36,7 +36,7 @@ import ReservarHiproModal from "./ReservarHiproModal";
 import AvailabilityImageModal from "@/components/AvailabilityImageModal";
 import { avisar } from "@/components/Dialogos";
 import HeroTela from "@/components/ui/HeroTela";
-import { CalendarCheck, Clock3, MapPin, MessageCircle, Navigation } from "lucide-react";
+import { CalendarCheck, Clock3, MapPin, MessageCircle, Navigation, X } from "lucide-react";
 
 // `hex` é a mesma cor de `dot`, só que em valor puro — necessário porque o
 // indicador do dia no calendário (abaixo) usa conic-gradient via style
@@ -946,6 +946,15 @@ export default function AgendaClient({
                     title="HIPRO bloqueado"
                   />
                 )}
+                {/* Dia ocupado: X pequeno no canto, sem tirar o anel nem esconder o número. */}
+                {hasEvents && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -right-0.5 -top-0.5 z-10 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-red-500 shadow-sm ring-1 ring-red-200"
+                  >
+                    <X size={9} strokeWidth={3} />
+                  </span>
+                )}
                 {hasEvents && !selected ? (
                   <div
                     className="flex h-9 w-9 items-center justify-center rounded-full p-[2px]"
@@ -966,7 +975,7 @@ export default function AgendaClient({
 
       <p className="text-[11px] text-neutral-400">
         Anel claro no dia = pré-reserva (taxa de reserva pendente). Anel com a cor cheia = agendamento (taxa paga ou
-        isenta). Traço cinza embaixo do dia = HIPRO bloqueado (manutenção, recesso).
+        isenta). Traço cinza embaixo do dia = HIPRO bloqueado (manutenção, recesso). X vermelho no canto = dia ocupado.
       </p>
 
       <div>
