@@ -8,7 +8,31 @@ const COLORS = {
   ink: "#1f2937",
   muted: "#9aa3ad",
   closed: "#c17a6e",
+  ocupado: "#D9577E",
 };
+
+// X pequeno no canto de cima do círculo: deixa claro que o dia está
+// ocupado sem esconder o número nem tirar o círculo.
+function desenharXOcupado(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = COLORS.ocupado;
+  ctx.stroke();
+  const d = r * 0.45;
+  ctx.beginPath();
+  ctx.moveTo(x - d, y - d);
+  ctx.lineTo(x + d, y + d);
+  ctx.moveTo(x + d, y - d);
+  ctx.lineTo(x - d, y + d);
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.stroke();
+  ctx.restore();
+}
 
 // Versões mais profundas das mesmas cores da marca, só para o botão de
 // chamada no rodapé — o tom pastel original fica ótimo em área pequena,
@@ -257,6 +281,8 @@ export async function drawAvailabilityImage({
       ctx.fillStyle = COLORS.ink;
     }
     ctx.fillText(String(day.getDate()), cx, cy + 1);
+
+    if (needsRing) desenharXOcupado(ctx, cx + 27, cy - 27, 11);
   });
 
   // Legenda mínima, só pra explicar o círculo.
@@ -268,6 +294,7 @@ export async function drawAvailabilityImage({
   ctx.lineWidth = 3;
   ctx.strokeStyle = COLORS.teal;
   ctx.stroke();
+  desenharXOcupado(ctx, legendCx + 9, legendY - 9, 6);
   ctx.font = "500 22px system-ui, -apple-system, sans-serif";
   ctx.fillStyle = COLORS.muted;
   ctx.textAlign = "left";
