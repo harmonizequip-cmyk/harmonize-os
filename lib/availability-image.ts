@@ -11,25 +11,20 @@ const COLORS = {
   ocupado: "#D9577E",
 };
 
-// X pequeno no canto de cima do círculo: deixa claro que o dia está
-// ocupado sem esconder o número nem tirar o círculo.
-function desenharXOcupado(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+// X discreto por cima do número do dia reservado: deixa claro que está
+// ocupado sem tirar o círculo e sem apagar o número (traço fino e meio
+// transparente).
+function desenharXOcupado(ctx: CanvasRenderingContext2D, x: number, y: number, meio: number, espessura = 3) {
   ctx.save();
+  ctx.globalAlpha = 0.6;
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = COLORS.ocupado;
-  ctx.stroke();
-  const d = r * 0.45;
-  ctx.beginPath();
-  ctx.moveTo(x - d, y - d);
-  ctx.lineTo(x + d, y + d);
-  ctx.moveTo(x + d, y - d);
-  ctx.lineTo(x - d, y + d);
-  ctx.lineWidth = 2.5;
+  ctx.moveTo(x - meio, y - meio);
+  ctx.lineTo(x + meio, y + meio);
+  ctx.moveTo(x + meio, y - meio);
+  ctx.lineTo(x - meio, y + meio);
+  ctx.lineWidth = espessura;
   ctx.lineCap = "round";
+  ctx.strokeStyle = COLORS.ocupado;
   ctx.stroke();
   ctx.restore();
 }
@@ -282,7 +277,7 @@ export async function drawAvailabilityImage({
     }
     ctx.fillText(String(day.getDate()), cx, cy + 1);
 
-    if (needsRing) desenharXOcupado(ctx, cx + 27, cy - 27, 11);
+    if (needsRing) desenharXOcupado(ctx, cx, cy, 17);
   });
 
   // Legenda mínima, só pra explicar o círculo.
@@ -294,7 +289,7 @@ export async function drawAvailabilityImage({
   ctx.lineWidth = 3;
   ctx.strokeStyle = COLORS.teal;
   ctx.stroke();
-  desenharXOcupado(ctx, legendCx + 9, legendY - 9, 6);
+  desenharXOcupado(ctx, legendCx, legendY, 6, 2);
   ctx.font = "500 22px system-ui, -apple-system, sans-serif";
   ctx.fillStyle = COLORS.muted;
   ctx.textAlign = "left";

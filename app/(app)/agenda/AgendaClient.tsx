@@ -946,13 +946,13 @@ export default function AgendaClient({
                     title="HIPRO bloqueado"
                   />
                 )}
-                {/* Dia ocupado: X pequeno no canto, sem tirar o anel nem esconder o número. */}
+                {/* Dia ocupado: X discreto por cima do número, sem tirar o anel. */}
                 {hasEvents && (
                   <span
                     aria-hidden
-                    className="pointer-events-none absolute -right-0.5 -top-0.5 z-10 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-red-500 shadow-sm ring-1 ring-red-200"
+                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-red-500/60"
                   >
-                    <X size={9} strokeWidth={3} />
+                    <X size={26} strokeWidth={2} />
                   </span>
                 )}
                 {hasEvents && !selected ? (
@@ -975,7 +975,7 @@ export default function AgendaClient({
 
       <p className="text-[11px] text-neutral-400">
         Anel claro no dia = pré-reserva (taxa de reserva pendente). Anel com a cor cheia = agendamento (taxa paga ou
-        isenta). Traço cinza embaixo do dia = HIPRO bloqueado (manutenção, recesso). X vermelho no canto = dia ocupado.
+        isenta). Traço cinza embaixo do dia = HIPRO bloqueado (manutenção, recesso). X vermelho por cima do número = dia ocupado.
       </p>
 
       <div>
