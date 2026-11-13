@@ -9,6 +9,8 @@ import IndicadoPorSelect from "@/components/IndicadoPorSelect";
 import { confirmar } from "@/components/Dialogos";
 import { adicionarCidadeExtra } from "@/lib/cidades-cliente";
 import { X } from "lucide-react";
+import { usePreferencias } from "@/lib/usar-preferencias";
+import { origensParaTela, rotuloDaOrigem } from "@/app/(app)/funil/NovoLeadModal";
 
 interface Client {
   id: string;
@@ -26,6 +28,7 @@ interface Client {
   // Tabela de preço antiga (aluguel R$ 497 + disparo), migration 2026-11-07-tabela-antiga.
   tabela_antiga?: boolean;
   indicado_por?: string | null;
+  origem?: string | null;
   treatment?: string | null;
   display_name?: string | null;
   // Leva W: CPF/CNPJ do contratante, usado na geração do contrato de locação.
@@ -91,6 +94,19 @@ export default function EditarClienteModal({
   const [isentoTaxa, setIsentoTaxa] = useState(client.isento_taxa ?? false);
   const [tabelaAntiga, setTabelaAntiga] = useState(client.tabela_antiga ?? false);
   const [indicadoPor, setIndicadoPor] = useState<string | null>(client.indicado_por ?? null);
+  // Por onde chegou (pedido do dono, 13/11/2026: corrigir indicação lançada por engano).
+  const preferencias = usePreferencias();
+  const origemOriginal = client.origem ?? "";
+  const [origem, setOrigem] = useState(origemOriginal);
+  const opcoesOrigem = (() => {
+    const lista = origensParaTela(preferencias.listas.origens);
+    if (origemOriginal && !lista.some((o) => o.value === origemOriginal)) {
+      lista.push({ value: origemOriginal, label: rotuloDaOrigem(lista, origemOriginal) });
+    }
+    return lista;
+  })();
+  // Saiu de "indicação" nesta edição: a ligação com quem indicou e a etiqueta saem junto.
+  const deixouDeSerIndicacao = origemOriginal === "indicacao" && origem !== "indicacao";
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,13 +135,21 @@ export default function EditarClienteModal({
         notes: notes || null,
         parceiro,
         isento_taxa: isentoTaxa,
-        indicado_por: indicadoPor,
+        indicado_por: deixouDeSerIndicacao ? null : indicadoPor,
+        ...(origem !== origemOriginal ? { origem: origem || null } : {}),
+        // Nome de indicação pendente (Clientes > Indicações > Para ligar) também sai.
+        ...(deixouDeSerIndicacao ? { indicacao_nome: null } : {}),
         // Cidades extras: só manda quando mudou (sem o SQL de 10/11, a coluna não existe).
         ...(JSON.stringify(cidadesExtras) !== JSON.stringify(extrasOriginais) ? { cidades_extras: cidadesExtras } : {}),
         // Só manda quando mudou: sem o SQL da tabela antiga, a coluna não existe.
         ...(tabelaAntiga !== (client.tabela_antiga ?? false) ? { tabela_antiga: tabelaAntiga } : {}),
       })
       .eq("id", client.id);
+    if (!error && deixouDeSerIndicacao) {
+      // A etiqueta automática "Indicação" foi posta pelo banco; tira junto.
+      const { data: tag } = await supabase.from("tags").select("id").eq("name", "Indicação").maybeSingle();
+      if (tag?.id) await supabase.from("client_tags").delete().eq("client_id", client.id).eq("tag_id", tag.id);
+    }
     setSaving(false);
     if (error) {
       setError("Não foi possível salvar. Tente novamente.");
@@ -310,7 +334,30 @@ export default function EditarClienteModal({
             </div>
           )}
 
-          <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} excludeId={client.id} />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Por onde chegou</label>
+            <select
+              value={origem}
+              onChange={(e) => setOrigem(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            >
+              {!origemOriginal && <option value="">Não informado</option>}
+              {opcoesOrigem.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {deixouDeSerIndicacao && (
+              <p className="mt-1 text-[11px] text-amber-700">
+                Ao salvar, sai a ligação com quem indicou, a etiqueta "Indicação" e o desconto de indicação ainda não usado.
+              </p>
+            )}
+          </div>
+
+          {!deixouDeSerIndicacao && (
+            <IndicadoPorSelect value={indicadoPor} onChange={setIndicadoPor} excludeId={client.id} />
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600">Observação</label>
