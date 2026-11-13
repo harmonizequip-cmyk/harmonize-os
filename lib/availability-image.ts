@@ -8,26 +8,8 @@ const COLORS = {
   ink: "#1f2937",
   muted: "#9aa3ad",
   closed: "#c17a6e",
-  ocupado: "#D9577E",
 };
 
-// X discreto por cima do número do dia reservado: deixa claro que está
-// ocupado sem tirar o círculo e sem apagar o número (traço fino e meio
-// transparente).
-function desenharXOcupado(ctx: CanvasRenderingContext2D, x: number, y: number, meio: number, espessura = 3) {
-  ctx.save();
-  ctx.globalAlpha = 0.6;
-  ctx.beginPath();
-  ctx.moveTo(x - meio, y - meio);
-  ctx.lineTo(x + meio, y + meio);
-  ctx.moveTo(x + meio, y - meio);
-  ctx.lineTo(x - meio, y + meio);
-  ctx.lineWidth = espessura;
-  ctx.lineCap = "round";
-  ctx.strokeStyle = COLORS.ocupado;
-  ctx.stroke();
-  ctx.restore();
-}
 
 // Versões mais profundas das mesmas cores da marca, só para o botão de
 // chamada no rodapé — o tom pastel original fica ótimo em área pequena,
@@ -255,80 +237,36 @@ export async function drawAvailabilityImage({
     const key = toDateKey(day);
     const isPast = day.getTime() < today.getTime();
     const isBusy = busyDates.has(key);
-    const isSunday = day.getDay() === 0;
     const isAvailable = selectedDays.has(key);
-    // Círculo aparece quando o dia está reservado de verdade (evento
-    // marcado) ou foi desmarcado na mão — domingo por si só não ganha
-    // círculo, só um tom diferente de número, pra não poluir a grade com
-    // um círculo em todo domingo do mês.
-    const needsRing = !paraCliente && !isPast && (isBusy || (!isSunday && !isAvailable));
-
-    if (paraCliente) {
-      const escolhida = isAvailable && !isPast;
-      if (escolhida) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, 36, 0, Math.PI * 2);
-        ctx.fillStyle = CTA_COLORS.teal;
-        ctx.fill();
-      }
-      ctx.font = "700 32px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = escolhida ? "#ffffff" : "#d7dbe0";
-      ctx.fillText(String(day.getDate()), cx, cy + 1);
-      return;
-    }
-
-    if (needsRing) {
+    // Modelo único (pedido do dono, 13/11/2026): datas livres em círculo
+    // cheio e o resto do mês apagado, na agenda geral e na da cliente.
+    const livre = isAvailable && !isPast && (paraCliente || !isBusy);
+    if (livre) {
       ctx.beginPath();
       ctx.arc(cx, cy, 36, 0, Math.PI * 2);
-      ctx.lineWidth = 3.5;
-      ctx.strokeStyle = COLORS.teal;
-      ctx.stroke();
+      ctx.fillStyle = CTA_COLORS.teal;
+      ctx.fill();
     }
-
     ctx.font = "700 32px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    if (isPast) {
-      ctx.fillStyle = "#d7dbe0";
-    } else if (isSunday && !isBusy) {
-      ctx.fillStyle = COLORS.closed;
-    } else {
-      ctx.fillStyle = COLORS.ink;
-    }
+    ctx.fillStyle = livre ? "#ffffff" : "#d7dbe0";
     ctx.fillText(String(day.getDate()), cx, cy + 1);
-
-    if (needsRing) desenharXOcupado(ctx, cx, cy, 17);
   });
 
-  // Legenda mínima, só pra explicar o círculo.
+  // Legenda mínima, só pra explicar o círculo cheio.
   const legendY = cardY + cardHeight + legendGap + legendH / 2;
-  const legendTextWidthGuess = paraCliente ? 300 : 210; // suficiente pro texto abaixo, pra centralizar o par círculo+texto
+  const legendTextWidthGuess = paraCliente ? 300 : 210; // centraliza o par círculo+texto
   const legendCx = width / 2 - legendTextWidthGuess / 2;
-  if (paraCliente) {
-    ctx.beginPath();
-    ctx.arc(legendCx, legendY, 12, 0, Math.PI * 2);
-    ctx.fillStyle = CTA_COLORS.teal;
-    ctx.fill();
-    ctx.font = "500 22px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = COLORS.muted;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Escolha uma destas datas", legendCx + 24, legendY + 1);
-  } else {
   ctx.beginPath();
   ctx.arc(legendCx, legendY, 12, 0, Math.PI * 2);
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = COLORS.teal;
-  ctx.stroke();
-  desenharXOcupado(ctx, legendCx, legendY, 6, 2);
+  ctx.fillStyle = CTA_COLORS.teal;
+  ctx.fill();
   ctx.font = "500 22px system-ui, -apple-system, sans-serif";
   ctx.fillStyle = COLORS.muted;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("Dia já reservado", legendCx + 24, legendY + 1);
-  }
+  ctx.fillText(paraCliente ? "Escolha uma destas datas" : "Datas disponíveis", legendCx + 24, legendY + 1);
 
   // Botão de chamada, em formato de pílula.
   const ctaY = legendY + legendH / 2 + ctaGap;
