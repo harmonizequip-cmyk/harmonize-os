@@ -130,11 +130,17 @@ export async function drawAvailabilityImage({
   selectedDays,
   busyDates,
   today,
+  paraCliente = false,
 }: {
   daysInMonth: Date[];
   selectedDays: Set<string>;
   busyDates: Set<string>;
   today: Date;
+  /**
+   * Imagem de uma cliente só (Melhores datas): só as datas escolhidas pelo
+   * dono aparecem em destaque (círculo cheio); o resto fica apagado, sem X.
+   */
+  paraCliente?: boolean;
 }): Promise<HTMLCanvasElement> {
   const width = 1080;
   const cardMarginX = 64;
@@ -214,7 +220,7 @@ export async function drawAvailabilityImage({
   ctx.font = "600 22px system-ui, -apple-system, sans-serif";
   ctx.fillStyle = COLORS.teal;
   ctx.textAlign = "center";
-  fillTextSpaced(ctx, "AGENDA DISPONÍVEL", width / 2, subtitleY, 4);
+  fillTextSpaced(ctx, paraCliente ? "DATAS SEPARADAS PARA VOCÊ" : "AGENDA DISPONÍVEL", width / 2, subtitleY, 4);
 
   // Cartão branco com a grade do mês.
   ctx.save();
@@ -255,7 +261,23 @@ export async function drawAvailabilityImage({
     // marcado) ou foi desmarcado na mão — domingo por si só não ganha
     // círculo, só um tom diferente de número, pra não poluir a grade com
     // um círculo em todo domingo do mês.
-    const needsRing = !isPast && (isBusy || (!isSunday && !isAvailable));
+    const needsRing = !paraCliente && !isPast && (isBusy || (!isSunday && !isAvailable));
+
+    if (paraCliente) {
+      const escolhida = isAvailable && !isPast;
+      if (escolhida) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 36, 0, Math.PI * 2);
+        ctx.fillStyle = CTA_COLORS.teal;
+        ctx.fill();
+      }
+      ctx.font = "700 32px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = escolhida ? "#ffffff" : "#d7dbe0";
+      ctx.fillText(String(day.getDate()), cx, cy + 1);
+      return;
+    }
 
     if (needsRing) {
       ctx.beginPath();
@@ -282,8 +304,19 @@ export async function drawAvailabilityImage({
 
   // Legenda mínima, só pra explicar o círculo.
   const legendY = cardY + cardHeight + legendGap + legendH / 2;
-  const legendTextWidthGuess = 210; // suficiente pro texto abaixo, pra centralizar o par círculo+texto
+  const legendTextWidthGuess = paraCliente ? 300 : 210; // suficiente pro texto abaixo, pra centralizar o par círculo+texto
   const legendCx = width / 2 - legendTextWidthGuess / 2;
+  if (paraCliente) {
+    ctx.beginPath();
+    ctx.arc(legendCx, legendY, 12, 0, Math.PI * 2);
+    ctx.fillStyle = CTA_COLORS.teal;
+    ctx.fill();
+    ctx.font = "500 22px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = COLORS.muted;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Escolha uma destas datas", legendCx + 24, legendY + 1);
+  } else {
   ctx.beginPath();
   ctx.arc(legendCx, legendY, 12, 0, Math.PI * 2);
   ctx.lineWidth = 3;
@@ -295,6 +328,7 @@ export async function drawAvailabilityImage({
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText("Dia já reservado", legendCx + 24, legendY + 1);
+  }
 
   // Botão de chamada, em formato de pílula.
   const ctaY = legendY + legendH / 2 + ctaGap;

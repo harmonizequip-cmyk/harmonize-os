@@ -13,7 +13,10 @@ import {
   ChevronRight,
   CircleDashed,
   Copy,
+  Download,
+  ImageIcon,
   Loader2,
+  Share2,
   MapPin,
   MessageCircle,
   Snowflake,
@@ -61,6 +64,7 @@ import {
   type VisaoHipro,
 } from "@/lib/datas-logistica";
 import { avisar } from "@/components/Dialogos";
+import { canvasToPngFile, drawAvailabilityImage } from "@/lib/availability-image";
 import { IconeChip } from "@/components/ui/Visual";
 
 // Paleta validada para daltonismo (a dos gráficos), sempre com rótulo e ícone.
@@ -142,7 +146,7 @@ export default function MelhoresDatasModal({
   const [agendas, setAgendas] = useState<Record<string, AgendaMes>>({});
   const [erro, setErro] = useState<string | null>(null);
   const [tentativa, setTentativa] = useState(0);
-  // Datas marcadas por mês (null = ainda não mexeu: vale o padrão, as de "Perto").
+  // Datas marcadas por mês e aba (começa vazio: o dono escolhe).
   // A chave é mês + aba, porque cada aba tem as suas datas.
   const [marcadas, setMarcadas] = useState<Record<string, Set<string>>>({});
   const [visao, setVisao] = useState<VisaoHipro>("ambos");
@@ -238,7 +242,8 @@ export default function MelhoresDatasModal({
 
   const selecionadas = useMemo(() => {
     if (marcadas[chaveMarcadas]) return marcadas[chaveMarcadas];
-    return new Set((datas ?? []).filter((d) => d.grupo === "perto").map((d) => d.data));
+    // Nada vem marcado sozinho: o dono escolhe as datas (pedido de 13/11/2026).
+    return new Set<string>();
   }, [marcadas, chaveMarcadas, datas]);
 
   function alternar(dia: string) {
@@ -270,6 +275,64 @@ export default function MelhoresDatasModal({
     }
   }
 
+  // Imagem só com as datas escolhidas, para esta cliente.
+  const [imagem, setImagem] = useState<{ url: string; arquivo: File } | null>(null);
+  const [gerando, setGerando] = useState(false);
+  useEffect(() => () => { if (imagem) URL.revokeObjectURL(imagem.url); }, [imagem]);
+  const textoMensagem = escolhidas.length ? mensagemMelhoresDatas(saudacao, mes, escolhidas) : "";
+
+  async function gerarImagem() {
+    if (!escolhidas.length) return avisar("Marque ao menos uma data.", "erro");
+    setGerando(true);
+    try {
+      const [a, m] = mes.split("-").map(Number);
+      const ultimo = new Date(a, m, 0).getDate();
+      const dias = Array.from({ length: ultimo }, (_, i) => new Date(a, m - 1, i + 1));
+      const [ha, hm, hd] = hoje.split("-").map(Number);
+      const canvas = await drawAvailabilityImage({
+        daysInMonth: dias,
+        selectedDays: new Set(escolhidas),
+        busyDates: new Set(),
+        today: new Date(ha, hm - 1, hd),
+        paraCliente: true,
+      });
+      const arquivo = await canvasToPngFile(canvas, `datas-${mes}.png`);
+      setImagem({ url: URL.createObjectURL(arquivo), arquivo });
+    } catch {
+      avisar("Não consegui gerar a imagem.", "erro");
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  async function compartilharImagem() {
+    if (!imagem) return;
+    try {
+      await navigator.clipboard.writeText(textoMensagem);
+    } catch {
+      // sem área de transferência: segue só com o compartilhar
+    }
+    const dados = { files: [imagem.arquivo], text: textoMensagem, title: "Datas para você" };
+    if (navigator.canShare?.(dados)) {
+      try {
+        await navigator.share(dados);
+        return;
+      } catch (e) {
+        if ((e as Error)?.name === "AbortError") return;
+      }
+    }
+    baixarImagem();
+    avisar("Imagem baixada. Anexe no WhatsApp da cliente; o texto já está copiado.");
+  }
+
+  function baixarImagem() {
+    if (!imagem) return;
+    const a = document.createElement("a");
+    a.href = imagem.url;
+    a.download = imagem.arquivo.name;
+    a.click();
+  }
+
   const zonas = larguraDasZonas(pertoKm, raioKm);
   const marcadores = datas ? marcadoresDoTermometro(datas, pertoKm, raioKm) : [];
   const niveis = marcadores.reduce((m, x) => Math.max(m, x.nivel + 1), 1);
@@ -289,7 +352,7 @@ export default function MelhoresDatasModal({
         aria-modal="true"
         aria-label={`Melhores datas para ${titulo}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-2xl animate-[subir_.22s_ease-out] sm:max-w-lg sm:rounded-3xl"
+        className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl animate-[subir_.22s_ease-out] sm:max-w-lg sm:rounded-3xl"
       >
         {/* Topo */}
         <div className="flex-shrink-0 px-4 pt-2">
@@ -477,6 +540,14 @@ export default function MelhoresDatasModal({
           <p className="mb-2 text-xs text-neutral-500">
             {escolhidas.length === 0 ? "Nenhuma data marcada." : `${escolhidas.length} ${escolhidas.length === 1 ? "data marcada" : "datas marcadas"}: ${textoDatas(escolhidas)}`}
           </p>
+          <button
+            type="button"
+            onClick={gerarImagem}
+            disabled={!escolhidas.length || gerando}
+            className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-brand-teal/50 text-sm font-bold text-brand-teal disabled:opacity-40"
+          >
+            {gerando ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />} Gerar imagem com estas datas
+          </button>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -505,6 +576,29 @@ export default function MelhoresDatasModal({
             )}
           </div>
         </div>
+
+        {imagem && (
+          <div className="absolute inset-0 z-10 flex flex-col bg-white">
+            <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+              <p className="text-sm font-bold text-neutral-900">Imagem para {pessoa?.nomeCurto || pessoa?.nome || "a cliente"}</p>
+              <button type="button" onClick={() => setImagem(null)} aria-label="Fechar a imagem" className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50 p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagem.url} alt="Imagem com as datas escolhidas" className="mx-auto w-full max-w-sm rounded-xl shadow" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 border-t border-neutral-100 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+              <button type="button" onClick={baixarImagem} className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-neutral-100 text-sm font-bold text-neutral-700">
+                <Download size={15} /> Baixar
+              </button>
+              <button type="button" onClick={compartilharImagem} className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-brand-teal text-sm font-bold text-white">
+                <Share2 size={15} /> Compartilhar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
