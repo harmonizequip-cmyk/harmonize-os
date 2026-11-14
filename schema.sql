@@ -15679,3 +15679,39 @@ grant execute on function public.valor_taxa_atual() to authenticated;
 alter table public.clients add column if not exists cidades_extras text[] not null default '{}';
 comment on column public.clients.cidades_extras is
   'Outras cidades onde a cliente atende, além de city. Melhores datas deixa escolher entre elas; o Encaixe usa a mais perto.';
+
+-- Correção 14/11/2026: nome curto sem tomar o título (Dr./Dra.) como nome.
+create or replace function public.nome_curto_cliente(p_client_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with base as (
+    select nullif(btrim(c.treatment), '') as trat,
+           nullif(btrim(c.display_name), '') as exib,
+           btrim(coalesce(c.name, '')) as nome
+      from clients c where c.id = p_client_id
+  ), partes as (
+    select trat, exib, nome,
+           (regexp_match(nome, '^(dr|dra|doutor|doutora)\.?(\s+|$)', 'i'))[1] as titulo,
+           regexp_replace(nome, '^(dr|dra|doutora|doutor)\.?(\s+|$)', '', 'i') as resto
+      from base
+  ), prim as (
+    select trat, titulo,
+           coalesce(
+             (regexp_match(regexp_replace(coalesce(exib, ''), '^(dr|dra|doutora|doutor)\.?\s+', '', 'i'), '^[^\s().,\-0-9]+'))[1],
+             (regexp_match(resto, '^[^\s().,\-0-9]+'))[1]
+           ) as pn
+      from partes
+  )
+  select nullif(btrim(
+           coalesce(coalesce(trat, case lower(titulo) when 'dr' then 'Dr.' when 'doutor' then 'Dr.'
+                                                      when 'dra' then 'Dra.' when 'doutora' then 'Dra.' end) || ' ', '')
+           || initcap(lower(pn))), '')
+    from prim
+   where pn is not null;
+$$;
+revoke execute on function public.nome_curto_cliente(uuid) from public, anon, authenticated;
+grant execute on function public.nome_curto_cliente(uuid) to service_role;
