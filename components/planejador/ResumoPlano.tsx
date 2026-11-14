@@ -10,10 +10,24 @@ import { CSS_PRONTUARIO, htmlFichaPaciente, htmlProntuario, imagemDaArea } from 
 import { fmt } from "./Partes";
 import { usePreferencias } from "@/lib/usar-preferencias";
 
-type Modo = "lista" | "prontuario" | "paciente";
+export type ModoResumo = "lista" | "prontuario" | "paciente";
+type Modo = ModoResumo;
 
-export default function ResumoPlano({ plano, onIrParaArea }: { plano: Plano; onIrParaArea: (id: string) => void }) {
-  const [modo, setModo] = useState<Modo>("lista");
+export default function ResumoPlano({
+  plano,
+  onIrParaArea,
+  onModo,
+}: {
+  plano: Plano;
+  onIrParaArea: (id: string) => void;
+  /** Avisa a visão aberta, para o botão PDF do editor gerar o documento certo. */
+  onModo?: (m: ModoResumo) => void;
+}) {
+  const [modo, setModoInterno] = useState<Modo>("lista");
+  const setModo = (m: Modo) => {
+    setModoInterno(m);
+    onModo?.(m);
+  };
   const preferencias = usePreferencias();
   const s = situacaoSaldo(plano);
   const avisos = alertas(plano);

@@ -38,7 +38,7 @@ import AssinaturasSessoes from "@/components/planejador/AssinaturasSessoes";
 import SeletorPlanejamento from "@/components/SeletorPlanejamento";
 import ConfirmarApagarModal from "@/components/ConfirmarApagarModal";
 import { CartaoArea, Folha, FolhaModelo, FolhaNovaArea, fmt } from "@/components/planejador/Partes";
-import ResumoPlano from "@/components/planejador/ResumoPlano";
+import ResumoPlano, { type ModoResumo } from "@/components/planejador/ResumoPlano";
 import BotaoOrientacoes from "@/components/planejador/BotaoOrientacoes";
 import { mensagemOrientacoesPos } from "@/lib/orientacoes-pos";
 import { AVISO_GERAL_APLICACAO } from "@/lib/zonas-risco";
@@ -856,6 +856,8 @@ export default function EditorPlanejamento({
     }, titulo);
   }
 
+  // Visão aberta no Resumo: com "Paciente", o PDF da barra sai a ficha do paciente (pedido de 14/11/2026).
+  const [modoResumo, setModoResumo] = useState<ModoResumo>("lista");
   function pdf(tipo: "prontuario" | "paciente") {
     const origem = window.location.origin;
     const nome = plano.paciente || "paciente";
@@ -1543,7 +1545,7 @@ export default function EditorPlanejamento({
 
           {aba === "resumo" && (
             <div key="resumo" className="animate-[aparecer_.25s_ease-out]">
-              <ResumoPlano plano={plano} onIrParaArea={irParaArea} />
+              <ResumoPlano plano={plano} onIrParaArea={irParaArea} onModo={setModoResumo} />
               <div className={`${cartao} mt-4`}>
                 <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Depois da sessão</p>
                 <p className="mb-3 text-xs text-neutral-500">Cuidados, o que esperar{plano.dataRetorno ? " e o próximo retorno" : ""}, já escritos para o WhatsApp do paciente.</p>
@@ -1613,8 +1615,8 @@ export default function EditorPlanejamento({
                 <button onClick={compartilharResumo} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 py-3.5 text-sm font-bold text-white">
                   <Share2 size={16} /> Enviar
                 </button>
-                <button onClick={() => pdf("prontuario")} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
-                  <FileText size={16} /> PDF
+                <button onClick={() => pdf(modoResumo === "paciente" ? "paciente" : "prontuario")} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-brand-gradient py-3.5 text-sm font-bold text-white shadow-glow-teal">
+                  <FileText size={16} /> {modoResumo === "paciente" ? "PDF paciente" : "PDF"}
                 </button>
               </>
             )}
