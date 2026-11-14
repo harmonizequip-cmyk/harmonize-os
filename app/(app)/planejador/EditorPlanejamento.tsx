@@ -324,14 +324,21 @@ export default function EditorPlanejamento({
       clearTimeout(repetir.current);
       repetir.current = null;
     }
-    const rodada = (async () => {
+    // Nada para salvar: não abre rodada. Antes, uma rodada que terminava na
+    // hora (sem mudança, ex.: ao trocar de app) ficava guardada como "em
+    // andamento" para sempre e nenhum salvamento seguinte ia ao banco.
+    if (!sujo.current) return Promise.resolve();
+    // eslint-disable-next-line prefer-const
+    let rodada: Promise<void> | null = null;
+    rodada = (async () => {
+      await Promise.resolve();
       let r: "ok" | "nada" | "erro" = "nada";
       try {
         while (sujo.current && (r = await salvarUmaVez()) === "ok") {
           // repete enquanto houver mudança nova
         }
       } finally {
-        emAndamento.current = null;
+        if (emAndamento.current === rodada) emAndamento.current = null;
       }
       if (r === "erro" && sujo.current && montado.current) {
         const ms = proximaEspera(tentativas.current++);
