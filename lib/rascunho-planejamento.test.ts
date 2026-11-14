@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chaveRascunho, decidirRascunho, impressao, lerRascunho, proximaEspera, VALIDADE_RASCUNHO_MS, type Rascunho } from "./rascunho-planejamento";
+import { chaveRascunho, decidirRascunho, impressao, lerRascunho, PREFIXO_RASCUNHO, proximaEspera, rascunhosOrfaos, VALIDADE_RASCUNHO_MS, type Rascunho } from "./rascunho-planejamento";
 import { normalizarPlano, paraEstado } from "./planejador";
 import type { EstadoPlanejador } from "./planejamento";
 
@@ -96,5 +96,39 @@ describe("decidirRascunho em plano novo", () => {
 describe("proximaEspera", () => {
   it("cresce e para em 30 s", () => {
     expect([0, 1, 2, 3, 4, 5, 20].map(proximaEspera)).toEqual([2000, 5000, 10000, 20000, 30000, 30000, 30000]);
+  });
+});
+
+describe("rascunhosOrfaos", () => {
+  const agora = Date.UTC(2026, 10, 14, 13);
+  const comDisparos = {
+    v: 1,
+    estado: { paciente: "ALTAMIR", DATA: { pescoco: [{ prof: "4.5", dispD: 500, dispE: 500 }] } },
+    cliente: "c1",
+    evento: "",
+    versao: 3,
+    em: agora - 3600000,
+    base: null,
+  };
+  const vazio = { ...comDisparos, estado: { paciente: "SEM DISPAROS", DATA: {} } };
+  it("acha só o rascunho de plano apagado que tem disparos", () => {
+    const r = rascunhosOrfaos(
+      [
+        { chave: PREFIXO_RASCUNHO + "apagado", texto: JSON.stringify(comDisparos) },
+        { chave: PREFIXO_RASCUNHO + "existe", texto: JSON.stringify(comDisparos) },
+        { chave: PREFIXO_RASCUNHO + "vazio", texto: JSON.stringify(vazio) },
+        { chave: PREFIXO_RASCUNHO + "novo-c1-sem", texto: JSON.stringify(comDisparos) },
+        { chave: "outra-coisa", texto: JSON.stringify(comDisparos) },
+      ],
+      new Set(["existe"]),
+      agora
+    );
+    expect(r.map((x) => x.id)).toEqual(["apagado"]);
+    expect(r[0].total).toBe(1000);
+    expect(r[0].paciente).toBe("ALTAMIR");
+  });
+  it("ignora rascunho velho demais", () => {
+    const velho = { ...comDisparos, em: agora - 40 * 86400000 };
+    expect(rascunhosOrfaos([{ chave: PREFIXO_RASCUNHO + "x", texto: JSON.stringify(velho) }], new Set(), agora)).toEqual([]);
   });
 });

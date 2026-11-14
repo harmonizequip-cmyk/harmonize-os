@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/format";
 import { ArrowLeft, CalendarClock, CalendarDays, CircleCheck, ChevronRight, ClipboardList, Clock3, KeyRound, Plus, Search, UserRound, Users, X } from "lucide-react";
 import { useSomenteLeitura } from "@/components/SomenteLeitura";
 import FichaPaciente from "@/components/planejador/FichaPaciente";
+import RascunhosPerdidos from "@/components/planejador/RascunhosPerdidos";
 import SeloSituacao from "@/components/planejador/SeloSituacao";
 import { normalizarNome } from "@/lib/historico-paciente";
 import { createClient } from "@/lib/supabase/client";
@@ -380,6 +381,8 @@ export default function PlanejadorLista({
       </div>
 
       {erro && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{erro}</p>}
+
+      {!somenteLeitura && !erro && <RascunhosPerdidos planejamentos={planejamentos} />}
 
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />

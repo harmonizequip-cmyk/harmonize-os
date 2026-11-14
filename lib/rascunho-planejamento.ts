@@ -113,3 +113,34 @@ export function proximaEspera(tentativa: number): number {
   const passos = [2000, 5000, 10000, 20000];
   return tentativa >= 0 && tentativa < passos.length ? passos[tentativa] : 30000;
 }
+
+export type RascunhoOrfao = {
+  chave: string;
+  id: string;
+  rascunho: Rascunho;
+  paciente: string;
+  total: number;
+};
+
+/**
+ * Rascunhos de planos salvos que não existem mais no banco (o plano foi
+ * apagado antes de o rascunho chegar lá) e que têm disparos: o celular ainda
+ * guarda o trabalho, e a lista do Planejador oferece recuperar como plano novo.
+ * Só planos salvos (chave com id), nunca os "novo-<cliente>-<evento>".
+ */
+export function rascunhosOrfaos(entradas: { chave: string; texto: string | null }[], idsExistentes: Set<string>, agora = Date.now()): RascunhoOrfao[] {
+  const saida: RascunhoOrfao[] = [];
+  for (const { chave, texto } of entradas) {
+    if (!chave.startsWith(PREFIXO_RASCUNHO)) continue;
+    const id = chave.slice(PREFIXO_RASCUNHO.length);
+    if (!id || id.startsWith("novo-") || idsExistentes.has(id)) continue;
+    const r = lerRascunho(texto);
+    if (!r || agora - r.em > VALIDADE_RASCUNHO_MS) continue;
+    const p = normalizarPlano(r.estado);
+    const total = totalDistribuido(p) + usadoEmAnteriores(p);
+    if (total <= 0) continue;
+    const paciente = typeof r.estado.paciente === "string" ? r.estado.paciente.trim() : "";
+    saida.push({ chave, id, rascunho: r, paciente, total });
+  }
+  return saida.sort((a, b) => b.rascunho.em - a.rascunho.em);
+}
