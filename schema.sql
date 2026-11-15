@@ -11825,6 +11825,7 @@ declare
   v_evento uuid := p_calendar_event_id;
   v_nome text;
   v_paciente uuid;
+  v_antigo uuid;
 begin
   if v_cliente is null and not has_module_permission('agenda') then
     raise exception 'Sem permissão para salvar planejamentos.';
@@ -11882,6 +11883,7 @@ begin
         || case when v_cliente is not null then ' (pela cliente)' else '' end,
       jsonb_build_object('client_id', v_client_id, 'calendar_event_id', v_evento, 'paciente_id', v_paciente));
   else
+    select paciente_id into v_antigo from planejamentos where id = v_id;
     update planejamentos set
       client_id = v_client_id,
       calendar_event_id = v_evento,
@@ -11896,6 +11898,17 @@ begin
       updated_at = now()
     where id = v_id and (v_cliente is null or client_id = v_cliente);
     if not found then raise exception 'Planejamento não encontrado.'; end if;
+    -- Digitar o nome salva o plano várias vezes (R, RI, RIA...) e cada pausa criava um paciente.
+    -- O cadastro que ficou para trás, recente, sem dados e sem outro planejamento, é apagado.
+    if v_antigo is not null and v_antigo is distinct from v_paciente then
+      delete from pacientes pa
+       where pa.id = v_antigo
+         and pa.created_at > now() - interval '1 day'
+         and pa.whatsapp is null and pa.nascimento is null and pa.observacoes is null
+         and pa.fotos_autorizadas_em is null
+         and not exists (select 1 from planejamentos p where p.paciente_id = pa.id)
+         and not exists (select 1 from paciente_fotos f where f.paciente_id = pa.id);
+    end if;
   end if;
   return v_id;
 end;
