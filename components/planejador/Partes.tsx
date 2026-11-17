@@ -13,7 +13,7 @@ import { CATALOGO_CORPORAL } from "@/lib/boneco-corporal";
 import { imagemDaArea } from "@/lib/planejador-impressao";
 import { urlCorpoInteiro } from "@/lib/corpo-foto";
 import { resumoDaZona, zonaDeRisco } from "@/lib/zonas-risco";
-import { MOVIMENTO_DA_AREA, OPTS_PAP, linhaAbaixoDoMinimo, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
+import { MOVIMENTO_DA_AREA, marcarLados, OPTS_PAP, linhaAbaixoDoMinimo, linhaAcimaDoMaximo, linhaVazia, maximoDaLinha, subtotalLinha, type Area, type Linha } from "@/lib/planejador";
 
 export const fmt = (n: number) => n.toLocaleString("pt-BR");
 
@@ -51,10 +51,44 @@ export function Folha({ aberta, onFechar, titulo, children, rodape }: { aberta: 
 }
 
 /** Número com - e + (passo de 50, como a regra do Eder de números redondos). */
-export function CampoDisparos({ rotulo, valor, onMudar, alerta, passo = 50 }: { rotulo: string; valor: number; onMudar: (v: number) => void; alerta?: boolean; passo?: number }) {
+export function CampoDisparos({
+  rotulo,
+  valor,
+  onMudar,
+  alerta,
+  passo = 50,
+  feito,
+  onFeito,
+}: {
+  rotulo: string;
+  valor: number;
+  onMudar: (v: number) => void;
+  alerta?: boolean;
+  passo?: number;
+  /** Lado feito no atendimento (só nas áreas com direito e esquerdo). */
+  feito?: boolean;
+  onFeito?: () => void;
+}) {
+  const Raiz = onFeito ? "div" : "label";
   return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{rotulo}</span>
+    <Raiz className="block min-w-0">
+      {onFeito ? (
+        <span className="mb-1 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onFeito}
+            className="-my-2 -ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
+            aria-label={feito ? `Desmarcar ${rotulo.toLowerCase()} feito` : `Marcar ${rotulo.toLowerCase()} como feito`}
+          >
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full ring-1 transition ${feito ? "bg-emerald-500 text-white ring-emerald-500" : "bg-white text-transparent ring-neutral-300"}`}>
+              <Check size={13} strokeWidth={3} />
+            </span>
+          </button>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${feito ? "text-emerald-700" : "text-neutral-500"}`}>{rotulo}</span>
+        </span>
+      ) : (
+        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{rotulo}</span>
+      )}
       <span className={`flex items-stretch overflow-hidden rounded-xl bg-white ring-1 transition focus-within:ring-2 ${alerta ? "ring-amber-400 focus-within:ring-amber-400" : "ring-neutral-200 focus-within:ring-brand-teal"}`}>
         <button type="button" tabIndex={-1} onClick={() => onMudar(Math.max(0, valor - passo))} className="flex w-9 flex-shrink-0 items-center justify-center text-neutral-400 active:bg-neutral-100" aria-label={`Menos ${passo}`}>
           <Minus size={15} />
@@ -73,7 +107,7 @@ export function CampoDisparos({ rotulo, valor, onMudar, alerta, passo = 50 }: { 
           <Plus size={15} />
         </button>
       </span>
-    </label>
+    </Raiz>
   );
 }
 
@@ -105,7 +139,7 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => onMudar({ ...linha, feito: !linha.feito })}
+          onClick={() => onMudar(area.bilateral ? marcarLados(linha, !linha.feito, !linha.feito) : { ...linha, feito: !linha.feito })}
           className="-my-1.5 -ml-1.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
           aria-label={linha.feito ? "Desmarcar feito" : "Marcar como feito"}
           title="Feito no atendimento"
@@ -139,8 +173,8 @@ function LinhaEditor({ area, linha, podeRemover, onMudar, onRemover }: { area: A
       <div className={`mt-2 grid gap-2 ${colunas}`}>
         {area.bilateral ? (
           <>
-            <CampoDisparos rotulo="Direito" valor={linha.dispD ?? 0} onMudar={mudarDireito} alerta={!!acima && (linha.dispD ?? 0) > (max ?? Infinity)} />
-            <CampoDisparos rotulo="Esquerdo" valor={linha.dispE ?? 0} onMudar={(v) => onMudar({ ...linha, dispE: v })} alerta={!!acima && (linha.dispE ?? 0) > (max ?? Infinity)} />
+            <CampoDisparos rotulo="Direito" valor={linha.dispD ?? 0} onMudar={mudarDireito} alerta={!!acima && (linha.dispD ?? 0) > (max ?? Infinity)} feito={!!linha.feitoD} onFeito={() => onMudar(marcarLados(linha, !linha.feitoD, !!linha.feitoE))} />
+            <CampoDisparos rotulo="Esquerdo" valor={linha.dispE ?? 0} onMudar={(v) => onMudar({ ...linha, dispE: v })} alerta={!!acima && (linha.dispE ?? 0) > (max ?? Infinity)} feito={!!linha.feitoE} onFeito={() => onMudar(marcarLados(linha, !!linha.feitoD, !linha.feitoE))} />
           </>
         ) : (
           <CampoDisparos rotulo={corporal ? "Disparos por quadrante" : "Disparos"} valor={linha.disp ?? 0} onMudar={(v) => onMudar({ ...linha, disp: v })} alerta={!!acima} />

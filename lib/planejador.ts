@@ -27,8 +27,11 @@ export interface Linha {
   disp?: number;
   /** Corporal: quadrantes de 10 x 10 cm (multiplica os disparos). */
   quad?: number;
-  /** Marcado como feito no atendimento. */
+  /** Marcado como feito no atendimento (nas áreas com dois lados: os dois lados feitos). */
   feito?: boolean;
+  /** Lado direito / esquerdo feito (áreas bilaterais). */
+  feitoD?: boolean;
+  feitoE?: boolean;
 }
 
 export interface Area {
@@ -144,8 +147,26 @@ function normalizarLinha(a: Area, r: unknown): Linha {
       : { prof, dispD: num(o.dispD), dispE: num(o.dispE) }
     : { prof, disp: num(o.disp) };
   if (a.regiao === "corporal") l.quad = Math.max(1, num(o.quad) || 1);
+  if (a.bilateral) {
+    // Planos antigos só tinham o "feito" da linha: vale para os dois lados.
+    const d = !!o.feitoD || (!!o.feito && o.feitoD === undefined);
+    const e = !!o.feitoE || (!!o.feito && o.feitoE === undefined);
+    return marcarLados(l, d, e);
+  }
   if (o.feito) l.feito = true;
   return l;
+}
+
+/** Marca os lados da linha; a linha só fica "feita" com os dois lados feitos. */
+export function marcarLados(l: Linha, direito: boolean, esquerdo: boolean): Linha {
+  const r: Linha = { ...l };
+  delete r.feito;
+  delete r.feitoD;
+  delete r.feitoE;
+  if (direito) r.feitoD = true;
+  if (esquerdo) r.feitoE = true;
+  if (direito && esquerdo) r.feito = true;
+  return r;
 }
 
 function normalizarCustom(c: unknown, i: number): Area | null {

@@ -179,7 +179,7 @@ export function htmlProntuario(p: Plano, origem = "", agora = new Date(), cfg: C
       const nome = primeira ? `<div class="pront-area-cell"><img class="pront-th" src="${imagemDaArea(a, origem)}" alt=""><span>${esc(a.nome)}</span></div>` : "";
       const chk = `<td style="text-align:center"><span class="pront-chk${r.feito ? " on" : ""}">${r.feito ? "✓" : ""}</span></td>`;
       const lados = a.bilateral
-        ? `<td>${r.dispD ?? 0}</td><td>${r.dispE ?? 0}</td>`
+        ? `<td>${r.dispD ?? 0}${r.feitoD && !r.feito ? " ✓" : ""}</td><td>${r.dispE ?? 0}${r.feitoE && !r.feito ? " ✓" : ""}</td>`
         : `<td colspan="2" style="text-align:center">${r.disp ?? 0}${corporal ? "/quad" : " (único)"}</td>`;
       const sub = (a.bilateral ? (r.dispD ?? 0) + (r.dispE ?? 0) : r.disp ?? 0) * q;
       linhas += `<tr>${chk}<td>${nome}</td><td>${r.prof} mm</td>${lados}<td>${corporal ? "×" + q : "—"}</td><td><strong>${fmt(sub)}</strong></td></tr>`;

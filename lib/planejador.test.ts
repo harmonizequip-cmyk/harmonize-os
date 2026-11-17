@@ -306,3 +306,17 @@ describe("sessões do pacote", () => {
     expect(h).toContain("Fica para a Sessão 2");
   });
 });
+
+describe("feito por lado", () => {
+  it("linha só fica feita com os dois lados; plano antigo com feito vale para os dois", async () => {
+    const { marcarLados, normalizarPlano } = await import("./planejador");
+    const l = { prof: "4.5", dispD: 500, dispE: 500 };
+    expect(marcarLados(l, true, false)).toEqual({ prof: "4.5", dispD: 500, dispE: 500, feitoD: true });
+    expect(marcarLados(l, true, true).feito).toBe(true);
+    const antigo = normalizarPlano({ DATA: { arcomandibular: [{ prof: "4.5", dispD: 600, dispE: 600, feito: true }] } });
+    const r = antigo.DATA.arcomandibular[0];
+    expect([r.feito, r.feitoD, r.feitoE]).toEqual([true, true, true]);
+    const meio = normalizarPlano({ DATA: { arcomandibular: [{ prof: "4.5", dispD: 600, dispE: 600, feitoE: true }] } });
+    expect(meio.DATA.arcomandibular[0].feito).toBeUndefined();
+  });
+});
