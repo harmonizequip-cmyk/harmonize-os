@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  linhaVazia,
   AREAS_FIXAS,
   alertas,
   contaDaSessao,
@@ -83,7 +84,8 @@ describe("planejador nativo: estado antigo", () => {
   });
   it("Jowls só tem 4,5 mm e passa do máximo acima de 1.500 por lado", () => {
     const jowls = AREAS_FIXAS.find((a) => a.id === "jowls")!;
-    expect(jowls.opts).toEqual(["4.5"]);
+    expect(jowls.opts.at(-1)).toBe("13.0");
+    expect(linhaVazia(jowls).prof).toBe("4.5");
     const q = normalizarPlano({ DATA: { jowls: [{ prof: "4.5", dispD: 1600, dispE: 1500 }] } });
     expect(alertas(q).some((x) => x.areaId === "jowls" && /1\.500 por lado/.test(x.texto))).toBe(true);
     const ok = normalizarPlano({ DATA: { jowls: [{ prof: "4.5", dispD: 1500, dispE: 1500 }] } });
@@ -116,7 +118,7 @@ describe("planejador nativo: estado antigo", () => {
   });
   it("Frontal só tem uma profundidade (1,5 mm): mais de uma com disparos gera aviso", () => {
     const frontal = AREAS_FIXAS.find((a) => a.id === "frontal")!;
-    expect(frontal.opts).toEqual(["1.5"]);
+    expect(frontal.opts.at(-1)).toBe("13.0");
     const ok = normalizarPlano({ DATA: { frontal: [{ prof: "1.5", dispD: 500, dispE: 500 }] } });
     expect(alertas(ok).some((x) => x.areaId === "frontal")).toBe(false);
     const duas = normalizarPlano({ DATA: { frontal: [{ prof: "4.5", dispD: 300, dispE: 300 }, { prof: "1.5", dispD: 200, dispE: 200 }] } });

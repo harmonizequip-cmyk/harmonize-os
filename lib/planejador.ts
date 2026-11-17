@@ -37,6 +37,8 @@ export interface Area {
   bilateral: boolean;
   opts: string[];
   hint?: string;
+  /** Profundidade da primeira linha (sem isso, a primeira da lista). */
+  profPadrao?: string;
   regiao?: "facial" | "corporal";
   /** Corporal: região do boneco (lib/boneco-corporal). */
   parte?: string;
@@ -45,15 +47,15 @@ export interface Area {
 
 /** Áreas fixas, na ordem do dono (pescoço, papada, submandibular, jowls, terço médio...). Nasolabial saiu (fica no Jowls). Papada (campo único) e Submandibular (direito e esquerdo) são áreas separadas, com a mesma foto (regra do dono, 19 e 22/10/2026). Temporal e Arco Zigomático saiu: só ficou Pálpebras inferiores e lateral dos olhos (23/10/2026). */
 export const AREAS_FIXAS: Area[] = [
-  { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_STD },
+  { id: "pescoco", nome: "Pescoço", bilateral: true, opts: OPTS_PAP },
   { id: "papada", nome: "Papada", bilateral: false, opts: OPTS_PAP, hint: "Área central única. Iniciar da maior profundidade." },
-  { id: "submandibular", nome: "Submandibular", bilateral: true, opts: OPTS_STD, hint: "Direito e esquerdo, de 600 a 1.200 por lado em cada profundidade. Iniciar da maior profundidade." },
-  { id: "jowls", nome: "Jowls", bilateral: true, opts: ["4.5"], hint: "Só a profundidade 4,5 mm, até 1.500 por lado (derretimento da face chega perto do máximo)." },
-  { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_STD, hint: "De 600 a 1.200 por lado em cada profundidade." },
-  { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, opts: OPTS_STD, hint: "Usar gaze, nunca sobre o globo ocular. Normalmente 1,5 mm, até 500 por lado." },
-  { id: "frontal", nome: "Frontal", bilateral: true, opts: ["1.5"], hint: "Uma profundidade só (1,5 mm), até 500 por lado." },
-  { id: "perioral_sup", nome: "Perioral Superior", bilateral: true, opts: OPTS_STD },
-  { id: "perioral_inf", nome: "Perioral Inferior", bilateral: true, opts: OPTS_STD },
+  { id: "submandibular", nome: "Submandibular", bilateral: true, opts: OPTS_PAP, hint: "Direito e esquerdo, de 600 a 1.200 por lado em cada profundidade. Iniciar da maior profundidade." },
+  { id: "jowls", nome: "Jowls", bilateral: true, opts: OPTS_PAP, profPadrao: "4.5", hint: "Uma profundidade só (normalmente 4,5 mm), até 1.500 por lado (derretimento da face chega perto do máximo)." },
+  { id: "arcomandibular", nome: "Terço médio", bilateral: true, opts: OPTS_PAP, hint: "De 600 a 1.200 por lado em cada profundidade." },
+  { id: "olhos", nome: "Pálpebras inferiores e lateral dos olhos", bilateral: true, opts: OPTS_PAP, hint: "Usar gaze, nunca sobre o globo ocular. Normalmente 1,5 mm, até 500 por lado." },
+  { id: "frontal", nome: "Frontal", bilateral: true, opts: OPTS_PAP, hint: "Uma profundidade só (normalmente 1,5 mm), até 500 por lado." },
+  { id: "perioral_sup", nome: "Perioral Superior", bilateral: true, opts: OPTS_PAP },
+  { id: "perioral_inf", nome: "Perioral Inferior", bilateral: true, opts: OPTS_PAP },
 ];
 
 /** Como a ponteira anda em cada área (texto curto, para a tela e o prontuário). */
@@ -125,6 +127,7 @@ const num = (v: unknown) => {
 };
 
 export function linhaVazia(a: Area, prof?: string): Linha {
+  prof = prof ?? a.profPadrao;
   const l: Linha = a.bilateral ? { prof: prof ?? a.opts[0], dispD: 0, dispE: 0 } : { prof: prof ?? a.opts[0], disp: 0 };
   if (a.regiao === "corporal") l.quad = 1;
   return l;
@@ -132,7 +135,7 @@ export function linhaVazia(a: Area, prof?: string): Linha {
 
 function normalizarLinha(a: Area, r: unknown): Linha {
   const o = (r ?? {}) as Record<string, unknown>;
-  const prof = txt(o.prof) || a.opts[0];
+  const prof = txt(o.prof) || a.profPadrao || a.opts[0];
   // Linha de campo único (disp) numa área que agora tem os dois lados: divide entre direito e esquerdo.
   const soDisp = a.bilateral && o.dispD === undefined && o.dispE === undefined && o.disp !== undefined;
   const l: Linha = a.bilateral
@@ -423,7 +426,7 @@ export function alertas(p: Plano): Alerta[] {
     const limite = MAX_PROFUNDIDADES[a.id];
     if (limite) {
       const usadas = new Set((p.DATA[a.id] ?? []).filter((r) => subtotalLinha(a, r) > 0).map((r) => r.prof));
-      if (usadas.size > limite) out.push({ texto: `${a.nome} só pode ter ${limite} profundidade (${a.opts[0].replace(".", ",")} mm), e há ${usadas.size} com disparos.`, grave: false, areaId: a.id });
+      if (usadas.size > limite) out.push({ texto: `${a.nome} só pode ter ${limite} profundidade, e há ${usadas.size} com disparos.`, grave: false, areaId: a.id });
     }
     for (const r of p.DATA[a.id] ?? []) {
       const min = linhaAbaixoDoMinimo(a, r);
