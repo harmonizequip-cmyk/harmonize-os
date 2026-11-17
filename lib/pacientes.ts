@@ -209,6 +209,16 @@ export function pacientesDoDia<T extends PlanoDoPaciente>(pacientes: PacienteRes
   return pacientes.filter((r) => r.planos.some((p) => dia(p.data) === diaHipro));
 }
 
+/** Disparos do paciente: dos planejamentos daquele HIPRO Day, ou de todos (dia vazio). Soma o total de cada planejamento (todas as sessões). */
+export function disparosDoPaciente<T extends PlanoDoPaciente>(r: PacienteResumo<T>, diaHipro = ""): number {
+  return r.planos.filter((p) => !diaHipro || dia(p.data) === diaHipro).reduce((s, p) => s + (Number(p.total_disparos) || 0), 0);
+}
+
+/** Total de disparos dos pacientes mostrados (a seleção da tela). */
+export function totalDeDisparos<T extends PlanoDoPaciente>(pacientes: PacienteResumo<T>[], diaHipro = ""): number {
+  return pacientes.reduce((s, r) => s + disparosDoPaciente(r, diaHipro), 0);
+}
+
 export interface ClienteDoPlanejador<T extends PlanoDoPaciente = PlanoDoPaciente> {
   clientId: string | null;
   nome: string;

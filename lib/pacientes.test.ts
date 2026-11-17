@@ -138,3 +138,16 @@ describe("situação, dias de HIPRO e clientes", () => {
     expect(g[0].ultimoDia).toBe("2026-10-30");
   });
 });
+
+describe("disparos por paciente e total da seleção", () => {
+  it("soma por HIPRO Day e no total", async () => {
+    const { disparosDoPaciente, totalDeDisparos } = await import("./pacientes");
+    const plano = (data: string, total: number) => ({ data, total_disparos: total }) as never;
+    const a = { planos: [plano("2026-11-14", 10000), plano("2026-10-01", 5000)] } as never;
+    const b = { planos: [plano("2026-11-14", 7400)] } as never;
+    expect(disparosDoPaciente(a)).toBe(15000);
+    expect(disparosDoPaciente(a, "2026-11-14")).toBe(10000);
+    expect(totalDeDisparos([a, b])).toBe(22400);
+    expect(totalDeDisparos([a, b], "2026-10-01")).toBe(5000);
+  });
+});

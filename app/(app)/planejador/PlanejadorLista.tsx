@@ -20,6 +20,8 @@ import {
   agruparPacientesPorCliente,
   agruparPorPaciente,
   diasDeHipro,
+  disparosDoPaciente,
+  totalDeDisparos,
   pacienteBate,
   pacientesDoDia,
   situacaoDoPaciente,
@@ -78,7 +80,8 @@ function CartaoCliente({ g, onAbrir }: { g: ClienteDoPlanejador<LinhaLista>; onA
   );
 }
 
-function CartaoPaciente({ r, hoje, portal, mostrarCliente, onAbrir }: { r: Paciente; hoje: string; portal?: boolean; mostrarCliente?: boolean; onAbrir: () => void }) {
+function CartaoPaciente({ r, hoje, portal, mostrarCliente, diaHipro = "", onAbrir }: { r: Paciente; hoje: string; portal?: boolean; mostrarCliente?: boolean; diaHipro?: string; onAbrir: () => void }) {
+  const disparos = disparosDoPaciente(r, diaHipro);
   const situacao = situacaoDoPaciente(r);
   const saldo = r.saldos[0];
   const diasRetorno = r.retorno ? diasAte(r.retorno, hoje) : null;
@@ -97,6 +100,7 @@ function CartaoPaciente({ r, hoje, portal, mostrarCliente, onAbrir }: { r: Pacie
             {r.ultimoProcedimento ? ` · ${r.ultimoProcedimento}` : ""}
             {` · ${r.sessoes} ${r.sessoes === 1 ? "sessão" : "sessões"}`}
           </p>
+          <p className="text-xs font-semibold text-brand-teal-dark">{fmt(disparos)} disparos</p>
           {mostrarCliente && r.cliente_nome && <p className="truncate text-xs text-neutral-400">{r.cliente_nome}</p>}
         </div>
         <ChevronRight size={18} className="mt-1 flex-shrink-0 text-neutral-300" />
@@ -326,6 +330,15 @@ export default function PlanejadorLista({
           </div>
         )}
 
+        {visiveis.length > 0 && (
+          <div className="flex items-center justify-between rounded-2xl bg-brand-teal/10 px-4 py-3">
+            <p className="text-sm font-semibold text-neutral-700">
+              {visiveis.length === doDia.length && !diaHipro && !busca ? "Total de todos" : "Total da seleção"} · {visiveis.length} {visiveis.length === 1 ? "paciente" : "pacientes"}
+            </p>
+            <p className="text-base font-black text-brand-teal-dark">{fmt(totalDeDisparos(visiveis, diaHipro))} disparos</p>
+          </div>
+        )}
+
         {visiveis.length === 0 && !erro && (
           <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center">
             <ClipboardList size={28} className="mx-auto text-neutral-300" />
@@ -342,7 +355,7 @@ export default function PlanejadorLista({
 
         <div className="space-y-2">
           {visiveis.map((r) => (
-            <CartaoPaciente key={r.chave} r={r} hoje={hoje} portal={portal} onAbrir={() => setAberta(r.chave)} />
+            <CartaoPaciente key={r.chave} r={r} hoje={hoje} portal={portal} diaHipro={diaHipro} onAbrir={() => setAberta(r.chave)} />
           ))}
         </div>
         {ficha}
