@@ -1,5 +1,6 @@
 "use client";
 
+import { nomeDeExibicaoPadrao } from "@/lib/saudacao";
 import CaixaIsencaoTaxa from "@/components/CaixaIsencaoTaxa";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -42,7 +43,7 @@ export default function NovoClienteModal({
     const { error } = await supabase.from("clients").insert({
       name: toUpperTrim(name),
       treatment: treatment || null,
-      display_name: displayName.trim() || null,
+      display_name: displayName.trim() || nomeDeExibicaoPadrao(name) || null,
       clinic_name: toUpperOrNull(clinicName),
       whatsapp: whatsapp || null,
       email: email || null,
@@ -95,7 +96,7 @@ export default function NovoClienteModal({
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Ex: Camila Lima"
+                placeholder={nomeDeExibicaoPadrao(name) || "Primeiro nome, ex: Camila"}
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
             </div>

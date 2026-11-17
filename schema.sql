@@ -15728,3 +15728,37 @@ as $$
 $$;
 revoke execute on function public.nome_curto_cliente(uuid) from public, anon, authenticated;
 grant execute on function public.nome_curto_cliente(uuid) to service_role;
+
+-- Nome de exibição padrão (17/11/2026): primeiro nome do campo Nome quando vazio.
+create or replace function public.primeiro_nome_exibicao(p_nome text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select nullif(initcap(lower(
+           (regexp_match(regexp_replace(btrim(coalesce(p_nome, '')), '^(dr|dra|doutora|doutor)\.?(\s+|$)', '', 'i'), '^[^\s().,\-0-9]+'))[1]
+         )), '');
+$$;
+revoke execute on function public.primeiro_nome_exibicao(text) from public, anon;
+grant execute on function public.primeiro_nome_exibicao(text) to authenticated, service_role;
+
+create or replace function public.clients_preencher_nome_exibicao()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if nullif(btrim(coalesce(new.display_name, '')), '') is null then
+    new.display_name := public.primeiro_nome_exibicao(new.name);
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.clients_preencher_nome_exibicao() from public, anon, authenticated;
+
+drop trigger if exists trg_clients_nome_exibicao on public.clients;
+create trigger trg_clients_nome_exibicao
+  before insert or update of name, display_name on public.clients
+  for each row execute function public.clients_preencher_nome_exibicao();
+

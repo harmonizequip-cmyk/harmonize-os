@@ -58,6 +58,11 @@ export function tratamentoEPrimeiroNome(params: {
   return { tratamento: primeiroNome ? tratamento : null, primeiroNome };
 }
 
+/** Nome de exibição padrão: o primeiro nome do campo "Nome" ("DRA. CAMILA - NATAL" vira "Camila"). Vazio se não houver nome. */
+export function nomeDeExibicaoPadrao(name: string | null | undefined): string {
+  return tratamentoEPrimeiroNome({ name }).primeiroNome ?? "";
+}
+
 export function saudacaoCurta(params: {
   name?: string | null;
   treatment?: string | null;
