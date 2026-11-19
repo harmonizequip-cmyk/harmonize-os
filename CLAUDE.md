@@ -414,6 +414,12 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 - Varredura do banco real em 05/11/2026: todas as tabelas com RLS, nenhuma leitura para `anon`, todas as views com `security_invoker`, políticas por `has_module_permission`/dono do registro, funções de apagar e de dados de teste com `require_admin`, Storage por permissão. O que garante os dados é o banco; o app só não pode abrir tela para quem não tem perfil.
 - Backup: só administrador ativo, que não é visualização nem cliente.
 
+## Esqueci minha senha (18/11/2026, sem migration)
+
+- Tela de login: "Esqueci minha senha" pede o e-mail e chama `resetPasswordForEmail` (a resposta é a mesma exista o cadastro ou não). O e-mail leva a `/redefinir-senha` (`app/redefinir-senha/page.tsx`, liberada no `proxy.ts`), onde a pessoa escolhe a senha nova (`problemaSenha`/`REGRA_SENHA`), e depois volta ao login. Vale para o dono, a equipe e as clientes do portal.
+- Usa o fluxo implícito (`clienteDeRecuperacao` em `lib/recuperar-senha.ts`, `@supabase/supabase-js` puro, sem guardar sessão): o link traz o token depois do `#` e funciona mesmo aberto em outro aparelho ou navegador, o que o fluxo PKCE do resto do app não permitiria. Link vencido ou já usado mostra mensagem e volta ao login. Se o Supabase mandar o link para a raiz (endereço não liberado), o login detecta `#...type=recovery` e repassa para `/redefinir-senha`.
+- Configuração no Supabase (Authentication > URL Configuration): `https://harmonize-os.vercel.app/redefinir-senha` precisa estar em Redirect URLs. O e-mail sai do remetente padrão do Supabase, que no plano gratuito aceita poucos envios por hora.
+
 ## Segurança (checklist de 24 pontos, 14/10/2026)
 
 - Cabeçalhos em `next.config.js`: CSP (só o próprio site e `*.supabase.co`; `wasm-unsafe-eval` pelo PDF do contrato), HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy e Permissions-Policy (microfone só `self`). Serviço externo novo precisa entrar na CSP, senão é bloqueado sem aviso.
