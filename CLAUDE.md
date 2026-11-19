@@ -418,7 +418,7 @@ Somas de dinheiro leem de `rentals_contabilizaveis` e `transactions_contabilizav
 
 - Tela de login: "Esqueci minha senha" pede o e-mail e chama `resetPasswordForEmail` (a resposta é a mesma exista o cadastro ou não). O e-mail leva a `/redefinir-senha` (`app/redefinir-senha/page.tsx`, liberada no `proxy.ts`), onde a pessoa escolhe a senha nova (`problemaSenha`/`REGRA_SENHA`), e depois volta ao login. Vale para o dono, a equipe e as clientes do portal.
 - Usa o fluxo implícito (`clienteDeRecuperacao` em `lib/recuperar-senha.ts`, `@supabase/supabase-js` puro, sem guardar sessão): o link traz o token depois do `#` e funciona mesmo aberto em outro aparelho ou navegador, o que o fluxo PKCE do resto do app não permitiria. Link vencido ou já usado mostra mensagem e volta ao login. Se o Supabase mandar o link para a raiz (endereço não liberado), o login detecta `#...type=recovery` e repassa para `/redefinir-senha`.
-- Configuração no Supabase (Authentication > URL Configuration): `https://harmonize-os.vercel.app/redefinir-senha` precisa estar em Redirect URLs. O e-mail sai do remetente padrão do Supabase, que no plano gratuito aceita poucos envios por hora.
+- Configuração no Supabase (Authentication > URL Configuration), feita pelo dono e testada em 19/11/2026: Site URL `https://harmonize-os.vercel.app` (estava `http://localhost:3000`) e `https://harmonize-os.vercel.app/redefinir-senha` em Redirect URLs. Mudar essa tela exige papel Owner ou Administrator na organização do Supabase. O e-mail sai do remetente padrão do Supabase, que no plano gratuito aceita poucos envios por hora.
 
 ## Segurança (checklist de 24 pontos, 14/10/2026)
 
