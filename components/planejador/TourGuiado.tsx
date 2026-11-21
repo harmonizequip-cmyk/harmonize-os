@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import type { AbaTour, PassoTour } from "@/lib/tour-planejador";
+import type { AbaTour, PassoTour, VisaoResumoTour } from "@/lib/tour-planejador";
 
 type Caixa = { top: number; left: number; width: number; height: number };
 
@@ -16,8 +16,11 @@ const MARGEM = 8;
 export default function TourGuiado({
   passos,
   onAba,
+  onVisao,
   onFim,
 }: {
+  /** Abre a visão do Resumo que o passo mostra. */
+  onVisao?: (v: VisaoResumoTour) => void;
   passos: PassoTour[];
   /** Abre a aba que o passo precisa. */
   onAba: (a: AbaTour) => void;
@@ -44,6 +47,7 @@ export default function TourGuiado({
   useEffect(() => {
     if (!passo) return;
     if (passo.aba) onAba(passo.aba);
+    if (passo.visao) onVisao?.(passo.visao);
     setCaixa(null);
     const t1 = setTimeout(() => {
       const el = passo.alvo ? document.querySelector<HTMLElement>(`[data-tour="${passo.alvo}"]`) : null;
@@ -54,7 +58,7 @@ export default function TourGuiado({
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [passo, onAba, medir]);
+  }, [passo, onAba, onVisao, medir]);
 
   useLayoutEffect(() => {
     window.addEventListener("resize", medir);

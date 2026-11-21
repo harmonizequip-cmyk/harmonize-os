@@ -5,12 +5,15 @@
 import { estadoInicial, montarPlanejamento, type EstadoPlanejador } from "./planejamento";
 
 export type AbaTour = "paciente" | "areas" | "resumo";
+export type VisaoResumoTour = "lista" | "prontuario" | "paciente";
 
 export interface PassoTour {
   /** data-tour do elemento destacado; sem alvo, o balão fica no meio da tela. */
   alvo?: string;
   /** Aba que precisa estar aberta para o alvo existir. */
   aba?: AbaTour;
+  /** No Resumo, qual visão abrir (Texto, Prontuário ou Ficha paciente). */
+  visao?: VisaoResumoTour;
   titulo: string;
   texto: string;
 }
@@ -76,25 +79,40 @@ export const PASSOS_TOUR: PassoTour[] = [
   {
     alvo: "resumo",
     aba: "resumo",
+    visao: "lista",
     titulo: "9. O resumo",
-    texto: "O plano pronto, área por área. Os botões de baixo geram o PDF e mandam o resumo.",
+    texto: "O plano pronto, área por área. Os botões de baixo copiam e mandam o resumo, e geram o PDF.",
+  },
+  {
+    alvo: "documentos",
+    aba: "resumo",
+    visao: "prontuario",
+    titulo: "10. O prontuário",
+    texto: "Na aba \"Prontuário\" fica o registro completo do atendimento, para a clínica guardar. Com ela aberta, o botão \"PDF\" de baixo gera o prontuário.",
+  },
+  {
+    alvo: "documentos",
+    aba: "resumo",
+    visao: "paciente",
+    titulo: "11. A ficha do paciente",
+    texto: "Na aba \"Ficha paciente\" fica a versão simples, para entregar ao paciente. Com ela aberta, o botão vira \"PDF paciente\".",
   },
   {
     alvo: "assinaturas",
     aba: "resumo",
-    titulo: "10. Assinaturas",
-    texto: "No fim da sessão, toque em \"Colher assinaturas\": triagem, termo, o paciente assina com o dedo e depois a profissional. Experimente no exemplo depois do tour.",
+    titulo: "12. Assinaturas",
+    texto: "No fim da sessão, toque em \"Colher assinaturas\": triagem, termo, o paciente assina com o dedo na tela e depois a profissional. Tudo pelo celular, sem imprimir. Experimente no exemplo depois do tour.",
   },
   {
     alvo: "orientacoes",
     aba: "resumo",
-    titulo: "11. Orientações ao paciente",
+    titulo: "13. Orientações ao paciente",
     texto: "Manda pelo WhatsApp os cuidados depois da sessão, já escritos. Para funcionar, o paciente precisa ter o WhatsApp na ficha.",
   },
   {
     alvo: "concluir-sessao",
     aba: "paciente",
-    titulo: "12. Fechar a sessão",
+    titulo: "14. Fechar a sessão",
     texto: "Ao terminar, toque em \"Concluir Sessão 1 e abrir Sessão 2\". Quando o paciente voltar, abra a ficha dele e toque em \"Continuar\".",
   },
   {

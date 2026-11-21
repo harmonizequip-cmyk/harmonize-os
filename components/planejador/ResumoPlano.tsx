@@ -3,7 +3,7 @@
 // Aba Resumo: números do plano, alertas, distribuição por área (barras com a
 // modelo de cada área) e prévia do texto, do prontuário e da ficha do paciente.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { alertas, situacaoSaldo, textoResumo, todasAreas, totalArea, type Plano } from "@/lib/planejador";
 import { CSS_PRONTUARIO, htmlFichaPaciente, htmlProntuario, imagemDaArea } from "@/lib/planejador-impressao";
@@ -17,7 +17,10 @@ export default function ResumoPlano({
   plano,
   onIrParaArea,
   onModo,
+  modoPedido,
 }: {
+  /** Visão pedida de fora (tour guiado): abre Texto, Prontuário ou Ficha paciente. */
+  modoPedido?: ModoResumo | null;
   plano: Plano;
   onIrParaArea: (id: string) => void;
   /** Avisa a visão aberta, para o botão PDF do editor gerar o documento certo. */
@@ -28,6 +31,13 @@ export default function ResumoPlano({
     setModoInterno(m);
     onModo?.(m);
   };
+  useEffect(() => {
+    if (modoPedido) {
+      setModoInterno(modoPedido);
+      onModo?.(modoPedido);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoPedido]);
   const preferencias = usePreferencias();
   const s = situacaoSaldo(plano);
   const avisos = alertas(plano);
@@ -117,7 +127,7 @@ export default function ResumoPlano({
         </div>
       )}
 
-      <div className="rounded-3xl bg-white p-2 ring-1 ring-neutral-200/80">
+      <div className="rounded-3xl bg-white p-2 ring-1 ring-neutral-200/80" data-tour="documentos">
         <div className="grid grid-cols-3 gap-1 rounded-2xl bg-neutral-100 p-1">
           {(
             [

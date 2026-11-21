@@ -187,6 +187,9 @@ export default function EditorPlanejamento({
   const [voltaTour, setVoltaTour] = useState(0);
   const [assinarExemplo, setAssinarExemplo] = useState(false);
   const abrirAbaTour = useCallback((a: AbaTour) => setAba(a), []);
+  // O tour abre o Prontuário e a Ficha paciente no Resumo (objeto novo a cada pedido).
+  const [visaoTour, setVisaoTour] = useState<{ v: ModoResumo } | null>(null);
+  const abrirVisaoTour = useCallback((v: ModoResumo) => setVisaoTour({ v }), []);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repetir = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1063,7 +1066,7 @@ export default function EditorPlanejamento({
                   {varias && (
                     <>
                       <button onClick={() => (setMenu(false), fichaSessao(plano.sessaoAtual))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-semibold text-neutral-800 active:bg-neutral-50">
-                        <FileText size={16} /> Ficha para assinar (Sessão {plano.sessaoAtual})
+                        <FileText size={16} /> Ficha impressa (Sessão {plano.sessaoAtual})
                       </button>
                       {plano.sessoesAnteriores.map((x) => (
                         <button key={x.n} onClick={() => (setMenu(false), fichaSessao(x.n))} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50">
@@ -1581,7 +1584,7 @@ export default function EditorPlanejamento({
           {aba === "resumo" && (
             <div key="resumo" className="animate-[aparecer_.25s_ease-out]">
               <div data-tour="resumo">
-                <ResumoPlano plano={plano} onIrParaArea={irParaArea} onModo={setModoResumo} />
+                <ResumoPlano plano={plano} onIrParaArea={irParaArea} onModo={setModoResumo} modoPedido={visaoTour?.v ?? null} />
               </div>
               {demo && (
                 <div className={`${cartao} mt-4`} data-tour="assinaturas">
@@ -1621,7 +1624,8 @@ export default function EditorPlanejamento({
               )}
               {varias && (
                 <div className={`${cartao} mt-4`}>
-                  <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Fichas para assinar</p>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Fichas impressas</p>
+                  <p className="mb-3 text-xs text-neutral-500">Para assinar no papel. Para assinar no celular, use &quot;Colher assinaturas&quot;.</p>
                   <div className="flex flex-wrap gap-2">
                     {plano.sessoesAnteriores.map((x) => (
                       <button key={x.n} type="button" onClick={() => fichaSessao(x.n)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-neutral-700 ring-1 ring-neutral-200">
@@ -1629,7 +1633,7 @@ export default function EditorPlanejamento({
                       </button>
                     ))}
                     <button type="button" onClick={() => fichaSessao(plano.sessaoAtual)} className="inline-flex items-center gap-1.5 rounded-full bg-brand-teal px-3.5 py-2 text-xs font-bold text-white shadow-glow-teal">
-                      <FileText size={14} /> Ficha para assinar (Sessão {plano.sessaoAtual})
+                      <FileText size={14} /> Imprimir ficha (Sessão {plano.sessaoAtual})
                     </button>
                   </div>
                 </div>
@@ -1733,7 +1737,7 @@ export default function EditorPlanejamento({
           )}
         </div>
       </Folha>
-      {demo && tour && <TourGuiado key={voltaTour} passos={PASSOS_TOUR} onAba={abrirAbaTour} onFim={() => setTour(false)} />}
+      {demo && tour && <TourGuiado key={voltaTour} passos={PASSOS_TOUR} onAba={abrirAbaTour} onVisao={abrirVisaoTour} onFim={() => (setTour(false), setVisaoTour(null))} />}
       {demo && assinarExemplo && (
         <ColherAssinaturas
           demo
