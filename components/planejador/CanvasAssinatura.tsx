@@ -168,7 +168,7 @@ export default function CanvasAssinatura({
           aria-label={rotulo}
           data-testid="canvas-assinatura"
           className="block h-52 w-full cursor-crosshair touch-none select-none"
-          style={{ touchAction: "none" }}
+          style={{ touchAction: "none", height: 208 }}
           onPointerDown={comecar}
           onPointerMove={mover}
           onPointerUp={terminar}

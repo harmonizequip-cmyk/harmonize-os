@@ -86,7 +86,7 @@ export default function FichaPaciente({
 
   useEffect(() => setMontado(true), []);
   // Assinaturas por sessão: só o dono.
-  const assinaturas = useAssinaturasSessao(planoIds, aberto && !portal && !somenteLeitura);
+  const assinaturas = useAssinaturasSessao(planoIds, aberto && !somenteLeitura);
   // No portal, as fotos só aparecem para a cliente que o dono liberou (clients.portal_fotos).
   const [fotosNoPortal, setFotosNoPortal] = useState(false);
   useEffect(() => {
@@ -576,7 +576,7 @@ export default function FichaPaciente({
           onCancelar={() => setConfirmarApagar(false)}
           onConfirmar={async () => {
             const sb = createClient();
-            const limpar = !portal ? await prepararLimpezaAssinaturas(sb, [...selecionados]) : null;
+            const limpar = await prepararLimpezaAssinaturas(sb, [...selecionados]);
             for (const id of selecionados) {
               const { error } = await sb.rpc("excluir_planejamento", { p_id: id });
               if (error) {

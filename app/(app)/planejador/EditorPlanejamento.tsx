@@ -170,8 +170,8 @@ export default function EditorPlanejamento({
   // Uma profissional ativa só: escolhe sozinho no plano novo ("inicial") ou depois de trocar a cliente ("troca").
   const autoEscolher = useRef<"inicial" | "troca" | null>(planoId ? null : "inicial");
   const rolagem = useRef<HTMLDivElement>(null);
-  // Assinaturas da sessão: só o dono (nunca no portal nem na visualização).
-  const assinaturas = useAssinaturasSessao(id ? [id] : [], !portal && !somenteLeitura);
+  // Assinaturas da sessão: o dono e, desde 21/11/2026, a cliente no portal (só os planejamentos dela); nunca na visualização.
+  const assinaturas = useAssinaturasSessao(id ? [id] : [], !somenteLeitura);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repetir = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -782,7 +782,7 @@ export default function EditorPlanejamento({
     if (timer.current) clearTimeout(timer.current);
     sujo.current = false;
     if (emAndamento.current) await emAndamento.current;
-    const limpar = !portal && idRef.current ? await prepararLimpezaAssinaturas(supabase, [idRef.current]) : null;
+    const limpar = idRef.current ? await prepararLimpezaAssinaturas(supabase, [idRef.current]) : null;
     const { error } = await supabase.rpc("excluir_planejamento", { p_id: idRef.current });
     if (error) return error.message || "Não consegui apagar. Confira a internet.";
     await limpar?.().catch(() => {});
@@ -1556,7 +1556,7 @@ export default function EditorPlanejamento({
                   <AssinaturasSessoes
                     planoId={id}
                     plano={plano}
-                    clienteId={cliente || null}
+                    clienteId={(portal ? clienteId : cliente) || null}
                     estado={assinaturas.estado}
                     lista={assinaturas.lista}
                     onMudou={assinaturas.recarregar}

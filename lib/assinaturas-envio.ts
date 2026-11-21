@@ -27,7 +27,7 @@ const semColunaTriagem = (e: { code?: string; message?: string } | null) => !!e 
 const semParametroTriagem = (e: { code?: string; message?: string } | null) =>
   !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function|does not exist/i.test(e.message ?? ""));
 
-/** Assinaturas dos planejamentos (só para o dono; para os outros, "sem_permissao"). */
+/** Assinaturas dos planejamentos (dono e cliente do portal em dia; para os outros, "sem_permissao"). */
 export function useAssinaturasSessao(planoIds: string[], ativo: boolean) {
   const chave = planoIds.filter(Boolean).sort().join(",");
   const [estado, setEstado] = useState<EstadoAssinaturas>("carregando");
@@ -42,7 +42,9 @@ export function useAssinaturasSessao(planoIds: string[], ativo: boolean) {
     let vivo = true;
     const sb = createClient();
     (async () => {
-      const pode = await sb.rpc("pode_assinar_sessao");
+      // Dono ou cliente do portal em dia (SQL de 21/11/2026); antes dele, só o dono.
+      let pode = await sb.rpc("pode_colher_assinaturas");
+      if (pode.error && faltaSql(pode.error)) pode = await sb.rpc("pode_assinar_sessao");
       if (!vivo) return;
       if (pode.error) return setEstado(faltaSql(pode.error) ? "sem_sql" : "erro");
       if (!pode.data) return setEstado("sem_permissao");
