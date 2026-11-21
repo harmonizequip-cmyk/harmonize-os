@@ -119,7 +119,10 @@ export default function EditorPlanejamento({
   clientes,
   portal,
   demo,
+  voltarPara,
 }: {
+  /** Endereço do botão voltar (prévia do tour para o dono, fora do portal). */
+  voltarPara?: string;
   /** Paciente de exemplo do tour (/portal/exemplo): nada vai ao banco nem ao rascunho. */
   demo?: boolean;
   /** Login da cliente (/portal): sem escolha de cliente/atendimento, sem IA. */
@@ -970,7 +973,7 @@ export default function EditorPlanejamento({
   const profDoPlano = profissionais ? profissionalDoPlano(profissionais, plano) : null;
   const quemAtende = nomeCliente || plano.profissional;
   const areas = todasAreas(plano).filter((a) => !soPreenchidas || totalArea(plano, a) > 0);
-  const voltar = portal ? base : cliente ? `/planejador?cliente=${cliente}` : "/planejador";
+  const voltar = voltarPara ? voltarPara : portal ? base : cliente ? `/planejador?cliente=${cliente}` : "/planejador";
   const linkIa = `/assistente?${cliente ? `cliente=${cliente}&` : ""}pergunta=${encodeURIComponent(
     `Monta um planejamento: paciente ${plano.paciente}, saldo de ${plano.saldoTotal !== "0" ? plano.saldoTotal : ""} disparos, queixa principal: ${plano.queixa}`
   )}`;
