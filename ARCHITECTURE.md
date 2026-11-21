@@ -345,6 +345,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 - `page.tsx` (rota `/portal/novo`): Página /portal/novo (`PortalNovoPage`): abre um planejamento novo no `EditorPlanejamento` em modo portal, com o profissional da cliente (`clienteDoPortal`).
 
+#### `app/(portal)/portal/exemplo/`
+
+- `page.tsx` (rota `/portal/exemplo`): tour guiado (`PortalExemploPage`): `EditorPlanejamento` com `demo` e a paciente de exemplo (`estadoDeExemplo`, `lib/tour-planejador.ts`); nada vai ao banco nem ao rascunho do celular. Balões em `components/planejador/TourGuiado.tsx`, convite da primeira vez em `ConviteTour.tsx`, dicas de uma vez em `DicaUmaVez.tsx`.
+
 #### `app/api/backup/`
 
 - `route.ts` (rota `/api/backup`): Backup manual: baixa um arquivo JSON com todas as tabelas do negócio. Só administrador ativo. A leitura passa pelo login de quem pede (RLS), então nada vem a mais do que a pessoa já enxerga. Não inclui chaves de acesso biométrico (webauthn_credentials), que não servem para restaurar dados.
@@ -4757,7 +4761,7 @@ Rotas: `/planejador`, `/planejador/[id]`, `/planejador/novo`.
 
 ### Portal da cliente e formulário de cadastro público
 
-Rotas: `/cadastro/[token]`, `/portal`, `/portal/[id]`, `/portal/novo`.
+Rotas: `/cadastro/[token]`, `/portal`, `/portal/[id]`, `/portal/novo`, `/portal/exemplo`.
 
 **O que faz (fluxo do usuário).** A cliente com login próprio vê só os planejamentos dela em `/portal` (mesmo editor, sem IA e sem atendimento). O dono cria o acesso na ficha ("Acesso ao Planejador": cria o login e chama `liberar_acesso_planejador`) ou manda o formulário `/cadastro/<token>` (gerado por `criar_convite_cadastro`), que fala com a Edge Function `cadastro-cliente`: ela cria o login e chama `convite_cadastro_receber`.
 

@@ -47,7 +47,10 @@ export default function ColherAssinaturas({
   clienteId,
   onFechar,
   onConcluiu,
+  demo,
 }: {
+  /** Tour do paciente de exemplo: passa por todos os passos, mas não guarda nada. */
+  demo?: boolean;
   planoId: string;
   plano: Plano;
   sessao: number;
@@ -137,6 +140,11 @@ export default function ColherAssinaturas({
     if (!nomeProf.trim()) return avisar("Escolha ou escreva o nome da profissional.", "erro");
     const bProf = await canvasProf.current?.exportar();
     if (!bProf) return avisar("Falta a assinatura da profissional.", "erro");
+    if (demo) {
+      avisar("Muito bem! No exemplo nada é guardado. Com um paciente de verdade, as assinaturas ficam na ficha dele.");
+      onFechar();
+      return;
+    }
     setEnviando(true);
     try {
       const hash = await hashDoResumo(resumo);

@@ -3,6 +3,7 @@ import { hojeLocal } from "@/lib/period";
 import PlanejadorLista from "../../(app)/planejador/PlanejadorLista";
 import { carregarListaPlanejador } from "../../(app)/planejador/carregar";
 import { clienteDoPortal } from "./carregar";
+import ConviteTour from "@/components/planejador/ConviteTour";
 
 // As políticas planejamentos_select_cliente e pacientes_select_cliente só devolvem os dela.
 export default async function PortalPage(props: { searchParams: Promise<{ paciente?: string }> }) {
@@ -10,6 +11,8 @@ export default async function PortalPage(props: { searchParams: Promise<{ pacien
   const supabase = createClient();
   const [carga, cliente] = await Promise.all([carregarListaPlanejador(supabase, true), clienteDoPortal(supabase)]);
   return (
+    <>
+    <ConviteTour />
     <PlanejadorLista
       portal
       nomeCliente={cliente?.profissional ?? null}
@@ -22,5 +25,6 @@ export default async function PortalPage(props: { searchParams: Promise<{ pacien
       hoje={hojeLocal()}
       erro={carga.erro}
     />
+    </>
   );
 }

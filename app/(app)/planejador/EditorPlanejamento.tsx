@@ -72,7 +72,11 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { confirmar } from "@/components/Dialogos";
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, Compass, PenLine as IconeAssinar } from "lucide-react";
+import TourGuiado from "@/components/planejador/TourGuiado";
+import DicaUmaVez from "@/components/planejador/DicaUmaVez";
+import ColherAssinaturas from "@/components/planejador/ColherAssinaturas";
+import { PASSOS_TOUR, type AbaTour } from "@/lib/tour-planejador";
 
 type Cliente = ClientOption & { profissional: string };
 type Evento = { id: string; date_start: string; event_type: string };
@@ -114,7 +118,10 @@ export default function EditorPlanejamento({
   eventoId,
   clientes,
   portal,
+  demo,
 }: {
+  /** Paciente de exemplo do tour (/portal/exemplo): nada vai ao banco nem ao rascunho. */
+  demo?: boolean;
   /** Login da cliente (/portal): sem escolha de cliente/atendimento, sem IA. */
   portal?: boolean;
   planoId: string | null;
@@ -171,7 +178,12 @@ export default function EditorPlanejamento({
   const autoEscolher = useRef<"inicial" | "troca" | null>(planoId ? null : "inicial");
   const rolagem = useRef<HTMLDivElement>(null);
   // Assinaturas da sessão: o dono e, desde 21/11/2026, a cliente no portal (só os planejamentos dela); nunca na visualização.
-  const assinaturas = useAssinaturasSessao(id ? [id] : [], !somenteLeitura);
+  const assinaturas = useAssinaturasSessao(id ? [id] : [], !somenteLeitura && !demo);
+  // Tour: começa aberto no exemplo; "Ver o tour de novo" remonta (volta ao passo 1).
+  const [tour, setTour] = useState(!!demo);
+  const [voltaTour, setVoltaTour] = useState(0);
+  const [assinarExemplo, setAssinarExemplo] = useState(false);
+  const abrirAbaTour = useCallback((a: AbaTour) => setAba(a), []);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repetir = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -354,7 +366,8 @@ export default function EditorPlanejamento({
   salvarRef.current = salvar;
 
   const agendar = useCallback(() => {
-    if (somenteLeitura) return;
+    // No exemplo nada é salvo (nem no banco, nem no rascunho do celular).
+    if (somenteLeitura || demo) return;
     sujo.current = true;
     sujoDesde.current ??= Date.now();
     versao.current += 1;
@@ -366,7 +379,7 @@ export default function EditorPlanejamento({
       timer.current = null;
       void salvar();
     }, espera);
-  }, [salvar, gravarRascunho, somenteLeitura]);
+  }, [salvar, gravarRascunho, somenteLeitura, demo]);
 
   const mudar = useCallback(
     (fn: (p: Plano) => Plano) => {
@@ -414,7 +427,7 @@ export default function EditorPlanejamento({
   // aparelho reaproveita a página guardada pelo Next, que pode estar velha).
   const abriu = useRef(false);
   useEffect(() => {
-    if (abriu.current || somenteLeitura) return;
+    if (abriu.current || somenteLeitura || demo) return;
     abriu.current = true;
     const veioDaIa = !planoId && new URLSearchParams(window.location.search).get("ia") === "1";
     let texto: string | null = null;
@@ -674,6 +687,7 @@ export default function EditorPlanejamento({
 
   async function criarProfissional() {
     if (!novaProf || !clienteDasProfissionais) return;
+    if (demo) return mostrarAviso("No exemplo, nada é cadastrado. Faça isso num planejamento de verdade.", 4000);
     const problema = problemaProfissional(novaProf);
     if (problema) return mostrarAviso(problema);
     setSalvandoProf(true);
@@ -990,7 +1004,9 @@ export default function EditorPlanejamento({
             </p>
           </div>
           <span className="flex flex-shrink-0 items-center text-xs text-neutral-500" aria-live="polite">
-            {somenteLeitura ? (
+            {demo ? (
+              <span className="rounded-full bg-amber-100 px-2 py-1 font-bold text-amber-800">Exemplo</span>
+            ) : somenteLeitura ? (
               <span className="rounded-full bg-neutral-100 px-2 py-1">Só ver</span>
             ) : falhou ? (
               <CloudOff size={16} className="text-amber-600" aria-label="Não salvo ainda" />
@@ -1010,7 +1026,7 @@ export default function EditorPlanejamento({
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
                 <div className="absolute right-0 top-11 z-20 w-60 overflow-hidden rounded-2xl bg-white py-1 shadow-xl ring-1 ring-neutral-200">
-                  {!somenteLeitura && (
+                  {!somenteLeitura && !demo && (
                     <>
                       <button onClick={novo} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-neutral-800 active:bg-neutral-50">
                         <Plus size={16} /> Novo planejamento
@@ -1058,7 +1074,7 @@ export default function EditorPlanejamento({
                       <PenLine size={16} /> Colher assinaturas (Sessão {plano.sessaoAtual})
                     </button>
                   )}
-                  {!somenteLeitura && (
+                  {!somenteLeitura && !demo && (
                     <button onClick={excluir} className="flex w-full items-center gap-2.5 border-t border-neutral-100 px-4 py-3 text-left text-sm text-rose-600 active:bg-rose-50">
                       <Trash2 size={16} /> Excluir planejamento
                     </button>
@@ -1092,8 +1108,20 @@ export default function EditorPlanejamento({
           </div>
         )}
 
+        {demo && (
+          <div className="mx-auto max-w-3xl px-3 pb-2">
+            <div className="flex items-center gap-2.5 rounded-2xl bg-amber-50 px-3 py-2 text-[13px] font-semibold text-amber-900 ring-1 ring-amber-200">
+              <Compass size={17} className="flex-shrink-0" />
+              <span className="min-w-0 flex-1 leading-snug">Paciente de exemplo: pode mexer à vontade, nada aqui fica salvo.</span>
+              <button type="button" onClick={() => (setVoltaTour((v) => v + 1), setTour(true))} className="flex-shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-amber-800 ring-1 ring-amber-300">
+                Ver o tour
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Saldo sempre à vista. */}
-        <div className="mx-auto max-w-3xl px-4 pb-2.5">
+        <div className="mx-auto max-w-3xl px-4 pb-2.5" data-tour="barra-saldo">
           <button type="button" onClick={() => s.saldo <= 0 && irPara("paciente")} className="block w-full text-left">
             <div className="flex items-end justify-between gap-3">
               <div>
@@ -1193,7 +1221,7 @@ export default function EditorPlanejamento({
               <div className={cartao}>
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Paciente</p>
                 <div className="space-y-3">
-                  <div className="relative">
+                  <div className="relative" data-tour="nome-paciente">
                     <label className="block">
                       <span className={rotulo}>Nome do paciente</span>
                       <input
@@ -1264,12 +1292,12 @@ export default function EditorPlanejamento({
                     <input value={plano.queixa} onChange={(e) => campo("queixa", e.target.value)} placeholder="Ex.: flacidez de papada" className={entrada} />
                   </label>
                   {profissionais === null ? (
-                    <label className="block">
+                    <label className="block" data-tour="profissional">
                       <span className={rotulo}>Profissional</span>
                       <input value={plano.profissional} onChange={(e) => mudar((p) => ({ ...p, profissional: e.target.value, profissionalId: "", profissionalRegistro: "" }))} placeholder="Nome do profissional" className={entrada} />
                     </label>
                   ) : (
-                    <div>
+                    <div data-tour="profissional">
                       <label className="block">
                         <span className={rotulo}>Profissional</span>
                         <select
@@ -1324,7 +1352,7 @@ export default function EditorPlanejamento({
                 </div>
               </div>
 
-              <div className={cartao}>
+              <div className={cartao} data-tour="sessoes">
                 <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Sessões do pacote</p>
                 <p className="mb-3 text-sm font-semibold text-neutral-800">Quantas sessões o paciente vai fazer?</p>
                 <div className="grid grid-cols-6 gap-1.5">
@@ -1381,7 +1409,10 @@ export default function EditorPlanejamento({
                   </ul>
                 )}
                 {varias && !somenteLeitura && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-2" data-tour="concluir-sessao">
+                    {portal && !demo && naoUltima && (
+                      <DicaUmaVez id="concluir-sessao">Ao terminar o atendimento, toque em &quot;Concluir Sessão&quot;. O que sobrar fica de crédito para a próxima, e na volta é só abrir a ficha do paciente e tocar em &quot;Continuar&quot;.</DicaUmaVez>
+                    )}
                     {naoUltima && (
                       <>
                         <button
@@ -1404,7 +1435,7 @@ export default function EditorPlanejamento({
                 )}
               </div>
 
-              <div className={cartao}>
+              <div className={cartao} data-tour="saldo">
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500">{varias ? "Saldo de disparos do pacote" : "Saldo de disparos"}</p>
                 <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${perfisTela.length <= 4 ? 4 : 3}, minmax(0, 1fr))` }}>
                   {perfisTela.map((pf) => {
@@ -1468,7 +1499,7 @@ export default function EditorPlanejamento({
               </div>
 
               {!somenteLeitura && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2" data-tour="montar">
                   <button type="button" onClick={() => setSeletor(true)} className="flex items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-sm font-bold text-brand-teal-dark ring-1 ring-brand-teal/40">
                     <ListChecks size={17} /> Montar pelas regras
                   </button>
@@ -1514,9 +1545,9 @@ export default function EditorPlanejamento({
               </p>
               {areas.length === 0 && <p className="rounded-3xl bg-white p-6 text-center text-sm text-neutral-500 ring-1 ring-neutral-200">Nenhuma área com disparos ainda.</p>}
               <div className="gap-3 md:columns-2 [&>*]:mb-3 [&>*]:break-inside-avoid">
-                {areas.map((a) => (
+                {areas.map((a, ix) => (
+                  <div key={a.id} data-tour={ix === areas.findIndex((x) => totalArea(plano, x) > 0) ? "primeira-area" : undefined}>
                   <CartaoArea
-                    key={a.id}
                     area={a}
                     linhas={plano.DATA[a.id] ?? []}
                     total={totalArea(plano, a)}
@@ -1533,6 +1564,7 @@ export default function EditorPlanejamento({
                     onVerModelo={() => setModelo(a)}
                     onRemoverArea={a.manual && !somenteLeitura ? () => removerArea(a) : undefined}
                   />
+                  </div>
                 ))}
               </div>
               {!somenteLeitura && (
@@ -1545,14 +1577,33 @@ export default function EditorPlanejamento({
 
           {aba === "resumo" && (
             <div key="resumo" className="animate-[aparecer_.25s_ease-out]">
-              <ResumoPlano plano={plano} onIrParaArea={irParaArea} onModo={setModoResumo} />
-              <div className={`${cartao} mt-4`}>
+              <div data-tour="resumo">
+                <ResumoPlano plano={plano} onIrParaArea={irParaArea} onModo={setModoResumo} />
+              </div>
+              {demo && (
+                <div className={`${cartao} mt-4`} data-tour="assinaturas">
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Assinaturas da sessão</p>
+                  <p className="mb-3 text-xs text-neutral-500">Paciente e profissional assinam com o dedo, no celular. No exemplo, nada é guardado.</p>
+                  <button type="button" onClick={() => setAssinarExemplo(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-teal py-3 text-sm font-bold text-white">
+                    <IconeAssinar size={16} /> Colher assinaturas (Sessão {plano.sessaoAtual})
+                  </button>
+                </div>
+              )}
+              <div className={`${cartao} mt-4`} data-tour="orientacoes">
                 <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Depois da sessão</p>
                 <p className="mb-3 text-xs text-neutral-500">Cuidados, o que esperar{plano.dataRetorno ? " e o próximo retorno" : ""}, já escritos para o WhatsApp do paciente.</p>
+                {portal && !demo && !whatsPaciente && (
+                  <div className="mb-3">
+                    <DicaUmaVez id="whatsapp-paciente">Para mandar as orientações e a ficha assinada, cadastre o WhatsApp do paciente: na lista, toque no nome dele, depois em &quot;Editar&quot;.</DicaUmaVez>
+                  </div>
+                )}
                 <BotaoOrientacoes paciente={plano.paciente} whatsapp={whatsPaciente} profissional={plano.profissional} retorno={plano.dataRetorno} />
               </div>
               {assinaturas.estado !== "sem_permissao" && assinaturas.estado !== "carregando" && (
-                <div id="assinaturas-sessao" className={`${cartao} mt-4 scroll-mt-4`}>
+                <div id="assinaturas-sessao" className={`${cartao} mt-4 scroll-mt-4 space-y-3`}>
+                  {portal && !demo && (
+                    <DicaUmaVez id="assinaturas">Ordem da assinatura: triagem, resumo, termo, o paciente assina com o dedo e, por último, a profissional confirma.</DicaUmaVez>
+                  )}
                   <AssinaturasSessoes
                     planoId={id}
                     plano={plano}
@@ -1679,6 +1730,18 @@ export default function EditorPlanejamento({
           )}
         </div>
       </Folha>
+      {demo && tour && <TourGuiado key={voltaTour} passos={PASSOS_TOUR} onAba={abrirAbaTour} onFim={() => setTour(false)} />}
+      {demo && assinarExemplo && (
+        <ColherAssinaturas
+          demo
+          planoId="exemplo"
+          plano={plano}
+          sessao={plano.sessaoAtual}
+          clienteId={clienteId}
+          onFechar={() => setAssinarExemplo(false)}
+          onConcluiu={() => {}}
+        />
+      )}
       <CustoDisparos
         aberta={custos}
         onFechar={() => setCustos(false)}
