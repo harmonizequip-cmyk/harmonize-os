@@ -5,6 +5,7 @@
 // falta e prende cada número na faixa válida.
 
 import { lerModelos, MODELOS_PADRAO, modelosDiferentes, type ModelosMensagem } from "./mensagens-modelos";
+import { lerLiberados } from "./recursos";
 
 export type ClasseCadencia = "nova" | "ativa" | "em_risco" | "sumida" | "quente" | "morna" | "fria";
 
@@ -124,6 +125,8 @@ export interface Preferencias {
    * celular ficam de fora (duplicados na função alertas).
    */
   mensagens: ModelosMensagem;
+  /** Recursos do portal que o dono já testou e liberou para as clientes (`lib/recursos.ts`). */
+  recursos: { liberados: string[] };
 }
 
 export interface EstimativaDisparos {
@@ -238,6 +241,7 @@ export const DEFAULT_PREFERENCIAS: Preferencias = {
     nota: "Valores médios por região. Podem variar conforme a avaliação do profissional.",
   },
   mensagens: MODELOS_PADRAO,
+  recursos: { liberados: [] },
 };
 
 type Obj = Record<string, unknown>;
@@ -423,6 +427,8 @@ export function lerPreferencias(bruto: unknown): Preferencias {
     },
     // Ausente, vazio, grande demais ou com variável errada: o texto de sempre.
     mensagens: lerModelos(r.mensagens),
+    // Ausente ou estragado: nada liberado (tudo continua em teste).
+    recursos: { liberados: lerLiberados(obj(r.recursos).liberados) },
   };
 }
 

@@ -66,6 +66,8 @@ import Cidades from "./secoes/Cidades";
 import Tags, { type TagRow } from "./secoes/Tags";
 import MinhaConta from "./secoes/MinhaConta";
 import Aparencia from "./secoes/Aparencia";
+import RecursosEmTeste from "./secoes/RecursosEmTeste";
+import { RECURSOS, estaLiberado } from "@/lib/recursos";
 import { lerTemaGuardado, nomeDoTema } from "@/lib/tema";
 import { TITULOS_SECAO as TITULOS, type SecaoId } from "./secoes-ids";
 import { modelosDiferentes } from "@/lib/mensagens-modelos";
@@ -277,6 +279,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
         {secao === "aparencia" && <Aparencia />}
         {secao === "backup" && <BackupCard />}
         {secao === "acesso" && <AcessoVisualizacaoCard />}
+        {secao === "recursos" && <RecursosEmTeste preferencias={settings.preferencias} />}
         {secao === "conta" && <MinhaConta nome={dados.nome} email={dados.email} />}
       </div>
     );
@@ -473,6 +476,16 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           href: "/configuracoes/dados-teste",
         },
         { id: "historico", titulo: "Histórico", resumo: "Quem mudou o quê", icone: History, cor: "bg-neutral-100 text-neutral-600", href: "/movimentacoes" },
+        {
+          id: "recursos",
+          titulo: "Recursos em teste",
+          resumo: (() => {
+            const n = RECURSOS.filter((r) => !estaLiberado(settings.preferencias.recursos.liberados, r.id)).length;
+            return n ? `${n} esperando você` : "Tudo liberado";
+          })(),
+          icone: FlaskConical,
+          cor: "bg-amber-50 text-amber-700",
+        },
       ],
     },
   ];

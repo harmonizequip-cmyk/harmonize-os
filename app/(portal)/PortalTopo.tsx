@@ -10,7 +10,7 @@ import { Compass, KeyRound, LogOut, UsersRound, X } from "lucide-react";
 import { ENDERECO_TOUR } from "@/lib/tour-planejador";
 import ProfissionaisCliente from "@/components/planejador/ProfissionaisCliente";
 
-export default function PortalTopo({ nome, clienteId }: { nome: string; clienteId?: string | null }) {
+export default function PortalTopo({ nome, clienteId, comoUsar }: { nome: string; clienteId?: string | null; comoUsar?: boolean }) {
   const supabase = createClient();
   const router = useRouter();
   const [trocando, setTrocando] = useState(false);
@@ -44,9 +44,11 @@ export default function PortalTopo({ nome, clienteId }: { nome: string; clienteI
           <span className="truncate text-xs text-neutral-500">Planejador · {nome}</span>
         </div>
         <div className="flex flex-shrink-0 items-center gap-3 text-neutral-500">
+          {comoUsar && (
           <Link href={ENDERECO_TOUR} aria-label="Como usar o Planejador" title="Como usar" className="inline-flex items-center gap-1 text-xs font-semibold hover:text-brand-teal-dark">
             <Compass size={17} /> <span>Como usar</span>
           </Link>
+          )}
           {clienteId && (
             <button onClick={() => setEquipe((v) => !v)} aria-label="Profissionais da clínica" title="Profissionais da clínica" className="inline-flex items-center gap-1 text-xs font-semibold hover:text-brand-teal-dark">
               <UsersRound size={17} /> <span className="hidden sm:inline">Profissionais</span>

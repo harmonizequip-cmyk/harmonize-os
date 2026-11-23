@@ -4,6 +4,8 @@ import PortalTopo from "./PortalTopo";
 import { buildWhatsAppLink } from "@/lib/format";
 import { mensagemPedirAcesso } from "@/lib/acesso";
 import { clienteDoPortal } from "./portal/carregar";
+import { carregarRecursosLiberados } from "@/lib/carregar-recursos";
+import { estaLiberado } from "@/lib/recursos";
 
 // Portal da cliente: login de cliente (profiles.cliente_id) vê só o
 // Planejador dela. Quem não é login de cliente volta para o sistema.
@@ -18,6 +20,8 @@ export default async function PortalLayout({ children }: { children: React.React
   // sem acesso decide (equipe volta ao sistema, os outros ficam lá).
   if (erroPerfil || !perfil?.cliente_id) redirect("/sem-acesso");
   const cliente = perfil.active ? await clienteDoPortal(supabase) : null;
+  // "Como usar" só depois que o dono libera o tour (Configurações > Recursos em teste).
+  const comoUsar = cliente ? estaLiberado(await carregarRecursosLiberados(supabase), "tour-planejador") : false;
   // Validade: 60 dias ao liberar, 45 depois de cada atendimento (portal_situacao, no banco).
   const { data: situacao } = cliente ? { data: null } : await supabase.rpc("portal_situacao");
   const s = situacao as { desligado?: boolean; ultimo_atendimento?: string | null } | null;
@@ -31,7 +35,7 @@ export default async function PortalLayout({ children }: { children: React.React
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <PortalTopo nome={cliente?.profissional ?? user.email ?? ""} clienteId={cliente?.client_id ?? null} />
+      <PortalTopo nome={cliente?.profissional ?? user.email ?? ""} clienteId={cliente?.client_id ?? null} comoUsar={comoUsar} />
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
         {cliente ? (
           children

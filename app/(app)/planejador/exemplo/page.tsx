@@ -2,8 +2,9 @@ import { hojeLocal } from "@/lib/period";
 import { estadoDeExemplo } from "@/lib/tour-planejador";
 import EditorPlanejamento from "../EditorPlanejamento";
 
-// TEMPORÁRIO (21/11/2026): prévia do tour do portal para o dono, sem login de cliente.
-// Mostra a mesma tela que a cliente vê em /portal/exemplo. Apagar quando o dono aprovar.
+// Prévia do tour do portal para o dono, sem login de cliente: a mesma tela que a
+// cliente vê em /portal/exemplo. É o "Ver como a cliente vê" de Configurações >
+// Recursos em teste (o tour só aparece para elas depois que o dono libera).
 export default function PreviaTourPage() {
   return (
     <EditorPlanejamento

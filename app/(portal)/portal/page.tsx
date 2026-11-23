@@ -4,15 +4,17 @@ import PlanejadorLista from "../../(app)/planejador/PlanejadorLista";
 import { carregarListaPlanejador } from "../../(app)/planejador/carregar";
 import { clienteDoPortal } from "./carregar";
 import ConviteTour from "@/components/planejador/ConviteTour";
+import { carregarRecursosLiberados } from "@/lib/carregar-recursos";
+import { estaLiberado } from "@/lib/recursos";
 
 // As políticas planejamentos_select_cliente e pacientes_select_cliente só devolvem os dela.
 export default async function PortalPage(props: { searchParams: Promise<{ paciente?: string }> }) {
   const searchParams = await props.searchParams;
   const supabase = createClient();
-  const [carga, cliente] = await Promise.all([carregarListaPlanejador(supabase, true), clienteDoPortal(supabase)]);
+  const [carga, cliente, liberados] = await Promise.all([carregarListaPlanejador(supabase, true), clienteDoPortal(supabase), carregarRecursosLiberados(supabase)]);
   return (
     <>
-    <ConviteTour />
+    {estaLiberado(liberados, "tour-planejador") && <ConviteTour />}
     <PlanejadorLista
       portal
       nomeCliente={cliente?.profissional ?? null}

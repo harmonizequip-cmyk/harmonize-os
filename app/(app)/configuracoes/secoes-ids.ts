@@ -23,6 +23,7 @@ export const TITULOS_SECAO = {
   aparencia: "Aparência",
   backup: "Backup",
   acesso: "Acesso só de visualização",
+  recursos: "Recursos em teste",
   conta: "Minha conta",
 } as const;
 

@@ -120,7 +120,10 @@ export default function EditorPlanejamento({
   portal,
   demo,
   voltarPara,
+  dicasPortal,
 }: {
+  /** Portal: mostra as dicas de uma vez (só depois que o dono libera o tour em Recursos em teste). */
+  dicasPortal?: boolean;
   /** Endereço do botão voltar (prévia do tour para o dono, fora do portal). */
   voltarPara?: string;
   /** Paciente de exemplo do tour (/portal/exemplo): nada vai ao banco nem ao rascunho. */
@@ -1416,7 +1419,7 @@ export default function EditorPlanejamento({
                 )}
                 {varias && !somenteLeitura && (
                   <div className="mt-3 space-y-2" data-tour="concluir-sessao">
-                    {portal && !demo && naoUltima && (
+                    {portal && !demo && dicasPortal && naoUltima && (
                       <DicaUmaVez id="concluir-sessao">Ao terminar o atendimento, toque em &quot;Concluir Sessão&quot;. O que sobrar fica de crédito para a próxima, e na volta é só abrir a ficha do paciente e tocar em &quot;Continuar&quot;.</DicaUmaVez>
                     )}
                     {naoUltima && (
@@ -1598,7 +1601,7 @@ export default function EditorPlanejamento({
               <div className={`${cartao} mt-4`} data-tour="orientacoes">
                 <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">Depois da sessão</p>
                 <p className="mb-3 text-xs text-neutral-500">Cuidados, o que esperar{plano.dataRetorno ? " e o próximo retorno" : ""}, já escritos para o WhatsApp do paciente.</p>
-                {portal && !demo && !whatsPaciente && (
+                {portal && !demo && dicasPortal && !whatsPaciente && (
                   <div className="mb-3">
                     <DicaUmaVez id="whatsapp-paciente">Para mandar as orientações e a ficha assinada, cadastre o WhatsApp do paciente: na lista, toque no nome dele, depois em &quot;Editar&quot;.</DicaUmaVez>
                   </div>
@@ -1607,7 +1610,7 @@ export default function EditorPlanejamento({
               </div>
               {assinaturas.estado !== "sem_permissao" && assinaturas.estado !== "carregando" && (
                 <div id="assinaturas-sessao" className={`${cartao} mt-4 scroll-mt-4 space-y-3`}>
-                  {portal && !demo && (
+                  {portal && !demo && dicasPortal && (
                     <DicaUmaVez id="assinaturas">Ordem da assinatura: triagem, resumo, termo, o paciente assina com o dedo e, por último, a profissional confirma.</DicaUmaVez>
                   )}
                   <AssinaturasSessoes
