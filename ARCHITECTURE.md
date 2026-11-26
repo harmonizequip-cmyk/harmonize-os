@@ -349,6 +349,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 - `page.tsx` (rota `/portal/exemplo`): tour guiado (`PortalExemploPage`): `EditorPlanejamento` com `demo` e a paciente de exemplo (`estadoDeExemplo`, `lib/tour-planejador.ts`); nada vai ao banco nem ao rascunho do celular. Balões em `components/planejador/TourGuiado.tsx`, convite da primeira vez em `ConviteTour.tsx`, dicas de uma vez em `DicaUmaVez.tsx`. Só abre para a cliente com o recurso `tour-planejador` liberado.
 
+#### Trocar o HIPRO (26/11/2026)
+
+- `components/TrocarHiproBotao.tsx` (usado em `app/(app)/agenda/EditarEventoModal.tsx`) chama a RPC `trocar_hipro_agendamento(uuid, uuid default null)` (troca simples ou entre dois atendimentos; internas `conferir_troca_hipro`, `ocupante_hipro`) (migration `2026-11-26-trocar-hipro-agendamento.sql`): troca `calendar_events.event_type`/`equipment_id` e `rentals.equipment_id`, recusa conflito, bloqueio, manutenção, cancelada e contagem iniciada.
+
 #### Recursos em teste (23/11/2026)
 
 - `lib/recursos.ts` (registro `RECURSOS`, `lerLiberados`, `estaLiberado`, `alternarLiberado`; testes em `lib/recursos.test.ts`), `lib/carregar-recursos.ts` (`carregarRecursosLiberados` pela RPC `recursos_liberados()`, security definer, devolve os ids de `settings.preferencias.recursos.liberados`; migration `2026-11-23-recursos-em-teste.sql`), grupo `recursos` em `lib/preferencias.ts` e a seção `app/(app)/configuracoes/secoes/RecursosEmTeste.tsx` (`?secao=recursos`). O portal (`layout.tsx`, `portal/page.tsx`, `portal/novo`, `portal/[id]`, `portal/exemplo`) confere a liberação no servidor; tudo escondido sem o SQL.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import TrocarHiproBotao from "@/components/TrocarHiproBotao";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FileText } from "lucide-react";
@@ -763,6 +764,8 @@ export default function EditarEventoModal({
                 Reagendar
               </button>
 
+              <TrocarHiproBotao eventId={event.id} eventType={event.event_type} dateStart={event.date_start} dateEnd={event.date_end} onTrocado={onSaved} className="mt-2" />
+
               {!event.is_mentoria && event.client_id && (
                 <button
                   onClick={() => setShowArte(true)}
@@ -1108,6 +1111,10 @@ export default function EditarEventoModal({
             <CuidadosHiproDia equipmentId={event.equipment_id} className="mb-4" />
           )}
 
+          {event.status !== "cancelada" && (
+            <TrocarHiproBotao eventId={event.id} eventType={event.event_type} dateStart={event.date_start} dateEnd={event.date_end} onTrocado={onSaved} className="mb-4" />
+          )}
+
           {saldoLocacao !== null && (
             <div className="mb-4 rounded-xl border border-neutral-200 p-3">
               {saldoLocacao > 0.009 ? (
@@ -1298,6 +1305,10 @@ export default function EditarEventoModal({
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
+
+        {event.status !== "cancelada" && (
+          <TrocarHiproBotao eventId={event.id} eventType={event.event_type} dateStart={event.date_start} dateEnd={event.date_end} onTrocado={onSaved} className="mt-3" />
+        )}
 
         <button
           onClick={() => setConfirmarExclusao(true)}
