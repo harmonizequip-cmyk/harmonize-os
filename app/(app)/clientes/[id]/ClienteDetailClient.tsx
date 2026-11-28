@@ -452,6 +452,9 @@ export default function ClienteDetailClient({
         {client.parceiro && (
           <span className="rounded-full bg-brand-blue/10 px-3 py-1 font-medium text-brand-blue">
             🤝 Parceiro · reserva sem taxa
+            {(client as { desconto_parceiro?: number | null }).desconto_parceiro
+              ? ` · ${String(Number((client as { desconto_parceiro?: number | null }).desconto_parceiro)).replace(".", ",")}% de desconto`
+              : ""}
           </span>
         )}
         {!client.parceiro && client.isento_taxa && (

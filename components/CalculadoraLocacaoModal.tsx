@@ -28,7 +28,7 @@
 // rental_payments, do jeito que já era (definir_taxa_agendamento).
 // ============================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import VinculoCampanha, { vincularCampanha } from "@/components/VinculoCampanha";
 import { createClient } from "@/lib/supabase/client";
@@ -677,10 +677,13 @@ export default function CalculadoraLocacaoModal({
   // Nome de quem ela indicou (ou de quem a indicou), para o cupom de indicação dizer de quem é.
   const [nomeIndicacao, setNomeIndicacao] = useState<string | null>(null);
   const cuponsSalvos = usePreferencias().cupons.lista;
+  // Carregou a indicação (e o nome da outra pessoa)? Os descontos automáticos esperam as cargas.
+  const [indicacaoCarregada, setIndicacaoCarregada] = useState(false);
   useEffect(() => {
     let vivo = true;
     setDescontoIndicacao(null);
     setIndicacaoTirada(false);
+    setIndicacaoCarregada(false);
     if (!activeClientId || isMentoria) return;
     supabase
       .from("descontos_indicacao")
@@ -688,24 +691,48 @@ export default function CalculadoraLocacaoModal({
       .eq("client_id", activeClientId)
       .is("usado_em", null)
       .then(({ data, error }) => {
-        if (!vivo || error) return; // sem o SQL do programa: nada muda
+        if (!vivo) return;
+        if (error) return setIndicacaoCarregada(true); // sem o SQL do programa: nada muda
         const d = descontoParaUsar((data ?? []) as DescontoIndicacao[], hojeLocal());
         setDescontoIndicacao(d);
         setNomeIndicacao(null);
-        if (d?.outro_client_id) {
-          supabase
-            .from("clients")
-            .select("name, display_name")
-            .eq("id", d.outro_client_id)
-            .maybeSingle()
-            .then(({ data: o }) => {
-              if (vivo && o) setNomeIndicacao(((o.display_name as string) || (o.name as string) || "").trim() || null);
-            });
-        }
-        if (d) {
-          setDescontoTipo("percentual");
-          setDescontoValor((v) => (v.trim() ? v : String(Number(d.percentual))));
-        }
+        if (!d?.outro_client_id) return setIndicacaoCarregada(true);
+        supabase
+          .from("clients")
+          .select("name, display_name")
+          .eq("id", d.outro_client_id)
+          .maybeSingle()
+          .then(({ data: o }) => {
+            if (!vivo) return;
+            if (o) setNomeIndicacao(((o.display_name as string) || (o.name as string) || "").trim() || null);
+            setIndicacaoCarregada(true);
+          });
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, isMentoria]);
+  // Desconto de parceiro da cliente (clients.desconto_parceiro): entra sozinho como "Cupom PARCEIRO".
+  const [descontoParceiroCliente, setDescontoParceiroCliente] = useState<number | null>(null);
+  const [parceiroCarregado, setParceiroCarregado] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setDescontoParceiroCliente(null);
+    setParceiroCarregado(false);
+    if (!activeClientId || isMentoria) return;
+    supabase
+      .from("clients")
+      .select("parceiro, desconto_parceiro")
+      .eq("id", activeClientId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!vivo) return;
+        setParceiroCarregado(true);
+        if (error || !data) return; // sem o SQL do desconto de parceiro: nada muda
+        const d = data as { parceiro?: boolean; desconto_parceiro?: number | null };
+        const p = d.parceiro && d.desconto_parceiro != null ? Number(d.desconto_parceiro) : 0;
+        setDescontoParceiroCliente(p > 0 ? p : null);
       });
     return () => {
       vivo = false;
@@ -741,6 +768,44 @@ export default function CalculadoraLocacaoModal({
   const cupomIndicacao = nomeIndicacao ? `${CUPOM_INDICACAO} · ${nomeIndicacao.split(" ")[0]}` : CUPOM_INDICACAO;
   const cupomEfetivo = normalizarCupom(cupomNome) || (indicacaoNoPrincipal ? cupomIndicacao : "");
   const descontoDescricaoEfetiva = rotuloDesconto(descontoTipo, descontoRawNumero, cupomEfetivo);
+
+  // Descontos automáticos, uma vez por cliente (depois das duas cargas): parceiro no
+  // desconto de cima; a indicação vai para cima sem parceiro, ou entra como adicional
+  // com parceiro. Tudo pode ser mudado ou tirado na tela.
+  const automaticosDe = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeClientId || isMentoria || !indicacaoCarregada || !parceiroCarregado) return;
+    if (automaticosDe.current === activeClientId) return;
+    automaticosDe.current = activeClientId;
+    if (descontoValor.trim()) return; // o dono já digitou um desconto
+    if (descontoParceiroCliente) {
+      setDescontoTipo("percentual");
+      setDescontoValor(String(descontoParceiroCliente).replace(".", ","));
+      setCupomNome("PARCEIRO");
+      if (descontoIndicacao) {
+        setIndicacaoTirada(true);
+        setItensPersonalizados((prev) =>
+          prev.some((i) => i.indicacao)
+            ? prev
+            : [
+                ...prev,
+                {
+                  id: newId("item"),
+                  desc: `Cupom ${normalizarCupom(cupomIndicacao)}`,
+                  valor: 0,
+                  tipo: "menos",
+                  percentual: Number(descontoIndicacao.percentual),
+                  indicacao: true,
+                },
+              ]
+        );
+      }
+    } else if (descontoIndicacao) {
+      setDescontoTipo("percentual");
+      setDescontoValor(String(Number(descontoIndicacao.percentual)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, isMentoria, indicacaoCarregada, parceiroCarregado]);
 
   const itensLivres: ItemAjuste[] = useMemo(
     () =>

@@ -28,6 +28,7 @@ interface Client {
   isento_taxa?: boolean;
   // Tabela de preço antiga (aluguel R$ 497 + disparo), migration 2026-11-07-tabela-antiga.
   tabela_antiga?: boolean;
+  desconto_parceiro?: number | null;
   indicado_por?: string | null;
   origem?: string | null;
   treatment?: string | null;
@@ -94,6 +95,9 @@ export default function EditarClienteModal({
   const [parceiro, setParceiro] = useState(client.parceiro ?? false);
   const [isentoTaxa, setIsentoTaxa] = useState(client.isento_taxa ?? false);
   const [tabelaAntiga, setTabelaAntiga] = useState(client.tabela_antiga ?? false);
+  // Desconto de parceiro em % (vazio = só parceira, sem desconto).
+  const descontoParceiroOriginal = client.desconto_parceiro != null ? Number(client.desconto_parceiro) : null;
+  const [descontoParceiro, setDescontoParceiro] = useState(descontoParceiroOriginal != null ? String(descontoParceiroOriginal).replace(".", ",") : "");
   const [indicadoPor, setIndicadoPor] = useState<string | null>(client.indicado_por ?? null);
   // Por onde chegou (pedido do dono, 13/11/2026: corrigir indicação lançada por engano).
   const preferencias = usePreferencias();
@@ -116,6 +120,13 @@ export default function EditarClienteModal({
       setError("Informe o nome do cliente.");
       return;
     }
+    // Desconto de parceiro: só vale para parceira; vazio = sem desconto.
+    const descontoDigitado = descontoParceiro.trim() ? Number(descontoParceiro.replace(",", ".")) : null;
+    if (parceiro && descontoDigitado != null && !(descontoDigitado > 0 && descontoDigitado <= 100)) {
+      setError("O desconto de parceiro precisa ficar entre 0 e 100%.");
+      return;
+    }
+    const descontoParceiroNovo = parceiro && descontoDigitado != null ? Math.round(descontoDigitado * 100) / 100 : null;
     if (!(await confirmar({ titulo: "Salvar as alterações no cliente?", confirmar: "Salvar" }))) return;
     setSaving(true);
     setError(null);
@@ -142,6 +153,8 @@ export default function EditarClienteModal({
         ...(deixouDeSerIndicacao ? { indicacao_nome: null } : {}),
         // Cidades extras: só manda quando mudou (sem o SQL de 10/11, a coluna não existe).
         ...(JSON.stringify(cidadesExtras) !== JSON.stringify(extrasOriginais) ? { cidades_extras: cidadesExtras } : {}),
+        // Desconto de parceiro: só manda quando mudou (sem o SQL de 28/11, a coluna não existe).
+        ...(descontoParceiroNovo !== descontoParceiroOriginal ? { desconto_parceiro: descontoParceiroNovo } : {}),
         // Só manda quando mudou: sem o SQL da tabela antiga, a coluna não existe.
         ...(tabelaAntiga !== (client.tabela_antiga ?? false) ? { tabela_antiga: tabelaAntiga } : {}),
       })
@@ -386,6 +399,27 @@ export default function EditarClienteModal({
               Reserva data sem pagar a taxa de compromisso.
             </span>
           </label>
+          {parceiro && (
+            <div className="-mt-1 rounded-lg border border-neutral-300 p-3">
+              <label className="block text-sm font-medium text-neutral-800" htmlFor="desconto-parceiro">
+                Desconto de parceiro (opcional)
+              </label>
+              <p className="text-xs text-neutral-600">
+                Preenchido, a calculadora já aplica sozinho como &quot;Cupom PARCEIRO&quot;. Em branco, ela é só parceira, sem desconto.
+              </p>
+              <div className="mt-2 flex w-32 items-center rounded-lg border border-neutral-300 px-2">
+                <input
+                  id="desconto-parceiro"
+                  value={descontoParceiro}
+                  onChange={(e) => setDescontoParceiro(e.target.value.replace(/[^\d,.]/g, ""))}
+                  inputMode="decimal"
+                  placeholder="Ex.: 10"
+                  className="w-full py-2 text-right text-sm outline-none"
+                />
+                <span className="pl-1 text-sm text-neutral-500">%</span>
+              </div>
+            </div>
+          )}
           <CaixaIsencaoTaxa checked={isentoTaxa} onChange={setIsentoTaxa} parceiro={parceiro} />
           <label className="flex items-start gap-2.5 rounded-lg border border-neutral-300 p-3">
             <input
