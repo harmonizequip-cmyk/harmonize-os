@@ -663,7 +663,9 @@ export default function CalculadoraLocacaoModal({
   const [descontoTipo, setDescontoTipo] = useState<"valor" | "percentual">("valor");
   // Item livre em R$ ou em % (o % incide sobre o valor dos disparos, como o desconto de cima,
   // e é recalculado se os disparos mudarem).
-  const [itensPersonalizados, setItensPersonalizados] = useState<(ItemAjuste & { percentual?: number })[]>([]);
+  const [itensPersonalizados, setItensPersonalizados] = useState<(ItemAjuste & { percentual?: number; indicacao?: boolean })[]>([]);
+  // O próximo item a adicionar é o desconto de indicação (vindo de "Usar como desconto adicional").
+  const [novoItemIndicacao, setNovoItemIndicacao] = useState(false);
   const [novoItemModo, setNovoItemModo] = useState<"valor" | "percentual">("valor");
 
   // Programa de indicação: desconto de 10% disponível da cliente entra sozinho no
@@ -672,6 +674,8 @@ export default function CalculadoraLocacaoModal({
   const [indicacaoTirada, setIndicacaoTirada] = useState(false);
   // Cupom com nome (Configurações > Cupons ou digitado): aparece no resumo e na imagem.
   const [cupomNome, setCupomNome] = useState("");
+  // Nome de quem ela indicou (ou de quem a indicou), para o cupom de indicação dizer de quem é.
+  const [nomeIndicacao, setNomeIndicacao] = useState<string | null>(null);
   const cuponsSalvos = usePreferencias().cupons.lista;
   useEffect(() => {
     let vivo = true;
@@ -687,6 +691,17 @@ export default function CalculadoraLocacaoModal({
         if (!vivo || error) return; // sem o SQL do programa: nada muda
         const d = descontoParaUsar((data ?? []) as DescontoIndicacao[], hojeLocal());
         setDescontoIndicacao(d);
+        setNomeIndicacao(null);
+        if (d?.outro_client_id) {
+          supabase
+            .from("clients")
+            .select("name, display_name")
+            .eq("id", d.outro_client_id)
+            .maybeSingle()
+            .then(({ data: o }) => {
+              if (vivo && o) setNomeIndicacao(((o.display_name as string) || (o.name as string) || "").trim() || null);
+            });
+        }
         if (d) {
           setDescontoTipo("percentual");
           setDescontoValor((v) => (v.trim() ? v : String(Number(d.percentual))));
@@ -716,16 +731,21 @@ export default function CalculadoraLocacaoModal({
   const descontoNumero =
     descontoTipo === "percentual" ? Math.round(subtotalParaDesconto * (descontoRawNumero / 100) * 100) / 100 : descontoRawNumero;
   // O desconto de indicação só conta como usado se o campo ficou nos 10% dela.
-  const indicacaoAplicada =
+  const indicacaoNoPrincipal =
     !!descontoIndicacao && !indicacaoTirada && descontoTipo === "percentual" && descontoRawNumero === Number(descontoIndicacao.percentual);
   // Nome do cupom: o digitado/escolhido; sem ele, o de indicação quando aplicado.
-  const cupomEfetivo = normalizarCupom(cupomNome) || (indicacaoAplicada ? CUPOM_INDICACAO : "");
+  // Indicação usada como desconto adicional (item personalizado marcado).
+  const indicacaoNoAdicional = !!descontoIndicacao && itensPersonalizados.some((i) => i.indicacao);
+  const indicacaoAplicada = indicacaoNoPrincipal || indicacaoNoAdicional;
+  // "INDICAÇÃO · CAMILA": o cupom diz de quem é a indicação.
+  const cupomIndicacao = nomeIndicacao ? `${CUPOM_INDICACAO} · ${nomeIndicacao.split(" ")[0]}` : CUPOM_INDICACAO;
+  const cupomEfetivo = normalizarCupom(cupomNome) || (indicacaoNoPrincipal ? cupomIndicacao : "");
   const descontoDescricaoEfetiva = rotuloDesconto(descontoTipo, descontoRawNumero, cupomEfetivo);
 
   const itensLivres: ItemAjuste[] = useMemo(
     () =>
       itensPersonalizados
-        .map(({ percentual, ...it }) =>
+        .map(({ percentual, indicacao: _i, ...it }) =>
           percentual != null
             ? {
                 ...it,
@@ -750,10 +770,14 @@ export default function CalculadoraLocacaoModal({
     if (novoItemModo === "percentual" && valor > 100) return;
     setItensPersonalizados((prev) => [
       ...prev,
-      novoItemModo === "percentual"
-        ? { id: newId("item"), desc: novoItemDesc.trim(), valor: 0, tipo: novoItemTipo, percentual: valor }
-        : { id: newId("item"), desc: novoItemDesc.trim(), valor, tipo: novoItemTipo },
+      {
+        ...(novoItemModo === "percentual"
+          ? { id: newId("item"), desc: novoItemDesc.trim(), valor: 0, tipo: novoItemTipo, percentual: valor }
+          : { id: newId("item"), desc: novoItemDesc.trim(), valor, tipo: novoItemTipo }),
+        ...(novoItemIndicacao && novoItemTipo === "menos" ? { indicacao: true } : {}),
+      },
     ]);
+    setNovoItemIndicacao(false);
     setNovoItemDesc("");
     setNovoItemValor("");
   }
@@ -2268,7 +2292,7 @@ export default function CalculadoraLocacaoModal({
                   <input
                     value={cupomNome}
                     onChange={(e) => setCupomNome(e.target.value)}
-                    placeholder={indicacaoAplicada ? CUPOM_INDICACAO : "Nome do cupom (opcional)"}
+                    placeholder={indicacaoNoPrincipal ? normalizarCupom(cupomIndicacao) : "Nome do cupom (opcional)"}
                     className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-2.5 py-1 text-xs uppercase"
                     maxLength={30}
                     aria-label="Nome do cupom"
@@ -2284,9 +2308,31 @@ export default function CalculadoraLocacaoModal({
               {descontoIndicacao && (
                 <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs ${indicacaoAplicada ? "bg-emerald-50 text-emerald-800" : "bg-neutral-50 text-neutral-600"}`}>
                   <span>
-                    {indicacaoAplicada ? "Desconto de indicação aplicado" : "Tem desconto de indicação"}: {Number(descontoIndicacao.percentual)}% ({rotuloTipo(descontoIndicacao.tipo).toLowerCase()}), vale até {formatDate(descontoIndicacao.valido_ate)}
+                    {indicacaoAplicada ? `Desconto de indicação aplicado${indicacaoNoAdicional ? " como adicional" : ""}` : "Tem desconto de indicação"}: {Number(descontoIndicacao.percentual)}% ({rotuloTipo(descontoIndicacao.tipo).toLowerCase()}
+                    {nomeIndicacao ? `: ${nomeIndicacao}` : ""}), vale até {formatDate(descontoIndicacao.valido_ate)}
                   </span>
-                  {indicacaoAplicada ? (
+                  {!indicacaoNoAdicional && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Leva a indicação para o desconto adicional: em %, com o nome; o valor pode ser trocado antes de adicionar.
+                        if (indicacaoNoPrincipal) {
+                          setIndicacaoTirada(true);
+                          setDescontoValor("");
+                          setCupomNome("");
+                        }
+                        setNovoItemDesc(`Cupom ${normalizarCupom(cupomIndicacao)}`);
+                        setNovoItemModo("percentual");
+                        setNovoItemTipo("menos");
+                        setNovoItemValor(String(Number(descontoIndicacao.percentual)).replace(".", ","));
+                        setNovoItemIndicacao(true);
+                      }}
+                      className="font-semibold underline"
+                    >
+                      Usar como desconto adicional
+                    </button>
+                  )}
+                  {indicacaoNoAdicional ? null : indicacaoNoPrincipal ? (
                     <button
                       type="button"
                       onClick={() => {
