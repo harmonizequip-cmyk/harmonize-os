@@ -10,6 +10,7 @@ import SinoAvisos from "./SinoAvisos";
 import GlobalSearch from "./GlobalSearch";
 import {
   HeartHandshake,
+  MapPin,
   LayoutDashboard,
   Wallet,
   Users,
@@ -54,6 +55,7 @@ const NAV_ITEMS: { href: string; label: string; icon: typeof Users; module: stri
   { href: "/financeiro", label: "Financeiro", icon: Wallet, module: "financeiro" },
   { href: "/relacionamento", label: "Relacionamento", icon: HeartHandshake, module: "clientes", grupo: "Atendimento" },
   { href: "/clientes", label: "Clientes", icon: Users, module: "clientes", grupo: "Atendimento" },
+  { href: "/agenda/encaixe", label: "Oferecer datas", icon: MapPin, module: "agenda", grupo: "Atendimento" },
   { href: "/tarefas", label: "Tarefas", icon: ListChecks, module: "clientes", grupo: "Atendimento" },
   { href: "/planejador", label: "Planejador", icon: ClipboardList, module: "agenda", grupo: "Atendimento" },
   { href: "/contratos", label: "Contratos", icon: FileText, module: "agenda", grupo: "Atendimento" },

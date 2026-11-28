@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CIDADES_PADRAO, coordenadasDaCidade, distanciaKm, lerCoordenadas, normalizarCidade } from "./cidades-coordenadas";
 import { cidadesSemPosicao, mapaDasCidades } from "./carregar-cidades";
-import { ancorasDoDia, candidatasPerto, mensagemEncaixe, oportunidadesDeEncaixe } from "./encaixe";
+import { ancorasDoDia, candidatasPerto, diasLivresSemAtendimentoPerto, mensagemEncaixe, oportunidadesDeEncaixe } from "./encaixe";
 import type { PessoaClassificada } from "./relacionamento";
 
 function pessoa(id: string, cidade: string | null, extra: Partial<PessoaClassificada> = {}): PessoaClassificada {
@@ -141,5 +141,38 @@ describe("cidades extras no encaixe", () => {
     ]);
     expect(lista.map((c) => c.pessoa.id)).toEqual(["duas"]);
     expect(lista[0].cidadeDela).toBe("Gravatá");
+  });
+});
+
+describe("encaixe pela cidade base", () => {
+  const eventos = [{ data: "2026-11-10", ate: null, cidade: "Caruaru" }];
+  const pessoas = [pessoa("jp", "Cabedelo"), pessoa("caru", "Gravatá")];
+  const base = { hoje: "2026-11-01", ocupados: new Set(["2026-11-10"]), eventos, pessoas, diasAFrente: 30 };
+
+  it("sem cidade base, dia sem atendimento perto fica de fora", () => {
+    const ops = oportunidadesDeEncaixe(base);
+    expect(ops.every((o) => o.origem === "atendimento")).toBe(true);
+    expect(ops.some((o) => o.data === "2026-11-20")).toBe(false);
+  });
+
+  it("com cidade base, dia sem atendimento perto entra medido dela", () => {
+    const ops = oportunidadesDeEncaixe({ ...base, cidadeBase: "João Pessoa" });
+    const dia20 = ops.find((o) => o.data === "2026-11-20");
+    expect(dia20?.origem).toBe("base");
+    expect(dia20?.candidatas.map((c) => c.pessoa.id)).toContain("jp");
+    // O dia colado ao atendimento continua medido de Caruaru.
+    expect(ops.find((o) => o.data === "2026-11-11")?.origem).toBe("atendimento");
+  });
+
+  it("cidade base fora do mapa não inventa referência", () => {
+    expect(oportunidadesDeEncaixe({ ...base, cidadeBase: "Cidade Inventada" }).some((o) => o.origem === "base")).toBe(false);
+  });
+
+  it("lista os dias livres sem atendimento perto", () => {
+    const dias = diasLivresSemAtendimentoPerto({ hoje: "2026-11-01", ocupados: new Set(["2026-11-10"]), eventos, diasAFrente: 12 });
+    expect(dias).not.toContain("2026-11-09");
+    expect(dias).not.toContain("2026-11-11");
+    expect(dias).not.toContain("2026-11-08"); // domingo
+    expect(dias).toContain("2026-11-03");
   });
 });

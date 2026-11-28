@@ -38,6 +38,8 @@ export interface Oportunidade {
   data: string;
   ancoras: Ancora[];
   candidatas: Candidata[];
+  /** "atendimento": colada a um atendimento; "base": dia sem atendimento perto, medido da cidade base. */
+  origem?: "atendimento" | "base";
 }
 
 function cobre(e: EventoComCidade, dia: string) {
@@ -150,20 +152,48 @@ export function oportunidadesDeEncaixe(params: {
   raioKm?: number;
   /** Cidades do banco (cidades_coordenadas); sem ele, a lista fixa de sempre. */
   mapa?: Readonly<MapaCidades>;
+  /**
+   * Cidade base do dono (Configurações > Agenda). Com ela, o dia livre sem
+   * atendimento ao redor também entra, medido a partir dela (origem "base").
+   */
+  cidadeBase?: string | null;
 }): Oportunidade[] {
   const { hoje, ocupados, eventos, pessoas, somenteDia, diasAFrente = DIAS_A_FRENTE, raioKm = RAIO_KM, mapa } = params;
+  const base = params.cidadeBase?.trim() && coordenadasDaCidade(params.cidadeBase, mapa) ? params.cidadeBase.trim() : null;
   const dias: string[] = [];
   if (somenteDia) dias.push(somenteDia);
   else for (let i = 1; i <= diasAFrente; i++) dias.push(somarDias(hoje, i));
   const lista: Oportunidade[] = [];
   for (const dia of dias) {
     if (!ehDiaLivre(dia, hoje, ocupados)) continue;
-    const ancoras = ancorasDoDia(dia, eventos, mapa);
-    if (ancoras.length === 0) continue;
+    let ancoras = ancorasDoDia(dia, eventos, mapa);
+    let origem: Oportunidade["origem"] = "atendimento";
+    if (ancoras.length === 0) {
+      if (!base) continue;
+      ancoras = [{ dia, cidade: base }];
+      origem = "base";
+    }
     const candidatas = candidatasPerto(ancoras, pessoas, raioKm, mapa);
-    if (candidatas.length > 0) lista.push({ data: dia, ancoras, candidatas });
+    if (candidatas.length > 0) lista.push({ data: dia, ancoras, candidatas, origem });
   }
   return lista;
+}
+
+/** Dias livres (depois de hoje, até `diasAFrente`) sem atendimento com cidade conhecida no dia anterior nem no seguinte. */
+export function diasLivresSemAtendimentoPerto(params: {
+  hoje: string;
+  ocupados: Set<string>;
+  eventos: EventoComCidade[];
+  diasAFrente?: number;
+  mapa?: Readonly<MapaCidades>;
+}): string[] {
+  const { hoje, ocupados, eventos, diasAFrente = DIAS_A_FRENTE, mapa } = params;
+  const dias: string[] = [];
+  for (let i = 1; i <= diasAFrente; i++) {
+    const dia = somarDias(hoje, i);
+    if (ehDiaLivre(dia, hoje, ocupados) && ancorasDoDia(dia, eventos, mapa).length === 0) dias.push(dia);
+  }
+  return dias;
 }
 
 /**

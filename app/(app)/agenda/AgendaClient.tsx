@@ -757,6 +757,12 @@ export default function AgendaClient({
           >
             Próximas locações
           </Link>
+          <Link
+            href="/agenda/encaixe"
+            className="inline-flex items-center gap-1 rounded-xl border border-brand-teal px-3 py-1.5 text-xs font-medium text-brand-teal"
+          >
+            <MapPin size={13} /> Oferecer datas
+          </Link>
           <button
             onClick={() => setAvailabilityOpen(true)}
             className="rounded-xl border border-brand-teal px-3 py-1.5 text-xs font-medium text-brand-teal"

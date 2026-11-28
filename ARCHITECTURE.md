@@ -4379,6 +4379,7 @@ Rotas: `/agenda`.
 - Reserva de vários dias é um evento só, com `date_end`. O banco recusa duas reservas do mesmo equipamento no mesmo período (restrição de exclusão, erro 23P01) e reserva que caia num bloqueio (gatilho `trg_validar_bloqueio_equipamento`).
 - Taxa de reserva nasce pelo gatilho `definir_taxa_ao_criar_evento`; parceiro e cliente com `isento_taxa` nascem `nao_aplica`.
 - Cancelar ou reagendar uma reserva de HIPRO com data futura pergunta "Ver quem encaixar" (leva a `/agenda/encaixe?data=`).
+- Entrada fixa (28/11/2026): Menu > Atendimento > "Oferecer datas", "+" > Agenda > "Oferecer datas livres" e botão no topo da Agenda. A tela inclui os dias livres sem atendimento ao redor, medidos da cidade base (`encaixe.cidadeBase`, `origem: "base"`); sem cidade base, lista esses dias e leva a preencher (`carregarEncaixeCompleto`, `diasLivresSemAtendimentoPerto`).
 - Ao reservar, "Veio de campanha?" (`VinculoCampanha`) marca a pessoa como "agendou" na campanha escolhida.
 - `cancelar_agendamento` recusa locação com pagamento lançado.
 - Abas Atendimentos e Compromissos (30/10/2026): eventos `outros` são compromissos pessoais, ficam na aba Compromissos (`?aba=compromissos`), fora da contagem de atendimentos, da confirmação de 7 dias, do aviso do Dashboard e do próximo evento do Funil.

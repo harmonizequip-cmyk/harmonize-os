@@ -126,7 +126,7 @@ export default function PrefsAgenda({ preferencias }: { preferencias: Preferenci
 
       <Bloco
         titulo="Imagem de datas livres"
-        dica="Com a cidade base preenchida, o dia seguinte a um atendimento em outra cidade não é sugerido como livre. Vazio: sem essa regra. Quem digitar a cidade direto na imagem usa o valor do próprio aparelho."
+        dica="Com a cidade base preenchida, o dia seguinte a um atendimento em outra cidade não é sugerido como livre, e em Oferecer datas livres os dias sem atendimento por perto mostram quem está perto dela. Vazio: sem essas regras. Quem digitar a cidade direto na imagem usa o valor do próprio aparelho."
       >
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-neutral-600">Cidade base</span>

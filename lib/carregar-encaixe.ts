@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { carregarMapaCidades } from "./carregar-cidades";
+import { coordenadasDaCidade } from "./cidades-coordenadas";
 import { carregarRelacionamento } from "./carregar-relacionamento";
-import { agendaDoEncaixe, oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
+import { agendaDoEncaixe, diasLivresSemAtendimentoPerto, oportunidadesDeEncaixe, type Oportunidade } from "./encaixe";
 import { DEFAULT_PREFERENCIAS, type Preferencias } from "./preferencias";
 import { somarDias, ultimoDiaDoMes } from "./period";
 import { diasLivresAte } from "./plano-meta";
@@ -17,6 +18,19 @@ export async function carregarEncaixe(
   hoje: string,
   opcoes: { somenteDia?: string | null; pessoas?: PessoaClassificada[]; encaixe?: Preferencias["encaixe"] } = {}
 ): Promise<Oportunidade[]> {
+  return (await carregarEncaixeCompleto(supabase, hoje, opcoes)).lista;
+}
+
+/**
+ * Igual a `carregarEncaixe`, com `incluirBase`: os dias livres sem atendimento
+ * ao redor entram medidos da cidade base (tela Oferecer datas livres). Devolve
+ * também os dias livres que ficaram sem referência (sem cidade base cadastrada).
+ */
+export async function carregarEncaixeCompleto(
+  supabase: SupabaseClient,
+  hoje: string,
+  opcoes: { somenteDia?: string | null; pessoas?: PessoaClassificada[]; encaixe?: Preferencias["encaixe"]; incluirBase?: boolean } = {}
+): Promise<{ lista: Oportunidade[]; semReferencia: string[]; baseValida: boolean }> {
   const enc = opcoes.encaixe ?? DEFAULT_PREFERENCIAS.encaixe;
   const ate = somarDias(opcoes.somenteDia && opcoes.somenteDia > hoje ? opcoes.somenteDia : hoje, enc.diasAFrente + 1);
   const de = somarDias(hoje, -1);
@@ -36,7 +50,14 @@ export async function carregarEncaixe(
 
   const { ocupados, comCidade } = agendaDoEncaixe((eventos ?? []) as any[], bloqueios ?? [], de);
 
-  return oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm, mapa });
+  const cidadeBase = opcoes.incluirBase ? enc.cidadeBase : null;
+  const lista = oportunidadesDeEncaixe({ hoje, ocupados, eventos: comCidade, pessoas, somenteDia: opcoes.somenteDia, diasAFrente: enc.diasAFrente, raioKm: enc.raioKm, mapa, cidadeBase });
+  const baseValida = !!cidadeBase?.trim() && !!coordenadasDaCidade(cidadeBase, mapa);
+  const semReferencia =
+    opcoes.incluirBase && !baseValida && !opcoes.somenteDia
+      ? diasLivresSemAtendimentoPerto({ hoje, ocupados, eventos: comCidade, diasAFrente: enc.diasAFrente, mapa })
+      : [];
+  return { lista, semReferencia, baseValida };
 }
 
 /**

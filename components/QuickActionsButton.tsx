@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ehEspacoPessoal } from "@/lib/espaco";
-import { Banknote, CalendarDays, CalendarPlus, ClipboardList, KeyRound, ListChecks, type LucideIcon, Megaphone, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
+import { Banknote, CalendarDays, MapPin, CalendarPlus, ClipboardList, KeyRound, ListChecks, type LucideIcon, Megaphone, Mic, Plus, Tag, Target, UserPlus, Wallet, X } from "lucide-react";
 import { IconeChip, type CorVisual } from "@/components/ui/Visual";
 import { createClient } from "@/lib/supabase/client";
 import dynamic from "next/dynamic";
@@ -54,7 +54,8 @@ type ActionKey =
   | "tabela"
   | "planejador"
   | "acesso_planejador"
-  | "campanha";
+  | "campanha"
+  | "oferecer_datas";
 
 // Cada atalho aponta pro módulo de permissão que já governa a tela
 // equivalente (mesma regra que Sidebar/BottomNav usam), pra um funcionário
@@ -73,6 +74,7 @@ const VISUAL_ACAO: Record<ActionKey, { icone: LucideIcon; cor: CorVisual }> = {
   tarefa: { icone: ListChecks, cor: "verde" },
   tabela: { icone: Tag, cor: "roxo" },
   campanha: { icone: Megaphone, cor: "rosa" },
+  oferecer_datas: { icone: MapPin, cor: "teal" },
 };
 
 // Em grupos e em blocos de duas colunas, como o Menu (pedido do dono,
@@ -85,6 +87,7 @@ const ACTIONS: { key: ActionKey; label: string; dica: string; emoji: string; mod
   { key: "locacao", label: "Reservar data", dica: "Sem disparos ainda", emoji: "📦", module: "agenda", grupo: "Agenda" },
   { key: "locacao_disparos", label: "Lançar locação", dica: "Com os disparos", emoji: "🎯", module: "agenda", grupo: "Agenda" },
   { key: "evento", label: "Evento", dica: "Na agenda", emoji: "📅", module: "agenda", grupo: "Agenda" },
+  { key: "oferecer_datas", label: "Oferecer datas livres", dica: "Para quem está perto", emoji: "📍", module: "agenda", grupo: "Agenda" },
   { key: "planejador", label: "Planejamento", dica: "Planejador HIPRO", emoji: "📋", module: "agenda", grupo: "Agenda" },
   { key: "lancamento", label: "Lançamento", dica: "Entrada ou saída", emoji: "💰", module: "financeiro", grupo: "Dinheiro" },
   { key: "despesa_voz", label: "Despesa por voz", dica: "Fale o gasto", emoji: "🎙️", module: "financeiro", grupo: "Dinheiro" },
@@ -165,6 +168,11 @@ export default function QuickActionsButton({
     if (key === "acesso_planejador") {
       setMenuOpen(false);
       router.push("/planejador/acessos?acao=formulario");
+      return;
+    }
+    if (key === "oferecer_datas") {
+      setMenuOpen(false);
+      router.push("/agenda/encaixe");
       return;
     }
     if (key === "campanha") {
