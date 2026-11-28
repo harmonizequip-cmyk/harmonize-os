@@ -661,7 +661,10 @@ export default function CalculadoraLocacaoModal({
   const [aluguelValor, setAluguelValor] = useState("");
   const [descontoValor, setDescontoValor] = useState("");
   const [descontoTipo, setDescontoTipo] = useState<"valor" | "percentual">("valor");
-  const [itensPersonalizados, setItensPersonalizados] = useState<ItemAjuste[]>([]);
+  // Item livre em R$ ou em % (o % incide sobre o valor dos disparos, como o desconto de cima,
+  // e é recalculado se os disparos mudarem).
+  const [itensPersonalizados, setItensPersonalizados] = useState<(ItemAjuste & { percentual?: number })[]>([]);
+  const [novoItemModo, setNovoItemModo] = useState<"valor" | "percentual">("valor");
 
   // Programa de indicação: desconto de 10% disponível da cliente entra sozinho no
   // campo de desconto (com opção de tirar). Só locação de HIPRO, não mentoria.
@@ -719,17 +722,38 @@ export default function CalculadoraLocacaoModal({
   const cupomEfetivo = normalizarCupom(cupomNome) || (indicacaoAplicada ? CUPOM_INDICACAO : "");
   const descontoDescricaoEfetiva = rotuloDesconto(descontoTipo, descontoRawNumero, cupomEfetivo);
 
+  const itensLivres: ItemAjuste[] = useMemo(
+    () =>
+      itensPersonalizados
+        .map(({ percentual, ...it }) =>
+          percentual != null
+            ? {
+                ...it,
+                desc: `${it.desc} (${String(percentual).replace(".", ",")}%)`,
+                valor: Math.round(subtotalParaDesconto * (percentual / 100) * 100) / 100,
+              }
+            : it
+        )
+        .filter((it) => it.valor > 0),
+    [itensPersonalizados, subtotalParaDesconto]
+  );
   const itens: ItemAjuste[] = useMemo(() => {
     const lista: ItemAjuste[] = [];
     if (aluguelNumero > 0) lista.push({ id: "aluguel", desc: "Aluguel", valor: aluguelNumero, tipo: "mais" });
     if (descontoNumero > 0) lista.push({ id: "desconto", desc: descontoDescricaoEfetiva, valor: descontoNumero, tipo: "menos" });
-    return [...lista, ...itensPersonalizados];
-  }, [aluguelNumero, descontoNumero, descontoDescricaoEfetiva, itensPersonalizados]);
+    return [...lista, ...itensLivres];
+  }, [aluguelNumero, descontoNumero, descontoDescricaoEfetiva, itensLivres]);
 
   function addItemPersonalizado() {
     const valor = parseDecimal(novoItemValor);
     if (!novoItemDesc.trim() || valor <= 0) return;
-    setItensPersonalizados((prev) => [...prev, { id: newId("item"), desc: novoItemDesc.trim(), valor, tipo: novoItemTipo }]);
+    if (novoItemModo === "percentual" && valor > 100) return;
+    setItensPersonalizados((prev) => [
+      ...prev,
+      novoItemModo === "percentual"
+        ? { id: newId("item"), desc: novoItemDesc.trim(), valor: 0, tipo: novoItemTipo, percentual: valor }
+        : { id: newId("item"), desc: novoItemDesc.trim(), valor, tipo: novoItemTipo },
+    ]);
     setNovoItemDesc("");
     setNovoItemValor("");
   }
@@ -2293,6 +2317,9 @@ export default function CalculadoraLocacaoModal({
               {/* Itens personalizados */}
               <div className="mt-3">
                 <p className="mb-1 text-xs font-medium text-neutral-600">Itens personalizados</p>
+                {novoItemModo === "percentual" && (
+                  <p className="mb-1 text-[11px] text-neutral-500">Em %, a conta é sobre o valor dos disparos ({formatCurrency(subtotalParaDesconto)}), como no desconto de cima.</p>
+                )}
                 <div className="space-y-2">
                   <input
                     value={novoItemDesc}
@@ -2302,12 +2329,28 @@ export default function CalculadoraLocacaoModal({
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                   />
                   <div className="flex gap-2">
+                    <div className="flex rounded-lg border border-neutral-300 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setNovoItemModo("valor")}
+                        className={`rounded px-2 py-1 text-xs font-medium transition ${novoItemModo === "valor" ? "bg-brand-teal text-white" : "text-neutral-500"}`}
+                      >
+                        R$
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNovoItemModo("percentual")}
+                        className={`rounded px-2 py-1 text-xs font-medium transition ${novoItemModo === "percentual" ? "bg-brand-teal text-white" : "text-neutral-500"}`}
+                      >
+                        %
+                      </button>
+                    </div>
                     <input
                       inputMode="decimal"
                       value={novoItemValor}
                       onChange={(e) => setNovoItemValor(e.target.value)}
-                      placeholder="R$ 0,00"
-                      className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                      placeholder={novoItemModo === "percentual" ? "Ex: 5" : "R$ 0,00"}
+                      className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
                     />
                     <div className="flex rounded-lg border border-neutral-300 p-0.5">
                       <button
@@ -2335,7 +2378,9 @@ export default function CalculadoraLocacaoModal({
                     {itensPersonalizados.map((it) => (
                       <li key={it.id} className="flex items-center justify-between text-xs text-neutral-600">
                         <span>
-                          {it.tipo === "mais" ? "+" : "−"} {it.desc}: {formatCurrency(it.valor)}
+                          {it.tipo === "mais" ? "+" : "−"} {it.desc}
+                          {it.percentual != null ? ` (${String(it.percentual).replace(".", ",")}%)` : ""}:{" "}
+                          {formatCurrency(it.percentual != null ? Math.round(subtotalParaDesconto * (it.percentual / 100) * 100) / 100 : it.valor)}
                         </span>
                         <button type="button" onClick={() => removeItemPersonalizado(it.id)} className="text-neutral-400 hover:text-red-500">
                           remover
