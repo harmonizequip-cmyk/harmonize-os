@@ -28,6 +28,7 @@ import {
   DatabaseBackup,
   Eye,
   FlaskConical,
+  TicketPercent,
   Fingerprint,
   History,
   Palette,
@@ -51,6 +52,7 @@ import Automacoes from "./secoes/Automacoes";
 import PrefsMetas from "./secoes/PrefsMetas";
 import PrefsDeslocamento from "./secoes/PrefsDeslocamento";
 import PrefsRecibo from "./secoes/PrefsRecibo";
+import PrefsCupons from "./secoes/PrefsCupons";
 import PrefsRelacionamento from "./secoes/PrefsRelacionamento";
 import PrefsAgenda from "./secoes/PrefsAgenda";
 import PrefsListas from "./secoes/PrefsListas";
@@ -254,6 +256,7 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           </>
         )}
         {secao === "metas" && <PrefsMetas preferencias={settings.preferencias} />}
+        {secao === "cupons" && <PrefsCupons preferencias={settings.preferencias} />}
         {secao === "automacoes" && (
           <>
             <Automacoes settings={settings} />
@@ -304,6 +307,15 @@ export default function ConfiguracoesHub({ secao, dados }: { secao: SecaoId | nu
           resumo: `${formatCurrency(settings.pricing.flatPackageValue)} até ${settings.pricing.flatPackageLimit.toLocaleString("pt-BR")}`,
           icone: BadgeDollarSign,
           cor: "bg-emerald-50 text-emerald-600",
+        },
+        {
+          id: "cupons",
+          titulo: "Cupons",
+          resumo: settings.preferencias.cupons.lista.length
+            ? settings.preferencias.cupons.lista.map((c) => `${c.nome} ${c.percentual}%`).join(" · ")
+            : "Nenhum cadastrado",
+          icone: TicketPercent,
+          cor: "bg-pink-50 text-pink-600",
         },
         {
           id: "metas",

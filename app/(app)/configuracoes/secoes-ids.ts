@@ -3,6 +3,7 @@
 export const TITULOS_SECAO = {
   precos: "Preços",
   metas: "Metas do mês",
+  cupons: "Cupons de desconto",
   contas: "Contas fixas",
   tags: "Tags",
   automacoes: "Automações",

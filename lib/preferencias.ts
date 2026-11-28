@@ -6,6 +6,7 @@
 
 import { lerModelos, MODELOS_PADRAO, modelosDiferentes, type ModelosMensagem } from "./mensagens-modelos";
 import { lerLiberados } from "./recursos";
+import { lerCupons, type Cupom } from "./cupons";
 
 export type ClasseCadencia = "nova" | "ativa" | "em_risco" | "sumida" | "quente" | "morna" | "fria";
 
@@ -127,6 +128,8 @@ export interface Preferencias {
   mensagens: ModelosMensagem;
   /** Recursos do portal que o dono já testou e liberou para as clientes (`lib/recursos.ts`). */
   recursos: { liberados: string[] };
+  /** Cupons de desconto da calculadora (nome e %), além do de indicação, que é automático. */
+  cupons: { lista: Cupom[] };
 }
 
 export interface EstimativaDisparos {
@@ -242,6 +245,7 @@ export const DEFAULT_PREFERENCIAS: Preferencias = {
   },
   mensagens: MODELOS_PADRAO,
   recursos: { liberados: [] },
+  cupons: { lista: [{ nome: "BLACK FRIDAY", percentual: 15 }] },
 };
 
 type Obj = Record<string, unknown>;
@@ -429,6 +433,7 @@ export function lerPreferencias(bruto: unknown): Preferencias {
     mensagens: lerModelos(r.mensagens),
     // Ausente ou estragado: nada liberado (tudo continua em teste).
     recursos: { liberados: lerLiberados(obj(r.recursos).liberados) },
+    cupons: { lista: lerCupons(obj(r.cupons).lista, d.cupons.lista) },
   };
 }
 

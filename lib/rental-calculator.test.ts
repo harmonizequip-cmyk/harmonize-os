@@ -164,6 +164,29 @@ describe("deslocamento configurável", () => {
   });
 });
 
+describe("pendente anterior no resumo do WhatsApp", () => {
+  it("soma o pendente no total, mostra cada locação e o saldo usa o total geral", () => {
+    const resumo = calcularResumoLocacao(entrada({ pricing: { totalValue: 1000 } as any }));
+    const t = buildResumoWhatsApp(
+      {
+        ...entrada({ pricing: { totalValue: 1000 } as any }),
+        initialCount: 0,
+        finalCount: 0,
+        patientCount: 0,
+        clientName: "Dra. Ana",
+        eventDate: "2026-11-20",
+        pagamentos: [{ id: "p1", forma: "pix", valor: 1200, valorTexto: "1200", pixConta: "harmonize", data: "2026-11-20" }],
+        pendentesAnteriores: [{ data: "2026-10-05", valor: 500 }],
+      },
+      resumo
+    ).replace(/\u00a0/g, " ");
+    expect(t).toContain("PENDENTE DE LOCAÇÕES ANTERIORES");
+    expect(t).toContain("Locação de 05/10/2026: + R$ 500,00");
+    expect(t).toContain("TOTAL A PAGAR: R$ 1.500,00");
+    expect(t).toContain("Saldo em aberto: R$ 300,00");
+  });
+});
+
 describe("PIX no resumo do WhatsApp", () => {
   const base = {
     ...entrada({ pricing: null, shots: 0 }),

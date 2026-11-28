@@ -172,6 +172,47 @@ describe("ajustes e total da imagem do cálculo", () => {
   });
 });
 
+describe("pendente anterior e cupom na imagem", () => {
+  const base = {
+    isMentoria: false as const,
+    shots: 80_163,
+    pricing: calculateRentalValue(80_163, DEFAULT_PRICING),
+    custoManualPorDisparo: null,
+    mentoriaPricing: null,
+    kmIda: 0,
+    reservationFee: 250,
+  };
+  it("soma o pendente no total e mostra a locação de antes", () => {
+    const resumo = calcularResumoLocacao({ ...base, itens: [], reservationFeeStatus: "nao_aplica" });
+    const d = {
+      ...montarDadosCalculo({
+        cliente: "DRA. TESTE",
+        dataEvento: "2026-11-20",
+        contagemInicial: 0,
+        contagemFinal: 80_163,
+        disparos: 80_163,
+        pricing: base.pricing,
+        custoManualPorDisparo: null,
+        itens: [],
+        descontoPercentual: null,
+        kmIda: 0,
+        resumo,
+      }),
+      pendentesAnteriores: [{ data: "2026-10-05", valor: 1000 }],
+    };
+    const l = linhasRecibo(d);
+    expect(l.find((x) => x.rotulo === "Esta locação")?.valor).toBe(reais(resumo.totalAPagarAgora));
+    expect(l.find((x) => x.rotulo === "Locação de 05/10/2026")?.valor).toBe(reais(1000));
+    expect(l[l.length - 1].valor).toBe(reais(resumo.totalAPagarAgora + 1000));
+  });
+  it("o cupom aparece pelo nome", () => {
+    const resumo = calcularResumoLocacao({ ...base, itens: [], reservationFeeStatus: "nao_aplica" });
+    const a = montarAjustes({ itens: [{ id: "desconto", desc: "Cupom BLACK FRIDAY (15%)", valor: 100, tipo: "menos" }], descontoPercentual: 15, kmIda: 0, resumo });
+    expect(a[0].rotulo).toBe("Cupom BLACK FRIDAY");
+    expect(a[0].valor).toBe(`-15% = ${reais(100)}`);
+  });
+});
+
 describe("imagem da mentoria", () => {
   it("mostra pacientes x valor por paciente e o total a pagar do resumo", () => {
     const mentoria = calculateMentoriaValue(3, "pix");

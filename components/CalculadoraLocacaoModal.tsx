@@ -70,6 +70,8 @@ import { somarContagens, creditoUsavel, disparosCobrados, type Contagem } from "
 import { codigoPadrao, contasParaEscolha } from "@/lib/contas-pix";
 import { useContasPix } from "@/lib/usar-contas-pix";
 import { descontoParaUsar, rotuloTipo, type DescontoIndicacao } from "@/lib/indicacao";
+import { CUPOM_INDICACAO, normalizarCupom, rotuloDesconto } from "@/lib/cupons";
+import { distribuirNasPendencias, ordenarPendencias, separarPagamentos, totalPendencias, type PendenciaAnterior } from "@/lib/pendencias-anteriores";
 
 let idSeq = 0;
 function newId(prefix: string): string {
@@ -665,6 +667,9 @@ export default function CalculadoraLocacaoModal({
   // campo de desconto (com opção de tirar). Só locação de HIPRO, não mentoria.
   const [descontoIndicacao, setDescontoIndicacao] = useState<DescontoIndicacao | null>(null);
   const [indicacaoTirada, setIndicacaoTirada] = useState(false);
+  // Cupom com nome (Configurações > Cupons ou digitado): aparece no resumo e na imagem.
+  const [cupomNome, setCupomNome] = useState("");
+  const cuponsSalvos = usePreferencias().cupons.lista;
   useEffect(() => {
     let vivo = true;
     setDescontoIndicacao(null);
@@ -710,8 +715,9 @@ export default function CalculadoraLocacaoModal({
   // O desconto de indicação só conta como usado se o campo ficou nos 10% dela.
   const indicacaoAplicada =
     !!descontoIndicacao && !indicacaoTirada && descontoTipo === "percentual" && descontoRawNumero === Number(descontoIndicacao.percentual);
-  const descontoDescricaoEfetiva =
-    descontoTipo === "percentual" ? (indicacaoAplicada ? `${descontoRawNumero}% de desconto (indicação)` : `${descontoRawNumero}% de desconto`) : "Desconto";
+  // Nome do cupom: o digitado/escolhido; sem ele, o de indicação quando aplicado.
+  const cupomEfetivo = normalizarCupom(cupomNome) || (indicacaoAplicada ? CUPOM_INDICACAO : "");
+  const descontoDescricaoEfetiva = rotuloDesconto(descontoTipo, descontoRawNumero, cupomEfetivo);
 
   const itens: ItemAjuste[] = useMemo(() => {
     const lista: ItemAjuste[] = [];
@@ -854,11 +860,50 @@ export default function CalculadoraLocacaoModal({
   const deslocReservaAParte = kmIdaNumber > 0 ? 0 : deslocReserva;
   const totalCobrar = resumo ? Math.round((resumo.totalAPagarAgora + deslocReservaAParte) * 100) / 100 : 0;
 
+  // Locações anteriores da cliente em aberto: o dono pode cobrar junto ("Adicionar pendente").
+  const [pendencias, setPendencias] = useState<PendenciaAnterior[]>([]);
+  const [incluirPendentes, setIncluirPendentes] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setPendencias([]);
+    setIncluirPendentes(false);
+    if (!activeClientId) return;
+    (async () => {
+      const { data: locs, error: e1 } = await supabase
+        .from("rentals")
+        .select("id, event_date")
+        .eq("client_id", activeClientId)
+        .eq("is_test", false)
+        .neq("status", "cancelada")
+        .eq("pago", false)
+        .limit(50);
+      if (!vivo || e1 || !locs?.length) return;
+      const { data: sit, error: e2 } = await supabase
+        .from("rentals_situacao_pagamento")
+        .select("rental_id, saldo")
+        .in("rental_id", locs.map((l) => l.id));
+      if (!vivo || e2) return;
+      const saldo = new Map((sit ?? []).map((x) => [x.rental_id as string, Number(x.saldo)]));
+      setPendencias(
+        ordenarPendencias(locs.map((l) => ({ rentalId: l.id as string, data: l.event_date as string, saldo: saldo.get(l.id as string) ?? 0 })))
+      );
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId]);
+  const totalPendente = totalPendencias(pendencias);
+  const totalAnteriores = incluirPendentes ? totalPendente : 0;
+  const pendentesParaResumo = incluirPendentes ? pendencias.map((p) => ({ data: p.data, valor: p.saldo })) : undefined;
+  // O que a cliente paga agora: esta locação mais o pendente que o dono escolheu cobrar junto.
+  const totalGeral = Math.round((totalCobrar + totalAnteriores) * 100) / 100;
+
   function preencherValorTotal(id: string) {
     if (!resumo) return;
     updatePagamento(id, {
-      valor: totalCobrar,
-      valorTexto: totalCobrar > 0 ? String(totalCobrar).replace(".", ",") : "",
+      valor: totalGeral,
+      valorTexto: totalGeral > 0 ? String(totalGeral).replace(".", ",") : "",
     });
   }
 
@@ -867,10 +912,10 @@ export default function CalculadoraLocacaoModal({
     () => Math.round(pagamentos.reduce((acc, p) => acc + (p.forma === "permuta" ? 0 : p.valor || 0), 0) * 100) / 100,
     [pagamentos]
   );
-  const saldoAposPagamentos = resumo ? Math.round((totalCobrar - somaPagamentos) * 100) / 100 : 0;
+  const saldoAposPagamentos = resumo ? Math.round((totalGeral - somaPagamentos) * 100) / 100 : 0;
   // Dinheiro (pix, cartão, espécie) acima do total: o banco recusaria as últimas linhas depois de
   // criar a locação (meio registrada). Permuta acima do total vira crédito e pode.
-  const dinheiroExcedeTotal = !!resumo && somaDinheiro - totalCobrar > 0.009;
+  const dinheiroExcedeTotal = !!resumo && somaDinheiro - totalGeral > 0.009;
   // Permuta abate o que sobra depois do dinheiro; o que passar vira crédito em R$.
   const divisaoPermuta = useMemo(() => {
     const mapa: Record<string, { abate: number; credito: number }> = {};
@@ -941,6 +986,7 @@ export default function CalculadoraLocacaoModal({
         creditoUsado,
         viraCredito: disparosViraCredito,
         contasPix,
+        pendentesAnteriores: pendentesParaResumo,
       },
       resumo
     );
@@ -965,6 +1011,7 @@ export default function CalculadoraLocacaoModal({
     activeClientName,
     eventDate,
     pagamentos,
+    pendentesParaResumo,
   ]);
   const previewWhatsappLink = previewWhatsappText ? buildWhatsAppLink(activeClientWhatsapp, previewWhatsappText) : null;
 
@@ -972,7 +1019,7 @@ export default function CalculadoraLocacaoModal({
   const dadosImagem = useMemo(() => {
     if (isMentoria) {
       if (!mentoriaCalc || !resumo) return null;
-      return montarDadosMentoria({
+      const dm = montarDadosMentoria({
         cliente: activeClientName || null,
         dataEvento: eventDate || null,
         mentoria: mentoriaCalc,
@@ -981,11 +1028,12 @@ export default function CalculadoraLocacaoModal({
         kmIda: kmIdaNumber,
         resumo,
       });
+      return { ...dm, pendentesAnteriores: pendentesParaResumo };
     }
     // Tudo no crédito: sai a imagem com o valor dos disparos zerado.
     if (!resumo) return null;
     if (!tudoNoCredito && (!pricing || shots <= 0)) return null;
-    return montarDadosCalculo({
+    const dc = montarDadosCalculo({
       cliente: activeClientName || null,
       dataEvento: eventDate || null,
       contagemInicial: initialNumber,
@@ -1003,7 +1051,9 @@ export default function CalculadoraLocacaoModal({
       disparosRealizados: totalDisparos,
       creditoUsado,
     });
+    return { ...dc, pendentesAnteriores: pendentesParaResumo };
   }, [
+    pendentesParaResumo,
     isMentoria,
     mentoriaCalc,
     pricing,
@@ -1300,6 +1350,16 @@ export default function CalculadoraLocacaoModal({
       }
     }
 
+    // Com o pendente anterior cobrado junto: o dinheiro cobre primeiro esta
+    // locação; o que passar quita as anteriores, da mais antiga para a mais nova.
+    let sobraParaAnteriores: PagamentoTela[] = [];
+    if (incluirPendentes && totalAnteriores > 0) {
+      const limiteAtual = taxaRegistrada ? Math.max(0, totalCobrar - fee) : totalCobrar;
+      const partes = separarPagamentos(pagamentosDaLocacao, limiteAtual);
+      pagamentosDaLocacao = partes.atual;
+      sobraParaAnteriores = partes.sobra;
+    }
+
     for (const p of pagamentosDaLocacao) {
       if (p.valor <= 0) continue;
       const { error: ePag } = await supabase.rpc("registrar_pagamento_locacao", {
@@ -1314,6 +1374,21 @@ export default function CalculadoraLocacaoModal({
         p_notes: null,
       });
       if (ePag) avisos.push(`um pagamento (${PAYMENT_LABELS[p.forma] ?? p.forma} · ${formatCurrency(p.valor)}) não foi registrado`);
+    }
+
+    if (sobraParaAnteriores.length) {
+      const { pagamentos: dasAnteriores } = distribuirNasPendencias(sobraParaAnteriores, pendencias);
+      for (const { rentalId: anteriorId, linha } of dasAnteriores) {
+        const { error: eAnt } = await supabase.rpc("registrar_pagamento_locacao", {
+          p_rental_id: anteriorId,
+          p_forma: linha.forma,
+          p_valor: linha.valor,
+          p_data: linha.data || eventDate,
+          p_pix_conta: linha.forma === "pix" ? linha.pixConta || null : null,
+          p_notes: "Acertado junto com a locação seguinte",
+        });
+        if (eAnt) avisos.push(`o pagamento de ${formatCurrency(linha.valor)} da locação anterior não foi registrado (${eAnt.message || "erro no banco"})`);
+      }
     }
 
     // Permuta: sai do caixa como Outros (empresa) ou Retirada (pessoal), abate a
@@ -1360,6 +1435,7 @@ export default function CalculadoraLocacaoModal({
           creditoUsado,
           viraCredito: disparosViraCredito,
           contasPix,
+          pendentesAnteriores: pendentesParaResumo,
         },
         resumo
       )
@@ -2138,6 +2214,49 @@ export default function CalculadoraLocacaoModal({
                   />
                 </div>
               </div>
+              {/* Cupom: escolhido da lista de Configurações ou digitado. Indicação entra sozinho. */}
+              <div className="mt-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-medium text-neutral-600">Cupom:</span>
+                  {cuponsSalvos.map((c) => {
+                    const ativo = normalizarCupom(cupomNome) === c.nome;
+                    return (
+                      <button
+                        key={c.nome}
+                        type="button"
+                        onClick={() => {
+                          if (ativo) {
+                            setCupomNome("");
+                            setDescontoValor("");
+                            return;
+                          }
+                          if (descontoIndicacao) setIndicacaoTirada(true);
+                          setCupomNome(c.nome);
+                          setDescontoTipo("percentual");
+                          setDescontoValor(String(c.percentual).replace(".", ","));
+                        }}
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${ativo ? "bg-brand-teal text-white ring-brand-teal" : "bg-white text-neutral-700 ring-neutral-300"}`}
+                      >
+                        {c.nome} · {String(c.percentual).replace(".", ",")}%
+                      </button>
+                    );
+                  })}
+                  <input
+                    value={cupomNome}
+                    onChange={(e) => setCupomNome(e.target.value)}
+                    placeholder={indicacaoAplicada ? CUPOM_INDICACAO : "Nome do cupom (opcional)"}
+                    className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-2.5 py-1 text-xs uppercase"
+                    maxLength={30}
+                    aria-label="Nome do cupom"
+                  />
+                </div>
+                {descontoNumero > 0 && (
+                  <p className="mt-1 text-xs text-neutral-500">
+                    No resumo sai: <b className="text-neutral-700">{descontoDescricaoEfetiva}</b>
+                  </p>
+                )}
+              </div>
+
               {descontoIndicacao && (
                 <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs ${indicacaoAplicada ? "bg-emerald-50 text-emerald-800" : "bg-neutral-50 text-neutral-600"}`}>
                   <span>
@@ -2159,6 +2278,7 @@ export default function CalculadoraLocacaoModal({
                       type="button"
                       onClick={() => {
                         setIndicacaoTirada(false);
+                        setCupomNome("");
                         setDescontoTipo("percentual");
                         setDescontoValor(String(Number(descontoIndicacao.percentual)));
                       }}
@@ -2235,10 +2355,54 @@ export default function CalculadoraLocacaoModal({
                 </div>
               )}
 
+              {totalPendente > 0 && (
+                <div className={`mt-4 rounded-xl p-3 text-sm ring-1 ${incluirPendentes ? "bg-amber-50 ring-amber-300" : "bg-amber-50/60 ring-amber-200"}`}>
+                  <p className="font-semibold text-amber-900">
+                    {activeClientName ? `${activeClientName.split(" ")[0]} tem` : "Tem"} {formatCurrency(totalPendente)} em aberto de antes
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
+                    {pendencias.map((p) => (
+                      <li key={p.rentalId} className="flex justify-between gap-2">
+                        <span>Locação de {formatDate(p.data)}</span>
+                        <span className="font-semibold tabular-nums">{formatCurrency(p.saldo)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {incluirPendentes ? (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-amber-800">Somado no total, no resumo e na imagem. O pagamento quita primeiro esta locação e depois as anteriores.</span>
+                      <button type="button" onClick={() => setIncluirPendentes(false)} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-300">
+                        Tirar o pendente
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIncluirPendentes(true)}
+                      className="mt-2 w-full rounded-lg bg-amber-500 py-2 text-sm font-bold text-white"
+                    >
+                      Adicionar pendente ({formatCurrency(totalPendente)})
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="mt-4 rounded-xl bg-neutral-900 p-3 text-sm text-white">
+                {totalAnteriores > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-white/80">
+                      <span>Esta locação</span>
+                      <span className="tabular-nums">{formatCurrency(totalCobrar)}</span>
+                    </div>
+                    <div className="mb-1 flex items-center justify-between text-white/80">
+                      <span>Pendente anterior</span>
+                      <span className="tabular-nums">+ {formatCurrency(totalAnteriores)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center justify-between">
                   <span>Total a cobrar do cliente</span>
-                  <span className="text-lg font-semibold">{formatCurrency(totalCobrar)}</span>
+                  <span className="text-lg font-semibold">{formatCurrency(totalGeral)}</span>
                 </div>
                 {deslocReservaAParte > 0 && (
                   <p className="mt-1 text-xs text-white/70">
@@ -2463,7 +2627,7 @@ export default function CalculadoraLocacaoModal({
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         {dinheiroExcedeTotal && !error && resumo && (
           <p className="mt-3 text-sm text-red-600">
-            Os pagamentos passam do total em {formatCurrency(Math.round((somaDinheiro - totalCobrar) * 100) / 100)}. Ajuste os valores para salvar.
+            Os pagamentos passam do total em {formatCurrency(Math.round((somaDinheiro - totalGeral) * 100) / 100)}. Ajuste os valores para salvar.
           </p>
         )}
 

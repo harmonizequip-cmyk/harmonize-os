@@ -349,6 +349,10 @@ Responsabilidade de cada arquivo versionado (git), na ordem da árvore. A descri
 
 - `page.tsx` (rota `/portal/exemplo`): tour guiado (`PortalExemploPage`): `EditorPlanejamento` com `demo` e a paciente de exemplo (`estadoDeExemplo`, `lib/tour-planejador.ts`); nada vai ao banco nem ao rascunho do celular. Balões em `components/planejador/TourGuiado.tsx`, convite da primeira vez em `ConviteTour.tsx`, dicas de uma vez em `DicaUmaVez.tsx`. Só abre para a cliente com o recurso `tour-planejador` liberado.
 
+#### Pendente anterior e cupons (28/11/2026)
+
+- `lib/pendencias-anteriores.ts` (`ordenarPendencias`, `totalPendencias`, `separarPagamentos`, `distribuirNasPendencias`) e `lib/cupons.ts` (`rotuloDesconto`, `rotuloCupomImagem`, `lerCupons`), usados por `components/CalculadoraLocacaoModal.tsx`, `lib/rental-calculator.ts` (`pendentesAnteriores` no resumo) e `lib/calculo-image.ts` (`pendentesAnteriores`, `totalGeralImagem`). Lê `rentals` e `rentals_situacao_pagamento`; grava por `registrar_pagamento_locacao`. Grupo `cupons` em `lib/preferencias.ts`, tela `app/(app)/configuracoes/secoes/PrefsCupons.tsx` (`?secao=cupons`).
+
 #### Trocar o HIPRO (26/11/2026)
 
 - `components/TrocarHiproBotao.tsx` (usado em `app/(app)/agenda/EditarEventoModal.tsx`) chama a RPC `trocar_hipro_agendamento(uuid, uuid default null)` (troca simples ou entre dois atendimentos; internas `conferir_troca_hipro`, `ocupante_hipro`) (migration `2026-11-26-trocar-hipro-agendamento.sql`): troca `calendar_events.event_type`/`equipment_id` e `rentals.equipment_id`, recusa conflito, bloqueio, manutenção, cancelada e contagem iniciada.

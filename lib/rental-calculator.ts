@@ -277,6 +277,8 @@ export interface ResumoWhatsAppInput extends ResumoLocacaoInput {
   viraCredito?: number;
   // Contas PIX da tabela contas_pix (sem elas, as de sempre).
   contasPix?: ContaPix[];
+  // Locações anteriores em aberto que o dono escolheu cobrar junto (data AAAA-MM-DD e saldo).
+  pendentesAnteriores?: { data: string; valor: number }[];
 }
 
 // Conta pela tabela de preços (pacote fixo, excedente, acima do limite), uma
@@ -415,9 +417,23 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
     linhas.push(`  • Paga agora: ${fmtMoney(resumo.taxaACobrarAgora)} (já faz parte do valor da locação, entra como crédito)`);
   }
 
+  // Pendente de locações anteriores cobrado junto (o dono escolhe na calculadora).
+  const anteriores = (input.pendentesAnteriores ?? []).filter((p) => p.valor > 0);
+  const totalAnteriores = round2(anteriores.reduce((s, p) => s + p.valor, 0));
+  const totalGeral = round2(resumo.totalAPagarAgora + totalAnteriores);
+  if (totalAnteriores > 0) {
+    linhas.push("");
+    linhas.push("📌 *PENDENTE DE LOCAÇÕES ANTERIORES*");
+    for (const p of anteriores) linhas.push(`  • Locação de ${fmtDate(p.data)}: + ${fmtMoney(p.valor)}`);
+    linhas.push(`  ▸ *Total pendente: + ${fmtMoney(totalAnteriores)}*`);
+  }
+
   linhas.push("");
   linhas.push("━━━━━━━━━━━━━━━━━━━━━");
-  linhas.push(`💰 *TOTAL A PAGAR: ${fmtMoney(resumo.totalAPagarAgora)}*`);
+  linhas.push(`💰 *TOTAL A PAGAR: ${fmtMoney(totalGeral)}*`);
+  if (totalAnteriores > 0) {
+    linhas.push(`  _Esta locação: ${fmtMoney(resumo.totalAPagarAgora)} + pendente anterior: ${fmtMoney(totalAnteriores)}_`);
+  }
   linhas.push("━━━━━━━━━━━━━━━━━━━━━");
 
   const pagamentosValidos = input.pagamentos.filter((p) => p.valor > 0);
@@ -430,7 +446,7 @@ export function buildResumoWhatsApp(input: ResumoWhatsAppInput, resumo: ResumoLo
       linhas.push(`  • ${PAYMENT_LABELS[p.forma] ?? p.forma}${contaTxt}: ${fmtMoney(p.valor)}`);
     }
     const somaPagamentos = round2(pagamentosValidos.reduce((acc, p) => acc + p.valor, 0));
-    const saldo = round2(resumo.totalAPagarAgora - somaPagamentos);
+    const saldo = round2(totalGeral - somaPagamentos);
     if (saldo > 0.009) {
       linhas.push(`  ▸ *Saldo em aberto: ${fmtMoney(saldo)}*`);
     }

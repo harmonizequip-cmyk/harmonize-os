@@ -1,5 +1,6 @@
 import { roundedRectPath } from "./availability-image";
 import type { ItemAjuste, ResumoLocacao } from "./rental-calculator";
+import { rotuloCupomImagem } from "./cupons";
 import type { MentoriaPricingBreakdown, RentalPricingBreakdown } from "./rental-pricing";
 import { TABELA_ANTIGA } from "./rental-pricing";
 
@@ -51,6 +52,14 @@ export interface DadosImagemCalculo {
   disparosRealizados?: number;
   /** Disparos do crédito da cliente usados nesta locação. */
   creditoUsado?: number;
+  /** Locações anteriores em aberto cobradas junto (somam no total a pagar). */
+  pendentesAnteriores?: { data: string; valor: number }[];
+}
+
+/** Total da imagem: esta locação mais o pendente anterior cobrado junto. */
+export function totalGeralImagem(d: DadosImagemCalculo): number {
+  const ant = (d.pendentesAnteriores ?? []).reduce((s, p) => s + (p.valor > 0 ? p.valor : 0), 0);
+  return Math.round((d.total + ant) * 100) / 100;
 }
 
 export interface ContagemImagem {
@@ -180,7 +189,7 @@ export function montarAjustes(params: {
       linhas.push({ rotulo: "Aluguel do equipamento", valor: reais(it.valor), tom: "mais" });
     } else if (it.id === "desconto") {
       linhas.push({
-        rotulo: "Desconto aplicado",
+        rotulo: rotuloCupomImagem(it.desc) ?? "Desconto aplicado",
         valor: descontoPercentual != null ? `-${descontoPercentual}% = ${reais(it.valor)}` : `-${reais(it.valor)}`,
         tom: "menos",
       });
@@ -388,7 +397,13 @@ export function linhasRecibo(d: DadosImagemCalculo): LinhaRecibo[] {
     out.push({ tipo: "secao", rotulo: "Ajustes" });
     for (const a of d.ajustes) out.push({ tipo: "linha", rotulo: a.rotulo, valor: a.valor, tom: a.tom });
   }
-  out.push({ tipo: "total", rotulo: "Total a pagar", valor: reais(d.total) });
+  const anteriores = (d.pendentesAnteriores ?? []).filter((p) => p.valor > 0);
+  if (anteriores.length) {
+    out.push({ tipo: "subtotal", rotulo: "Esta locação", valor: reais(d.total) });
+    out.push({ tipo: "secao", rotulo: "Pendente de locações anteriores" });
+    for (const p of anteriores) out.push({ tipo: "linha", rotulo: `Locação de ${formatarData(p.data)}`, valor: reais(p.valor), tom: "mais" });
+  }
+  out.push({ tipo: "total", rotulo: "Total a pagar", valor: reais(totalGeralImagem(d)) });
   return out;
 }
 
@@ -501,7 +516,7 @@ async function desenharRecibo(dados: DadosImagemCalculo): Promise<HTMLCanvasElem
   ctx.fillText("T O T A L   A   P A G A R", MARGEM + 22, y + 34);
   ctx.fillStyle = "#FFFFFF";
   ctx.font = `900 44px ${FONTE}`;
-  ctx.fillText(reais(dados.total), MARGEM + 20, y + 84);
+  ctx.fillText(reais(totalGeralImagem(dados)), MARGEM + 20, y + 84);
 
   // pílulas: disparos e faixa
   const pilulas: string[] = [];
